@@ -3,51 +3,43 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Viagens — teste multiusuário</title>
+  <title>Viagens — contas separadas</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <main class="shell">
     <section class="hero">
-      <span class="eyebrow">PROTÓTIPO</span>
+      <span class="eyebrow">VIAGENS</span>
       <h1>Suas viagens,<br>do seu jeito.</h1>
       <p>Um espaço para organizar roteiros, reservas, orçamento e checklist — separados por conta.</p>
     </section>
-
     <section class="card" id="auth-card">
       <div class="tabs">
         <button class="tab active" data-mode="login">Entrar</button>
         <button class="tab" data-mode="signup">Criar conta</button>
       </div>
-
       <form id="auth-form">
         <label for="email">E-mail</label>
         <input id="email" type="email" autocomplete="email" placeholder="voce@exemplo.com" required>
-
         <label for="password">Senha</label>
         <input id="password" type="password" autocomplete="current-password" placeholder="mínimo de 6 caracteres" required>
-
         <button class="primary" type="submit" id="submit-button">Entrar</button>
-        <p class="hint">Este primeiro teste usa dados locais no navegador. Ainda não é uma autenticação real.</p>
+        <p class="hint">A autenticação é feita pelo Supabase. Confirme seu e-mail se o projeto exigir essa etapa.</p>
         <p class="message" id="message" role="status"></p>
       </form>
     </section>
-
     <section class="card dashboard hidden" id="dashboard">
       <div class="dashboard-head">
-        <div>
-          <span class="eyebrow">MINHA ÁREA</span>
-          <h2 id="welcome"></h2>
-        </div>
+        <div><span class="eyebrow">MINHA ÁREA</span><h2 id="welcome"></h2></div>
         <button class="link-button" id="logout">Sair</button>
       </div>
       <div class="trip-grid" id="trip-grid"></div>
       <button class="secondary" id="new-trip">＋ Criar uma nova viagem</button>
-      <p class="hint">No próximo passo, estes dados irão para um banco seguro e poderão ser compartilhados por convite.</p>
+      <p class="hint">Cada conta só consegue acessar as próprias viagens, conforme as regras do banco.</p>
     </section>
-
-    <footer>Viagens · experimento de contas separadas</footer>
+    <footer>Viagens · protótipo conectado ao Supabase</footer>
   </main>
-  <script src="app.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="app-supabase.js"></script>
 </body>
 </html>
