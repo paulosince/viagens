@@ -9,17 +9,19 @@ const themes = [
   { id:'bold', name:'Aventureiro', title:'Fraunces', body:'Work Sans', primary:'#1e5147', secondary:'#d5a84a' },
   { id:'quiet', name:'Minimalista', title:'Libre Baskerville', body:'Manrope', primary:'#304052', secondary:'#9bafc4' }
 ];
-let state = { user:null, trips:[], route:'home', activeTrip:null, days:[], activeDay:null, activities:[], editingDay:false, wizard:{step:1, passengers:1, theme:'classic'} };
+let state = { user:null, trips:[], route:'home', activeTrip:null, days:[], activeDay:null, activities:[], checklist:[], budget:[], editingDay:false, wizard:{step:1, passengers:1, theme:'classic'} };
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
 const formatDate = value => value ? new Intl.DateTimeFormat('pt-BR',{dateStyle:'medium'}).format(new Date(`${value}T12:00:00`)) : '';
 function setTheme(theme){ document.documentElement.style.setProperty('--primary',theme.primary); document.documentElement.style.setProperty('--secondary',theme.secondary); }
-function shell(content){ const back=state.route==='trip'?'<button class="btn ghost top-back" data-action="back-home">← Minhas viagens</button>':state.route==='day'?'<button class="btn ghost top-back" data-action="back-trip">← Book da viagem</button>':'<div class="brand">Viagens</div>'; return `<main class="shell"><header class="topbar">${back}${state.user?'<button class="btn ghost" data-action="logout">Sair</button>':''}</header>${content}</main>`; }
+function shell(content){ const back=['trip','day','checklist','budget'].includes(state.route)?`<button class="btn ghost top-back" data-action="${state.route==='trip'?'back-home':'back-trip'}">← ${state.route==='trip'?'Minhas viagens':'Book da viagem'}</button>`:'<div class="brand">Viagens</div>'; return `<main class="shell"><header class="topbar">${back}${state.user?'<button class="btn ghost" data-action="logout">Sair</button>':''}</header>${content}</main>`; }
 function render(){
   if(!state.user){ app.innerHTML=shell(authView()); return; }
   if(state.route==='wizard'){ app.innerHTML=shell(wizardView()); return; }
   if(state.route==='trip'){ app.innerHTML=shell(bookView()); return; }
   if(state.route==='day'){ app.innerHTML=shell(readableDayView()); return; }
+  if(state.route==='checklist'){ app.innerHTML=shell(checklistView()); return; }
+  if(state.route==='budget'){ app.innerHTML=shell(budgetView()); return; }
   app.innerHTML=shell(homeView());
 }
 function authView(){ return `<section class="hero"><span class="eyebrow">SEUS BOOKS DE VIAGEM</span><h1>Planeje.<br>Viva.<br>Relembre.</h1><p>Crie viagens com roteiro, mapa, fotos, orçamento e checklist em um único lugar.</p></section><section class="card"><div class="section-row"><div><span class="eyebrow">ACESSO</span><h2 class="section-title">Entrar na sua conta</h2></div></div><form data-form="auth" class="grid"><div class="field"><label>E-mail</label><input name="email" type="email" required autocomplete="email"></div><div class="field"><label>Senha</label><input name="password" type="password" required minlength="6" autocomplete="current-password"></div><div><button class="btn primary" type="submit">Entrar</button><button class="btn ghost" type="button" data-action="signup">Criar conta</button></div><p class="message" data-message></p></form></section>`; }
@@ -29,7 +31,7 @@ function homeView(){
 }
 function bookView(){
   const t=state.activeTrip;
-  return `<section class="book-head"><span class="eyebrow">BOOK DA VIAGEM</span><h1 class="section-title">${esc(t.name)}</h1><p class="muted">${esc(t.destination)} · ${esc(formatDate(t.start_date))} — ${esc(formatDate(t.end_date))}</p></section><section class="grid day-grid">${state.days.map(day=>`<article class="card day-card ${day.status==='empty'?'empty-day':''}"><div class="day-card-image" style="background-image:url('${esc(day.photo_url||t.cover_url||'')}')"></div><div class="day-card-body"><span class="eyebrow">DIA ${day.day_number} · ${esc(formatDate(day.date))}</span><h2>${esc(day.title||'Dia sem programação')}</h2><p class="muted">${esc(day.summary||'Este dia ainda não tem programação. Crie manhã, tarde e noite.')}</p><button class="btn ${day.status==='empty'?'primary':''}" data-action="open-day" data-id="${day.id}">${day.status==='empty'?'＋ Preencher dia':'Abrir dia →'}</button></div></article>`).join('')}</section>`;
+  return `<section class="book-head"><span class="eyebrow">BOOK DA VIAGEM</span><h1 class="section-title">${esc(t.name)}</h1><p class="muted">${esc(t.destination)} · ${esc(formatDate(t.start_date))} — ${esc(formatDate(t.end_date))}</p></section><section class="grid day-grid">${state.days.map(day=>`<article class="card day-card ${day.status==='empty'?'empty-day':''}"><div class="day-card-image" style="background-image:url('${esc(day.photo_url||t.cover_url||'')}')"></div><div class="day-card-body"><span class="eyebrow">DIA ${day.day_number} · ${esc(formatDate(day.date))}</span><h2>${esc(day.title||'Dia sem programação')}</h2><p class="muted">${esc(day.summary||'Este dia ainda não tem programação. Crie manhã, tarde e noite.')}</p><button class="btn ${day.status==='empty'?'primary':''}" data-action="open-day" data-id="${day.id}">${day.status==='empty'?'＋ Preencher dia':'Abrir dia →'}</button></div></article>`).join('')}</section><section class="support-grid"><button class="card support-card" data-action="open-checklist"><span class="support-icon">✓</span><div><span class="eyebrow">ORGANIZAÇÃO</span><h2>Checklist</h2><p class="muted">${state.checklist.filter(i=>i.completed).length}/${state.checklist.length||0} tarefas concluídas</p></div><span>→</span></button><button class="card support-card" data-action="open-budget"><span class="support-icon">R$</span><div><span class="eyebrow">PLANEJAMENTO</span><h2>Orçamento</h2><p class="muted">Acompanhe previsto e realizado</p></div><span>→</span></button></section>`;
 }
 function dayView(){
   const d=state.activeDay, t=state.activeTrip;
@@ -41,6 +43,14 @@ function readableDayView(){
   const hero=d.photo_url||t.cover_url||'';
   const edit=state.editingDay?`<section class="card day-editor"><form data-form="day" class="form-grid"><div class="field full"><label>Título do dia</label><input name="title" value="${esc(d.title||'')}" placeholder="Ex.: Torre Eiffel e o Sena"></div><div class="field full"><label>Resumo</label><input name="summary" value="${esc(d.summary||'')}" placeholder="Uma frase para apresentar este dia no Book"></div><div class="field full"><label>Foto do dia (opcional)</label><input name="photo_url" value="${esc(d.photo_url||'')}" placeholder="Cole uma URL de imagem por enquanto"></div><div><button class="btn primary" type="submit">Salvar informações</button><button class="btn ghost" type="button" data-action="cancel-edit-day">Cancelar</button></div></form></section>`:'';
   return `<section class="day-hero" style="background-image:linear-gradient(180deg,rgba(20,33,43,.08),rgba(20,33,43,.84)),url('${esc(hero)}')"><div class="day-hero-top"><span class="eyebrow">DIA ${d.day_number} · ${esc(formatDate(d.date))}</span><button class="edit-pencil" type="button" data-action="edit-day" aria-label="Editar dia">✎</button></div><div class="day-hero-copy"><h1>${esc(d.title||'Dia sem programação')}</h1><p>${esc(t.name)}${d.summary?' · '+esc(d.summary):''}</p></div></section>${edit}<section class="card day-content">${periods.map(([key,label])=>`<section class="period"><div class="section-row"><h2>${label}</h2>${state.editingDay?`<button class="btn" type="button" data-action="new-activity" data-period="${key}">＋ Atividade</button>`:''}</div>${state.activities.filter(a=>a.period===key).map(a=>`<article class="activity"><strong>${esc(a.starts_at?new Date(a.starts_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+' · ':'')}${esc(a.title)}</strong><p class="muted">${esc(a.place_name||'Local a definir')} · ${esc(a.description||'')}</p></article>`).join('')||'<p class="muted">Nenhuma atividade cadastrada.</p>'}</section>`).join('')}<div class="danger-zone">${state.editingDay?'<button class="btn ghost" type="button" data-action="clear-day">Limpar programação deste dia</button>':'<span class="muted">Toque no lápis para editar este dia.</span>'}</div></section>`;
+}
+function checklistView(){
+  const done=state.checklist.filter(i=>i.completed).length;
+  return `<section class="book-head"><span class="eyebrow">ORGANIZAÇÃO</span><h1 class="section-title">Checklist</h1><p class="muted">${esc(state.activeTrip.name)} · ${done} de ${state.checklist.length} concluídas</p></section><section class="card checklist-list">${state.checklist.length?state.checklist.map(item=>`<label class="check-item ${item.completed?'is-done':''}"><input type="checkbox" data-action="toggle-check" data-id="${item.id}" ${item.completed?'checked':''}><span><strong>${esc(item.label)}</strong>${item.due_at?`<small>Prazo: ${esc(formatDate(item.due_at.slice(0,10)))}</small>`:''}</span></label>`).join(''):'<p class="muted">Nenhuma tarefa cadastrada ainda.</p>'}</section>`;
+}
+function budgetView(){
+  const planned=state.budget.reduce((s,i)=>s+Number(i.planned_amount||0),0), actual=state.budget.reduce((s,i)=>s+Number(i.actual_amount||0),0);
+  return `<section class="book-head"><span class="eyebrow">PLANEJAMENTO</span><h1 class="section-title">Orçamento</h1><p class="muted">${esc(state.activeTrip.name)} · valores na moeda registrada</p></section><section class="budget-summary"><div class="card"><span class="eyebrow">PREVISTO</span><strong>R$ ${planned.toLocaleString('pt-BR',{minimumFractionDigits:2})}</strong></div><div class="card"><span class="eyebrow">REALIZADO</span><strong>R$ ${actual.toLocaleString('pt-BR',{minimumFractionDigits:2})}</strong></div><div class="card"><span class="eyebrow">DIFERENÇA</span><strong>R$ ${(planned-actual).toLocaleString('pt-BR',{minimumFractionDigits:2})}</strong></div></section><section class="card budget-list">${state.budget.length?state.budget.map(item=>`<article class="budget-item"><div><strong>${esc(item.label)}</strong><small>${esc(item.category||'Sem categoria')} · ${esc(item.purchase_status)}</small></div><div class="budget-values"><span>R$ ${Number(item.planned_amount||0).toLocaleString('pt-BR',{minimumFractionDigits:2})}</span><small>realizado: R$ ${Number(item.actual_amount||0).toLocaleString('pt-BR',{minimumFractionDigits:2})}</small></div></article>`).join(''):'<p class="muted">Nenhum item de orçamento cadastrado ainda.</p>'}</section>`;
 }
 function wizardView(){
   const w=state.wizard; const steps=['Viagem','Passageiros','Personalidade'];
@@ -55,13 +65,18 @@ async function openTrip(id){
   state.activeTrip=state.trips.find(t=>t.id===id); if(!state.activeTrip)return;
   setTheme({primary:state.activeTrip.primary_color||'#14212b',secondary:state.activeTrip.secondary_color||'#b89d63'});
   const r=await supabase.from('trip_days').select('*').eq('trip_id',id).order('day_number'); if(r.error)return message(r.error.message);
-  state.days=r.data||[]; state.route='trip'; render();
+  state.days=r.data||[];
+  const c=await supabase.from('checklist_items').select('id,completed').eq('trip_id',id); state.checklist=c.data||[];
+  state.route='trip'; render();
 }
 async function openDay(id){
   state.activeDay=state.days.find(d=>d.id===id); if(!state.activeDay)return;
   const r=await supabase.from('activities').select('*').eq('day_id',id).order('position'); if(r.error)return message(r.error.message);
   state.activities=r.data||[]; state.editingDay=false; state.route='day'; render();
 }
+async function openChecklist(){ const r=await supabase.from('checklist_items').select('*').eq('trip_id',state.activeTrip.id).order('completed').order('label'); if(r.error)return message(r.error.message);state.checklist=r.data||[];state.route='checklist';render(); }
+async function openBudget(){ const r=await supabase.from('budget_items').select('*').eq('trip_id',state.activeTrip.id).order('category').order('label'); if(r.error)return message(r.error.message);state.budget=r.data||[];state.route='budget';render(); }
+async function toggleChecklist(id,checked){ const r=await supabase.from('checklist_items').update({completed:checked}).eq('id',id); if(r.error)return message(r.error.message);const item=state.checklist.find(i=>i.id===id);if(item)item.completed=checked;render(); }
 async function saveDay(form){
   const data=Object.fromEntries(new FormData(form)); const r=await supabase.from('trip_days').update({title:data.title||null,summary:data.summary||null,photo_url:data.photo_url||null,status:data.title||data.summary?'planned':'empty'}).eq('id',state.activeDay.id); if(r.error)return message(r.error.message);
   Object.assign(state.activeDay,{title:data.title,summary:data.summary,photo_url:data.photo_url,status:data.title||data.summary?'planned':'empty'}); state.editingDay=false; render();
@@ -88,6 +103,9 @@ document.addEventListener('click',async e=>{const a=e.target.closest('[data-acti
   if(action==='logout'){await supabase.auth.signOut();state.user=null;state.trips=[];render();}
   if(action==='open-trip'){await openTrip(a.dataset.id);}
   if(action==='open-day'){await openDay(a.dataset.id);}
+  if(action==='open-checklist'){await openChecklist();}
+  if(action==='open-budget'){await openBudget();}
+  if(action==='toggle-check'){await toggleChecklist(a.dataset.id,a.checked);}
   if(action==='edit-day'){state.editingDay=true;render();}
   if(action==='cancel-edit-day'){state.editingDay=false;render();}
   if(action==='back-home'){state.route='home';render();}
