@@ -9,7 +9,7 @@ const themes = [
   { id:'bold', name:'Aventureiro', title:'Fraunces', body:'Work Sans', primary:'#1e5147', secondary:'#d5a84a' },
   { id:'quiet', name:'Minimalista', title:'Libre Baskerville', body:'Manrope', primary:'#304052', secondary:'#9bafc4' }
 ];
-let state = { user:null, trips:[], route:'home', activeTrip:null, days:[], activeDay:null, activities:[], wizard:{step:1, passengers:1, theme:'classic'} };
+let state = { user:null, trips:[], route:'home', activeTrip:null, days:[], activeDay:null, activities:[], editingDay:false, wizard:{step:1, passengers:1, theme:'classic'} };
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
 const formatDate = value => value ? new Intl.DateTimeFormat('pt-BR',{dateStyle:'medium'}).format(new Date(`${value}T12:00:00`)) : '';
@@ -19,7 +19,7 @@ function render(){
   if(!state.user){ app.innerHTML=shell(authView()); return; }
   if(state.route==='wizard'){ app.innerHTML=shell(wizardView()); return; }
   if(state.route==='trip'){ app.innerHTML=shell(bookView()); return; }
-  if(state.route==='day'){ app.innerHTML=shell(dayView()); return; }
+  if(state.route==='day'){ app.innerHTML=shell(readableDayView()); return; }
   app.innerHTML=shell(homeView());
 }
 function authView(){ return `<section class="hero"><span class="eyebrow">SEUS BOOKS DE VIAGEM</span><h1>Planeje.<br>Viva.<br>Relembre.</h1><p>Crie viagens com roteiro, mapa, fotos, orçamento e checklist em um único lugar.</p></section><section class="card"><div class="section-row"><div><span class="eyebrow">ACESSO</span><h2 class="section-title">Entrar na sua conta</h2></div></div><form data-form="auth" class="grid"><div class="field"><label>E-mail</label><input name="email" type="email" required autocomplete="email"></div><div class="field"><label>Senha</label><input name="password" type="password" required minlength="6" autocomplete="current-password"></div><div><button class="btn primary" type="submit">Entrar</button><button class="btn ghost" type="button" data-action="signup">Criar conta</button></div><p class="message" data-message></p></form></section>`; }
@@ -35,6 +35,12 @@ function dayView(){
   const d=state.activeDay, t=state.activeTrip;
   const periods=[['morning','MANHÃ'],['afternoon','TARDE'],['night','NOITE']];
   return `<section class="book-head"><span class="eyebrow">DIA ${d.day_number} · ${esc(formatDate(d.date))}</span><h1 class="section-title">${esc(d.title||'Dia sem programação')}</h1><p class="muted">${esc(t.name)}</p></section><section class="card day-editor"><form data-form="day" class="form-grid"><div class="field full"><label>Título do dia</label><input name="title" value="${esc(d.title||'')}" placeholder="Ex.: Torre Eiffel e o Sena"></div><div class="field full"><label>Resumo</label><input name="summary" value="${esc(d.summary||'')}" placeholder="Uma frase para apresentar este dia no Book"></div><div class="field full"><label>Foto do dia (opcional)</label><input name="photo_url" value="${esc(d.photo_url||'')}" placeholder="Cole uma URL de imagem por enquanto"></div><div><button class="btn primary" type="submit">Salvar informações</button></div></form><div class="divider"></div>${periods.map(([key,label])=>`<section class="period"><div class="section-row"><h2>${label}</h2><button class="btn" type="button" data-action="new-activity" data-period="${key}">＋ Atividade</button></div>${state.activities.filter(a=>a.period===key).map(a=>`<article class="activity"><strong>${esc(a.starts_at?new Date(a.starts_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+' · ':'')}${esc(a.title)}</strong><p class="muted">${esc(a.place_name||'Local a definir')} · ${esc(a.description||'')}</p></article>`).join('')||'<p class="muted">Nenhuma atividade cadastrada.</p>'}</section>`).join('')}<div class="danger-zone"><button class="btn ghost" type="button" data-action="clear-day">Limpar programação deste dia</button></div></section>`;
+}
+function readableDayView(){
+  const d=state.activeDay, t=state.activeTrip, periods=[['morning','MANHÃ'],['afternoon','TARDE'],['night','NOITE']];
+  const hero=d.photo_url||t.cover_url||'';
+  const edit=state.editingDay?`<section class="card day-editor"><form data-form="day" class="form-grid"><div class="field full"><label>Título do dia</label><input name="title" value="${esc(d.title||'')}" placeholder="Ex.: Torre Eiffel e o Sena"></div><div class="field full"><label>Resumo</label><input name="summary" value="${esc(d.summary||'')}" placeholder="Uma frase para apresentar este dia no Book"></div><div class="field full"><label>Foto do dia (opcional)</label><input name="photo_url" value="${esc(d.photo_url||'')}" placeholder="Cole uma URL de imagem por enquanto"></div><div><button class="btn primary" type="submit">Salvar informações</button><button class="btn ghost" type="button" data-action="cancel-edit-day">Cancelar</button></div></form></section>`:'';
+  return `<section class="day-hero" style="background-image:linear-gradient(180deg,rgba(20,33,43,.08),rgba(20,33,43,.84)),url('${esc(hero)}')"><div class="day-hero-top"><span class="eyebrow">DIA ${d.day_number} · ${esc(formatDate(d.date))}</span><button class="edit-pencil" type="button" data-action="edit-day" aria-label="Editar dia">✎</button></div><div class="day-hero-copy"><h1>${esc(d.title||'Dia sem programação')}</h1><p>${esc(t.name)}${d.summary?' · '+esc(d.summary):''}</p></div></section>${edit}<section class="card day-content">${periods.map(([key,label])=>`<section class="period"><div class="section-row"><h2>${label}</h2>${state.editingDay?`<button class="btn" type="button" data-action="new-activity" data-period="${key}">＋ Atividade</button>`:''}</div>${state.activities.filter(a=>a.period===key).map(a=>`<article class="activity"><strong>${esc(a.starts_at?new Date(a.starts_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+' · ':'')}${esc(a.title)}</strong><p class="muted">${esc(a.place_name||'Local a definir')} · ${esc(a.description||'')}</p></article>`).join('')||'<p class="muted">Nenhuma atividade cadastrada.</p>'}</section>`).join('')}<div class="danger-zone">${state.editingDay?'<button class="btn ghost" type="button" data-action="clear-day">Limpar programação deste dia</button>':'<span class="muted">Toque no lápis para editar este dia.</span>'}</div></section>`;
 }
 function wizardView(){
   const w=state.wizard; const steps=['Viagem','Passageiros','Personalidade'];
@@ -54,11 +60,11 @@ async function openTrip(id){
 async function openDay(id){
   state.activeDay=state.days.find(d=>d.id===id); if(!state.activeDay)return;
   const r=await supabase.from('activities').select('*').eq('day_id',id).order('position'); if(r.error)return message(r.error.message);
-  state.activities=r.data||[]; state.route='day'; render();
+  state.activities=r.data||[]; state.editingDay=false; state.route='day'; render();
 }
 async function saveDay(form){
   const data=Object.fromEntries(new FormData(form)); const r=await supabase.from('trip_days').update({title:data.title||null,summary:data.summary||null,photo_url:data.photo_url||null,status:data.title||data.summary?'planned':'empty'}).eq('id',state.activeDay.id); if(r.error)return message(r.error.message);
-  Object.assign(state.activeDay,{title:data.title,summary:data.summary,photo_url:data.photo_url,status:data.title||data.summary?'planned':'empty'}); state.route='trip'; render();
+  Object.assign(state.activeDay,{title:data.title,summary:data.summary,photo_url:data.photo_url,status:data.title||data.summary?'planned':'empty'}); state.editingDay=false; render();
 }
 async function clearDay(){
   if(!confirm('Limpar toda a programação deste dia? A data continuará na viagem.'))return;
@@ -82,6 +88,8 @@ document.addEventListener('click',async e=>{const a=e.target.closest('[data-acti
   if(action==='logout'){await supabase.auth.signOut();state.user=null;state.trips=[];render();}
   if(action==='open-trip'){await openTrip(a.dataset.id);}
   if(action==='open-day'){await openDay(a.dataset.id);}
+  if(action==='edit-day'){state.editingDay=true;render();}
+  if(action==='cancel-edit-day'){state.editingDay=false;render();}
   if(action==='back-home'){state.route='home';render();}
   if(action==='back-trip'){state.route='trip';render();}
   if(action==='clear-day'){await clearDay();}
