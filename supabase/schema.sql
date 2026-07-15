@@ -20,6 +20,11 @@ create table if not exists public.trips (
 );
 
 alter table public.trips add column if not exists destination text not null default '';
+alter table public.trip_days add column if not exists main_place_name text;
+alter table public.activities add column if not exists shopping_items text;
+alter table public.activities add column if not exists meal text;
+alter table public.activities add column if not exists transport text;
+alter table public.activities add column if not exists notes text;
 alter table public.trips add column if not exists start_date date;
 alter table public.trips add column if not exists end_date date;
 alter table public.trips add column if not exists arrival_method text;
@@ -49,6 +54,7 @@ create table if not exists public.trip_days (
   title text,
   summary text,
   photo_url text,
+  main_place_name text,
   status text not null default 'empty',
   unique(trip_id, day_number),
   unique(trip_id, date)
@@ -68,6 +74,10 @@ create table if not exists public.activities (
   longitude numeric,
   place_id text,
   photo_url text,
+  shopping_items text,
+  meal text,
+  transport text,
+  notes text,
   ticket_required boolean not null default false,
   purchase_status text not null default 'not_needed',
   currency text not null default 'BRL',
