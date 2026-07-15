@@ -1,0 +1,12 @@
+{
+  "name":"Viagens — seus Books",
+  "short_name":"Viagens",
+  "description":"Crie e viva seus Books de viagem.",
+  "start_url":"/viagens/",
+  "scope":"/viagens/",
+  "display":"standalone",
+  "orientation":"portrait",
+  "background_color":"#f4f0e8",
+  "theme_color":"#14212b",
+  "icons":[{"src":"assets/app-icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}
