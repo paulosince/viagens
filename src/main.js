@@ -14,7 +14,8 @@ let state = { user:null, trips:[], route:'home', activeTrip:null, days:[], activ
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
 const formatDate = value => value ? new Intl.DateTimeFormat('pt-BR',{dateStyle:'medium'}).format(new Date(`${value}T12:00:00`)) : '';
 function setTheme(theme){ document.documentElement.style.setProperty('--primary',theme.primary); document.documentElement.style.setProperty('--secondary',theme.secondary); }
-function shell(content){ const back=['trip','day','checklist','budget'].includes(state.route)?`<button class="btn ghost top-back" data-action="${state.route==='trip'?'back-home':'back-trip'}">← ${state.route==='trip'?'Minhas viagens':'Book da viagem'}</button>`:'<div class="brand">Viagens</div>'; return `<main class="shell"><header class="topbar">${back}${state.user?'<button class="btn ghost" data-action="logout">Sair</button>':''}</header>${content}</main>`; }
+function shell(content){ const back=['trip','day','checklist','budget'].includes(state.route)?`<button class="btn ghost top-back" data-action="${state.route==='trip'?'back-home':'back-trip'}">← ${state.route==='trip'?'Minhas viagens':'Book da viagem'}</button>`:'<div class="brand">Viagens</div>'; const nav=state.user&&['trip','day','checklist','budget'].includes(state.route)?appNav():''; return `<main class="shell"><header class="topbar">${back}${state.user?'<button class="btn ghost" data-action="logout">Sair</button>':''}</header>${content}</main>${nav}`; }
+function appNav(){ const active=state.route==='day'?'trip':state.route; return `<nav class="app-nav" aria-label="Navegação da viagem"><button class="app-nav-item ${active==='trip'?'active':''}" data-action="back-trip"><span>⌂</span><small>Roteiro</small></button><button class="app-nav-item ${active==='checklist'?'active':''}" data-action="open-checklist"><span>✓</span><small>Checklist</small></button><button class="app-nav-item ${active==='budget'?'active':''}" data-action="open-budget"><span>R$</span><small>Orçamento</small></button><button class="app-nav-item" data-action="more"><span>•••</span><small>Mais</small></button></nav>`; }
 function render(){
   if(!state.user){ app.innerHTML=shell(authView()); return; }
   if(state.route==='wizard'){ app.innerHTML=shell(wizardView()); return; }
@@ -106,6 +107,7 @@ document.addEventListener('click',async e=>{const a=e.target.closest('[data-acti
   if(action==='open-checklist'){await openChecklist();}
   if(action==='open-budget'){await openBudget();}
   if(action==='toggle-check'){await toggleChecklist(a.dataset.id,a.checked);}
+  if(action==='more'){alert('Compartilhamento, passageiros e configurações entrarão nesta área.');}
   if(action==='edit-day'){state.editingDay=true;render();}
   if(action==='cancel-edit-day'){state.editingDay=false;render();}
   if(action==='back-home'){state.route='home';render();}
