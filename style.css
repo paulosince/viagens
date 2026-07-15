@@ -1,0 +1,36 @@
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+  color: #17212b;
+  background: #f4f0e8;
+  line-height: 1.5;
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; }
+.shell { width: min(100% - 32px, 760px); margin: 0 auto; padding: 56px 0 32px; }
+.hero { background: #132534; color: #fffaf0; border-radius: 24px; padding: 42px 36px; margin-bottom: 18px; }
+.eyebrow { color: #b89d63; font-size: .72rem; letter-spacing: .18em; font-weight: 700; }
+h1, h2, p { margin-top: 0; }
+h1 { font-family: Georgia, serif; font-size: clamp(2.4rem, 7vw, 4.5rem); line-height: .98; font-weight: 400; margin: 14px 0 20px; }
+.hero p { max-width: 520px; color: #d9e0e2; font-size: 1.05rem; }
+.card { background: #fffdf8; border: 1px solid #e5ddcf; border-radius: 20px; padding: 28px; box-shadow: 0 12px 34px #24313b10; }
+.tabs { display: flex; gap: 6px; border-bottom: 1px solid #e5ddcf; margin-bottom: 24px; }
+.tab { border: 0; background: none; color: #6c7379; padding: 0 12px 12px; font: inherit; cursor: pointer; }
+.tab.active { color: #17212b; border-bottom: 2px solid #b89d63; font-weight: 700; }
+label { display: block; font-size: .82rem; font-weight: 700; margin: 14px 0 6px; }
+input { width: 100%; border: 1px solid #d7cdbc; border-radius: 10px; padding: 13px 14px; font: inherit; background: #fff; }
+button { font: inherit; cursor: pointer; }
+.primary, .secondary { width: 100%; border-radius: 10px; padding: 13px 16px; margin-top: 22px; font-weight: 700; }
+.primary { border: 1px solid #132534; background: #132534; color: #fff; }
+.secondary { border: 1px solid #b89d63; background: transparent; color: #132534; }
+.hint { color: #747b80; font-size: .82rem; margin: 14px 0 0; }
+.message { min-height: 1.3em; color: #9a4d3f; font-size: .88rem; }
+.hidden { display: none; }
+.dashboard-head { display: flex; align-items: start; justify-content: space-between; gap: 20px; }
+h2 { font-size: 1.7rem; margin: 8px 0 0; }
+.link-button { border: 0; background: none; color: #886d35; padding: 4px; }
+.trip-grid { display: grid; gap: 12px; margin-top: 24px; }
+.trip { border: 1px solid #e5ddcf; border-radius: 14px; padding: 18px; background: #fff; }
+.trip h3 { margin: 0 0 4px; }
+.trip p { margin: 0; color: #6c7379; font-size: .9rem; }
+footer { text-align: center; color: #84898c; font-size: .78rem; padding: 24px 0 0; }
+@media (max-width: 520px) { .shell { width: min(100% - 20px, 760px); padding-top: 20px; } .hero, .card { padding: 24px 20px; } }
