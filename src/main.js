@@ -175,7 +175,7 @@ document.addEventListener('click',async e=>{const a=e.target.closest('button[dat
   if(action==='edit-budget'){state.editingBudgetId=a.dataset.id;render();}
   if(action==='cancel-budget'){state.editingBudgetId=null;render();}
   if(action==='more'){alert('Compartilhamento, passageiros e configurações entrarão nesta área.');}
-  if(action==='edit-day'){state.editingDay=true;state.dayEditDraft={...state.activeDay};render();}
+  if(action==='edit-day'){state.editingDay=true;state.dayEditDraft={...state.activeDay};render();if(state.dayEditDraft.main_place_name)await searchDayPhotos(true);}
   if(action==='cancel-edit-day'){state.editingDay=false;state.activityForm=null;state.photoSuggestions=[];render();}
   if(action==='back-home'){transitionDirection='back';state.route='home';render();}
   if(action==='back-trip'){transitionDirection='back';state.route='trip';render();}
