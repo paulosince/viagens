@@ -9,7 +9,7 @@ const themes = [
   { id:'bold', name:'Aventureiro', title:'Fraunces', body:'Work Sans', primary:'#1e5147', secondary:'#d5a84a' },
   { id:'quiet', name:'Minimalista', title:'Libre Baskerville', body:'Manrope', primary:'#304052', secondary:'#9bafc4' }
 ];
-let state = { user:null, trips:[], route:'home', activeTrip:null, days:[], activeDay:null, activities:[], checklist:[], budget:[], editingDay:false, wizard:{step:1, passengers:1, theme:'classic'} };
+let state = { user:null, trips:[], route:'home', activeTrip:null, days:[], activeDay:null, activities:[], checklist:[], budget:[], editingBudgetId:null, editingDay:false, wizard:{step:1, passengers:1, theme:'classic'} };
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
 const formatDate = value => value ? new Intl.DateTimeFormat('pt-BR',{dateStyle:'medium'}).format(new Date(`${value}T12:00:00`)) : '';
@@ -57,7 +57,8 @@ function invoiceBudgetView(){
   const planned=state.budget.reduce((s,i)=>s+Number(i.planned_amount||0),0), actual=state.budget.reduce((s,i)=>s+Number(i.actual_amount||0),0), diff=planned-actual;
   const groups=[...new Set(state.budget.map(i=>i.category||'Outros'))];
   const brl=value=>`R$ ${Number(value||0).toLocaleString('pt-BR',{minimumFractionDigits:2})}`;
-  return `<section class="book-head"><span class="eyebrow">PLANEJAMENTO</span><h1 class="section-title">Orçamento</h1><p class="muted">${esc(state.activeTrip.name)}</p></section><section class="budget-sticky card"><div><span class="eyebrow">TOTAL PREVISTO</span><strong>${brl(planned)}</strong></div><div><span class="eyebrow">REALIZADO</span><strong>${brl(actual)}</strong></div><div><span class="eyebrow">SALDO</span><strong>${brl(diff)}</strong></div></section><section class="invoice card">${groups.map(group=>`<section class="invoice-section"><div class="invoice-section-head"><span>${esc(group)}</span><span>Previsto · Realizado</span></div>${state.budget.filter(i=>(i.category||'Outros')===group).map(item=>`<article class="invoice-row"><div><strong>${esc(item.label)}</strong><small>${esc(item.purchase_status||'pendente')}</small></div><div class="invoice-values"><span>${brl(item.planned_amount)}</span><span>${item.actual_amount===null?'—':brl(item.actual_amount)}</span></div></article>`).join('')}</section>`).join('')||'<p class="muted">Nenhum item de orçamento cadastrado ainda.</p>'}</section>`;
+  const diffClass=diff>=0?'positive':'negative', diffText=`${diff>=0?'+':''}${brl(diff)}`;
+  return `<section class="book-head"><span class="eyebrow">PLANEJAMENTO</span><h1 class="section-title">Orçamento</h1><p class="muted">${esc(state.activeTrip.name)}</p></section><section class="budget-sticky card"><div><span class="eyebrow">TOTAL PREVISTO</span><strong>${brl(planned)}</strong></div><div><span class="eyebrow">REALIZADO</span><strong>${brl(actual)}</strong></div><div class="${diffClass}"><span class="eyebrow">${diff>=0?'ECONOMIA':'ACIMA DO ORÇADO'}</span><strong>${diffText}</strong></div></section><section class="card invoice">${groups.map(group=>`<section class="invoice-section"><div class="invoice-section-head"><span>${esc(group)}</span><span>Previsto · Realizado</span></div>${state.budget.filter(i=>(i.category||'Outros')===group).map(item=>{const over=item.actual_amount!==null&&Number(item.actual_amount)>Number(item.planned_amount||0);return `<article class="invoice-row ${state.editingBudgetId===item.id?'is-editing':''}" data-action="edit-budget" data-id="${item.id}"><div><strong>${esc(item.label)}</strong><small class="purchase-status ${item.actual_amount!==null?'purchased':'not-purchased'}"><span>${item.actual_amount!==null?'✓':'○'}</span>${item.actual_amount!==null?'Comprado':'Não comprado'}</small></div><div class="invoice-values"><span>${brl(item.planned_amount)}</span><span class="${over?'negative':'realized'}">${item.actual_amount===null?'—':brl(item.actual_amount)}</span></div></article>${state.editingBudgetId===item.id?`<form class="budget-edit-form" data-form="budget"><label>Valor pago</label><div class="budget-edit-line"><input name="actual_amount" type="number" min="0" step="0.01" value="${item.actual_amount??''}" placeholder="0,00"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-action="cancel-budget">Cancelar</button></div></form>`:''}`;}).join('')}</section>`).join('')||'<p class="muted">Nenhum item de orçamento cadastrado ainda.</p>'}</section>`;
 }
 function wizardView(){
   const w=state.wizard; const steps=['Viagem','Passageiros','Personalidade'];
@@ -84,6 +85,7 @@ async function openDay(id){
 async function openChecklist(){ const r=await supabase.from('checklist_items').select('*').eq('trip_id',state.activeTrip.id).order('completed').order('label'); if(r.error)return message(r.error.message);state.checklist=r.data||[];state.route='checklist';render(); }
 async function openBudget(){ const r=await supabase.from('budget_items').select('*').eq('trip_id',state.activeTrip.id).order('category').order('label'); if(r.error)return message(r.error.message);state.budget=r.data||[];state.route='budget';render(); }
 async function toggleChecklist(id,checked){ const r=await supabase.from('checklist_items').update({completed:checked}).eq('id',id); if(r.error)return message(r.error.message);const item=state.checklist.find(i=>i.id===id);if(item)item.completed=checked;render(); }
+async function saveBudget(form){ const amount=form.actual_amount.value===''?null:Number(form.actual_amount.value); const r=await supabase.from('budget_items').update({actual_amount:amount,purchase_status:amount===null?'pending':'purchased'}).eq('id',state.editingBudgetId); if(r.error)return message(r.error.message);const item=state.budget.find(i=>i.id===state.editingBudgetId);if(item){item.actual_amount=amount;item.purchase_status=amount===null?'pending':'purchased';}state.editingBudgetId=null;render(); }
 async function saveDay(form){
   const data=Object.fromEntries(new FormData(form)); const r=await supabase.from('trip_days').update({title:data.title||null,summary:data.summary||null,photo_url:data.photo_url||null,status:data.title||data.summary?'planned':'empty'}).eq('id',state.activeDay.id); if(r.error)return message(r.error.message);
   Object.assign(state.activeDay,{title:data.title,summary:data.summary,photo_url:data.photo_url,status:data.title||data.summary?'planned':'empty'}); state.editingDay=false; render();
@@ -113,6 +115,8 @@ document.addEventListener('click',async e=>{const a=e.target.closest('[data-acti
   if(action==='open-checklist'){await openChecklist();}
   if(action==='open-budget'){await openBudget();}
   if(action==='toggle-check'){await toggleChecklist(a.dataset.id,a.checked);}
+  if(action==='edit-budget'){state.editingBudgetId=a.dataset.id;render();}
+  if(action==='cancel-budget'){state.editingBudgetId=null;render();}
   if(action==='more'){alert('Compartilhamento, passageiros e configurações entrarão nesta área.');}
   if(action==='edit-day'){state.editingDay=true;render();}
   if(action==='cancel-edit-day'){state.editingDay=false;render();}
@@ -132,5 +136,6 @@ document.addEventListener('click',async e=>{const a=e.target.closest('[data-acti
 document.addEventListener('input',e=>{if(e.target.dataset.passenger){const i=Number(e.target.dataset.index);state.wizard.passengerData=state.wizard.passengerData||[];state.wizard.passengerData[i]=state.wizard.passengerData[i]||{};state.wizard.passengerData[i][e.target.dataset.passenger]=e.target.value;}});
 document.addEventListener('submit',async e=>{if(e.target.dataset.form!=='auth')return;e.preventDefault();const data=Object.fromEntries(new FormData(e.target));const r=await supabase.auth.signInWithPassword(data);if(r.error)return message(r.error.message);state.user=r.data.user;await loadTrips();render();});
 document.addEventListener('submit',async e=>{if(e.target.dataset.form!=='day')return;e.preventDefault();await saveDay(e.target);});
+document.addEventListener('submit',async e=>{if(e.target.dataset.form!=='budget')return;e.preventDefault();await saveBudget(e.target);});
 async function boot(){const {data}=await supabase.auth.getSession();if(data.session){state.user=data.session.user;try{await loadTrips();}catch(e){message(e.message);}}render();}
 supabase.auth.onAuthStateChange((_event,session)=>{if(session&&!state.user){state.user=session.user;loadTrips().then(render);}});boot();
