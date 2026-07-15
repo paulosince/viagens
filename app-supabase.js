@@ -62,7 +62,7 @@ form.addEventListener("submit", async event => {
   const password = document.querySelector("#password").value;
   const result = mode === "login"
     ? await client.auth.signInWithPassword({ email, password })
-    : await client.auth.signUp({ email, password });
+    : await client.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin + window.location.pathname } });
   submitButton.disabled = false;
   if (result.error) return showMessage(result.error.message);
   if (mode === "signup" && !result.data.session) return showMessage("Conta criada. Confirme seu e-mail para poder entrar.", false);
