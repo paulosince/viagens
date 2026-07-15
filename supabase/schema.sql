@@ -19,6 +19,18 @@ create table if not exists public.trips (
   constraint trips_dates_valid check (end_date >= start_date)
 );
 
+alter table public.trips add column if not exists destination text not null default '';
+alter table public.trips add column if not exists start_date date;
+alter table public.trips add column if not exists end_date date;
+alter table public.trips add column if not exists arrival_method text;
+alter table public.trips add column if not exists location_label text;
+alter table public.trips add column if not exists latitude numeric;
+alter table public.trips add column if not exists longitude numeric;
+alter table public.trips add column if not exists cover_url text;
+alter table public.trips add column if not exists theme_id text not null default 'classic';
+alter table public.trips add column if not exists primary_color text not null default '#14212b';
+alter table public.trips add column if not exists secondary_color text not null default '#b89d63';
+
 create table if not exists public.passengers (
   id uuid primary key default gen_random_uuid(),
   trip_id uuid not null references public.trips(id) on delete cascade,
