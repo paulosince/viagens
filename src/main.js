@@ -9,12 +9,12 @@ const themes = [
   { id:'bold', name:'Aventureiro', title:'Fraunces', body:'Work Sans', primary:'#1e5147', secondary:'#d5a84a' },
   { id:'quiet', name:'Minimalista', title:'Libre Baskerville', body:'Manrope', primary:'#304052', secondary:'#9bafc4' }
 ];
-let state = { user:null, trips:[], route:'home', activeTrip:null, days:[], activeDay:null, activities:[], checklist:[], budget:[], activityForm:null, editingBudgetId:null, editingDay:false, wizard:{step:1, passengers:1, theme:'classic'} };
+let state = { user:null, trips:[], route:'home', activeTrip:null, days:[], activeDay:null, activities:[], checklist:[], budget:[], activityForm:null, editingBudgetId:null, editingDay:false, wizard:{step:1, passengers:1, theme:'classic'} };\nlet transitionDirection='none';
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
 const formatDate = value => value ? new Intl.DateTimeFormat('pt-BR',{dateStyle:'medium'}).format(new Date(`${value}T12:00:00`)) : '';
 function setTheme(theme){ document.documentElement.style.setProperty('--primary',theme.primary); document.documentElement.style.setProperty('--secondary',theme.secondary); }
-function shell(content){ const back=['trip','day','checklist','budget'].includes(state.route)?`<button class="btn ghost top-back" data-action="${state.route==='trip'?'back-home':'back-trip'}">← ${state.route==='trip'?'Minhas viagens':'Book da viagem'}</button>`:'<div class="brand">Viagens</div>'; const nav=state.user&&['trip','day','checklist','budget'].includes(state.route)?appNav():''; return `<main class="shell"><header class="topbar">${back}${state.user?'<button class="btn ghost" data-action="logout">Sair</button>':''}</header>${content}</main>${nav}`; }
+function shell(content){ const direction=transitionDirection; transitionDirection='none'; const back=['trip','day','checklist','budget'].includes(state.route)?`<button class="btn ghost top-back" data-action="${state.route==='trip'?'back-home':'back-trip'}">← ${state.route==='trip'?'Minhas viagens':'Book da viagem'}</button>`:'<div class="brand">Viagens</div>'; const nav=state.user&&['trip','day','checklist','budget'].includes(state.route)?appNav():''; return `<main class="shell page-transition page-${direction}"><header class="topbar">${back}${state.user?'<button class="btn ghost" data-action="logout">Sair</button>':''}</header>${content}</main>${nav}`; }
 function appNav(){ const active=state.route==='day'?'trip':state.route; return `<nav class="app-nav" aria-label="Navegação da viagem"><button class="app-nav-item ${active==='trip'?'active':''}" data-action="back-trip"><span>⌂</span><small>Roteiro</small></button><button class="app-nav-item ${active==='checklist'?'active':''}" data-action="open-checklist"><span>✓</span><small>Checklist</small></button><button class="app-nav-item ${active==='budget'?'active':''}" data-action="open-budget"><span>R$</span><small>Orçamento</small></button><button class="app-nav-item" data-action="more"><span>•••</span><small>Mais</small></button></nav>`; }
 function render(){
   if(!state.user){ app.innerHTML=shell(authView()); return; }
@@ -123,25 +123,25 @@ function message(text){ const el=document.querySelector('[data-message]'); if(el
 document.addEventListener('click',async e=>{const a=e.target.closest('[data-action]');if(!a)return;const action=a.dataset.action;
   if(action==='signup'){const email=prompt('Seu e-mail:');const password=prompt('Crie uma senha com pelo menos 6 caracteres:');if(!email||!password)return;const r=await supabase.auth.signUp({email,password,options:{emailRedirectTo:window.location.origin+window.location.pathname}});if(r.error)message(r.error.message);else message('Conta criada. Confira seu e-mail para confirmar o acesso.');}
   if(action==='logout'){await supabase.auth.signOut();state.user=null;state.trips=[];render();}
-  if(action==='open-trip'){await openTrip(a.dataset.id);}
-  if(action==='open-day'){await openDay(a.dataset.id);}
-  if(action==='open-checklist'){await openChecklist();}
-  if(action==='open-budget'){await openBudget();}
+  if(action==='open-trip'){transitionDirection='forward';await openTrip(a.dataset.id);}
+  if(action==='open-day'){transitionDirection='forward';await openDay(a.dataset.id);}
+  if(action==='open-checklist'){transitionDirection='forward';await openChecklist();}
+  if(action==='open-budget'){transitionDirection='forward';await openBudget();}
   if(action==='toggle-check'){await toggleChecklist(a.dataset.id,a.checked);}
   if(action==='edit-budget'){state.editingBudgetId=a.dataset.id;render();}
   if(action==='cancel-budget'){state.editingBudgetId=null;render();}
   if(action==='more'){alert('Compartilhamento, passageiros e configurações entrarão nesta área.');}
   if(action==='edit-day'){state.editingDay=true;render();}
   if(action==='cancel-edit-day'){state.editingDay=false;render();}
-  if(action==='back-home'){state.route='home';render();}
-  if(action==='back-trip'){state.route='trip';render();}
+  if(action==='back-home'){transitionDirection='back';state.route='home';render();}
+  if(action==='back-trip'){transitionDirection='back';state.route='trip';render();}
   if(action==='clear-day'){await clearDay();}
   if(action==='new-activity'){state.activityForm={period:a.dataset.period};render();}
   if(action==='cancel-activity'){state.activityForm=null;render();}
-  if(action==='new-trip'){state.route='wizard';state.wizard={step:1,passengers:1,theme:'classic',passengerData:[]};render();}
-  if(action==='cancel-wizard'){state.route='home';render();}
-  if(action==='next-step'){if(state.wizard.step===1){const f=document.querySelector('[data-form="basic"]');const data=Object.fromEntries(new FormData(f));state.wizard.basic=data;}state.wizard.step++;render();}
-  if(action==='prev-step'){state.wizard.step--;render();}
+  if(action==='new-trip'){transitionDirection='forward';state.route='wizard';state.wizard={step:1,passengers:1,theme:'classic',passengerData:[]};render();}
+  if(action==='cancel-wizard'){transitionDirection='back';state.route='home';render();}
+  if(action==='next-step'){transitionDirection='forward';if(state.wizard.step===1){const f=document.querySelector('[data-form="basic"]');const data=Object.fromEntries(new FormData(f));state.wizard.basic=data;}state.wizard.step++;render();}
+  if(action==='prev-step'){transitionDirection='back';state.wizard.step--;render();}
   if(action==='add-passenger'){state.wizard.passengers++;render();}
   if(action==='remove-passenger'){state.wizard.passengers--;render();}
   if(action==='choose-theme'){state.wizard.theme=a.dataset.theme;setTheme(themes.find(t=>t.id===state.wizard.theme));render();}
