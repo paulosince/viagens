@@ -1,225 +1,315 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
-const supabase = createClient('https://siabldasqinpfmxslwji.supabase.co', 'sb_publishable_UgbBIOq1TnInuPRrQpAFag_JLIzYuFf');
+const supabase = createClient(
+  'https://siabldasqinpfmxslwji.supabase.co',
+  'sb_publishable_UgbBIOq1TnInuPRrQpAFag_JLIzYuFf'
+);
+
 const app = document.querySelector('#app');
-const themes = [
-  { id:'classic', name:'Clássico', title:'Cormorant Garamond', body:'Montserrat', primary:'#14212b', secondary:'#b89d63' },
-  { id:'modern', name:'Contemporâneo', title:'Playfair Display', body:'DM Sans', primary:'#243447', secondary:'#c2785c' },
-  { id:'warm', name:'Aconchegante', title:'Lora', body:'Nunito Sans', primary:'#6b4f3a', secondary:'#d39b67' },
-  { id:'bold', name:'Aventureiro', title:'Fraunces', body:'Work Sans', primary:'#1e5147', secondary:'#d5a84a' },
-  { id:'quiet', name:'Minimalista', title:'Libre Baskerville', body:'Manrope', primary:'#304052', secondary:'#9bafc4' }
-];
-let state = { user:null, trips:[], route:'home', activeTrip:null, days:[], activeDay:null, activities:[], checklist:[], budget:[], activityForm:null, dayEditDraft:null, photoSuggestions:[], photoSearch:{page:1,loading:false,hasMore:true,timer:null}, showPhotoUrl:false, editingBudgetId:null, editingDay:false, wizard:{step:1, passengers:1, theme:'classic'} };
-let transitionDirection='none';
+const profilePhoto = 'assets/paulo.jpeg';
 
-const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
-const formatDate = value => value ? new Intl.DateTimeFormat('pt-BR',{dateStyle:'medium'}).format(new Date(`${value}T12:00:00`)) : '';
-function setTheme(theme){ document.documentElement.style.setProperty('--primary',theme.primary); document.documentElement.style.setProperty('--secondary',theme.secondary); }
-function shell(content){ const direction=transitionDirection; transitionDirection='none'; const back=['trip','day','checklist','budget'].includes(state.route)?`<button class="btn ghost top-back" data-action="${state.route==='trip'?'back-home':'back-trip'}">← ${state.route==='trip'?'Minhas viagens':'Book da viagem'}</button>`:'<div class="brand">Viagens</div>'; const nav=state.user&&['trip','day','checklist','budget'].includes(state.route)?appNav():''; return `<main class="shell page-transition page-${direction}"><header class="topbar">${back}${state.user?'<button class="btn ghost" data-action="logout">Sair</button>':''}</header>${content}</main>${nav}`; }
-function appNav(){ const active=state.route==='day'?'trip':state.route; return `<nav class="app-nav" aria-label="Navegação da viagem"><button class="app-nav-item ${active==='trip'?'active':''}" data-action="back-trip"><span>⌂</span><small>Roteiro</small></button><button class="app-nav-item ${active==='checklist'?'active':''}" data-action="open-checklist"><span>✓</span><small>Checklist</small></button><button class="app-nav-item ${active==='budget'?'active':''}" data-action="open-budget"><span>R$</span><small>Orçamento</small></button><button class="app-nav-item" data-action="more"><span>•••</span><small>Mais</small></button></nav>`; }
-function render(){
-  document.body.classList.toggle('is-editing-day', state.route==='day'&&state.editingDay);
-  if(!state.user){ app.innerHTML=shell(authView()); return; }
-  if(state.route==='wizard'){ app.innerHTML=shell(wizardView()); return; }
-  if(state.route==='trip'){ app.innerHTML=shell(bookView()); return; }
-  if(state.route==='day'){ app.innerHTML=shell(agendaDayView()); setTimeout(drawDayMap,0); return; }
-  if(state.route==='checklist'){ app.innerHTML=shell(checklistView()); return; }
-  if(state.route==='budget'){ app.innerHTML=shell(invoiceBudgetView()); return; }
-  app.innerHTML=shell(homeView());
-}
-function authView(){ return `<section class="hero"><span class="eyebrow">SEUS BOOKS DE VIAGEM</span><h1>Planeje.<br>Viva.<br>Relembre.</h1><p>Crie viagens com roteiro, mapa, fotos, orçamento e checklist em um único lugar.</p></section><section class="card"><div class="section-row"><div><span class="eyebrow">ACESSO</span><h2 class="section-title">Entrar na sua conta</h2></div></div><form data-form="auth" class="grid"><div class="field"><label>E-mail</label><input name="email" type="email" required autocomplete="email"></div><div class="field"><label>Senha</label><input name="password" type="password" required minlength="6" autocomplete="current-password"></div><div><button class="btn primary" type="submit">Entrar</button><button class="btn ghost" type="button" data-action="signup">Criar conta</button></div><p class="message" data-message></p></form></section>`; }
-function homeView(){
-  if(!state.trips.length) return `<section class="hero"><span class="eyebrow">BEM-VINDO</span><h1>Crie o seu<br>primeiro Book.</h1><p>Comece pelas informações básicas da viagem. Depois, vamos construir cada dia juntos.</p></section><section class="card empty"><h2>Nenhuma viagem ainda</h2><p class="muted">Sua próxima história começa com um destino.</p><button class="btn primary" data-action="new-trip">＋ Criar viagem</button></section>`;
-  return `<section class="section-row"><div><span class="eyebrow">MINHAS VIAGENS</span><h1 class="section-title">Seus Books</h1></div><button class="btn primary" data-action="new-trip">＋ Nova viagem</button></section><section class="grid trip-grid">${state.trips.map(trip=>`<article class="card trip-card"><div class="trip-cover" style="background-image:url('${esc(trip.cover_url||'')}')"></div><div class="trip-body"><span class="eyebrow">${esc(formatDate(trip.start_date))} — ${esc(formatDate(trip.end_date))}</span><h3>${esc(trip.name)}</h3><p class="muted">${esc(trip.destination||'Destino a definir')}</p><button class="btn" data-action="open-trip" data-id="${trip.id}">Abrir Book →</button></div></article>`).join('')}</section>`;
-}
-function bookView(){
-  const t=state.activeTrip;
-  return `<section class="book-head"><span class="eyebrow">BOOK DA VIAGEM</span><h1 class="section-title">${esc(t.name)}</h1><p class="muted">${esc(t.destination)} · ${esc(formatDate(t.start_date))} — ${esc(formatDate(t.end_date))}</p></section><section class="grid day-grid">${state.days.map(day=>`<article class="card day-card ${day.status==='empty'?'empty-day':''}"><div class="day-card-image" style="background-image:url('${esc(day.photo_url||t.cover_url||'')}')"></div><div class="day-card-body"><span class="eyebrow">DIA ${day.day_number} · ${esc(formatDate(day.date))}</span><h2>${esc(day.title||'Dia sem programação')}</h2><p class="muted">${esc(day.summary||'Este dia ainda não tem programação. Crie manhã, tarde e noite.')}</p><button class="btn ${day.status==='empty'?'primary':''}" data-action="open-day" data-id="${day.id}">${day.status==='empty'?'＋ Preencher dia':'Abrir dia →'}</button></div></article>`).join('')}</section><section class="support-grid"><button class="card support-card" data-action="open-checklist"><span class="support-icon">✓</span><div><span class="eyebrow">ORGANIZAÇÃO</span><h2>Checklist</h2><p class="muted">${state.checklist.filter(i=>i.completed).length}/${state.checklist.length||0} tarefas concluídas</p></div><span>→</span></button><button class="card support-card" data-action="open-budget"><span class="support-icon">R$</span><div><span class="eyebrow">PLANEJAMENTO</span><h2>Orçamento</h2><p class="muted">Acompanhe previsto e realizado</p></div><span>→</span></button></section>`;
-}
-function dayView(){
-  const d=state.activeDay, t=state.activeTrip;
-  const periods=[['morning','MANHÃ'],['afternoon','TARDE'],['night','NOITE']];
-  return `<section class="book-head"><span class="eyebrow">DIA ${d.day_number} · ${esc(formatDate(d.date))}</span><h1 class="section-title">${esc(d.title||'Dia sem programação')}</h1><p class="muted">${esc(t.name)}</p></section><section class="card day-editor"><form data-form="day" class="form-grid"><div class="field full"><label>Título do dia</label><input name="title" value="${esc(d.title||'')}" placeholder="Ex.: Torre Eiffel e o Sena"></div><div class="field full"><label>Resumo</label><input name="summary" value="${esc(d.summary||'')}" placeholder="Uma frase para apresentar este dia no Book"></div><div class="field full"><label>Foto do dia (opcional)</label><input name="photo_url" value="${esc(d.photo_url||'')}" placeholder="Cole uma URL de imagem por enquanto"></div><div><button class="btn primary" type="submit">Salvar informações</button></div></form><div class="divider"></div>${periods.map(([key,label])=>`<section class="period"><div class="section-row"><h2>${label}</h2><button class="btn" type="button" data-action="new-activity" data-period="${key}">＋ Atividade</button></div>${state.activities.filter(a=>a.period===key).map(a=>`<article class="activity"><strong>${esc(a.starts_at?String(a.starts_at).slice(11,16)+' · ':'')}${esc(a.title)}</strong><p class="muted">${esc(a.place_name||'Local a definir')} · ${esc(a.description||'')}</p></article>`).join('')||'<p class="muted">Nenhuma atividade cadastrada.</p>'}</section>`).join('')}<div class="danger-zone"><button class="btn ghost" type="button" data-action="clear-day">Limpar programação deste dia</button></div></section>`;
-}
-function readableDayView(){
-  const d=state.activeDay, t=state.activeTrip, periods=[['morning','MANHÃ'],['afternoon','TARDE'],['night','NOITE']];
-  const hero=d.photo_url||t.cover_url||'';
-  const edit=state.editingDay?`<section class="card day-editor"><form data-form="day" class="form-grid"><div class="field full"><label>Título do dia</label><input name="title" value="${esc(d.title||'')}" placeholder="Ex.: Torre Eiffel e o Sena"></div><div class="field full"><label>Resumo</label><input name="summary" value="${esc(d.summary||'')}" placeholder="Uma frase para apresentar este dia no Book"></div><div class="field full"><label>Foto do dia (opcional)</label><input name="photo_url" value="${esc(d.photo_url||'')}" placeholder="Cole uma URL de imagem por enquanto"></div><div><button class="btn primary" type="submit">Salvar informações</button><button class="btn ghost" type="button" data-action="cancel-edit-day">Cancelar</button></div></form></section>`:'';
-  return `<section class="day-hero" style="background-image:linear-gradient(180deg,rgba(20,33,43,.08),rgba(20,33,43,.84)),url('${esc(hero)}')"><div class="day-hero-top"><span class="eyebrow">DIA ${d.day_number} · ${esc(formatDate(d.date))}</span><button class="edit-pencil" type="button" data-action="edit-day" aria-label="Editar dia">✎</button></div><div class="day-hero-copy"><h1>${esc(d.title||'Dia sem programação')}</h1><p>${esc(t.name)}${d.summary?' · '+esc(d.summary):''}</p></div></section>${edit}<section class="card day-content">${periods.map(([key,label])=>`<section class="period"><div class="section-row"><h2>${label}</h2>${state.editingDay?`<button class="btn" type="button" data-action="new-activity" data-period="${key}">＋ Atividade</button>`:''}</div>${state.activities.filter(a=>a.period===key).map(a=>`<article class="activity"><strong>${esc(a.starts_at?String(a.starts_at).slice(11,16)+' · ':'')}${esc(a.title)}</strong><p class="muted">${esc(a.place_name||'Local a definir')} · ${esc(a.description||'')}</p></article>`).join('')||'<p class="muted">Nenhuma atividade cadastrada.</p>'}</section>`).join('')}<div class="danger-zone">${state.editingDay?'<button class="btn ghost" type="button" data-action="clear-day">Limpar programação deste dia</button>':'<span class="muted">Toque no lápis para editar este dia.</span>'}</div></section>`;
+const state = {
+  user: null,
+  trips: [],
+  passengers: new Map(),
+  sheetOpen: false,
+  imageData: '',
+  saving: false,
+  editing: false
+};
+
+const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+}[char]));
+
+const displayDate = value => value
+  ? new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
+      .format(new Date(`${value}T12:00:00`)).replace('.', '')
+  : '';
+
+function profileName() {
+  return state.user?.user_metadata?.full_name || state.user?.user_metadata?.name || 'Paulo';
 }
 
+function profileImage() {
+  return state.user?.user_metadata?.avatar_url || profilePhoto;
+}
 
-function periodForTime(time){
-  const hour=Number(String(time||'').slice(0,2));
-  if(!Number.isFinite(hour))return 'morning';
-  return hour<12?'morning':hour<18?'afternoon':'night';
+function tripTiming(trip) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const start = new Date(`${trip.start_date}T00:00:00`);
+  const end = new Date(`${trip.end_date}T23:59:59`);
+  if (today > end) return 'viagem realizada';
+  if (today >= start) return 'em andamento';
+  const days = Math.ceil((start - today) / 86400000);
+  return days === 1 ? 'amanhã' : `em ${days} dias`;
 }
-function periodLabel(period){
-  return period==='morning'?'Manhã':period==='afternoon'?'Tarde':'Noite';
-}
-function dayEditorView(){
-  const d=state.activeDay;
-  const editorDate=new Intl.DateTimeFormat('pt-BR',{weekday:'long',day:'numeric',month:'long'}).format(new Date(d.date+'T12:00:00'));
-  if(!state.editingDay)return '';
-  return '<div class="edit-sheet-backdrop"><section class="edit-sheet" role="dialog" aria-modal="true" aria-label="Editar dia" data-stop-click="true"><header class="sheet-header"><button type="button" class="sheet-close" data-action="cancel-edit-day" aria-label="Cancelar"><span class="close-icon" aria-hidden="true"></span></button><h2>'+esc(editorDate)+'</h2><button type="button" data-action="save-day-draft" class="sheet-done" aria-label="Confirmar">✓</button></header></section></div>';
-}
-function activityEditor(){
-  const draft=state.dayEditDraft||{}, a=(draft.activities||[]).find(x=>x.id===state.activityForm?.id)||state.activityForm||{};
-  const time=a.starts_at?String(a.starts_at).slice(11,16):'';
-  return '<form id="activity-edit-form" class="activity-editor card" data-form="activity" novalidate><div class="section-row"><div><span class="eyebrow">AGENDA DO DIA</span><h3>Editar entrada</h3></div></div><div class="ios-activity-fields"><div class="field"><label>Horário</label><input name="time" data-draft-activity type="time" value="'+esc(time)+'"><small>Período: '+esc(periodLabel(periodForTime(time)))+'</small></div><div class="field full"><label>Texto principal</label><input name="title" data-draft-activity value="'+esc(a.title||'')+'" placeholder="Ex.: Chegada ao Hotel Jardim Lisboa"></div><div class="field full"><label>Locais</label><input name="place_name" data-draft-activity value="'+esc(a.place_name||'')+'" placeholder="Selecione tags de locais"><small>Você poderá adicionar locais reconhecidos pelo mapa.</small></div><div class="field full"><label>Detalhes</label><textarea name="description" data-draft-activity rows="5" placeholder="Descreva o que faremos...">'+esc(a.description||'')+'</textarea></div></div></form>';
-}
-function agendaDayView(){
-  const d=state.activeDay, t=state.activeTrip, periods=[['morning','MANHÃ'],['afternoon','TARDE'],['night','NOITE']], hero=d.photo_url||t.cover_url||'', edit=dayEditorView(), items=state.activities.slice().sort((a,b)=>(a.starts_at||'99').localeCompare(b.starts_at||'99'));
-  const periodHtml=periods.map(([key,label])=>{const p=items.filter(a=>a.period===key);const rows=p.map(a=>'<article class="timeline-item"><time>'+(a.starts_at?esc(String(a.starts_at).slice(11,16)):'—')+'</time><div><strong>'+esc(a.title)+'</strong><p class="muted">'+esc(a.place_name||'Local a definir')+'</p><p>'+esc(a.description||'')+'</p>'+(a.meal?'<small>🍽 '+esc(a.meal)+'</small>':'')+(a.transport?'<small>↔ '+esc(a.transport)+'</small>':'')+(a.shopping_items?'<small>🛍 '+esc(a.shopping_items)+'</small>':'')+(a.notes?'<small>✦ '+esc(a.notes)+'</small>':'')+'</div></article>').join('')||'<p class="muted">Nenhuma atividade cadastrada.</p>';return '<section class="period"><div class="section-row"><h3>'+label+'</h3>'+(state.editingDay?'<button class="btn" type="button" data-action="new-activity" data-period="'+key+'">＋ Entrada</button>':'')+'</div>'+rows+'</section>';}).join('');
-  return '<section class="day-hero" style="background-image:linear-gradient(180deg,rgba(20,33,43,.08),rgba(20,33,43,.84)),url(\''+esc(hero)+'\')"><div class="day-hero-top"><span class="eyebrow">DIA '+d.day_number+' · '+esc(new Intl.DateTimeFormat('pt-BR',{weekday:'long',day:'numeric',month:'long'}).format(new Date(d.date+'T12:00:00')) )+'</span><button class="edit-pencil" type="button" data-action="edit-day" aria-label="Editar dia">✎</button></div><div class="day-hero-copy"><h1>'+esc(d.title||'Dia sem programação')+'</h1><p>'+esc(t.name)+(d.summary?' · '+esc(d.summary):'')+'</p></div></section><div class="day-scroll-header"><span class="eyebrow">DIA '+d.day_number+' · '+esc(new Intl.DateTimeFormat('pt-BR',{weekday:'short',day:'numeric',month:'short'}).format(new Date(d.date+'T12:00:00')) )+'</span><strong>'+esc(d.title||'Dia sem programação')+'</strong><button class="edit-pencil small" data-action="'+(state.editingDay?'cancel-edit-day':'edit-day')+'" aria-label="'+(state.editingDay?'Cancelar edição':'Editar dia')+'">'+(state.editingDay?'×':'✎')+'</button></div>'+edit+'<section class="map-panel card"><div class="section-row"><div><span class="eyebrow">DESLOCAMENTOS</span><h2>Mapa do dia</h2></div><span class="muted">'+items.filter(i=>i.latitude&&i.longitude).length+' pontos</span></div><div id="day-map" class="day-map"><div class="map-empty">Adicione latitude e longitude às atividades para visualizar os pontos do dia.</div></div></section><section class="card day-content agenda-content"><div class="section-row"><div><span class="eyebrow">AGENDA</span><h2>O que faremos</h2></div>'+(state.editingDay?'<span class="muted">Use + para adicionar uma entrada</span>':'')+'</div>'+periodHtml+'<div class="danger-zone">'+(state.editingDay?'<button class="btn ghost" type="button" data-action="clear-day">Limpar programação deste dia</button>':'<span class="muted">Toque no lápis para editar este dia.</span>')+'</div></section>';
-}
-function drawDayMap(){
-  const el=document.querySelector('#day-map'); if(!el||!window.L)return;
-  const points=state.activities.filter(a=>a.latitude&&a.longitude).map(a=>({lat:Number(a.latitude),lng:Number(a.longitude),title:a.title})); if(!points.length)return;
-  el.innerHTML=''; const map=window.L.map(el,{scrollWheelZoom:false}).setView([points[0].lat,points[0].lng],13); window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors'}).addTo(map); const bounds=[];points.forEach(p=>{window.L.marker([p.lat,p.lng]).addTo(map).bindPopup(p.title);bounds.push([p.lat,p.lng]);}); if(points.length>1)map.fitBounds(bounds,{padding:[25,25]});
-}
-function checklistView(){
-  const done=state.checklist.filter(i=>i.completed).length;
-  return `<section class="book-head"><span class="eyebrow">ORGANIZAÇÃO</span><h1 class="section-title">Checklist</h1><p class="muted">${esc(state.activeTrip.name)} · ${done} de ${state.checklist.length} concluídas</p></section><section class="card checklist-list">${state.checklist.length?state.checklist.map(item=>`<label class="check-item ${item.completed?'is-done':''}"><input type="checkbox" data-action="toggle-check" data-id="${item.id}" ${item.completed?'checked':''}><span><strong>${esc(item.label)}</strong>${item.due_at?`<small>Prazo: ${esc(formatDate(item.due_at.slice(0,10)))}</small>`:''}</span></label>`).join(''):'<p class="muted">Nenhuma tarefa cadastrada ainda.</p>'}</section>`;
-}
-function budgetView(){
-  const planned=state.budget.reduce((s,i)=>s+Number(i.planned_amount||0),0), actual=state.budget.reduce((s,i)=>s+Number(i.actual_amount||0),0);
-  return `<section class="book-head"><span class="eyebrow">PLANEJAMENTO</span><h1 class="section-title">Orçamento</h1><p class="muted">${esc(state.activeTrip.name)} · valores na moeda registrada</p></section><section class="budget-summary"><div class="card"><span class="eyebrow">PREVISTO</span><strong>R$ ${planned.toLocaleString('pt-BR',{minimumFractionDigits:2})}</strong></div><div class="card"><span class="eyebrow">REALIZADO</span><strong>R$ ${actual.toLocaleString('pt-BR',{minimumFractionDigits:2})}</strong></div><div class="card"><span class="eyebrow">DIFERENÇA</span><strong>R$ ${(planned-actual).toLocaleString('pt-BR',{minimumFractionDigits:2})}</strong></div></section><section class="card budget-list">${state.budget.length?state.budget.map(item=>`<article class="budget-item"><div><strong>${esc(item.label)}</strong><small>${esc(item.category||'Sem categoria')} · ${esc(item.purchase_status)}</small></div><div class="budget-values"><span>R$ ${Number(item.planned_amount||0).toLocaleString('pt-BR',{minimumFractionDigits:2})}</span><small>realizado: R$ ${Number(item.actual_amount||0).toLocaleString('pt-BR',{minimumFractionDigits:2})}</small></div></article>`).join(''):'<p class="muted">Nenhum item de orçamento cadastrado ainda.</p>'}</section>`;
-}
-function invoiceBudgetView(){
-  const planned=state.budget.reduce((s,i)=>s+Number(i.planned_amount||0),0), actual=state.budget.reduce((s,i)=>s+Number(i.actual_amount||0),0), diff=planned-actual;
-  const groups=[...new Set(state.budget.map(i=>i.category||'Outros'))];
-  const brl=value=>`R$ ${Number(value||0).toLocaleString('pt-BR',{minimumFractionDigits:2})}`;
-  const diffClass=diff>=0?'positive':'negative', diffText=`${diff>=0?'+':''}${brl(diff)}`;
-  return `<section class="book-head"><span class="eyebrow">PLANEJAMENTO</span><h1 class="section-title">Orçamento</h1><p class="muted">${esc(state.activeTrip.name)}</p></section><section class="budget-sticky card"><div><span class="eyebrow">TOTAL PREVISTO</span><strong>${brl(planned)}</strong></div><div><span class="eyebrow">REALIZADO</span><strong>${brl(actual)}</strong></div><div class="${diffClass}"><span class="eyebrow">${diff>=0?'ECONOMIA':'ACIMA DO ORÇADO'}</span><strong>${diffText}</strong></div></section><section class="card invoice">${groups.map(group=>`<section class="invoice-section"><div class="invoice-section-head"><span>${esc(group)}</span><span>Previsto · Realizado</span></div>${state.budget.filter(i=>(i.category||'Outros')===group).map(item=>{const over=item.actual_amount!==null&&Number(item.actual_amount)>Number(item.planned_amount||0);return `<article class="invoice-row ${state.editingBudgetId===item.id?'is-editing':''}" data-action="edit-budget" data-id="${item.id}"><div><strong>${esc(item.label)}</strong><small class="purchase-status ${item.actual_amount!==null?'purchased':'not-purchased'}"><span>${item.actual_amount!==null?'✓':'○'}</span>${item.actual_amount!==null?'Comprado':'Não comprado'}</small></div><div class="invoice-values"><span>${brl(item.planned_amount)}</span><span class="${over?'negative':'realized'}">${item.actual_amount===null?'—':brl(item.actual_amount)}</span></div></article>${state.editingBudgetId===item.id?`<form class="budget-edit-form" data-form="budget"><label>Valor pago</label><div class="budget-edit-line"><input name="actual_amount" type="number" min="0" step="0.01" value="${item.actual_amount??''}" placeholder="0,00"><button class="btn primary" type="submit">Salvar</button><button class="btn ghost" type="button" data-action="cancel-budget">Cancelar</button></div></form>`:''}`;}).join('')}</section>`).join('')||'<p class="muted">Nenhum item de orçamento cadastrado ainda.</p>'}</section>`;
-}
-function wizardView(){
-  const w=state.wizard; const steps=['Viagem','Passageiros','Personalidade'];
-  return `<section class="card wizard"><div class="wizard-head"><div><span class="eyebrow">CRIAR VIAGEM · ${w.step}/3</span><h1>${steps[w.step-1]}</h1></div><button class="btn ghost" data-action="cancel-wizard">Cancelar</button></div>${w.step===1?basicStep():w.step===2?passengersStep():themeStep()}<div class="actions">${w.step>1?'<button class="btn" data-action="prev-step">← Voltar</button>':'<span></span>'}${w.step<3?'<button class="btn primary" data-action="next-step">Continuar →</button>':'<button class="btn primary" data-action="save-trip">Criar Book</button>'}</div><p class="message" data-message></p></section>`;
-}
-function basicStep(){return `<form data-form="basic" class="form-grid"><div class="field full"><label>Nome da viagem</label><input name="name" placeholder="Ex.: Paris em família" required></div><div class="field"><label>Data de início</label><input name="start_date" type="date" required></div><div class="field"><label>Data de fim</label><input name="end_date" type="date" required></div><div class="field"><label>Destino</label><input name="destination" placeholder="Ex.: Paris, França" required></div><div class="field"><label>Como chegar?</label><select name="arrival_method"><option>Avião</option><option>Carro</option><option>Trem</option><option>Ônibus</option><option>Outro</option></select></div><div class="field full"><label>Local principal</label><input name="location_label" placeholder="Busque um lugar ou endereço"><div class="choice-map">O mapa e o autocomplete entram aqui na próxima etapa da V1.</div></div></form>`;}
-function passengersStep(){return `<div><p class="muted">Adicione quem vai participar desta viagem. Fotos são opcionais.</p><div id="passengers">${Array.from({length:state.wizard.passengers},(_,i)=>`<div class="passenger"><div class="passenger-head"><strong>Passageiro ${i+1}</strong>${i?`<button class="btn ghost" type="button" data-action="remove-passenger" data-index="${i}">Remover</button>`:''}</div><div class="form-grid"><div class="field"><label>Nome</label><input data-passenger="name" data-index="${i}" placeholder="Nome completo"></div><div class="field"><label>Idade</label><input data-passenger="age" data-index="${i}" type="number" min="0" max="120"></div><div class="field"><label>Gênero (opcional)</label><select data-passenger="gender" data-index="${i}"><option value="">Prefiro não informar</option><option>Feminino</option><option>Masculino</option><option>Outro</option></select></div><div class="field"><label>Foto (opcional)</label><input data-passenger="photo" data-index="${i}" type="file" accept="image/*"></div></div></div>`).join('')}</div><button class="btn" data-action="add-passenger" type="button">＋ Adicionar passageiro</button></div>`;}
-function themeStep(){return `<div><p class="muted">Escolha uma personalidade para este Book. Você poderá mudar depois.</p><div class="theme-grid">${themes.map(t=>`<button type="button" class="theme-option ${state.wizard.theme===t.id?'selected':''}" data-action="choose-theme" data-theme="${t.id}"><div class="theme-swatch" style="background:linear-gradient(135deg,${t.primary},${t.secondary})"></div><strong>${t.name}</strong><div class="muted">${t.title} + ${t.body}</div></button>`).join('')}</div></div>`;}
 
-async function loadTrips(){ const {data,error}=await supabase.from('trips').select('*').order('start_date',{ascending:true}); if(error) throw error; state.trips=data||[]; }
-async function openTrip(id){
-  state.activeTrip=state.trips.find(t=>t.id===id); if(!state.activeTrip)return;
-  setTheme({primary:state.activeTrip.primary_color||'#14212b',secondary:state.activeTrip.secondary_color||'#b89d63'});
-  const r=await supabase.from('trip_days').select('*').eq('trip_id',id).order('day_number'); if(r.error)return message(r.error.message);
-  state.days=r.data||[];
-  const c=await supabase.from('checklist_items').select('id,completed').eq('trip_id',id); state.checklist=c.data||[];
-  state.route='trip'; render();
+function passengerAvatar(passenger) {
+  const initial = esc(passenger.name?.trim()?.[0]?.toUpperCase() || '?');
+  return `<span class="passenger-photo">${passenger.photo_url
+    ? `<img src="${esc(passenger.photo_url)}" alt="">`
+    : initial}</span>`;
 }
-async function openDay(id){
-  state.activeDay=state.days.find(d=>d.id===id); if(!state.activeDay)return;
-  const r=await supabase.from('activities').select('*').eq('day_id',id).order('position'); if(r.error)return message(r.error.message);
-  state.activities=r.data||[]; state.activityForm=null; state.dayEditDraft=null; state.photoSuggestions=[]; state.showPhotoUrl=false; state.editingDay=false; state.route='day'; render();
+
+function tripCard(trip) {
+  const passengers = state.passengers.get(trip.id) || [];
+  const owned = trip.user_id === state.user.id;
+  const background = trip.cover_url ? `style="background-image:url('${esc(trip.cover_url)}')"` : '';
+  return `<li>
+    <article class="trip-card" ${background}>
+      <button class="trip-card-button" type="button" data-action="open-trip" data-id="${trip.id}" aria-label="Abrir ${esc(trip.name)}">
+        <span class="trip-status">${esc(tripTiming(trip))}</span>
+        <span class="trip-copy">
+          <h2>${esc(trip.name)}</h2>
+          <span class="trip-dates">${esc(displayDate(trip.start_date))} — ${esc(displayDate(trip.end_date))}</span>
+          <span class="trip-footer">
+            <span class="passenger-stack">
+              ${passengers.slice(0, 5).map(passengerAvatar).join('')}
+              <span class="passenger-count">${passengers.length} ${passengers.length === 1 ? 'passageiro' : 'passageiros'}</span>
+            </span>
+            <span class="trip-owner">${owned ? 'criada por você' : 'viagem compartilhada'}</span>
+          </span>
+        </span>
+      </button>
+    </article>
+  </li>`;
 }
-async function openChecklist(){ const r=await supabase.from('checklist_items').select('*').eq('trip_id',state.activeTrip.id).order('completed').order('label'); if(r.error)return message(r.error.message);state.checklist=r.data||[];state.route='checklist';render(); }
-async function openBudget(){ const r=await supabase.from('budget_items').select('*').eq('trip_id',state.activeTrip.id).order('category').order('label'); if(r.error)return message(r.error.message);state.budget=r.data||[];state.route='budget';render(); }
-async function toggleChecklist(id,checked){ const r=await supabase.from('checklist_items').update({completed:checked}).eq('id',id); if(r.error)return message(r.error.message);const item=state.checklist.find(i=>i.id===id);if(item)item.completed=checked;render(); }
-async function saveBudget(form){ const amount=form.actual_amount.value===''?null:Number(form.actual_amount.value); const r=await supabase.from('budget_items').update({actual_amount:amount,purchase_status:amount===null?'pending':'purchased'}).eq('id',state.editingBudgetId); if(r.error)return message(r.error.message);const item=state.budget.find(i=>i.id===state.editingBudgetId);if(item){item.actual_amount=amount;item.purchase_status=amount===null?'pending':'purchased';}state.editingBudgetId=null;render(); }
-function shoppingRows(activity){
-  return (activity.shopping_items||'').split('\n').map(x=>x.trim()).filter(Boolean).map(line=>{
-    const parts=line.split('|'), amount=parts[1]?Number(parts[1].replace(',','.').replace(/[^\d.]/g,'')):null;
-    return {trip_id:state.activeTrip.id,activity_id:activity.id,label:parts[0].trim(),category:'Compras da agenda',planned_amount:Number.isFinite(amount)?amount:null,currency:'BRL',purchase_status:'pending'};
-  });
+
+function newTripSheet() {
+  return `<button class="scrim" type="button" data-action="close-sheet" aria-label="Fechar formulário"></button>
+    <section id="home_new_trip" class="new-trip-sheet" aria-hidden="${!state.sheetOpen}" aria-labelledby="new-trip-title">
+      <form data-form="new-trip">
+        <header class="sheet-header">
+          <button class="sheet-control" type="button" data-action="close-sheet" aria-label="Cancelar">×</button>
+          <h2 id="new-trip-title">Nova viagem</h2>
+          <button class="sheet-control confirm" type="submit" aria-label="Criar viagem" ${state.saving ? 'disabled' : ''}>✓</button>
+        </header>
+
+        <section class="form-section">
+          <h3>Viagem</h3>
+          <div class="form-group">
+            <div class="form-row"><label for="trip-name">Nome</label><input id="trip-name" name="name" required autocomplete="off" placeholder="Lisboa e Paris"></div>
+            <div class="form-row"><label for="destination">Destino</label><input id="destination" name="destination" required autocomplete="off" placeholder="Portugal e França"></div>
+            <div class="form-row"><label for="start-date">Início</label><input id="start-date" name="start_date" type="date" required></div>
+            <div class="form-row"><label for="end-date">Fim</label><input id="end-date" name="end_date" type="date" required></div>
+          </div>
+        </section>
+
+        <section class="form-section">
+          <h3>Chegada</h3>
+          <div class="form-group">
+            <div class="form-row"><label for="arrival-method">Transporte</label><select id="arrival-method" name="arrival_method"><option value="avião">Avião</option><option value="trem">Trem</option><option value="carro">Carro</option><option value="ônibus">Ônibus</option><option value="navio">Navio</option><option value="outro">Outro</option></select></div>
+            <div class="form-row"><label for="arrival-place">Local</label><input id="arrival-place" name="location_label" autocomplete="off" placeholder="Aeroporto de Lisboa"></div>
+          </div>
+        </section>
+
+        <section class="form-section">
+          <h3>Imagem</h3>
+          <div class="form-group">
+            <label class="form-row upload-row" for="cover-image">
+              <span class="upload-copy">Foto da viagem<small>Escolha uma imagem do aparelho</small></span>
+              <span class="upload-preview">${state.imageData ? `<img src="${state.imageData}" alt="Prévia da imagem">` : '<span class="upload-placeholder">＋</span>'}</span>
+              <input id="cover-image" name="cover" type="file" accept="image/*" required>
+            </label>
+          </div>
+          <p class="form-note">A imagem será ajustada para o card antes de ser salva.</p>
+          <p class="form-message" data-message></p>
+        </section>
+      </form>
+    </section>`;
 }
-async function saveDayDraft(){
-  const draft=state.dayEditDraft;
-  if(!draft)return;
-  for(const activity of (draft.activities||[])){if(!String(activity.title||'').trim())return message('Preencha o texto principal de todas as entradas da agenda.');}
-  const dayPayload={title:draft.title||null,summary:draft.summary||null,photo_url:draft.photo_url||null,main_place_name:draft.main_place_name||null,status:draft.title||draft.summary||draft.main_place_name?'planned':'empty'};
-  const dayResult=await supabase.from('trip_days').update(dayPayload).eq('id',state.activeDay.id);
-  if(dayResult.error)return message(dayResult.error.message);
-  for(const id of (draft.deletedActivityIds||[])){
-    const removedBudget=await supabase.from('budget_items').delete().eq('activity_id',id); if(removedBudget.error)return message(removedBudget.error.message);
-    const removed=await supabase.from('activities').delete().eq('id',id); if(removed.error)return message(removed.error.message);
+
+function homeView() {
+  const tripList = state.trips.length
+    ? `<ol class="trip-list">${state.trips.map(tripCard).join('')}</ol>`
+    : `<section class="home-empty"><h2>Nenhuma viagem ainda</h2><p>Sua próxima história começa aqui.</p><button class="glass-button" type="button" data-action="open-sheet">Criar viagem</button></section>`;
+
+  return `<section id="user_home" class="home">
+    <header class="home-header">
+      <div class="header-actions">
+        <button class="profile-button" type="button" aria-label="${esc(profileName())}, ${esc(state.user.email)}">
+          <img src="${esc(profileImage())}" alt="${esc(profileName())}" onerror="this.outerHTML='<span class=&quot;profile-fallback&quot;>${esc(profileName()[0])}</span>'">
+        </button>
+        <div class="header-buttons">
+          <button class="glass-button" type="button" data-action="toggle-edit">${state.editing ? 'OK' : 'Editar'}</button>
+          <button class="circle-button" type="button" data-action="open-sheet" aria-label="Nova viagem">＋</button>
+        </div>
+      </div>
+      <div><h1 class="home-title">Minhas viagens</h1></div>
+      <p class="session-reference">${esc(state.user.email)}</p>
+    </header>
+    ${tripList}
+    ${newTripSheet()}
+  </section>`;
+}
+
+function authView() {
+  return `<section class="auth"><form class="auth-card" data-form="auth"><h1>Viagens</h1><p>Entre para acessar suas viagens como passageiro.</p><input name="email" type="email" autocomplete="email" placeholder="E-mail" required><input name="password" type="password" autocomplete="current-password" placeholder="Senha" required><button type="submit">Entrar</button><p class="form-message" data-message></p></form></section>`;
+}
+
+function render() {
+  document.body.dataset.sheetOpen = String(state.sheetOpen);
+  app.innerHTML = state.user ? homeView() : authView();
+}
+
+function setMessage(text) {
+  const message = document.querySelector('[data-message]');
+  if (message) message.textContent = text;
+}
+
+async function loadTrips() {
+  const { data, error } = await supabase.from('trips').select('*').order('start_date', { ascending: true });
+  if (error) throw error;
+  state.trips = data || [];
+  state.passengers.clear();
+  if (!state.trips.length) return;
+  const ids = state.trips.map(trip => trip.id);
+  const result = await supabase.from('passengers').select('*').in('trip_id', ids).order('created_at');
+  if (result.error) throw result.error;
+  for (const passenger of result.data || []) {
+    const list = state.passengers.get(passenger.trip_id) || [];
+    list.push(passenger);
+    state.passengers.set(passenger.trip_id, list);
   }
-  const saved=[];
-  for(const activity of (draft.activities||[])){
-    const startsAt=activity.starts_at||null;
-    const time=startsAt?String(startsAt).slice(11,16):'';
-    const payload={day_id:state.activeDay.id,period:periodForTime(time),position:activity.position||0,title:activity.title||'',place_name:activity.place_name||null,description:activity.description||null,shopping_items:activity.shopping_items||null,meal:activity.meal||null,transport:activity.transport||null,notes:activity.notes||null,latitude:activity.latitude||null,longitude:activity.longitude||null,starts_at:startsAt};
-    const isNew=String(activity.id).startsWith('new-');
-    const result=isNew?await supabase.from('activities').insert(payload).select().single():await supabase.from('activities').update(payload).eq('id',activity.id).select().single();
-    if(result.error)return message(result.error.message);
-    const savedActivity=result.data;
-    const removedBudget=await supabase.from('budget_items').delete().eq('activity_id',savedActivity.id); if(removedBudget.error)return message(removedBudget.error.message);
-    const shopping=shoppingRows({...activity,id:savedActivity.id}); if(shopping.length){const added=await supabase.from('budget_items').insert(shopping);if(added.error)return message(added.error.message);}
-    saved.push(savedActivity);
-  }
-  Object.assign(state.activeDay,dayPayload); state.activities=saved; state.dayEditDraft=null; state.editingDay=false; state.activityForm=null; state.photoSuggestions=[]; state.showPhotoUrl=false; render();
-}
-async function searchDayPhotos(reset=false){
-  const place=(state.dayEditDraft&&state.dayEditDraft.main_place_name||'').trim(); if(!place)return;
-  if(reset){state.photoSuggestions=[];state.photoSearch={page:1,loading:false,hasMore:true,timer:null};}
-  if(state.photoSearch.loading||!state.photoSearch.hasMore)return;
-  state.photoSearch.loading=true;
-  const params=new URLSearchParams({tags:place,tagmode:'all',format:'json',nojsoncallback:'1',page:String(state.photoSearch.page)});
-  try{
-    const response=await fetch('https://www.flickr.com/services/feeds/photos_public.gne?'+params.toString()),json=await response.json();
-    const results=(json.items||[]).map(p=>({url:(p.media&&p.media.m||'').replace('_m.','_b.'),thumb:p.media&&p.media.m,title:p.title||place,creator:p.author||''})).filter(p=>p.url&&p.thumb);
-    const unique=results.filter(p=>!state.photoSuggestions.some(old=>old.thumb===p.thumb));
-    state.photoSuggestions=reset?unique:state.photoSuggestions.concat(unique);
-    state.photoSearch.page+=1; state.photoSearch.hasMore=unique.length>0&&state.photoSearch.page<=5;
-  }catch(error){state.photoSearch.hasMore=false;message('Não foi possível buscar fotos agora. Você pode usar uma URL específica.');}
-  state.photoSearch.loading=false; render();
 }
 
-function clearDay(){
-  if(!confirm('Limpar toda a programação deste dia? A data continuará na viagem.'))return;
-  if(!state.dayEditDraft)return;
-  state.dayEditDraft.title=null;state.dayEditDraft.summary=null;state.dayEditDraft.photo_url=null;state.dayEditDraft.main_place_name=null;state.dayEditDraft.deletedActivityIds=(state.dayEditDraft.activities||[]).filter(x=>!String(x.id).startsWith('new-')).map(x=>x.id);state.dayEditDraft.activities=[];state.activityForm=null;state.photoSuggestions=[];render();
+function openSheet() {
+  state.sheetOpen = true;
+  state.imageData = '';
+  render();
+  requestAnimationFrame(() => document.querySelector('#trip-name')?.focus({ preventScroll: true }));
 }
-async function saveTrip(){
-  const w=state.wizard; const t=themes.find(x=>x.id===w.theme); const basic=w.basic; if(!basic) return;
-  if(new Date(basic.end_date)<new Date(basic.start_date)) return message('A data final precisa ser igual ou posterior à inicial.');
-  const {data:trip,error}=await supabase.from('trips').insert({user_id:state.user.id,name:basic.name,destination:basic.destination,start_date:basic.start_date,end_date:basic.end_date,arrival_method:basic.arrival_method,location_label:basic.location_label,theme_id:t.id,primary_color:t.primary,secondary_color:t.secondary}).select().single();
-  if(error) return message(error.message);
-  const membership=await supabase.from('trip_members').insert({trip_id:trip.id,user_id:state.user.id,role:'owner'}); if(membership.error) return message(membership.error.message);
-  const passengers=(w.passengerData||[]).filter(p=>p.name).map(p=>({trip_id:trip.id,name:p.name,age:p.age?Number(p.age):null,gender:p.gender||null})); if(passengers.length) await supabase.from('passengers').insert(passengers);
-  const days=[]; for(let d=new Date(`${basic.start_date}T12:00:00`),i=1;d<=new Date(`${basic.end_date}T12:00:00`);d.setDate(d.getDate()+1),i++) days.push({trip_id:trip.id,day_number:i,date:d.toISOString().slice(0,10),status:'empty'}); if(days.length) await supabase.from('trip_days').insert(days);
-  await loadTrips(); state.route='home'; render();
+
+function closeSheet() {
+  if (state.saving) return;
+  state.sheetOpen = false;
+  state.imageData = '';
+  render();
 }
-function message(text){ const el=document.querySelector('[data-message]'); if(el) el.textContent=text; }
-document.addEventListener('click',async e=>{const a=e.target.closest('button[data-action]');if(!a)return;const action=a.dataset.action;if(a.closest('.edit-sheet')&&action!=='cancel-edit-day'&&action!=='save-day-draft'&&action!=='edit-activity'&&action!=='new-activity'&&action!=='search-day-photos'&&action!=='choose-day-photo'&&action!=='toggle-photo-url'&&action!=='cancel-activity')return;
-  if(action==='signup'){const email=prompt('Seu e-mail:');const password=prompt('Crie uma senha com pelo menos 6 caracteres:');if(!email||!password)return;const r=await supabase.auth.signUp({email,password,options:{emailRedirectTo:window.location.origin+window.location.pathname}});if(r.error)message(r.error.message);else message('Conta criada. Confira seu e-mail para confirmar o acesso.');}
-  if(action==='logout'){await supabase.auth.signOut();state.user=null;state.trips=[];render();}
-  if(action==='open-trip'){transitionDirection='forward';await openTrip(a.dataset.id);}
-  if(action==='open-day'){transitionDirection='forward';await openDay(a.dataset.id);}
-  if(action==='open-checklist'){transitionDirection='forward';await openChecklist();}
-  if(action==='open-budget'){transitionDirection='forward';await openBudget();}
-  if(action==='toggle-check'){await toggleChecklist(a.dataset.id,a.checked);}
-  if(action==='edit-budget'){state.editingBudgetId=a.dataset.id;render();}
-  if(action==='cancel-budget'){state.editingBudgetId=null;render();}
-  if(action==='more'){alert('Compartilhamento, passageiros e configurações entrarão nesta área.');}
-  if(action==='edit-day'){state.editingDay=true;state.activityForm=null;state.dayEditDraft={...state.activeDay,activities:state.activities.map(a=>({...a})),deletedActivityIds:[]};render();if(state.dayEditDraft.main_place_name)await searchDayPhotos(true);}
-  if(action==='cancel-edit-day'){state.editingDay=false;state.activityForm=null;state.dayEditDraft=null;state.photoSuggestions=[];render();}
-  if(action==='back-home'){transitionDirection='back';state.route='home';render();}
-  if(action==='back-trip'){transitionDirection='back';state.route='trip';render();}
-  if(action==='clear-day'){await clearDay();}
-  if(action==='new-activity'){const id='new-'+Date.now();state.dayEditDraft.activities.push({id,day_id:state.activeDay.id,period:a.dataset.period||'morning',position:state.dayEditDraft.activities.length,title:'',place_name:null,description:null,shopping_items:null,meal:null,transport:null,notes:null,starts_at:null});state.activityForm={id};render();}
-  if(action==='edit-activity'){state.activityForm={id:a.dataset.id};render();}
-  
-  if(action==='choose-day-photo'){state.dayEditDraft=state.dayEditDraft||{};state.dayEditDraft.photo_url=state.photoSuggestions[Number(a.dataset.index)]?.url||'';render();}
-  if(action==='toggle-photo-url'){state.showPhotoUrl=!state.showPhotoUrl;render();}
-  if(action==='search-day-photos'){await searchDayPhotos();}
-  if(action==='cancel-activity'){state.activityForm=null;render();}
-  if(action==='new-trip'){transitionDirection='forward';state.route='wizard';state.wizard={step:1,passengers:1,theme:'classic',passengerData:[]};render();}
-  if(action==='cancel-wizard'){transitionDirection='back';state.route='home';render();}
-  if(action==='next-step'){transitionDirection='forward';if(state.wizard.step===1){const f=document.querySelector('[data-form="basic"]');const data=Object.fromEntries(new FormData(f));state.wizard.basic=data;}state.wizard.step++;render();}
-  if(action==='prev-step'){transitionDirection='back';state.wizard.step--;render();}
-  if(action==='add-passenger'){state.wizard.passengers++;render();}
-  if(action==='remove-passenger'){state.wizard.passengers--;render();}
-  if(action==='choose-theme'){state.wizard.theme=a.dataset.theme;setTheme(themes.find(t=>t.id===state.wizard.theme));render();}
-  if(action==='save-trip'){await saveTrip();}
+
+async function compressImage(file) {
+  const bitmap = await createImageBitmap(file);
+  const maxWidth = 1600;
+  const scale = Math.min(1, maxWidth / bitmap.width);
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  canvas.getContext('2d', { alpha: false }).drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  return canvas.toDataURL('image/webp', .78);
+}
+
+function createDays(tripId, startValue, endValue) {
+  const days = [];
+  const end = new Date(`${endValue}T12:00:00`);
+  for (let date = new Date(`${startValue}T12:00:00`), number = 1; date <= end; date.setDate(date.getDate() + 1), number += 1) {
+    days.push({ trip_id: tripId, day_number: number, date: date.toISOString().slice(0, 10), status: 'empty' });
+  }
+  return days;
+}
+
+async function saveTrip(form) {
+  const values = Object.fromEntries(new FormData(form));
+  if (values.end_date < values.start_date) return setMessage('A data final deve ser igual ou posterior à inicial.');
+  if (!state.imageData) return setMessage('Escolha a imagem da viagem.');
+  state.saving = true;
+  const submit = form.querySelector('[type="submit"]');
+  if (submit) submit.disabled = true;
+
+  const payload = {
+    user_id: state.user.id,
+    name: values.name.trim(),
+    destination: values.destination.trim(),
+    start_date: values.start_date,
+    end_date: values.end_date,
+    arrival_method: values.arrival_method,
+    location_label: values.location_label.trim() || null,
+    cover_url: state.imageData
+  };
+
+  const created = await supabase.from('trips').insert(payload).select().single();
+  if (created.error) {
+    state.saving = false;
+    if (submit) submit.disabled = false;
+    return setMessage(created.error.message);
+  }
+
+  const trip = created.data;
+  const operations = [
+    supabase.from('trip_members').insert({ trip_id: trip.id, user_id: state.user.id, role: 'owner' }),
+    supabase.from('passengers').insert({ trip_id: trip.id, name: profileName(), photo_url: profileImage() }),
+    supabase.from('trip_days').insert(createDays(trip.id, values.start_date, values.end_date))
+  ];
+  const results = await Promise.all(operations);
+  const failure = results.find(result => result.error);
+  state.saving = false;
+  if (failure) {
+    if (submit) submit.disabled = false;
+    return setMessage(failure.error.message);
+  }
+
+  state.sheetOpen = false;
+  state.imageData = '';
+  await loadTrips();
+  render();
+}
+
+document.addEventListener('click', event => {
+  const button = event.target.closest('[data-action]');
+  if (!button) return;
+  if (button.dataset.action === 'open-sheet') openSheet();
+  if (button.dataset.action === 'close-sheet') closeSheet();
+  if (button.dataset.action === 'toggle-edit') { state.editing = !state.editing; render(); }
 });
-document.addEventListener('change',async e=>{const field=e.target;if(field.matches('input[data-action="toggle-check"]')){await toggleChecklist(field.dataset.id,field.checked);return;}});
-document.addEventListener('input',e=>{const field=e.target;if(state.editingDay&&field.name){if(field.matches('[data-draft-day]'))state.dayEditDraft[field.name]=field.value;if(field.matches('[data-draft-activity]')&&state.activityForm?.id){const a=(state.dayEditDraft.activities||[]).find(x=>x.id===state.activityForm.id);if(a){if(field.name==='time'){a.starts_at=field.value?state.activeDay.date+'T'+field.value+':00':null;a.period=periodForTime(field.value);}else a[field.name]=field.value;}}}if(field.matches('[data-photo-query]')){clearTimeout(state.photoSearch.timer);state.photoSearch.timer=setTimeout(()=>searchDayPhotos(true),450);}if(field.dataset.passenger){const i=Number(field.dataset.index);state.wizard.passengerData=state.wizard.passengerData||[];state.wizard.passengerData[i]=state.wizard.passengerData[i]||{};state.wizard.passengerData[i][field.dataset.passenger]=field.value;}});
-document.addEventListener('submit',async e=>{if(e.target.dataset.form!=='auth')return;e.preventDefault();const data=Object.fromEntries(new FormData(e.target));const r=await supabase.auth.signInWithPassword(data);if(r.error)return message(r.error.message);state.user=r.data.user;await loadTrips();render();});
-document.addEventListener('submit',async e=>{if(e.target.dataset.form!=='day'&&e.target.dataset.form!=='activity')return;e.preventDefault();await saveDayDraft();});
-document.addEventListener('submit',async e=>{if(e.target.dataset.form!=='budget')return;e.preventDefault();await saveBudget(e.target);});
-document.addEventListener('scroll',()=>{const el=document.querySelector('#photo-results');if(el&&el.scrollTop+el.clientHeight>=el.scrollHeight-80)searchDayPhotos(false);},true);
-async function boot(){const {data}=await supabase.auth.getSession();if(data.session){state.user=data.session.user;try{await loadTrips();}catch(e){message(e.message);}}render();}
-supabase.auth.onAuthStateChange((_event,session)=>{if(session&&!state.user){state.user=session.user;loadTrips().then(render);}});boot();
+
+document.addEventListener('change', async event => {
+  if (event.target.id !== 'cover-image') return;
+  const file = event.target.files?.[0];
+  if (!file) return;
+  try {
+    state.imageData = await compressImage(file);
+    const preview = document.querySelector('.upload-preview');
+    if (preview) preview.innerHTML = `<img src="${state.imageData}" alt="Prévia da imagem">`;
+  } catch {
+    setMessage('Não foi possível ler essa imagem. Escolha outra.');
+  }
+});
+
+document.addEventListener('submit', async event => {
+  const form = event.target;
+  if (form.dataset.form === 'new-trip') {
+    event.preventDefault();
+    await saveTrip(form);
+  }
+  if (form.dataset.form === 'auth') {
+    event.preventDefault();
+    const credentials = Object.fromEntries(new FormData(form));
+    const result = await supabase.auth.signInWithPassword(credentials);
+    if (result.error) return setMessage(result.error.message);
+    state.user = result.data.user;
+    await loadTrips();
+    render();
+  }
+});
+
+async function boot() {
+  const { data } = await supabase.auth.getSession();
+  state.user = data.session?.user || null;
+  if (state.user) {
+    try { await loadTrips(); }
+    catch (error) { console.error(error); }
+  }
+  render();
+}
+
+supabase.auth.onAuthStateChange((_event, session) => {
+  if (!session) {
+    state.user = null;
+    state.trips = [];
+    render();
+  }
+});
+
+boot();
