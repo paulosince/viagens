@@ -109,7 +109,7 @@ async function openTrip(id){
 async function openDay(id){
   state.activeDay=state.days.find(d=>d.id===id); if(!state.activeDay)return;
   const r=await supabase.from('activities').select('*').eq('day_id',id).order('position'); if(r.error)return message(r.error.message);
-  state.activities=r.data||[]; state.activityForm=null; state.dayEditDraft={...state.activeDay}; state.photoSuggestions=[]; state.showPhotoUrl=false; state.editingDay=false; state.route='day'; render();
+  state.activities=r.data||[]; state.activityForm=null; state.dayEditDraft=null; state.photoSuggestions=[]; state.showPhotoUrl=false; state.editingDay=false; state.route='day'; render();
 }
 async function openChecklist(){ const r=await supabase.from('checklist_items').select('*').eq('trip_id',state.activeTrip.id).order('completed').order('label'); if(r.error)return message(r.error.message);state.checklist=r.data||[];state.route='checklist';render(); }
 async function openBudget(){ const r=await supabase.from('budget_items').select('*').eq('trip_id',state.activeTrip.id).order('category').order('label'); if(r.error)return message(r.error.message);state.budget=r.data||[];state.route='budget';render(); }
@@ -147,7 +147,6 @@ async function saveDayDraft(){
   Object.assign(state.activeDay,dayPayload); state.activities=saved; state.dayEditDraft=null; state.editingDay=false; state.activityForm=null; state.photoSuggestions=[]; state.showPhotoUrl=false; render();
 }
 async function searchDayPhotos(reset=false){
-  const form=document.querySelector('[data-form="day"]'); if(form)state.dayEditDraft={...state.dayEditDraft,...Object.fromEntries(new FormData(form))};
   const place=(state.dayEditDraft&&state.dayEditDraft.main_place_name||'').trim(); if(!place)return;
   if(reset){state.photoSuggestions=[];state.photoSearch={page:1,loading:false,hasMore:true,timer:null};}
   if(state.photoSearch.loading||!state.photoSearch.hasMore)return;
@@ -184,7 +183,7 @@ async function saveTrip(){
   await loadTrips(); state.route='home'; render();
 }
 function message(text){ const el=document.querySelector('[data-message]'); if(el) el.textContent=text; }
-document.addEventListener('click',async e=>{const a=e.target.closest('button[data-action]');if(!a)return;if(a.classList.contains('reminder-row')&&a.closest('.reminder-swipe')?.classList.contains('swiped')){a.closest('.reminder-swipe').classList.remove('swiped');return;}const action=a.dataset.action;if(a.closest('.edit-sheet')&&action!=='cancel-edit-day'&&action!=='edit-activity'&&action!=='delete-activity'&&action!=='new-activity'&&action!=='search-day-photos'&&action!=='choose-day-photo'&&action!=='toggle-photo-url'&&action!=='cancel-activity')return;
+document.addEventListener('click',async e=>{const a=e.target.closest('button[data-action]');if(!a)return;if(a.classList.contains('reminder-row')&&a.closest('.reminder-swipe')?.classList.contains('swiped')){a.closest('.reminder-swipe').classList.remove('swiped');return;}const action=a.dataset.action;if(a.closest('.edit-sheet')&&action!=='cancel-edit-day'&&action!=='save-day-draft'&&action!=='edit-activity'&&action!=='delete-activity'&&action!=='new-activity'&&action!=='search-day-photos'&&action!=='choose-day-photo'&&action!=='toggle-photo-url'&&action!=='cancel-activity')return;
   if(action==='signup'){const email=prompt('Seu e-mail:');const password=prompt('Crie uma senha com pelo menos 6 caracteres:');if(!email||!password)return;const r=await supabase.auth.signUp({email,password,options:{emailRedirectTo:window.location.origin+window.location.pathname}});if(r.error)message(r.error.message);else message('Conta criada. Confira seu e-mail para confirmar o acesso.');}
   if(action==='logout'){await supabase.auth.signOut();state.user=null;state.trips=[];render();}
   if(action==='open-trip'){transitionDirection='forward';await openTrip(a.dataset.id);}
@@ -195,14 +194,14 @@ document.addEventListener('click',async e=>{const a=e.target.closest('button[dat
   if(action==='edit-budget'){state.editingBudgetId=a.dataset.id;render();}
   if(action==='cancel-budget'){state.editingBudgetId=null;render();}
   if(action==='more'){alert('Compartilhamento, passageiros e configurações entrarão nesta área.');}
-  if(action==='edit-day'){state.editingDay=true;state.dayEditDraft={...state.activeDay};render();if(state.dayEditDraft.main_place_name)await searchDayPhotos(true);}
-  if(action==='cancel-edit-day'){state.editingDay=false;state.activityForm=null;state.photoSuggestions=[];render();}
+  if(action==='edit-day'){state.editingDay=true;state.activityForm=null;state.dayEditDraft={...state.activeDay,activities:state.activities.map(a=>({...a})),deletedActivityIds:[]};render();if(state.dayEditDraft.main_place_name)await searchDayPhotos(true);}
+  if(action==='cancel-edit-day'){state.editingDay=false;state.activityForm=null;state.dayEditDraft=null;state.photoSuggestions=[];render();}
   if(action==='back-home'){transitionDirection='back';state.route='home';render();}
   if(action==='back-trip'){transitionDirection='back';state.route='trip';render();}
   if(action==='clear-day'){await clearDay();}
-  if(action==='new-activity'){state.activityForm={period:a.dataset.period};render();}
+  if(action==='new-activity'){const id='new-'+Date.now();state.dayEditDraft.activities.push({id,day_id:state.activeDay.id,period:a.dataset.period||'morning',position:state.dayEditDraft.activities.length,title:'',place_name:null,description:null,shopping_items:null,meal:null,transport:null,notes:null,starts_at:null});state.activityForm={id};render();}
   if(action==='edit-activity'){state.activityForm={id:a.dataset.id};render();}
-  if(action==='delete-activity'){await deleteActivity(a.dataset.id);}
+  if(action==='delete-activity'){if(!confirm('Excluir esta entrada da agenda?'))return;const id=a.dataset.id;state.dayEditDraft.activities=state.dayEditDraft.activities.filter(x=>x.id!==id);if(!String(id).startsWith('new-'))state.dayEditDraft.deletedActivityIds.push(id);state.activityForm=null;render();}
   if(action==='choose-day-photo'){state.dayEditDraft=state.dayEditDraft||{};state.dayEditDraft.photo_url=state.photoSuggestions[Number(a.dataset.index)]?.url||'';render();}
   if(action==='toggle-photo-url'){state.showPhotoUrl=!state.showPhotoUrl;render();}
   if(action==='search-day-photos'){await searchDayPhotos();}
@@ -219,12 +218,11 @@ document.addEventListener('click',async e=>{const a=e.target.closest('button[dat
 document.addEventListener('touchstart',e=>{const row=e.target.closest('.reminder-swipe');if(!row)return;row._swipeStartX=e.touches[0].clientX;row._swipeDelta=0;},{passive:true});
 document.addEventListener('touchmove',e=>{const row=e.target.closest('.reminder-swipe');if(!row||row._swipeStartX==null)return;row._swipeDelta=e.touches[0].clientX-row._swipeStartX;if(row._swipeDelta<0){row.querySelector('.reminder-row').style.transform='translateX('+Math.max(-92,row._swipeDelta)+'px)';}},{passive:true});
 document.addEventListener('touchend',e=>{const row=e.target.closest('.reminder-swipe');if(!row||row._swipeStartX==null)return;if(row._swipeDelta<-42){row.classList.add('swiped');row.querySelector('.reminder-row').style.transform='translateX(-88px)';}else{row.classList.remove('swiped');row.querySelector('.reminder-row').style.transform='';}row._swipeStartX=null;row._swipeDelta=0;},{passive:true});
-document.addEventListener('change',async e=>{if(e.target.matches('input[data-action="toggle-check"]')){await toggleChecklist(e.target.dataset.id,e.target.checked);}});
-document.addEventListener('input',e=>{if(e.target.matches('[data-photo-query]')){state.dayEditDraft=state.dayEditDraft||{};state.dayEditDraft.main_place_name=e.target.value;clearTimeout(state.photoSearch.timer);state.photoSearch.timer=setTimeout(()=>searchDayPhotos(true),450);}if(e.target.dataset.passenger){const i=Number(e.target.dataset.index);state.wizard.passengerData=state.wizard.passengerData||[];state.wizard.passengerData[i]=state.wizard.passengerData[i]||{};state.wizard.passengerData[i][e.target.dataset.passenger]=e.target.value;}});
+document.addEventListener('change',async e=>{const field=e.target;if(field.matches('input[data-action="toggle-check"]')){await toggleChecklist(field.dataset.id,field.checked);return;}if(state.editingDay&&field.matches('[data-draft-activity]')&&field.name==='period'&&state.activityForm?.id){const a=(state.dayEditDraft.activities||[]).find(x=>x.id===state.activityForm.id);if(a)a.period=field.value;}});
+document.addEventListener('input',e=>{const field=e.target;if(state.editingDay&&field.name){if(field.matches('[data-draft-day]'))state.dayEditDraft[field.name]=field.value;if(field.matches('[data-draft-activity]')&&state.activityForm?.id){const a=(state.dayEditDraft.activities||[]).find(x=>x.id===state.activityForm.id);if(a){if(field.name==='time')a.starts_at=field.value?state.activeDay.date+'T'+field.value+':00':null;else a[field.name]=field.value;}}}if(field.matches('[data-photo-query]')){clearTimeout(state.photoSearch.timer);state.photoSearch.timer=setTimeout(()=>searchDayPhotos(true),450);}if(field.dataset.passenger){const i=Number(field.dataset.index);state.wizard.passengerData=state.wizard.passengerData||[];state.wizard.passengerData[i]=state.wizard.passengerData[i]||{};state.wizard.passengerData[i][field.dataset.passenger]=field.value;}});
 document.addEventListener('submit',async e=>{if(e.target.dataset.form!=='auth')return;e.preventDefault();const data=Object.fromEntries(new FormData(e.target));const r=await supabase.auth.signInWithPassword(data);if(r.error)return message(r.error.message);state.user=r.data.user;await loadTrips();render();});
-document.addEventListener('submit',async e=>{if(e.target.dataset.form!=='day')return;e.preventDefault();await saveDay(e.target);});
+document.addEventListener('submit',async e=>{if(e.target.dataset.form!=='day'&&e.target.dataset.form!=='activity')return;e.preventDefault();await saveDayDraft();});
 document.addEventListener('submit',async e=>{if(e.target.dataset.form!=='budget')return;e.preventDefault();await saveBudget(e.target);});
-document.addEventListener('submit',async e=>{if(e.target.dataset.form!=='activity')return;e.preventDefault();await saveActivity(e.target);});
 document.addEventListener('scroll',()=>{const el=document.querySelector('#photo-results');if(el&&el.scrollTop+el.clientHeight>=el.scrollHeight-80)searchDayPhotos(false);},true);
 async function boot(){const {data}=await supabase.auth.getSession();if(data.session){state.user=data.session.user;try{await loadTrips();}catch(e){message(e.message);}}render();}
 supabase.auth.onAuthStateChange((_event,session)=>{if(session&&!state.user){state.user=session.user;loadTrips().then(render);}});boot();
