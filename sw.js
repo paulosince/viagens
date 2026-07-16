@@ -1,12 +1,12 @@
-const CACHE_NAME = 'viagens-home-v1';
+const CACHE_NAME = 'viagens-home-v2';
 const APP_SHELL = [
   './',
   './index.html',
-  './style.css?v=20260716-01',
-  './src/main.js?v=20260716-01',
+  './style.css?v=20260716-02',
+  './src/main.js?v=20260716-02',
   './manifest.webmanifest',
   './assets/app-icon.svg',
-  './assets/paulo.jpeg'
+  './assets/cintia.png'
 ];
 
 self.addEventListener('install', event => {

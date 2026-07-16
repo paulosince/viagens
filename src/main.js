@@ -6,7 +6,7 @@ const supabase = createClient(
 );
 
 const app = document.querySelector('#app');
-const profilePhoto = 'assets/paulo.jpeg';
+const profilePhoto = 'assets/cintia.png';
 
 const state = {
   user: null,
@@ -28,7 +28,7 @@ const displayDate = value => value
   : '';
 
 function profileName() {
-  return state.user?.user_metadata?.full_name || state.user?.user_metadata?.name || 'Paulo';
+  return state.user?.user_metadata?.full_name || state.user?.user_metadata?.name || 'Cíntia';
 }
 
 function profileImage() {
@@ -48,18 +48,25 @@ function tripTiming(trip) {
 
 function passengerAvatar(passenger) {
   const initial = esc(passenger.name?.trim()?.[0]?.toUpperCase() || '?');
-  return `<span class="passenger-photo">${passenger.photo_url
-    ? `<img src="${esc(passenger.photo_url)}" alt="">`
+  const name = passenger.name || '';
+  let image = passenger.photo_url || '';
+  let position = '50% 50%';
+  if (!image && /c[ií]ntia/i.test(name)) { image = profilePhoto; position = '50% 46%'; }
+  if (!image && /paulo/i.test(name)) image = 'assets/paulo.jpeg';
+  return `<span class="passenger-photo" aria-label="${esc(passenger.name)}">${image
+    ? `<img src="${esc(image)}" alt="" style="object-position:${position}" onerror="this.remove();this.parentElement.textContent='${initial}'">`
     : initial}</span>`;
 }
 
 function tripCard(trip) {
   const passengers = state.passengers.get(trip.id) || [];
   const owned = trip.user_id === state.user.id;
-  const background = trip.cover_url ? `style="background-image:url('${esc(trip.cover_url)}')"` : '';
+  const accent = /^#[0-9a-f]{6}$/i.test(trip.secondary_color || '') ? trip.secondary_color : '#4775d1';
+  const style = `style="--card-accent:${esc(accent)};${trip.cover_url ? `background-image:url('${esc(trip.cover_url)}')` : ''}"`;
   return `<li>
-    <article class="trip-card" ${background}>
+    <article class="trip-card" ${style}>
       <button class="trip-card-button" type="button" data-action="open-trip" data-id="${trip.id}" aria-label="Abrir ${esc(trip.name)}">
+        <span class="trip-owner-flag">${owned ? 'criada por você' : 'viagem compartilhada'}</span>
         <span class="trip-status">${esc(tripTiming(trip))}</span>
         <span class="trip-copy">
           <h2>${esc(trip.name)}</h2>
@@ -69,7 +76,6 @@ function tripCard(trip) {
               ${passengers.slice(0, 5).map(passengerAvatar).join('')}
               <span class="passenger-count">${passengers.length} ${passengers.length === 1 ? 'passageiro' : 'passageiros'}</span>
             </span>
-            <span class="trip-owner">${owned ? 'criada por você' : 'viagem compartilhada'}</span>
           </span>
         </span>
       </button>
