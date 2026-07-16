@@ -10,13 +10,96 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="assets/app-icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon-180.PNG">
-  <link rel="stylesheet" href="style.css?v=20260716-04">
+  <link rel="stylesheet" href="style.css?v=20260716-05">
 </head>
-<body>
-  <main id="app" aria-live="polite"></main>
-  <script type="module" src="src/main.js?v=20260716-04"></script>
-  <script>
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260716-04');
-  </script>
+<body data-session="loading" data-active-sheet="none" data-editing="false">
+  <main id="app" aria-live="polite">
+    <section id="auth_view" class="auth" aria-hidden="true">
+      <form id="auth_form" class="auth-card">
+        <h1>Viagens</h1>
+        <p>Entre para acessar suas viagens como passageiro.</p>
+        <input name="email" type="email" autocomplete="email" placeholder="E-mail" required>
+        <input name="password" type="password" autocomplete="current-password" placeholder="Senha" required>
+        <button type="submit">Entrar</button>
+        <p id="auth_message" class="form-message" role="status"></p>
+      </form>
+    </section>
+
+    <section id="user_home" class="home" aria-hidden="true">
+      <header class="home-header">
+        <div class="header-actions">
+          <button id="profile_button" class="profile-button" type="button" aria-label="Abrir perfil">
+            <img id="header_profile_image" src="assets/cintia.png" alt="">
+            <span id="header_profile_fallback" class="profile-fallback" aria-hidden="true">C</span>
+          </button>
+          <div class="header-buttons">
+            <button id="edit_trips_button" class="glass-button" type="button">Editar</button>
+            <button id="new_trip_button" class="circle-button" type="button" aria-label="Nova viagem">＋</button>
+          </div>
+        </div>
+        <div><h1 class="home-title">Minhas viagens</h1></div>
+        <p id="session_email" class="session-reference"></p>
+      </header>
+
+      <ol id="trip_list" class="trip-list"></ol>
+      <section id="home_empty" class="home-empty" aria-hidden="true">
+        <h2>Nenhuma viagem ainda</h2>
+        <p>Sua próxima história começa aqui.</p>
+        <button id="empty_new_trip_button" class="glass-button" type="button">Criar viagem</button>
+      </section>
+
+      <button id="sheet_scrim" class="scrim" type="button" aria-label="Fechar formulário"></button>
+
+      <section id="home_new_trip" class="new-trip-sheet" aria-hidden="true" aria-labelledby="new-trip-title">
+        <form id="new_trip_form">
+          <header class="sheet-header">
+            <button id="close_new_trip" class="sheet-control" type="button" aria-label="Cancelar">×</button>
+            <h2 id="new-trip-title">Nova viagem</h2>
+            <button id="save_new_trip" class="sheet-control confirm" type="submit" aria-label="Criar viagem"><span class="confirm-check">✓</span><span class="confirm-spinner" aria-hidden="true"></span></button>
+          </header>
+          <section class="form-section"><h3>Viagem</h3><div class="form-group">
+            <div class="form-row"><label for="trip-name">Nome</label><input id="trip-name" name="name" required autocomplete="off" placeholder="Lisboa e Paris"></div>
+            <div class="form-row"><label for="destination">Destino</label><input id="destination" name="destination" required autocomplete="off" placeholder="Portugal e França"></div>
+            <div class="form-row"><label for="start-date">Início</label><input id="start-date" name="start_date" type="date" required></div>
+            <div class="form-row"><label for="end-date">Fim</label><input id="end-date" name="end_date" type="date" required></div>
+          </div></section>
+          <section class="form-section"><h3>Chegada</h3><div class="form-group">
+            <div class="form-row"><label for="arrival-method">Transporte</label><select id="arrival-method" name="arrival_method"><option value="avião">Avião</option><option value="trem">Trem</option><option value="carro">Carro</option><option value="ônibus">Ônibus</option><option value="navio">Navio</option><option value="outro">Outro</option></select></div>
+            <div class="form-row"><label for="arrival-place">Local</label><input id="arrival-place" name="location_label" autocomplete="off" placeholder="Aeroporto de Lisboa"></div>
+          </div></section>
+          <section class="form-section"><h3>Imagem</h3><div class="form-group">
+            <label class="form-row upload-row" for="cover-image"><span class="upload-copy">Foto da viagem<small>Escolha uma imagem do aparelho</small></span><span class="upload-preview" data-has-image="false"><img id="cover_preview_image" alt="Prévia da imagem"><span class="upload-placeholder">＋</span></span><input id="cover-image" name="cover" type="file" accept="image/*" required></label>
+          </div><p class="form-note">A imagem será ajustada para o card antes de ser salva.</p><p id="new_trip_message" class="form-message" role="status"></p></section>
+        </form>
+      </section>
+
+      <section id="profile-sheet" class="new-trip-sheet profile-sheet" aria-hidden="true" aria-labelledby="profile-title">
+        <form id="profile_form">
+          <header class="sheet-header">
+            <button id="close_profile" class="sheet-control" type="button" aria-label="Cancelar">×</button>
+            <h2 id="profile-title">Perfil</h2>
+            <button id="save_profile" class="sheet-control confirm" type="submit" aria-label="Salvar perfil" aria-busy="false" data-loading="false"><span class="confirm-check">✓</span><span class="confirm-spinner" aria-hidden="true"></span></button>
+          </header>
+          <p id="profile_message" class="profile-save-message" role="status"></p>
+          <section class="profile-photo-section">
+            <label class="profile-photo-editor" for="profile-photo"><img id="profile_editor_image" src="assets/cintia.png" alt=""><span>Alterar foto</span><input id="profile-photo" type="file" accept="image/*"></label>
+            <strong id="profile_display_name"></strong><span id="profile_email"></span>
+          </section>
+          <section class="form-section"><h3>Passageiro</h3><div class="form-group">
+            <div class="form-row"><label for="profile-name">Nome</label><input id="profile-name" name="name" required autocomplete="name"></div>
+            <div class="form-row"><label for="birth-date">Nascimento</label><input id="birth-date" name="birth_date" type="date"></div>
+            <div class="form-row static-row"><span>Idade</span><output id="profile_age">—</output></div>
+          </div><p class="form-note">A idade é calculada automaticamente pela data de nascimento.</p></section>
+          <section class="form-section"><h3>Conta</h3><div class="form-group">
+            <div class="form-row static-row"><span>Perfil criado em</span><output id="profile_created_at"></output></div>
+            <button id="logout_button" class="account-row" type="button">Sair</button>
+          </div></section>
+          <section class="form-section danger-section"><div class="form-group"><button id="delete_account_button" class="account-row destructive" type="button">Excluir conta</button></div><p class="form-note">A conta será desativada, sem apagar viagens, fotos ou qualquer outro dado.</p></section>
+        </form>
+      </section>
+    </section>
+  </main>
+  <script type="module" src="src/main.js?v=20260716-05"></script>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260716-05');</script>
 </body>
 </html>

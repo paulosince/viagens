@@ -1,21 +1,13 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
-const supabase = createClient(
-  'https://siabldasqinpfmxslwji.supabase.co',
-  'sb_publishable_UgbBIOq1TnInuPRrQpAFag_JLIzYuFf'
-);
-
-const app = document.querySelector('#app');
+const supabase = createClient('https://siabldasqinpfmxslwji.supabase.co', 'sb_publishable_UgbBIOq1TnInuPRrQpAFag_JLIzYuFf');
 const profilePhoto = 'assets/cintia.png';
 
 const state = {
   user: null,
   profile: null,
-  authMessage: '',
   trips: [],
   passengers: new Map(),
-  sheetOpen: false,
-  profileSheetOpen: false,
   imageData: '',
   avatarFile: null,
   avatarPreview: '',
@@ -23,507 +15,349 @@ const state = {
   editing: false
 };
 
-const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({
-  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
-}[char]));
+const dom = {
+  authView: document.querySelector('#auth_view'), authForm: document.querySelector('#auth_form'), authMessage: document.querySelector('#auth_message'),
+  home: document.querySelector('#user_home'), profileButton: document.querySelector('#profile_button'), headerProfileImage: document.querySelector('#header_profile_image'), headerProfileFallback: document.querySelector('#header_profile_fallback'),
+  editTripsButton: document.querySelector('#edit_trips_button'), newTripButton: document.querySelector('#new_trip_button'), emptyNewTripButton: document.querySelector('#empty_new_trip_button'), sessionEmail: document.querySelector('#session_email'),
+  tripList: document.querySelector('#trip_list'), homeEmpty: document.querySelector('#home_empty'), scrim: document.querySelector('#sheet_scrim'),
+  newTripSheet: document.querySelector('#home_new_trip'), newTripForm: document.querySelector('#new_trip_form'), closeNewTrip: document.querySelector('#close_new_trip'), saveNewTrip: document.querySelector('#save_new_trip'), newTripMessage: document.querySelector('#new_trip_message'), coverInput: document.querySelector('#cover-image'), coverPreview: document.querySelector('#cover_preview_image'),
+  profileSheet: document.querySelector('#profile-sheet'), profileForm: document.querySelector('#profile_form'), closeProfile: document.querySelector('#close_profile'), saveProfile: document.querySelector('#save_profile'), profileMessage: document.querySelector('#profile_message'), profileEditorImage: document.querySelector('#profile_editor_image'), profilePhotoInput: document.querySelector('#profile-photo'), profileDisplayName: document.querySelector('#profile_display_name'), profileEmail: document.querySelector('#profile_email'), profileNameInput: document.querySelector('#profile-name'), birthDateInput: document.querySelector('#birth-date'), profileAge: document.querySelector('#profile_age'), profileCreatedAt: document.querySelector('#profile_created_at'), logoutButton: document.querySelector('#logout_button'), deleteAccountButton: document.querySelector('#delete_account_button')
+};
 
-const displayDate = value => value
-  ? new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
-      .format(new Date(`${value}T12:00:00`)).replace('.', '')
-  : '';
-
-function profileName() {
-  return state.profile?.name || state.user?.user_metadata?.full_name || state.user?.user_metadata?.name || 'Cíntia';
-}
-
-function profileImage() {
-  return state.avatarPreview || state.profile?.avatar_url || state.user?.user_metadata?.avatar_url || profilePhoto;
-}
+const displayDate = value => value ? new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(`${value}T12:00:00`)).replace('.', '') : '';
+const profileName = () => state.profile?.name || state.user?.user_metadata?.full_name || state.user?.user_metadata?.name || 'Cíntia';
+const profileImage = () => state.avatarPreview || state.profile?.avatar_url || state.user?.user_metadata?.avatar_url || profilePhoto;
 
 function ageFromBirthDate(value) {
   if (!value) return null;
-  const birth = new Date(`${value}T12:00:00`);
-  const today = new Date();
+  const birth = new Date(`${value}T12:00:00`), today = new Date();
   let age = today.getFullYear() - birth.getFullYear();
-  const beforeBirthday = today.getMonth() < birth.getMonth() || (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate());
-  if (beforeBirthday) age -= 1;
+  if (today.getMonth() < birth.getMonth() || (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate())) age -= 1;
   return age;
 }
 
 function tripTiming(trip) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const start = new Date(`${trip.start_date}T00:00:00`);
-  const end = new Date(`${trip.end_date}T23:59:59`);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const start = new Date(`${trip.start_date}T00:00:00`), end = new Date(`${trip.end_date}T23:59:59`);
   if (today > end) return 'viagem realizada';
   if (today >= start) return 'em andamento';
   const days = Math.ceil((start - today) / 86400000);
   return days === 1 ? 'amanhã' : `em ${days} dias`;
 }
 
-function passengerAvatar(passenger) {
-  const initial = esc(passenger.name?.trim()?.[0]?.toUpperCase() || '?');
+function setSessionView(session) {
+  document.body.dataset.session = session;
+  dom.authView.setAttribute('aria-hidden', String(session !== 'anonymous'));
+  dom.home.setAttribute('aria-hidden', String(session !== 'authenticated'));
+}
+
+function setActiveSheet(name = 'none') {
+  document.body.dataset.activeSheet = name;
+  dom.newTripSheet.setAttribute('aria-hidden', String(name !== 'new-trip'));
+  dom.profileSheet.setAttribute('aria-hidden', String(name !== 'profile'));
+}
+
+function setLoading(button, loading) {
+  button.disabled = loading;
+  button.dataset.loading = String(loading);
+  button.setAttribute('aria-busy', String(loading));
+}
+
+function setImage(image, fallback, source, label) {
+  fallback.textContent = label?.trim()?.[0]?.toUpperCase() || '?';
+  fallback.hidden = true;
+  image.hidden = false;
+  image.onload = () => { image.hidden = false; fallback.hidden = true; };
+  image.onerror = () => { image.hidden = true; fallback.hidden = false; };
+  image.src = source;
+  image.alt = label || '';
+}
+
+function syncProfileUI() {
+  const name = profileName(), image = profileImage(), birth = state.profile?.birth_date || '';
+  setImage(dom.headerProfileImage, dom.headerProfileFallback, image, name);
+  dom.profileButton.setAttribute('aria-label', `Abrir perfil de ${name}`);
+  dom.sessionEmail.textContent = state.user?.email || '';
+  dom.profileEditorImage.src = image;
+  dom.profileEditorImage.alt = name;
+  dom.profileDisplayName.textContent = name;
+  dom.profileEmail.textContent = state.user?.email || '';
+  dom.profileNameInput.value = name;
+  dom.birthDateInput.value = birth;
+  syncAge();
+  dom.profileCreatedAt.textContent = state.user?.created_at ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'long' }).format(new Date(state.user.created_at)) : 'data indisponível';
+}
+
+function syncAge() {
+  const age = ageFromBirthDate(dom.birthDateInput.value);
+  dom.profileAge.textContent = age === null ? '—' : `${age} anos`;
+}
+
+function passengerImage(passenger) {
   const name = passenger.name || '';
-  let image = '';
-  let position = '50% 50%';
-  if (/c[ií]ntia/i.test(name)) { image = profileImage(); position = '50% 46%'; }
-  else if (/paulo/i.test(name)) image = 'assets/paulo.jpeg';
-  else image = passenger.photo_url || '';
-  return `<span class="passenger-photo" aria-label="${esc(passenger.name)}">${image
-    ? `<img src="${esc(image)}" alt="" style="object-position:${position}" onerror="this.remove();this.parentElement.textContent='${initial}'">`
-    : initial}</span>`;
+  if (/c[ií]ntia/i.test(name)) return { src: profileImage(), position: '50% 46%' };
+  if (/paulo/i.test(name)) return { src: 'assets/paulo.jpeg', position: '50% 50%' };
+  return { src: passenger.photo_url || '', position: '50% 50%' };
 }
 
-function tripCard(trip) {
-  const passengers = state.passengers.get(trip.id) || [];
-  const owned = trip.user_id === state.user.id;
+function createPassengerNode(passenger) {
+  const node = document.createElement('span');
+  node.className = 'passenger-photo';
+  const image = document.createElement('img');
+  image.alt = '';
+  const initial = document.createElement('span');
+  initial.className = 'passenger-initial';
+  node.append(image, initial);
+  node._refs = { image, initial };
+  updatePassengerNode(node, passenger);
+  return node;
+}
+
+function updatePassengerNode(node, passenger) {
+  node.dataset.passengerId = passenger.id || passenger.name;
+  node.setAttribute('aria-label', passenger.name || 'Passageiro');
+  const initial = passenger.name?.trim()?.[0]?.toUpperCase() || '?';
+  node._refs.initial.textContent = initial;
+  const picture = passengerImage(passenger);
+  node._refs.image.style.objectPosition = picture.position;
+  node._refs.image.onload = () => { node._refs.image.hidden = false; node._refs.initial.hidden = true; };
+  node._refs.image.onerror = () => { node._refs.image.hidden = true; node._refs.initial.hidden = false; };
+  if (picture.src) { node._refs.image.hidden = false; node._refs.initial.hidden = true; node._refs.image.src = picture.src; }
+  else { node._refs.image.removeAttribute('src'); node._refs.image.hidden = true; node._refs.initial.hidden = false; }
+}
+
+function syncPassengerList(container, passengers) {
+  const wanted = new Set(passengers.slice(0, 5).map(item => String(item.id || item.name)));
+  for (const node of [...container.querySelectorAll('.passenger-photo')]) if (!wanted.has(node.dataset.passengerId)) node.remove();
+  for (const passenger of passengers.slice(0, 5)) {
+    const key = String(passenger.id || passenger.name);
+    let node = [...container.querySelectorAll('.passenger-photo')].find(item => item.dataset.passengerId === key);
+    if (!node) node = createPassengerNode(passenger); else updatePassengerNode(node, passenger);
+    container.insertBefore(node, container._count);
+  }
+  container._count.textContent = `${passengers.length} ${passengers.length === 1 ? 'passageiro' : 'passageiros'}`;
+}
+
+function createTripNode(trip) {
+  const item = document.createElement('li');
+  const article = document.createElement('article'); article.className = 'trip-card';
+  const button = document.createElement('button'); button.className = 'trip-card-button'; button.type = 'button';
+  const owner = document.createElement('span'); owner.className = 'trip-owner-flag';
+  const timing = document.createElement('span'); timing.className = 'trip-status';
+  const copy = document.createElement('span'); copy.className = 'trip-copy';
+  const title = document.createElement('h2');
+  const dates = document.createElement('span'); dates.className = 'trip-dates';
+  const footer = document.createElement('span'); footer.className = 'trip-footer';
+  const stack = document.createElement('span'); stack.className = 'passenger-stack';
+  const count = document.createElement('span'); count.className = 'passenger-count'; stack._count = count; stack.append(count);
+  footer.append(stack); copy.append(title, dates, footer); button.append(owner, timing, copy); article.append(button); item.append(article);
+  item._refs = { article, button, owner, timing, title, dates, stack };
+  updateTripNode(item, trip);
+  return item;
+}
+
+function updateTripNode(item, trip) {
+  item.dataset.tripId = trip.id;
+  const refs = item._refs, owned = trip.user_id === state.user.id;
   const accent = /^#[0-9a-f]{6}$/i.test(trip.secondary_color || '') ? trip.secondary_color : '#4775d1';
-  const style = `style="--card-accent:${esc(accent)};${trip.cover_url ? `background-image:url('${esc(trip.cover_url)}')` : ''}"`;
-  return `<li>
-    <article class="trip-card" ${style}>
-      <button class="trip-card-button" type="button" data-action="open-trip" data-id="${trip.id}" aria-label="Abrir ${esc(trip.name)}">
-        <span class="trip-owner-flag">${owned ? 'criada por você' : 'viagem compartilhada'}</span>
-        <span class="trip-status">${esc(tripTiming(trip))}</span>
-        <span class="trip-copy">
-          <h2>${esc(trip.name)}</h2>
-          <span class="trip-dates">${esc(displayDate(trip.start_date))} — ${esc(displayDate(trip.end_date))}</span>
-          <span class="trip-footer">
-            <span class="passenger-stack">
-              ${passengers.slice(0, 5).map(passengerAvatar).join('')}
-              <span class="passenger-count">${passengers.length} ${passengers.length === 1 ? 'passageiro' : 'passageiros'}</span>
-            </span>
-          </span>
-        </span>
-      </button>
-    </article>
-  </li>`;
+  refs.article.style.setProperty('--card-accent', accent);
+  refs.article.style.backgroundImage = trip.cover_url ? `url("${trip.cover_url.replaceAll('"', '%22')}")` : '';
+  refs.button.dataset.tripId = trip.id;
+  refs.button.setAttribute('aria-label', `Abrir ${trip.name}`);
+  refs.owner.textContent = owned ? 'criada por você' : 'viagem compartilhada';
+  refs.timing.textContent = tripTiming(trip);
+  refs.title.textContent = trip.name;
+  refs.dates.textContent = `${displayDate(trip.start_date)} — ${displayDate(trip.end_date)}`;
+  syncPassengerList(refs.stack, state.passengers.get(trip.id) || []);
 }
 
-function newTripSheet() {
-  return `<button class="scrim" type="button" data-action="close-active-sheet" aria-label="Fechar formulário"></button>
-    <section id="home_new_trip" class="new-trip-sheet" aria-hidden="${!state.sheetOpen}" aria-labelledby="new-trip-title">
-      <form data-form="new-trip">
-        <header class="sheet-header">
-          <button class="sheet-control" type="button" data-action="close-sheet" aria-label="Cancelar">×</button>
-          <h2 id="new-trip-title">Nova viagem</h2>
-          <button class="sheet-control confirm" type="submit" aria-label="Criar viagem" ${state.saving ? 'disabled' : ''}>✓</button>
-        </header>
-
-        <section class="form-section">
-          <h3>Viagem</h3>
-          <div class="form-group">
-            <div class="form-row"><label for="trip-name">Nome</label><input id="trip-name" name="name" required autocomplete="off" placeholder="Lisboa e Paris"></div>
-            <div class="form-row"><label for="destination">Destino</label><input id="destination" name="destination" required autocomplete="off" placeholder="Portugal e França"></div>
-            <div class="form-row"><label for="start-date">Início</label><input id="start-date" name="start_date" type="date" required></div>
-            <div class="form-row"><label for="end-date">Fim</label><input id="end-date" name="end_date" type="date" required></div>
-          </div>
-        </section>
-
-        <section class="form-section">
-          <h3>Chegada</h3>
-          <div class="form-group">
-            <div class="form-row"><label for="arrival-method">Transporte</label><select id="arrival-method" name="arrival_method"><option value="avião">Avião</option><option value="trem">Trem</option><option value="carro">Carro</option><option value="ônibus">Ônibus</option><option value="navio">Navio</option><option value="outro">Outro</option></select></div>
-            <div class="form-row"><label for="arrival-place">Local</label><input id="arrival-place" name="location_label" autocomplete="off" placeholder="Aeroporto de Lisboa"></div>
-          </div>
-        </section>
-
-        <section class="form-section">
-          <h3>Imagem</h3>
-          <div class="form-group">
-            <label class="form-row upload-row" for="cover-image">
-              <span class="upload-copy">Foto da viagem<small>Escolha uma imagem do aparelho</small></span>
-              <span class="upload-preview">${state.imageData ? `<img src="${state.imageData}" alt="Prévia da imagem">` : '<span class="upload-placeholder">＋</span>'}</span>
-              <input id="cover-image" name="cover" type="file" accept="image/*" required>
-            </label>
-          </div>
-          <p class="form-note">A imagem será ajustada para o card antes de ser salva.</p>
-          <p class="form-message" data-message></p>
-        </section>
-      </form>
-    </section>`;
-}
-
-function profileSheet() {
-  const createdAt = state.user?.created_at
-    ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'long' }).format(new Date(state.user.created_at))
-    : 'data indisponível';
-  const age = ageFromBirthDate(state.profile?.birth_date);
-  return `<section id="profile-sheet" class="new-trip-sheet profile-sheet" aria-hidden="${!state.profileSheetOpen}" aria-labelledby="profile-title">
-    <form data-form="profile">
-      <header class="sheet-header">
-        <button class="sheet-control" type="button" data-action="close-profile" aria-label="Cancelar">×</button>
-        <h2 id="profile-title">Perfil</h2>
-        <button class="sheet-control confirm" type="submit" aria-label="Salvar perfil" aria-busy="false" data-loading="false" ${state.saving ? 'disabled' : ''}><span class="confirm-check">✓</span><span class="confirm-spinner" aria-hidden="true"></span></button>
-      </header>
-      <p class="profile-save-message" data-message role="status"></p>
-
-      <section class="profile-photo-section">
-        <label class="profile-photo-editor" for="profile-photo">
-          <img src="${esc(profileImage())}" alt="${esc(profileName())}">
-          <span>Alterar foto</span>
-          <input id="profile-photo" type="file" accept="image/*">
-        </label>
-        <strong>${esc(profileName())}</strong>
-        <span>${esc(state.user?.email)}</span>
-      </section>
-
-      <section class="form-section">
-        <h3>Passageiro</h3>
-        <div class="form-group">
-          <div class="form-row"><label for="profile-name">Nome</label><input id="profile-name" name="name" required autocomplete="name" value="${esc(profileName())}"></div>
-          <div class="form-row"><label for="birth-date">Nascimento</label><input id="birth-date" name="birth_date" type="date" value="${esc(state.profile?.birth_date || '')}"></div>
-          <div class="form-row static-row"><span>Idade</span><output>${age === null ? '—' : `${age} anos`}</output></div>
-        </div>
-        <p class="form-note">A idade é calculada automaticamente pela data de nascimento.</p>
-      </section>
-
-      <section class="form-section">
-        <h3>Conta</h3>
-        <div class="form-group">
-          <div class="form-row static-row"><span>Perfil criado em</span><output>${esc(createdAt)}</output></div>
-          <button class="account-row" type="button" data-action="logout">Sair</button>
-        </div>
-      </section>
-
-      <section class="form-section danger-section">
-        <div class="form-group"><button class="account-row destructive" type="button" data-action="delete-account">Excluir conta</button></div>
-        <p class="form-note">A conta será desativada, sem apagar viagens, fotos ou qualquer outro dado.</p>
-      </section>
-    </form>
-  </section>`;
-}
-
-function homeView() {
-  const tripList = state.trips.length
-    ? `<ol class="trip-list">${state.trips.map(tripCard).join('')}</ol>`
-    : `<section class="home-empty"><h2>Nenhuma viagem ainda</h2><p>Sua próxima história começa aqui.</p><button class="glass-button" type="button" data-action="open-sheet">Criar viagem</button></section>`;
-
-  return `<section id="user_home" class="home">
-    <header class="home-header">
-      <div class="header-actions">
-        <button class="profile-button" type="button" data-action="open-profile" aria-label="Abrir perfil de ${esc(profileName())}">
-          <img src="${esc(profileImage())}" alt="${esc(profileName())}" onerror="this.outerHTML='<span class=&quot;profile-fallback&quot;>${esc(profileName()[0])}</span>'">
-        </button>
-        <div class="header-buttons">
-          <button class="glass-button" type="button" data-action="toggle-edit">${state.editing ? 'OK' : 'Editar'}</button>
-          <button class="circle-button" type="button" data-action="open-sheet" aria-label="Nova viagem">＋</button>
-        </div>
-      </div>
-      <div><h1 class="home-title">Minhas viagens</h1></div>
-      <p class="session-reference">${esc(state.user.email)}</p>
-    </header>
-    ${tripList}
-    ${newTripSheet()}
-    ${profileSheet()}
-  </section>`;
-}
-
-function authView() {
-  return `<section class="auth"><form class="auth-card" data-form="auth"><h1>Viagens</h1><p>Entre para acessar suas viagens como passageiro.</p><input name="email" type="email" autocomplete="email" placeholder="E-mail" required><input name="password" type="password" autocomplete="current-password" placeholder="Senha" required><button type="submit">Entrar</button><p class="form-message" data-message>${esc(state.authMessage)}</p></form></section>`;
-}
-
-function render() {
-  document.body.dataset.activeSheet = state.profileSheetOpen ? 'profile' : state.sheetOpen ? 'new-trip' : 'none';
-  app.innerHTML = state.user ? homeView() : authView();
-}
-
-function setMessage(text) {
-  const message = document.querySelector('[aria-hidden="false"] [data-message]') || document.querySelector('[data-message]');
-  if (message) message.textContent = text;
+function syncTripList() {
+  const wanted = new Set(state.trips.map(trip => String(trip.id)));
+  for (const item of [...dom.tripList.children]) if (!wanted.has(item.dataset.tripId)) item.remove();
+  for (const trip of state.trips) {
+    let item = [...dom.tripList.children].find(node => node.dataset.tripId === String(trip.id));
+    if (!item) item = createTripNode(trip); else updateTripNode(item, trip);
+    dom.tripList.append(item);
+  }
+  const empty = state.trips.length === 0;
+  dom.homeEmpty.setAttribute('aria-hidden', String(!empty));
+  dom.tripList.setAttribute('aria-hidden', String(empty));
 }
 
 async function loadTrips() {
-  const { data, error } = await supabase.from('trips').select('*').order('start_date', { ascending: true });
-  if (error) throw error;
-  state.trips = data || [];
-  state.passengers.clear();
-  if (!state.trips.length) return;
-  const ids = state.trips.map(trip => trip.id);
-  const result = await supabase.from('passengers').select('*').in('trip_id', ids).order('created_at');
+  const result = await supabase.from('trips').select('*').order('start_date', { ascending: true });
   if (result.error) throw result.error;
-  for (const passenger of result.data || []) {
-    const list = state.passengers.get(passenger.trip_id) || [];
-    list.push(passenger);
-    state.passengers.set(passenger.trip_id, list);
+  state.trips = result.data || [];
+  state.passengers.clear();
+  if (state.trips.length) {
+    const passengers = await supabase.from('passengers').select('*').in('trip_id', state.trips.map(trip => trip.id)).order('created_at');
+    if (passengers.error) throw passengers.error;
+    for (const passenger of passengers.data || []) {
+      const list = state.passengers.get(passenger.trip_id) || [];
+      list.push(passenger); state.passengers.set(passenger.trip_id, list);
+    }
   }
+  syncTripList();
 }
 
 async function loadProfile() {
   const result = await supabase.from('passenger_profiles').select('*').eq('user_id', state.user.id).maybeSingle();
-  if (result.error) {
-    console.warn('Perfil de passageiro ainda não disponível:', result.error.message);
-    state.profile = { user_id: state.user.id, name: state.user.user_metadata?.name || 'Cíntia', birth_date: null, avatar_path: null };
-    return;
-  }
-  state.profile = result.data || { user_id: state.user.id, name: state.user.user_metadata?.name || 'Cíntia', birth_date: null, avatar_path: null };
-  if (state.profile.is_deleted) {
-    await supabase.auth.signOut();
-    state.user = null;
-    state.profile = null;
-    throw new Error('Esta conta está desativada. Seus dados continuam preservados.');
-  }
+  if (result.error) state.profile = { user_id: state.user.id, name: state.user.user_metadata?.name || 'Cíntia', birth_date: null, avatar_path: null };
+  else state.profile = result.data || { user_id: state.user.id, name: state.user.user_metadata?.name || 'Cíntia', birth_date: null, avatar_path: null };
+  if (state.profile.is_deleted) { await supabase.auth.signOut(); throw new Error('Esta conta está desativada. Seus dados continuam preservados.'); }
   if (state.profile.avatar_path) {
     const signed = await supabase.storage.from('profile-photos').createSignedUrl(state.profile.avatar_path, 3600);
     if (!signed.error) state.profile.avatar_url = signed.data.signedUrl;
   }
+  syncProfileUI();
 }
 
-function openSheet() {
-  state.profileSheetOpen = false;
-  state.sheetOpen = true;
+function openNewTrip() {
   state.imageData = '';
-  render();
-  requestAnimationFrame(() => document.querySelector('#trip-name')?.focus({ preventScroll: true }));
+  dom.newTripForm.reset();
+  dom.coverPreview.removeAttribute('src');
+  dom.coverPreview.parentElement.dataset.hasImage = 'false';
+  dom.newTripMessage.textContent = '';
+  setActiveSheet('new-trip');
+  requestAnimationFrame(() => document.querySelector('#trip-name').focus({ preventScroll: true }));
 }
 
 function openProfile() {
-  state.sheetOpen = false;
-  state.profileSheetOpen = true;
-  state.avatarFile = null;
-  state.avatarPreview = '';
-  render();
+  state.avatarFile = null; state.avatarPreview = '';
+  dom.profilePhotoInput.value = '';
+  dom.profileMessage.textContent = '';
+  syncProfileUI();
+  setActiveSheet('profile');
 }
 
-function closeProfile() {
+function closeSheets() {
   if (state.saving) return;
-  state.profileSheetOpen = false;
-  state.avatarFile = null;
-  state.avatarPreview = '';
-  render();
-}
-
-function closeSheet() {
-  if (state.saving) return;
-  state.sheetOpen = false;
-  state.imageData = '';
-  render();
+  if (state.avatarPreview) URL.revokeObjectURL(state.avatarPreview);
+  state.avatarFile = null; state.avatarPreview = ''; state.imageData = '';
+  setActiveSheet('none');
 }
 
 async function compressImage(file) {
-  const bitmap = await createImageBitmap(file);
-  const maxWidth = 1600;
-  const scale = Math.min(1, maxWidth / bitmap.width);
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
-  canvas.getContext('2d', { alpha: false }).drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
+  const bitmap = await createImageBitmap(file), maxWidth = 1600, scale = Math.min(1, maxWidth / bitmap.width);
+  const canvas = document.createElement('canvas'); canvas.width = Math.round(bitmap.width * scale); canvas.height = Math.round(bitmap.height * scale);
+  canvas.getContext('2d', { alpha: false }).drawImage(bitmap, 0, 0, canvas.width, canvas.height); bitmap.close();
   return canvas.toDataURL('image/webp', .78);
 }
 
 async function prepareAvatar(file) {
-  const bitmap = await createImageBitmap(file);
-  const size = Math.min(bitmap.width, bitmap.height);
-  const sourceX = (bitmap.width - size) / 2;
-  const sourceY = (bitmap.height - size) / 2;
-  const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 512;
-  canvas.getContext('2d', { alpha: false }).drawImage(bitmap, sourceX, sourceY, size, size, 0, 0, 512, 512);
-  bitmap.close();
+  const bitmap = await createImageBitmap(file), size = Math.min(bitmap.width, bitmap.height);
+  const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 512;
+  canvas.getContext('2d', { alpha: false }).drawImage(bitmap, (bitmap.width - size) / 2, (bitmap.height - size) / 2, size, size, 0, 0, 512, 512); bitmap.close();
   const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', .82));
   if (!blob) throw new Error('Falha ao preparar foto');
   return { blob, preview: URL.createObjectURL(blob) };
 }
 
-async function saveProfile(form) {
-  const values = Object.fromEntries(new FormData(form));
-  state.saving = true;
-  const submit = form.querySelector('[type="submit"]');
-  if (submit) {
-    submit.disabled = true;
-    submit.dataset.loading = 'true';
-    submit.setAttribute('aria-busy', 'true');
-  }
-  setMessage(state.avatarFile ? 'Enviando foto…' : 'Salvando perfil…');
+async function saveProfile() {
+  state.saving = true; setLoading(dom.saveProfile, true);
+  dom.profileMessage.textContent = state.avatarFile ? 'Enviando foto…' : 'Salvando perfil…';
   let avatarPath = state.profile?.avatar_path || null;
   try {
     if (state.avatarFile) {
       avatarPath = `${state.user.id}/avatar-${Date.now()}.webp`;
       const upload = await supabase.storage.from('profile-photos').upload(avatarPath, state.avatarFile, { contentType: 'image/webp', upsert: false });
       if (upload.error) throw new Error(`Foto: ${upload.error.message}`);
-      setMessage('Salvando perfil…');
+      dom.profileMessage.textContent = 'Salvando perfil…';
     }
-
-    const profile = await supabase.from('passenger_profiles').upsert({
-      user_id: state.user.id,
-      name: values.name.trim(),
-      birth_date: values.birth_date || null,
-      avatar_path: avatarPath,
-      updated_at: new Date().toISOString()
-    }).select().single();
-    if (profile.error) throw new Error(`Perfil: ${profile.error.message}`);
-
-    const passengerUpdate = await supabase.from('passengers').update({ name: values.name.trim(), age: ageFromBirthDate(values.birth_date) }).eq('user_id', state.user.id);
-    if (passengerUpdate.error) console.warn('Passageiros antigos não foram vinculados ao perfil:', passengerUpdate.error.message);
-
-    state.profile = profile.data;
-    try { await loadProfile(); } catch (error) { console.warn(error); }
-    try { await loadTrips(); } catch (error) { console.warn(error); }
-    state.profileSheetOpen = false;
+    const saved = await supabase.from('passenger_profiles').upsert({ user_id: state.user.id, name: dom.profileNameInput.value.trim(), birth_date: dom.birthDateInput.value || null, avatar_path: avatarPath, updated_at: new Date().toISOString() }).select().single();
+    if (saved.error) throw new Error(`Perfil: ${saved.error.message}`);
+    await supabase.from('passengers').update({ name: dom.profileNameInput.value.trim(), age: ageFromBirthDate(dom.birthDateInput.value) }).eq('user_id', state.user.id);
+    state.profile = saved.data;
     state.avatarFile = null;
     if (state.avatarPreview) URL.revokeObjectURL(state.avatarPreview);
     state.avatarPreview = '';
-    render();
-  } catch (error) {
-    setMessage(error.message || 'Não foi possível salvar o perfil.');
-  } finally {
+    try { await loadProfile(); } catch (error) { console.warn(error); }
+    try { await loadTrips(); } catch (error) { console.warn(error); }
     state.saving = false;
-    if (submit?.isConnected) {
-      submit.disabled = false;
-      submit.dataset.loading = 'false';
-      submit.setAttribute('aria-busy', 'false');
-    }
-  }
-}
-
-async function deleteAccount() {
-  const accepted = window.confirm('Desativar esta conta? A sessão será encerrada, mas nenhuma viagem, foto ou outro dado será apagado.');
-  if (!accepted) return;
-  const result = await supabase.rpc('soft_delete_own_account');
-  if (result.error) return setMessage(result.error.message);
-  await supabase.auth.signOut();
-  state.user = null;
-  state.profile = null;
-  state.trips = [];
-  render();
+    closeSheets();
+  } catch (error) { dom.profileMessage.textContent = error.message || 'Não foi possível salvar o perfil.'; }
+  finally { state.saving = false; setLoading(dom.saveProfile, false); }
 }
 
 function createDays(tripId, startValue, endValue) {
-  const days = [];
-  const end = new Date(`${endValue}T12:00:00`);
-  for (let date = new Date(`${startValue}T12:00:00`), number = 1; date <= end; date.setDate(date.getDate() + 1), number += 1) {
-    days.push({ trip_id: tripId, day_number: number, date: date.toISOString().slice(0, 10), status: 'empty' });
-  }
+  const days = [], end = new Date(`${endValue}T12:00:00`);
+  for (let date = new Date(`${startValue}T12:00:00`), number = 1; date <= end; date.setDate(date.getDate() + 1), number += 1) days.push({ trip_id: tripId, day_number: number, date: date.toISOString().slice(0, 10), status: 'empty' });
   return days;
 }
 
-async function saveTrip(form) {
-  const values = Object.fromEntries(new FormData(form));
-  if (values.end_date < values.start_date) return setMessage('A data final deve ser igual ou posterior à inicial.');
-  if (!state.imageData) return setMessage('Escolha a imagem da viagem.');
-  state.saving = true;
-  const submit = form.querySelector('[type="submit"]');
-  if (submit) submit.disabled = true;
-
-  const payload = {
-    user_id: state.user.id,
-    name: values.name.trim(),
-    destination: values.destination.trim(),
-    start_date: values.start_date,
-    end_date: values.end_date,
-    arrival_method: values.arrival_method,
-    location_label: values.location_label.trim() || null,
-    cover_url: state.imageData
-  };
-
-  const created = await supabase.from('trips').insert(payload).select().single();
-  if (created.error) {
-    state.saving = false;
-    if (submit) submit.disabled = false;
-    return setMessage(created.error.message);
-  }
-
+async function saveTrip() {
+  const values = Object.fromEntries(new FormData(dom.newTripForm));
+  if (values.end_date < values.start_date) { dom.newTripMessage.textContent = 'A data final deve ser igual ou posterior à inicial.'; return; }
+  if (!state.imageData) { dom.newTripMessage.textContent = 'Escolha a imagem da viagem.'; return; }
+  state.saving = true; setLoading(dom.saveNewTrip, true);
+  const created = await supabase.from('trips').insert({ user_id: state.user.id, name: values.name.trim(), destination: values.destination.trim(), start_date: values.start_date, end_date: values.end_date, arrival_method: values.arrival_method, location_label: values.location_label.trim() || null, cover_url: state.imageData }).select().single();
+  if (created.error) { dom.newTripMessage.textContent = created.error.message; state.saving = false; setLoading(dom.saveNewTrip, false); return; }
   const trip = created.data;
-  const operations = [
+  const results = await Promise.all([
     supabase.from('trip_members').insert({ trip_id: trip.id, user_id: state.user.id, role: 'owner' }),
     supabase.from('passengers').insert({ trip_id: trip.id, user_id: state.user.id, name: profileName(), photo_url: null, age: ageFromBirthDate(state.profile?.birth_date) }),
     supabase.from('trip_days').insert(createDays(trip.id, values.start_date, values.end_date))
-  ];
-  const results = await Promise.all(operations);
+  ]);
   const failure = results.find(result => result.error);
-  state.saving = false;
-  if (failure) {
-    if (submit) submit.disabled = false;
-    return setMessage(failure.error.message);
-  }
-
-  state.sheetOpen = false;
-  state.imageData = '';
-  await loadTrips();
-  render();
+  if (failure) dom.newTripMessage.textContent = failure.error.message;
+  else { await loadTrips(); state.saving = false; closeSheets(); }
+  state.saving = false; setLoading(dom.saveNewTrip, false);
 }
 
-document.addEventListener('click', event => {
-  const button = event.target.closest('[data-action]');
-  if (!button) return;
-  if (button.dataset.action === 'open-sheet') openSheet();
-  if (button.dataset.action === 'close-sheet') closeSheet();
-  if (button.dataset.action === 'close-active-sheet') state.profileSheetOpen ? closeProfile() : closeSheet();
-  if (button.dataset.action === 'open-profile') openProfile();
-  if (button.dataset.action === 'close-profile') closeProfile();
-  if (button.dataset.action === 'logout') supabase.auth.signOut();
-  if (button.dataset.action === 'delete-account') deleteAccount();
-  if (button.dataset.action === 'toggle-edit') { state.editing = !state.editing; render(); }
+async function deleteAccount() {
+  if (!window.confirm('Desativar esta conta? A sessão será encerrada, mas nenhuma viagem, foto ou outro dado será apagado.')) return;
+  const result = await supabase.rpc('soft_delete_own_account');
+  if (result.error) { dom.profileMessage.textContent = result.error.message; return; }
+  await supabase.auth.signOut();
+}
+
+dom.profileButton.addEventListener('click', openProfile);
+dom.newTripButton.addEventListener('click', openNewTrip);
+dom.emptyNewTripButton.addEventListener('click', openNewTrip);
+dom.closeNewTrip.addEventListener('click', closeSheets);
+dom.closeProfile.addEventListener('click', closeSheets);
+dom.scrim.addEventListener('click', closeSheets);
+dom.editTripsButton.addEventListener('click', () => { state.editing = !state.editing; document.body.dataset.editing = String(state.editing); dom.editTripsButton.textContent = state.editing ? 'OK' : 'Editar'; });
+dom.birthDateInput.addEventListener('input', syncAge);
+dom.logoutButton.addEventListener('click', () => supabase.auth.signOut());
+dom.deleteAccountButton.addEventListener('click', deleteAccount);
+
+dom.coverInput.addEventListener('change', async () => {
+  const file = dom.coverInput.files?.[0]; if (!file) return;
+  try { state.imageData = await compressImage(file); dom.coverPreview.src = state.imageData; dom.coverPreview.parentElement.dataset.hasImage = 'true'; }
+  catch { dom.newTripMessage.textContent = 'Não foi possível ler essa imagem. Escolha outra.'; }
 });
 
-document.addEventListener('change', async event => {
-  if (event.target.id !== 'cover-image') return;
-  const file = event.target.files?.[0];
-  if (!file) return;
-  try {
-    state.imageData = await compressImage(file);
-    const preview = document.querySelector('.upload-preview');
-    if (preview) preview.innerHTML = `<img src="${state.imageData}" alt="Prévia da imagem">`;
-  } catch {
-    setMessage('Não foi possível ler essa imagem. Escolha outra.');
-  }
-});
-
-document.addEventListener('change', async event => {
-  if (event.target.id !== 'profile-photo') return;
-  const file = event.target.files?.[0];
-  if (!file) return;
+dom.profilePhotoInput.addEventListener('change', async () => {
+  const file = dom.profilePhotoInput.files?.[0]; if (!file) return;
   try {
     if (state.avatarPreview) URL.revokeObjectURL(state.avatarPreview);
-    const prepared = await prepareAvatar(file);
-    state.avatarFile = prepared.blob;
-    state.avatarPreview = prepared.preview;
-    const image = document.querySelector('.profile-photo-editor img');
-    if (image) image.src = state.avatarPreview;
-  } catch { setMessage('Não foi possível preparar essa foto.'); }
+    const prepared = await prepareAvatar(file); state.avatarFile = prepared.blob; state.avatarPreview = prepared.preview; dom.profileEditorImage.src = prepared.preview;
+  } catch { dom.profileMessage.textContent = 'Não foi possível preparar essa foto.'; }
 });
 
-document.addEventListener('submit', async event => {
-  const form = event.target;
-  if (form.dataset.form === 'new-trip') {
-    event.preventDefault();
-    await saveTrip(form);
-  }
-  if (form.dataset.form === 'profile') {
-    event.preventDefault();
-    await saveProfile(form);
-  }
-  if (form.dataset.form === 'auth') {
-    event.preventDefault();
-    const credentials = Object.fromEntries(new FormData(form));
-    const result = await supabase.auth.signInWithPassword(credentials);
-    if (result.error) return setMessage(result.error.message);
-    state.user = result.data.user;
-    state.authMessage = '';
-    try { await loadProfile(); await loadTrips(); }
-    catch (error) { state.authMessage = error.message; }
-    render();
-  }
+dom.newTripForm.addEventListener('submit', event => { event.preventDefault(); saveTrip(); });
+dom.profileForm.addEventListener('submit', event => { event.preventDefault(); saveProfile(); });
+dom.authForm.addEventListener('submit', async event => {
+  event.preventDefault(); dom.authMessage.textContent = '';
+  const result = await supabase.auth.signInWithPassword(Object.fromEntries(new FormData(dom.authForm)));
+  if (result.error) { dom.authMessage.textContent = result.error.message; return; }
+  state.user = result.data.user;
+  try { await loadProfile(); await loadTrips(); setSessionView('authenticated'); }
+  catch (error) { dom.authMessage.textContent = error.message; setSessionView('anonymous'); }
 });
 
 async function boot() {
-  const { data } = await supabase.auth.getSession();
-  state.user = data.session?.user || null;
-  if (state.user) {
-    try { await loadProfile(); await loadTrips(); }
-    catch (error) { state.authMessage = error.message; console.error(error); }
-  }
-  render();
+  const { data } = await supabase.auth.getSession(); state.user = data.session?.user || null;
+  if (!state.user) { setSessionView('anonymous'); return; }
+  try { await loadProfile(); await loadTrips(); setSessionView('authenticated'); }
+  catch (error) { dom.authMessage.textContent = error.message; setSessionView('anonymous'); }
 }
 
 supabase.auth.onAuthStateChange((_event, session) => {
-  if (!session) {
-    state.user = null;
-    state.profile = null;
-    state.trips = [];
-    render();
-  }
+  if (session) return;
+  state.user = null; state.profile = null; state.trips = []; state.passengers.clear();
+  syncTripList(); closeSheets(); setSessionView('anonymous');
 });
 
 boot();
