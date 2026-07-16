@@ -166,11 +166,10 @@ async function deleteActivity(id){
   if(!confirm('Excluir esta entrada da agenda?'))return;
   const r=await supabase.from('activities').delete().eq('id',id); if(r.error)return message(r.error.message); await supabase.from('budget_items').delete().eq('activity_id',id); state.activities=state.activities.filter(a=>a.id!==id); state.activityForm=null; render();
 }
-async function clearDay(){
+function clearDay(){
   if(!confirm('Limpar toda a programação deste dia? A data continuará na viagem.'))return;
-  const r=await supabase.from('activities').delete().eq('day_id',state.activeDay.id); if(r.error)return message(r.error.message);
-  const d=await supabase.from('trip_days').update({title:null,summary:null,photo_url:null,status:'empty'}).eq('id',state.activeDay.id); if(d.error)return message(d.error.message);
-  state.activeDay.title=null;state.activeDay.summary=null;state.activeDay.photo_url=null;state.activeDay.status='empty';state.activities=[];state.route='trip';render();
+  if(!state.dayEditDraft)return;
+  state.dayEditDraft.title=null;state.dayEditDraft.summary=null;state.dayEditDraft.photo_url=null;state.dayEditDraft.main_place_name=null;state.dayEditDraft.deletedActivityIds=(state.dayEditDraft.activities||[]).filter(x=>!String(x.id).startsWith('new-')).map(x=>x.id);state.dayEditDraft.activities=[];state.activityForm=null;state.photoSuggestions=[];render();
 }
 async function saveTrip(){
   const w=state.wizard; const t=themes.find(x=>x.id===w.theme); const basic=w.basic; if(!basic) return;
