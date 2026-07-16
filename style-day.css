@@ -48,3 +48,15 @@ html,body{overflow-x:hidden}
 .activity-edit-fields input[type=time]{padding-right:7px}
 .empty-agenda{padding:16px 2px;margin:0}
 @media(max-width:380px){.activity-edit-fields{grid-template-columns:104px minmax(0,1fr)}.photo-suggestions{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Primeira etapa do editor: somente a folha e o cabeçalho. */
+body.is-editing-day{overflow:hidden;user-select:none;-webkit-user-select:none}
+.is-editing-day .edit-sheet-backdrop{position:fixed;inset:0;z-index:3000;display:flex;align-items:flex-end;background:rgba(30,32,36,.28);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);pointer-events:auto}
+.is-editing-day .edit-sheet{width:100%;height:auto;min-height:0;max-height:none;margin:0;padding:0 16px calc(18px + env(safe-area-inset-bottom));overflow:hidden;background:#f1f1f6;border-radius:28px 28px 0 0;box-shadow:0 -10px 36px rgba(0,0,0,.18);color:#1d1d22}
+.is-editing-day .sheet-header{height:82px;min-height:82px;margin:0 -16px;padding:0 16px;display:grid;grid-template-columns:48px minmax(0,1fr) 48px;align-items:center;background:#f1f1f6;border-bottom:1px solid #d5d5da}
+.is-editing-day .sheet-header h2{margin:0;text-align:center;color:#76767d;font:600 17px/1.15 -apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-transform:capitalize}
+.is-editing-day .sheet-close,.is-editing-day .sheet-done{width:44px;height:44px;display:grid;place-items:center;border-radius:50%}
+.is-editing-day .sheet-close{border:0;background:transparent;color:#77777e}
+.is-editing-day .sheet-done{justify-self:end;border:0;background:#1687f5;color:#fff;box-shadow:0 3px 8px rgba(22,135,245,.25);font-size:0}
+.is-editing-day .sheet-done::after{content:"✓";font-size:25px;line-height:1}
+.is-editing-day .sheet-close .close-icon,.is-editing-day .sheet-close .close-icon::after{width:24px;height:3px;background:#77777e}
