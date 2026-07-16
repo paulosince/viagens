@@ -10,9 +10,9 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="assets/app-icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon-180.PNG">
-  <link rel="stylesheet" href="style.css?v=20260716-07">
+  <link rel="stylesheet" href="style.css?v=20260716-08">
 </head>
-<body data-session="loading" data-active-sheet="none" data-editing="false">
+<body data-session="loading" data-active-sheet="none" data-editing="false" data-year-menu="closed">
   <main id="app" aria-live="polite">
     <section id="auth_view" class="auth" aria-hidden="true">
       <form id="auth_form" class="auth-card">
@@ -37,8 +37,12 @@
             <button id="new_trip_button" class="circle-button" type="button" aria-label="Nova viagem">＋</button>
           </div>
         </div>
-        <div><h1 class="home-title">Minhas viagens</h1></div>
-        <p id="session_email" class="session-reference"></p>
+        <div id="trip_heading" class="trip-heading">
+          <p class="home-context">Minhas viagens</p>
+          <p id="session_email" class="session-reference"></p>
+          <h1 class="home-title"><button id="year_selector_button" type="button" aria-expanded="false" aria-controls="year_menu"><span id="current_year">2026</span><span class="year-chevron" aria-hidden="true">⌄</span></button></h1>
+          <div id="year_menu" class="year-menu" aria-hidden="true"><ol id="year_list"></ol></div>
+        </div>
       </header>
 
       <ol id="trip_list" class="trip-list"></ol>
@@ -99,7 +103,7 @@
       </section>
     </section>
   </main>
-  <script type="module" src="src/main.js?v=20260716-06"></script>
-  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260716-07');</script>
+  <script type="module" src="src/main.js?v=20260716-08"></script>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260716-08');</script>
 </body>
 </html>

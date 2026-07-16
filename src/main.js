@@ -11,6 +11,7 @@ const state = {
   imageData: '',
   avatarFile: null,
   avatarPreview: '',
+  selectedYear: null,
   saving: false,
   editing: false
 };
@@ -18,7 +19,7 @@ const state = {
 const dom = {
   authView: document.querySelector('#auth_view'), authForm: document.querySelector('#auth_form'), authMessage: document.querySelector('#auth_message'),
   home: document.querySelector('#user_home'), profileButton: document.querySelector('#profile_button'), headerProfileImage: document.querySelector('#header_profile_image'), headerProfileFallback: document.querySelector('#header_profile_fallback'),
-  editTripsButton: document.querySelector('#edit_trips_button'), newTripButton: document.querySelector('#new_trip_button'), emptyNewTripButton: document.querySelector('#empty_new_trip_button'), sessionEmail: document.querySelector('#session_email'),
+  editTripsButton: document.querySelector('#edit_trips_button'), newTripButton: document.querySelector('#new_trip_button'), emptyNewTripButton: document.querySelector('#empty_new_trip_button'), sessionEmail: document.querySelector('#session_email'), tripHeading: document.querySelector('#trip_heading'), yearButton: document.querySelector('#year_selector_button'), currentYear: document.querySelector('#current_year'), yearMenu: document.querySelector('#year_menu'), yearList: document.querySelector('#year_list'),
   tripList: document.querySelector('#trip_list'), homeEmpty: document.querySelector('#home_empty'), scrim: document.querySelector('#sheet_scrim'),
   newTripSheet: document.querySelector('#home_new_trip'), newTripForm: document.querySelector('#new_trip_form'), closeNewTrip: document.querySelector('#close_new_trip'), saveNewTrip: document.querySelector('#save_new_trip'), newTripMessage: document.querySelector('#new_trip_message'), coverInput: document.querySelector('#cover-image'), coverPreview: document.querySelector('#cover_preview_image'),
   profileSheet: document.querySelector('#profile-sheet'), profileForm: document.querySelector('#profile_form'), closeProfile: document.querySelector('#close_profile'), saveProfile: document.querySelector('#save_profile'), profileMessage: document.querySelector('#profile_message'), profileEditorImage: document.querySelector('#profile_editor_image'), profilePhotoInput: document.querySelector('#profile-photo'), profileDisplayName: document.querySelector('#profile_display_name'), profileEmail: document.querySelector('#profile_email'), profileNameInput: document.querySelector('#profile-name'), birthDateInput: document.querySelector('#birth-date'), profileAge: document.querySelector('#profile_age'), profileCreatedAt: document.querySelector('#profile_created_at'), logoutButton: document.querySelector('#logout_button'), deleteAccountButton: document.querySelector('#delete_account_button')
@@ -172,16 +173,53 @@ function updateTripNode(item, trip) {
 }
 
 function syncTripList() {
-  const wanted = new Set(state.trips.map(trip => String(trip.id)));
+  const visibleTrips = state.trips.filter(trip => Number(String(trip.start_date).slice(0, 4)) === state.selectedYear);
+  const wanted = new Set(visibleTrips.map(trip => String(trip.id)));
   for (const item of [...dom.tripList.children]) if (!wanted.has(item.dataset.tripId)) item.remove();
-  for (const trip of state.trips) {
+  for (const trip of visibleTrips) {
     let item = [...dom.tripList.children].find(node => node.dataset.tripId === String(trip.id));
     if (!item) item = createTripNode(trip); else updateTripNode(item, trip);
     dom.tripList.append(item);
   }
-  const empty = state.trips.length === 0;
+  const empty = visibleTrips.length === 0;
   dom.homeEmpty.setAttribute('aria-hidden', String(!empty));
   dom.tripList.setAttribute('aria-hidden', String(empty));
+}
+
+function setYearMenu(open) {
+  document.body.dataset.yearMenu = open ? 'open' : 'closed';
+  dom.yearButton.setAttribute('aria-expanded', String(open));
+  dom.yearMenu.setAttribute('aria-hidden', String(!open));
+}
+
+function selectYear(year) {
+  state.selectedYear = Number(year);
+  dom.currentYear.textContent = String(state.selectedYear);
+  for (const button of dom.yearList.querySelectorAll('button')) button.setAttribute('aria-current', String(Number(button.dataset.year) === state.selectedYear));
+  syncTripList();
+  setYearMenu(false);
+}
+
+function syncYearList() {
+  const years = [...new Set(state.trips.map(trip => Number(String(trip.start_date).slice(0, 4))).filter(Boolean))].sort((a, b) => b - a);
+  if (!years.length) years.push(new Date().getFullYear());
+  if (!years.includes(state.selectedYear)) {
+    const current = new Date().getFullYear();
+    state.selectedYear = years.includes(current) ? current : years.reduce((closest, year) => Math.abs(year - current) < Math.abs(closest - current) ? year : closest, years[0]);
+  }
+  const wanted = new Set(years.map(String));
+  for (const item of [...dom.yearList.children]) if (!wanted.has(item.dataset.year)) item.remove();
+  for (const year of years) {
+    let item = [...dom.yearList.children].find(node => node.dataset.year === String(year));
+    if (!item) {
+      item = document.createElement('li'); item.dataset.year = String(year);
+      const button = document.createElement('button'); button.type = 'button'; button.dataset.year = String(year); button.addEventListener('click', () => selectYear(year)); item.append(button);
+    }
+    item.firstElementChild.textContent = String(year);
+    item.firstElementChild.setAttribute('aria-current', String(year === state.selectedYear));
+    dom.yearList.append(item);
+  }
+  dom.currentYear.textContent = String(state.selectedYear);
 }
 
 async function loadTrips() {
@@ -197,6 +235,7 @@ async function loadTrips() {
       list.push(passenger); state.passengers.set(passenger.trip_id, list);
     }
   }
+  syncYearList();
   syncTripList();
 }
 
@@ -213,6 +252,7 @@ async function loadProfile() {
 }
 
 function openNewTrip() {
+  setYearMenu(false);
   state.imageData = '';
   dom.newTripForm.reset();
   dom.coverPreview.removeAttribute('src');
@@ -223,6 +263,7 @@ function openNewTrip() {
 }
 
 function openProfile() {
+  setYearMenu(false);
   state.avatarFile = null; state.avatarPreview = '';
   dom.profilePhotoInput.value = '';
   dom.profileMessage.textContent = '';
@@ -308,7 +349,7 @@ async function saveTrip() {
   ]);
   const failure = results.find(result => result.error);
   if (failure) dom.newTripMessage.textContent = failure.error.message;
-  else { await loadTrips(); state.saving = false; closeSheets(); }
+  else { state.selectedYear = Number(String(values.start_date).slice(0, 4)); await loadTrips(); state.saving = false; closeSheets(); }
   state.saving = false; setLoading(dom.saveNewTrip, false);
 }
 
@@ -326,6 +367,8 @@ dom.closeNewTrip.addEventListener('click', closeSheets);
 dom.closeProfile.addEventListener('click', closeSheets);
 dom.scrim.addEventListener('click', closeSheets);
 dom.editTripsButton.addEventListener('click', () => { state.editing = !state.editing; document.body.dataset.editing = String(state.editing); dom.editTripsButton.textContent = state.editing ? 'OK' : 'Editar'; });
+dom.yearButton.addEventListener('click', () => setYearMenu(document.body.dataset.yearMenu !== 'open'));
+document.addEventListener('click', event => { if (document.body.dataset.yearMenu === 'open' && !dom.tripHeading.contains(event.target)) setYearMenu(false); });
 dom.birthDateInput.addEventListener('input', syncAge);
 dom.logoutButton.addEventListener('click', () => supabase.auth.signOut());
 dom.deleteAccountButton.addEventListener('click', deleteAccount);

@@ -127,14 +127,23 @@ button { -webkit-tap-highlight-color: transparent; }
   font-weight: 600;
 }
 
+.trip-heading { position: relative; margin: 32px 2px 22px; }
+.home-context { margin: 0; color: var(--text); font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
+.session-reference { margin: 2px 0 10px; color: var(--secondary); font-size: 11px; opacity: .8; }
 .home-title {
-  margin: 32px 0 22px;
+  margin: 0;
   font-size: clamp(42px, 11vw, 66px);
   line-height: .98;
   letter-spacing: -.055em;
 }
-
-.session-reference { margin: -10px 2px 24px; color: var(--secondary); font-size: 13px; }
+.home-title button { display: inline-flex; align-items: center; gap: 9px; padding: 0; border: 0; color: inherit; background: transparent; font: inherit; font-weight: 700; letter-spacing: inherit; }
+.year-chevron { display: inline-block; color: var(--ios-blue); font-size: .52em; font-weight: 600; transform: translateY(-.04em) rotate(0); transition: transform .25s ease; }
+body[data-year-menu="open"] .year-chevron { transform: translateY(.04em) rotate(180deg); }
+.year-menu { position: absolute; z-index: 8; top: calc(100% - 2px); left: 0; min-width: 130px; padding: 7px; border: 1px solid rgba(60,60,67,.16); border-radius: 17px; background: rgba(255,255,255,.82); box-shadow: 0 14px 35px rgba(0,0,0,.14); opacity: 0; visibility: hidden; pointer-events: none; transform: translateY(-8px) scale(.96); transform-origin: top left; transition: opacity .22s ease, transform .22s ease, visibility 0s linear .22s; backdrop-filter: blur(24px) saturate(150%); }
+body[data-year-menu="open"] .year-menu { opacity: 1; visibility: visible; pointer-events: auto; transform: translateY(0) scale(1); transition-delay: 0s; }
+.year-menu ol { margin: 0; padding: 0; list-style: none; }
+.year-menu button { width: 100%; min-height: 42px; padding: 0 12px; border: 0; border-radius: 11px; color: var(--text); background: transparent; text-align: left; font-size: 17px; }
+.year-menu button[aria-current="true"] { color: var(--ios-blue); background: rgba(0,122,255,.1); font-weight: 600; }
 
 .trip-list { display: grid; gap: 18px; margin-block: 0; padding: 0; list-style-position: inside; }
 .trip-list::marker, .trip-list > li::marker { color: transparent; font-size: 0; }
