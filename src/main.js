@@ -153,8 +153,9 @@ function profileSheet() {
       <header class="sheet-header">
         <button class="sheet-control" type="button" data-action="close-profile" aria-label="Cancelar">×</button>
         <h2 id="profile-title">Perfil</h2>
-        <button class="sheet-control confirm" type="submit" aria-label="Salvar perfil" ${state.saving ? 'disabled' : ''}>✓</button>
+        <button class="sheet-control confirm" type="submit" aria-label="Salvar perfil" aria-busy="false" data-loading="false" ${state.saving ? 'disabled' : ''}><span class="confirm-check">✓</span><span class="confirm-spinner" aria-hidden="true"></span></button>
       </header>
+      <p class="profile-save-message" data-message role="status"></p>
 
       <section class="profile-photo-section">
         <label class="profile-photo-editor" for="profile-photo">
@@ -187,7 +188,6 @@ function profileSheet() {
       <section class="form-section danger-section">
         <div class="form-group"><button class="account-row destructive" type="button" data-action="delete-account">Excluir conta</button></div>
         <p class="form-note">A conta será desativada, sem apagar viagens, fotos ou qualquer outro dado.</p>
-        <p class="form-message" data-message></p>
       </section>
     </form>
   </section>`;
@@ -330,34 +330,51 @@ async function saveProfile(form) {
   const values = Object.fromEntries(new FormData(form));
   state.saving = true;
   const submit = form.querySelector('[type="submit"]');
-  if (submit) submit.disabled = true;
-  let avatarPath = state.profile?.avatar_path || null;
-
-  if (state.avatarFile) {
-    avatarPath = `${state.user.id}/avatar.webp`;
-    const upload = await supabase.storage.from('profile-photos').upload(avatarPath, state.avatarFile, { contentType: 'image/webp', upsert: true });
-    if (upload.error) { state.saving = false; submit.disabled = false; return setMessage(upload.error.message); }
+  if (submit) {
+    submit.disabled = true;
+    submit.dataset.loading = 'true';
+    submit.setAttribute('aria-busy', 'true');
   }
+  setMessage(state.avatarFile ? 'Enviando foto…' : 'Salvando perfil…');
+  let avatarPath = state.profile?.avatar_path || null;
+  try {
+    if (state.avatarFile) {
+      avatarPath = `${state.user.id}/avatar-${Date.now()}.webp`;
+      const upload = await supabase.storage.from('profile-photos').upload(avatarPath, state.avatarFile, { contentType: 'image/webp', upsert: false });
+      if (upload.error) throw new Error(`Foto: ${upload.error.message}`);
+      setMessage('Salvando perfil…');
+    }
 
-  const profile = await supabase.from('passenger_profiles').upsert({
-    user_id: state.user.id,
-    name: values.name.trim(),
-    birth_date: values.birth_date || null,
-    avatar_path: avatarPath,
-    updated_at: new Date().toISOString()
-  }).select().single();
-  if (profile.error) { state.saving = false; submit.disabled = false; return setMessage(profile.error.message); }
+    const profile = await supabase.from('passenger_profiles').upsert({
+      user_id: state.user.id,
+      name: values.name.trim(),
+      birth_date: values.birth_date || null,
+      avatar_path: avatarPath,
+      updated_at: new Date().toISOString()
+    }).select().single();
+    if (profile.error) throw new Error(`Perfil: ${profile.error.message}`);
 
-  await supabase.from('passengers').update({ name: values.name.trim(), age: ageFromBirthDate(values.birth_date) }).eq('user_id', state.user.id);
-  state.profile = profile.data;
-  state.saving = false;
-  state.profileSheetOpen = false;
-  state.avatarFile = null;
-  if (state.avatarPreview) URL.revokeObjectURL(state.avatarPreview);
-  state.avatarPreview = '';
-  await loadProfile();
-  await loadTrips();
-  render();
+    const passengerUpdate = await supabase.from('passengers').update({ name: values.name.trim(), age: ageFromBirthDate(values.birth_date) }).eq('user_id', state.user.id);
+    if (passengerUpdate.error) console.warn('Passageiros antigos não foram vinculados ao perfil:', passengerUpdate.error.message);
+
+    state.profile = profile.data;
+    try { await loadProfile(); } catch (error) { console.warn(error); }
+    try { await loadTrips(); } catch (error) { console.warn(error); }
+    state.profileSheetOpen = false;
+    state.avatarFile = null;
+    if (state.avatarPreview) URL.revokeObjectURL(state.avatarPreview);
+    state.avatarPreview = '';
+    render();
+  } catch (error) {
+    setMessage(error.message || 'Não foi possível salvar o perfil.');
+  } finally {
+    state.saving = false;
+    if (submit?.isConnected) {
+      submit.disabled = false;
+      submit.dataset.loading = 'false';
+      submit.setAttribute('aria-busy', 'false');
+    }
+  }
 }
 
 async function deleteAccount() {

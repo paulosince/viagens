@@ -267,6 +267,12 @@ body[data-active-sheet="profile"] #profile-sheet { transform: translateY(0); vis
 .sheet-control { width: 48px; height: 48px; border: 1px solid var(--line); border-radius: 50%; background: rgba(255,255,255,.65); font-size: 27px; box-shadow: 0 5px 15px rgba(0,0,0,.06); }
 .sheet-control.confirm { color: var(--ios-blue); font-size: 23px; font-weight: 700; }
 .sheet-control:disabled { opacity: .4; }
+.sheet-control.confirm[data-loading="true"] { opacity: 1; }
+.confirm-spinner { display: none; width: 19px; height: 19px; border: 2.5px solid rgba(0,122,255,.24); border-top-color: var(--ios-blue); border-radius: 50%; animation: confirm-spin .75s linear infinite; }
+.sheet-control.confirm[data-loading="true"] .confirm-check { display: none; }
+.sheet-control.confirm[data-loading="true"] .confirm-spinner { display: block; margin: auto; }
+@keyframes confirm-spin { to { transform: rotate(1turn); } }
+.profile-save-message { width: min(100%, 660px); min-height: 18px; margin: -8px auto 3px; padding: 0 14px; color: var(--secondary); font-size: 13px; text-align: center; }
 
 .form-section { margin: 18px auto 0; width: min(100%, 660px); }
 .form-section > h3 { margin: 0 14px 8px; color: #8e8e93; font-size: 15px; }
