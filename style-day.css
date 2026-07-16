@@ -8,3 +8,7 @@
 .reminder-content{min-width:0;flex:1}.reminder-content strong,.reminder-content small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.reminder-content small{color:#8a8a91;margin-top:3px}
 .reminder-info{flex:0 0 auto;color:#8a8a91;font-size:1.2rem}.reminder-delete{position:absolute;z-index:0;inset:0 0 0 auto;width:88px;border:0;background:#ff3b30;color:#fff;font:inherit;font-weight:700}
 .edit-sheet .activity-editor .actions{display:flex;flex-wrap:wrap;gap:8px}.edit-sheet .activity-editor .actions .danger{color:#b14d43}
+
+/* A folha não participa da transição da página: uma única animação de entrada. */
+.page-transition > .edit-sheet-backdrop{animation:none!important;transform:none!important;opacity:1!important}
+.edit-sheet{animation:sheet-rise .42s cubic-bezier(.22,.61,.36,1) both!important}
