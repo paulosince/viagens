@@ -226,6 +226,7 @@ function openProfile() {
   state.avatarFile = null; state.avatarPreview = '';
   dom.profilePhotoInput.value = '';
   dom.profileMessage.textContent = '';
+  dom.profileMessage.dataset.kind = 'info';
   syncProfileUI();
   setActiveSheet('profile');
 }
@@ -248,19 +249,21 @@ async function prepareAvatar(file) {
   const bitmap = await createImageBitmap(file), size = Math.min(bitmap.width, bitmap.height);
   const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 512;
   canvas.getContext('2d', { alpha: false }).drawImage(bitmap, (bitmap.width - size) / 2, (bitmap.height - size) / 2, size, size, 0, 0, 512, 512); bitmap.close();
-  const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', .82));
+  const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', .86));
   if (!blob) throw new Error('Falha ao preparar foto');
   return { blob, preview: URL.createObjectURL(blob) };
 }
 
 async function saveProfile() {
   state.saving = true; setLoading(dom.saveProfile, true);
+  dom.profileMessage.dataset.kind = 'info';
   dom.profileMessage.textContent = state.avatarFile ? 'Enviando foto…' : 'Salvando perfil…';
   let avatarPath = state.profile?.avatar_path || null;
   try {
     if (state.avatarFile) {
-      avatarPath = `${state.user.id}/avatar-${Date.now()}.webp`;
-      const upload = await supabase.storage.from('profile-photos').upload(avatarPath, state.avatarFile, { contentType: 'image/webp', upsert: false });
+      const extension = state.avatarFile.type === 'image/png' ? 'png' : state.avatarFile.type === 'image/webp' ? 'webp' : 'jpg';
+      avatarPath = `${state.user.id}/avatar-${Date.now()}.${extension}`;
+      const upload = await supabase.storage.from('profile-photos').upload(avatarPath, state.avatarFile, { contentType: state.avatarFile.type || 'image/jpeg', upsert: false });
       if (upload.error) throw new Error(`Foto: ${upload.error.message}`);
       dom.profileMessage.textContent = 'Salvando perfil…';
     }
@@ -275,7 +278,12 @@ async function saveProfile() {
     try { await loadTrips(); } catch (error) { console.warn(error); }
     state.saving = false;
     closeSheets();
-  } catch (error) { dom.profileMessage.textContent = error.message || 'Não foi possível salvar o perfil.'; }
+  } catch (error) {
+    dom.profileMessage.dataset.kind = 'error';
+    dom.profileMessage.textContent = /mime type .* is not supported/i.test(error.message || '')
+      ? 'O formato desta foto não é aceito pelo armazenamento. Atualize a configuração do banco e tente novamente.'
+      : error.message || 'Não foi possível salvar o perfil.';
+  }
   finally { state.saving = false; setLoading(dom.saveProfile, false); }
 }
 

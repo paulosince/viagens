@@ -34,8 +34,8 @@ create policy "passenger update self" on public.passengers
   for update using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('profile-photos', 'profile-photos', false, 2097152, array['image/webp'])
-on conflict (id) do update set public = false, file_size_limit = 2097152, allowed_mime_types = array['image/webp'];
+values ('profile-photos', 'profile-photos', false, 2097152, array['image/webp','image/jpeg','image/png'])
+on conflict (id) do update set public = false, file_size_limit = 2097152, allowed_mime_types = array['image/webp','image/jpeg','image/png'];
 
 drop policy if exists "profile photo read own" on storage.objects;
 create policy "profile photo read own" on storage.objects

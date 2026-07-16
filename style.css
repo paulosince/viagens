@@ -297,7 +297,9 @@ body[data-active-sheet="profile"] #profile-sheet { transform: translateY(0); vis
 .sheet-control.confirm[data-loading="true"] .confirm-check { display: none; }
 .sheet-control.confirm[data-loading="true"] .confirm-spinner { display: block; margin: auto; }
 @keyframes confirm-spin { to { transform: rotate(1turn); } }
-.profile-save-message { width: min(100%, 660px); min-height: 18px; margin: -8px auto 3px; padding: 0 14px; color: var(--secondary); font-size: 13px; text-align: center; }
+.profile-save-message { width: min(calc(100% - 28px), 632px); min-height: 18px; margin: -6px auto 8px; padding: 8px 12px; border-radius: 12px; color: var(--secondary); font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; text-align: center; }
+.profile-save-message:empty { padding-block: 0; }
+.profile-save-message[data-kind="error"] { color: #9f1c18; background: rgba(255,59,48,.1); }
 
 .form-section { margin: 18px auto 0; width: min(100%, 660px); }
 .form-section > h3 { margin: 0 14px 8px; color: #8e8e93; font-size: 15px; }
