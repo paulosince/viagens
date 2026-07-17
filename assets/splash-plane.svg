@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 460 210" role="img" aria-label="Avião">
+  <defs>
+    <linearGradient id="plane" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#fff"/>
+      <stop offset="1" stop-color="#dbe9f5"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(18 18) rotate(-4 220 100)">
+    <path fill="url(#plane)" d="M31 128 214 44l126-37c27-8 63 8 75 31l9 17-104 38 86 49c11 6 8 22-5 25l-103-19-82 36c-10 4-21 1-27-7l-18-25-101 28c-18 5-31-18-15-29Z"/>
+    <path fill="#1479dc" d="m30 128 181-82 25 17-94 57-100 28c-18 5-27-13-12-20Z"/>
+    <path fill="#1479dc" d="m238 73 113-37 33 12-102 45Z"/>
+    <path fill="#1479dc" d="m260 115 112 52-41 7-92-36Z"/>
+    <ellipse cx="329" cy="63" rx="50" ry="29" fill="#a9ddf4"/>
+    <circle cx="309" cy="61" r="8" fill="#183d70"/>
+    <circle cx="344" cy="56" r="8" fill="#183d70"/>
+    <path d="M316 76c11 12 25 12 36 0" fill="none" stroke="#183d70" stroke-width="5" stroke-linecap="round"/>
+  </g>
+</svg>
