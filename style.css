@@ -209,7 +209,8 @@ body[data-year-menu="open"] .year-menu { opacity: 1; visibility: visible; pointe
   transition: transform .3s ease, box-shadow .3s ease;
 }
 
-.trip-card:active {
+.trip-card:active,
+.trip-card:has(.trip-card-button:active) {
   box-shadow: 0 8px 20px color-mix(in srgb, var(--card-accent, #4775d1) 28%, transparent);
   transform: scale(.8);
 }
