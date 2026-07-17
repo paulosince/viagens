@@ -25,6 +25,11 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+html:has(body[data-app-ready="false"]),
+body[data-app-ready="false"] {
+  background: linear-gradient(180deg, #159bf0 0%, #65d8ef 58%, #b9eff8 100%);
+}
+
 .app-splash {
   position: fixed;
   z-index: 100;
