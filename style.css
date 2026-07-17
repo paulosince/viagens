@@ -495,46 +495,32 @@ body[data-trip-page="open"] .trip-page {
   position: sticky;
   z-index: 4;
   top: 0;
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
   height: 0;
+  padding: calc(max(18px, env(safe-area-inset-top)) + 1rem) 18px 0;
+  pointer-events: none;
 }
-.trip-page-back {
-  position: absolute;
-  top: calc(max(18px, env(safe-area-inset-top)) + 1rem);
-  left: 18px;
+.trip-page-control {
+  position: relative;
   display: grid;
   width: 50px;
   height: 50px;
-  padding: 0 3px 3px 0;
+  padding: 0;
   place-items: center;
   border: 1px solid rgba(255,255,255,.55);
   border-radius: 50%;
   color: white;
   background: rgba(20,20,24,.25);
   box-shadow: 0 8px 22px rgba(0,0,0,.18);
-  font-size: 42px;
   line-height: 1;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
+  pointer-events: auto;
 }
-.trip-page-edit {
-  position: absolute;
-  top: calc(max(18px, env(safe-area-inset-top)) + 1rem);
-  right: 18px;
-  display: grid;
-  width: 50px;
-  height: 50px;
-  padding: 0 0 2px;
-  place-items: center;
-  border: 1px solid rgba(255,255,255,.55);
-  border-radius: 50%;
-  color: white;
-  background: rgba(20,20,24,.25);
-  box-shadow: 0 8px 22px rgba(0,0,0,.18);
-  font-size: 28px;
-  line-height: 1;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
+.trip-page-back { padding: 0 3px 3px 0; font-size: 42px; }
+.trip-page-edit svg { width: 25px; height: 25px; fill: currentColor; }
 .trip-page-hero-copy {
   position: absolute;
   z-index: 2;
