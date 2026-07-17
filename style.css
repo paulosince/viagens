@@ -671,13 +671,49 @@ body[data-day-sheet="open"] .day-edit-sheet { visibility: visible; transform: tr
 .day-edit-heading { min-width: 0; text-align: center; }
 .day-edit-heading h2 { margin: 0; font-size: 20px; }
 .day-edit-heading span { display: block; margin-top: 2px; color: var(--secondary); font-size: 11px; font-weight: 600; }
+.day-locations-editor { padding-left: 16px; }
+.day-location-row {
+  display: grid;
+  grid-template-columns: 56px minmax(0,1fr) 38px;
+  gap: 11px;
+  align-items: center;
+  min-height: 76px;
+  border-bottom: 1px solid var(--line);
+}
+.day-location-photo {
+  position: relative;
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 15px;
+  color: var(--ios-blue);
+  background: #e5e5ea;
+  cursor: pointer;
+  font-size: 25px;
+}
+.day-location-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.day-location-photo input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.day-location-row > input {
+  width: 100%;
+  min-width: 0;
+  height: 74px;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  color: var(--text);
+  background: transparent;
+  font-weight: 600;
+}
 .day-agenda-editor { padding-left: 16px; }
 .day-agenda-row {
   display: grid;
   grid-template-columns: 82px minmax(0,1fr) 38px;
-  gap: 10px;
+  gap: 6px 10px;
   align-items: center;
-  min-height: 56px;
+  min-height: 88px;
+  padding: 6px 0;
   border-bottom: 1px solid var(--line);
 }
 .day-agenda-row input {
@@ -692,6 +728,20 @@ body[data-day-sheet="open"] .day-edit-sheet { visibility: visible; transform: tr
   font-weight: 600;
 }
 .day-agenda-row input[type="time"] { color: var(--ios-blue); }
+.day-activity-location {
+  grid-column: 2 / 4;
+  width: 100%;
+  min-width: 0;
+  height: 30px;
+  padding: 0 28px 0 0;
+  border: 0;
+  outline: 0;
+  color: var(--secondary);
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+}
 .day-notes-input {
   display: block;
   width: 100%;
