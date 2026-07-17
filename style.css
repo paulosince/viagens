@@ -491,9 +491,14 @@ body[data-trip-page="open"] .trip-page {
   content: "";
   background: linear-gradient(to top, color-mix(in srgb, var(--trip-page-color) 78%, transparent) 0%, rgba(0,0,0,.12) 50%, rgba(0,0,0,.28) 100%);
 }
+.trip-page-nav {
+  position: sticky;
+  z-index: 4;
+  top: 0;
+  height: 0;
+}
 .trip-page-back {
-  position: absolute;
-  z-index: 3;
+  position: relative;
   top: max(18px, env(safe-area-inset-top));
   left: 18px;
   display: grid;
@@ -557,6 +562,25 @@ body[data-trip-page="open"] .trip-page {
   content: "";
   background: linear-gradient(to top, rgba(0,0,0,.28), transparent 58%);
 }
+.trip-day-timing {
+  position: absolute;
+  z-index: 2;
+  top: 16px;
+  right: 16px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255,255,255,.55);
+  border-radius: 999px;
+  color: white;
+  background: var(--trip-page-color);
+  box-shadow: 0 5px 16px color-mix(in srgb, var(--trip-page-color) 58%, rgba(0,0,0,.25));
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+.trip-day-timing[data-today="true"] { letter-spacing: .04em; }
+
 .trip-day-badge {
   position: absolute;
   z-index: 2;
