@@ -10,7 +10,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="assets/app-icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon-180.PNG">
-  <link rel="stylesheet" href="style.css?v=20260717-20">
+  <link rel="stylesheet" href="style.css?v=20260717-21">
 </head>
 <body data-session="loading" data-active-sheet="none" data-editing="false" data-year-menu="closed" data-trip-page="closed" data-app-ready="false">
   <div id="app_splash" class="app-splash" aria-label="Carregando Viaggio">
@@ -153,11 +153,40 @@
       </div>
     </section>
 
+    <button id="day_sheet_scrim" class="day-sheet-scrim" type="button" aria-label="Fechar edição do dia"></button>
+    <section id="day_edit_sheet" class="day-edit-sheet" aria-hidden="true">
+      <form id="day_edit_form">
+        <header class="sheet-header">
+          <button id="close_day_edit" class="sheet-control" type="button" aria-label="Cancelar">×</button>
+          <div class="day-edit-heading"><h2 id="day_edit_title">Dia</h2><span id="day_edit_date"></span></div>
+          <button id="save_day_edit" class="sheet-control confirm" type="submit" aria-label="Salvar dia"><span class="confirm-check">✓</span><span class="confirm-spinner" aria-hidden="true"></span></button>
+        </header>
+
+        <section class="form-section"><h3>Dia</h3><div class="form-group">
+          <div class="form-row"><label for="day-title-input">Título</label><input id="day-title-input" type="text" autocomplete="off" placeholder="Primeiro dia em Lisboa"></div>
+        </div></section>
+
+        <section class="form-section"><h3>Local principal</h3><div class="form-group">
+          <div class="form-row"><label for="day-place-input">Local</label><input id="day-place-input" type="text" autocomplete="off" placeholder="Praça do Comércio"></div>
+          <label class="form-row upload-row" for="day-photo-input"><span class="upload-copy">Foto do dia<small>Imagem do primeiro local</small></span><span id="day_photo_preview" class="upload-preview" data-has-image="false"><img id="day_photo_preview_image" alt=""><span class="upload-placeholder">＋</span></span><input id="day-photo-input" type="file" accept="image/*"></label>
+        </div></section>
+
+        <section class="form-section"><h3>Agenda</h3><div class="form-group day-agenda-group">
+          <div id="day_agenda_editor" class="day-agenda-editor"></div>
+          <button id="add_day_activity" class="add-trip-passenger" type="button"><span>＋</span>Adicionar horário</button>
+        </div><p class="form-note">Manhã, tarde e noite são definidas automaticamente pelo horário.</p></section>
+
+        <section class="form-section"><h3>Notas</h3><div class="form-group">
+          <textarea id="day-notes-input" class="day-notes-input" placeholder="Informações gerais do dia"></textarea>
+        </div><p id="day_edit_message" class="form-message" role="status"></p></section>
+      </form>
+    </section>
+
     <footer id="trip_edit_footer" class="trip-edit-footer" aria-hidden="true">
       <button id="delete_selected_trips" type="button" disabled>Excluir selecionadas</button>
     </footer>
   </main>
-  <script type="module" src="src/main.js?v=20260717-15"></script>
-  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260717-21');</script>
+  <script type="module" src="src/main.js?v=20260717-16"></script>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260717-22');</script>
 </body>
 </html>
