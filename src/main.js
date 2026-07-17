@@ -143,21 +143,69 @@ function syncPassengerList(container, passengers) {
   container._count.textContent = `${passengers.length} ${passengers.length === 1 ? 'passageiro' : 'passageiros'}`;
 }
 
-function renderTripDays(days) {
+function renderTripDays(days, activitiesByDay = new Map()) {
   dom.tripDayList.replaceChildren();
+  const periodLabels = { morning: 'manhã', afternoon: 'tarde', night: 'noite' };
   for (const day of days) {
+    const activities = activitiesByDay.get(String(day.id)) || [];
+    const firstPlace = activities.find(activity => activity.place_name) || activities[0];
+    const photo = day.photo_url || activities.find(activity => activity.photo_url)?.photo_url || '';
+    const titleText = day.title || day.main_place_name || firstPlace?.place_name || firstPlace?.title || `Dia ${day.day_number}`;
+
     const card = document.createElement('li');
     card.className = 'trip-day-card';
+
+    const image = document.createElement('div');
+    image.className = 'trip-day-image';
+    if (photo) image.style.backgroundImage = `url("${String(photo).replaceAll('"', '%22')}")`;
+
+    const badge = document.createElement('div');
+    badge.className = 'trip-day-badge';
     const label = document.createElement('span');
     label.className = 'trip-day-label';
     label.textContent = 'dia';
     const number = document.createElement('strong');
     number.className = 'trip-day-number';
     number.textContent = String(day.day_number);
+    badge.append(label, number);
+    image.append(badge);
+
+    const body = document.createElement('div');
+    body.className = 'trip-day-body';
+    const title = document.createElement('h2');
+    title.textContent = titleText;
     const date = document.createElement('span');
     date.className = 'trip-day-date';
     date.textContent = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' }).format(new Date(`${day.date}T12:00:00`));
-    card.append(label, number, date);
+    body.append(title, date);
+
+    const agenda = document.createElement('div');
+    agenda.className = 'trip-day-agenda';
+    for (const period of ['morning', 'afternoon', 'night']) {
+      const periodActivities = activities.filter(activity => activity.period === period);
+      if (!periodActivities.length) continue;
+      const group = document.createElement('section');
+      group.className = 'trip-day-period';
+      const heading = document.createElement('h3');
+      heading.textContent = periodLabels[period];
+      const list = document.createElement('ol');
+      for (const activity of periodActivities) {
+        const item = document.createElement('li');
+        if (activity.starts_at) {
+          const time = document.createElement('time');
+          time.textContent = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(new Date(activity.starts_at));
+          item.append(time);
+        }
+        const text = document.createElement('span');
+        text.textContent = activity.title || activity.place_name || 'Atividade';
+        item.append(text);
+        list.append(item);
+      }
+      group.append(heading, list);
+      agenda.append(group);
+    }
+    if (agenda.childElementCount) body.append(agenda);
+    card.append(image, body);
     dom.tripDayList.append(card);
   }
   dom.tripDayMessage.textContent = days.length ? '' : 'Nenhum dia encontrado para esta viagem.';
@@ -185,7 +233,23 @@ async function openTrip(tripId) {
     dom.tripDayMessage.textContent = result.error.message;
     return;
   }
-  renderTripDays(result.data || []);
+  const days = result.data || [];
+  const activitiesByDay = new Map();
+  if (days.length) {
+    const activityResult = await supabase.from('activities').select('*').in('day_id', days.map(day => day.id)).order('position');
+    if (state.activeTripId !== String(trip.id)) return;
+    if (activityResult.error) {
+      dom.tripDayMessage.textContent = activityResult.error.message;
+      return;
+    }
+    for (const activity of activityResult.data || []) {
+      const key = String(activity.day_id);
+      const list = activitiesByDay.get(key) || [];
+      list.push(activity);
+      activitiesByDay.set(key, list);
+    }
+  }
+  renderTripDays(days, activitiesByDay);
 }
 
 function closeTripPage() {
