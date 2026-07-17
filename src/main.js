@@ -17,7 +17,8 @@ const state = {
   editing: false,
   tripColor: '#4775d1',
   newTripPassengers: [],
-  activeTripId: null
+  activeTripId: null,
+  dayEditor: null
 };
 
 const dom = {
@@ -26,6 +27,7 @@ const dom = {
   editTripsButton: document.querySelector('#edit_trips_button'), newTripButton: document.querySelector('#new_trip_button'), emptyNewTripButton: document.querySelector('#empty_new_trip_button'), sessionEmail: document.querySelector('#session_email'), tripHeading: document.querySelector('#trip_heading'), yearButton: document.querySelector('#year_selector_button'), currentYear: document.querySelector('#current_year'), yearMenu: document.querySelector('#year_menu'), yearList: document.querySelector('#year_list'),
   tripList: document.querySelector('#trip_list'), homeEmpty: document.querySelector('#home_empty'), scrim: document.querySelector('#sheet_scrim'), tripEditFooter: document.querySelector('#trip_edit_footer'), deleteSelectedTrips: document.querySelector('#delete_selected_trips'), tripPage: document.querySelector('#trip_page'), closeTripPage: document.querySelector('#close_trip_page'), tripPageHero: document.querySelector('#trip_page_hero'), tripPageTitle: document.querySelector('#trip_page_title'), tripPageDates: document.querySelector('#trip_page_dates'), tripPagePassengers: document.querySelector('#trip_page_passengers'), tripPagePassengerCount: document.querySelector('#trip_page_passenger_count'), tripDayList: document.querySelector('#trip_day_list'), tripDayMessage: document.querySelector('#trip_day_message'),
   newTripSheet: document.querySelector('#home_new_trip'), newTripForm: document.querySelector('#new_trip_form'), closeNewTrip: document.querySelector('#close_new_trip'), saveNewTrip: document.querySelector('#save_new_trip'), newTripMessage: document.querySelector('#new_trip_message'), coverInput: document.querySelector('#cover-image'), coverPreview: document.querySelector('#cover_preview_image'), tripColorValue: document.querySelector('#trip-color-value'), tripColorPalette: document.querySelector('#trip_color_palette'), tripColorCustom: document.querySelector('#trip-color-custom'), newTripPassengerList: document.querySelector('#new_trip_passenger_list'), addTripPassenger: document.querySelector('#add_trip_passenger'),
+  dayEditSheet: document.querySelector('#day_edit_sheet'), daySheetScrim: document.querySelector('#day_sheet_scrim'), dayEditForm: document.querySelector('#day_edit_form'), closeDayEdit: document.querySelector('#close_day_edit'), saveDayEdit: document.querySelector('#save_day_edit'), dayEditTitle: document.querySelector('#day_edit_title'), dayEditDate: document.querySelector('#day_edit_date'), dayTitleInput: document.querySelector('#day-title-input'), dayPlaceInput: document.querySelector('#day-place-input'), dayPhotoInput: document.querySelector('#day-photo-input'), dayPhotoPreview: document.querySelector('#day_photo_preview'), dayPhotoPreviewImage: document.querySelector('#day_photo_preview_image'), dayAgendaEditor: document.querySelector('#day_agenda_editor'), addDayActivity: document.querySelector('#add_day_activity'), dayNotesInput: document.querySelector('#day-notes-input'), dayEditMessage: document.querySelector('#day_edit_message'),
   profileSheet: document.querySelector('#profile-sheet'), profileForm: document.querySelector('#profile_form'), closeProfile: document.querySelector('#close_profile'), saveProfile: document.querySelector('#save_profile'), profileMessage: document.querySelector('#profile_message'), profileEditorImage: document.querySelector('#profile_editor_image'), profilePhotoInput: document.querySelector('#profile-photo'), profileDisplayName: document.querySelector('#profile_display_name'), profileEmail: document.querySelector('#profile_email'), profileNameInput: document.querySelector('#profile-name'), birthDateInput: document.querySelector('#birth-date'), profileAge: document.querySelector('#profile_age'), profileCreatedAt: document.querySelector('#profile_created_at'), logoutButton: document.querySelector('#logout_button'), deleteAccountButton: document.querySelector('#delete_account_button')
 };
 
@@ -223,10 +225,133 @@ function renderTripDays(days, activitiesByDay = new Map()) {
       agenda.append(group);
     }
     if (agenda.childElementCount) body.append(agenda);
-    card.append(image, body);
+    const button = document.createElement('button');
+    button.className = 'trip-day-card-button';
+    button.type = 'button';
+    const empty = !day.title && !day.summary && !day.main_place_name && !day.photo_url && activities.length === 0;
+    button.setAttribute('aria-label', empty ? `Preencher dia ${day.day_number}` : `Abrir dia ${day.day_number}`);
+    button.addEventListener('click', () => {
+      if (empty) openDayEditor(day);
+    });
+    button.append(image, body);
+    card.append(button);
     dom.tripDayList.append(card);
   }
   dom.tripDayMessage.textContent = days.length ? '' : 'Nenhum dia encontrado para esta viagem.';
+}
+
+function periodFromTime(time) {
+  const hour = Number(String(time || '00:00').slice(0, 2));
+  if (hour < 12) return 'morning';
+  if (hour < 18) return 'afternoon';
+  return 'night';
+}
+
+function renderDayAgendaEditor(focusLast = false) {
+  dom.dayAgendaEditor.replaceChildren();
+  for (const activity of state.dayEditor.activities) {
+    const row = document.createElement('div');
+    row.className = 'day-agenda-row';
+    const time = document.createElement('input');
+    time.type = 'time';
+    time.value = activity.time;
+    time.addEventListener('input', () => { activity.time = time.value; });
+    const text = document.createElement('input');
+    text.type = 'text';
+    text.placeholder = 'O que está programado?';
+    text.value = activity.text;
+    text.addEventListener('input', () => { activity.text = text.value; });
+    const remove = document.createElement('button');
+    remove.className = 'new-trip-passenger-remove';
+    remove.type = 'button';
+    remove.textContent = '×';
+    remove.setAttribute('aria-label', 'Remover horário');
+    remove.addEventListener('click', () => {
+      state.dayEditor.activities = state.dayEditor.activities.filter(item => item.id !== activity.id);
+      renderDayAgendaEditor();
+    });
+    row.append(time, text, remove);
+    dom.dayAgendaEditor.append(row);
+  }
+  if (focusLast) dom.dayAgendaEditor.lastElementChild?.querySelector('input[type="text"]')?.focus({ preventScroll: true });
+}
+
+function addDayAgendaActivity() {
+  state.dayEditor.activities.push({ id: crypto.randomUUID(), time: '09:00', text: '' });
+  renderDayAgendaEditor(true);
+}
+
+function openDayEditor(day) {
+  state.dayEditor = {
+    day,
+    title: day.title || '',
+    place: day.main_place_name || '',
+    photoUrl: day.photo_url || '',
+    notes: day.summary || '',
+    activities: [{ id: crypto.randomUUID(), time: '09:00', text: '' }]
+  };
+  dom.dayEditTitle.textContent = `Dia ${day.day_number}`;
+  dom.dayEditDate.textContent = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' }).format(new Date(`${day.date}T12:00:00`));
+  dom.dayTitleInput.value = state.dayEditor.title;
+  dom.dayPlaceInput.value = state.dayEditor.place;
+  dom.dayNotesInput.value = state.dayEditor.notes;
+  dom.dayPhotoInput.value = '';
+  dom.dayPhotoPreview.dataset.hasImage = String(Boolean(state.dayEditor.photoUrl));
+  if (state.dayEditor.photoUrl) dom.dayPhotoPreviewImage.src = state.dayEditor.photoUrl;
+  else dom.dayPhotoPreviewImage.removeAttribute('src');
+  dom.dayEditMessage.textContent = '';
+  renderDayAgendaEditor();
+  dom.dayEditSheet.setAttribute('aria-hidden', 'false');
+  document.body.dataset.daySheet = 'open';
+}
+
+function closeDayEditor() {
+  if (state.saving) return;
+  state.dayEditor = null;
+  document.body.dataset.daySheet = 'closed';
+  dom.dayEditSheet.setAttribute('aria-hidden', 'true');
+}
+
+async function saveDayEditor() {
+  if (!state.dayEditor) return;
+  state.saving = true;
+  setLoading(dom.saveDayEdit, true);
+  const editor = state.dayEditor;
+  const savedDay = await supabase.from('trip_days').update({
+    title: editor.title.trim() || null,
+    summary: editor.notes.trim() || null,
+    main_place_name: editor.place.trim() || null,
+    photo_url: editor.photoUrl || null,
+    status: 'planned'
+  }).eq('id', editor.day.id);
+  if (savedDay.error) {
+    dom.dayEditMessage.textContent = savedDay.error.message;
+    state.saving = false;
+    setLoading(dom.saveDayEdit, false);
+    return;
+  }
+  const activities = editor.activities.filter(activity => activity.text.trim()).map((activity, position) => ({
+    day_id: editor.day.id,
+    period: periodFromTime(activity.time),
+    position,
+    title: activity.text.trim(),
+    starts_at: `${editor.day.date}T${activity.time || '09:00'}:00`,
+    place_name: position === 0 ? editor.place.trim() || null : null,
+    photo_url: position === 0 ? editor.photoUrl || null : null
+  }));
+  if (activities.length) {
+    const inserted = await supabase.from('activities').insert(activities);
+    if (inserted.error) {
+      dom.dayEditMessage.textContent = inserted.error.message;
+      state.saving = false;
+      setLoading(dom.saveDayEdit, false);
+      return;
+    }
+  }
+  state.saving = false;
+  setLoading(dom.saveDayEdit, false);
+  closeDayEditor();
+  if (state.activeTripId) await openTrip(state.activeTripId, { pushHistory: false });
 }
 
 async function openTrip(tripId, { pushHistory = true } = {}) {
@@ -715,6 +840,25 @@ async function deleteAccount() {
   if (result.error) { dom.profileMessage.textContent = result.error.message; return; }
   await supabase.auth.signOut();
 }
+
+dom.closeDayEdit.addEventListener('click', closeDayEditor);
+dom.daySheetScrim.addEventListener('click', closeDayEditor);
+dom.addDayActivity.addEventListener('click', addDayAgendaActivity);
+dom.dayTitleInput.addEventListener('input', () => { if (state.dayEditor) state.dayEditor.title = dom.dayTitleInput.value; });
+dom.dayPlaceInput.addEventListener('input', () => { if (state.dayEditor) state.dayEditor.place = dom.dayPlaceInput.value; });
+dom.dayNotesInput.addEventListener('input', () => { if (state.dayEditor) state.dayEditor.notes = dom.dayNotesInput.value; });
+dom.dayPhotoInput.addEventListener('change', async () => {
+  const file = dom.dayPhotoInput.files?.[0];
+  if (!file || !state.dayEditor) return;
+  try {
+    state.dayEditor.photoUrl = await compressImage(file);
+    dom.dayPhotoPreviewImage.src = state.dayEditor.photoUrl;
+    dom.dayPhotoPreview.dataset.hasImage = 'true';
+  } catch {
+    dom.dayEditMessage.textContent = 'Não foi possível preparar a foto do dia.';
+  }
+});
+dom.dayEditForm.addEventListener('submit', event => { event.preventDefault(); saveDayEditor(); });
 
 dom.closeTripPage.addEventListener('click', navigateBackFromTrip);
 window.addEventListener('popstate', event => {
