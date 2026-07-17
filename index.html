@@ -10,7 +10,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="assets/app-icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon-180.PNG">
-  <link rel="stylesheet" href="style.css?v=20260716-12">
+  <link rel="stylesheet" href="style.css?v=20260716-13">
 </head>
 <body data-session="loading" data-active-sheet="none" data-editing="false" data-year-menu="closed">
   <main id="app" aria-live="polite">
@@ -94,16 +94,16 @@
             <div class="form-row"><label for="birth-date">Nascimento</label><input id="birth-date" name="birth_date" type="date"></div>
             <div class="form-row static-row"><span>Idade</span><output id="profile_age">—</output></div>
           </div><p class="form-note">A idade é calculada automaticamente pela data de nascimento.</p></section>
-          <section class="form-section"><h3>Conta</h3><div class="form-group">
-            <div class="form-row static-row"><span>Perfil criado em</span><output id="profile_created_at"></output></div>
-            <button id="logout_button" class="account-row" type="button">Sair</button>
-          </div></section>
+          <section class="form-section"><h3>Conta</h3>
+            <div class="form-group"><div class="form-row static-row"><span>Perfil criado em</span><output id="profile_created_at"></output></div></div>
+            <div class="form-group account-actions"><button id="logout_button" class="account-row" type="button">Sair</button></div>
+          </section>
           <section class="form-section danger-section"><div class="form-group"><button id="delete_account_button" class="account-row destructive" type="button">Excluir conta</button></div><p class="form-note">A conta será desativada, sem apagar viagens, fotos ou qualquer outro dado.</p></section>
         </form>
       </section>
     </section>
   </main>
   <script type="module" src="src/main.js?v=20260716-08"></script>
-  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260716-12');</script>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260716-13');</script>
 </body>
 </html>
