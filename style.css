@@ -317,13 +317,17 @@ body[data-year-menu="open"] .year-menu { opacity: 1; visibility: visible; pointe
 .profile-sheet .form-row > span { font-weight: 700; }
 .profile-sheet .form-row input,
 .profile-sheet .form-row output {
-  color: var(--text);
-  opacity: .7;
+  color: #77746f;
+  opacity: .72;
   font-weight: 700;
 }
-.profile-sheet .form-row input[type="date"] { text-align: right; }
+.profile-sheet .form-row input[type="date"] {
+  padding-right: 16px;
+  text-align: right;
+}
 .profile-sheet .form-row input[type="date"]::-webkit-date-and-time-value {
-  min-width: 100%;
+  width: 100%;
+  margin: 0;
   text-align: right;
 }
 .static-row output { padding-right: 16px; text-align: right; }
