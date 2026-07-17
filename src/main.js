@@ -8,6 +8,7 @@ const state = {
   profile: null,
   trips: [],
   passengers: new Map(),
+  selectedTripIds: new Set(),
   imageData: '',
   avatarFile: null,
   avatarPreview: '',
@@ -21,7 +22,7 @@ const dom = {
   authView: document.querySelector('#auth_view'), authForm: document.querySelector('#auth_form'), authMessage: document.querySelector('#auth_message'),
   home: document.querySelector('#user_home'), profileButton: document.querySelector('#profile_button'), headerProfileImage: document.querySelector('#header_profile_image'), headerProfileFallback: document.querySelector('#header_profile_fallback'),
   editTripsButton: document.querySelector('#edit_trips_button'), newTripButton: document.querySelector('#new_trip_button'), emptyNewTripButton: document.querySelector('#empty_new_trip_button'), sessionEmail: document.querySelector('#session_email'), tripHeading: document.querySelector('#trip_heading'), yearButton: document.querySelector('#year_selector_button'), currentYear: document.querySelector('#current_year'), yearMenu: document.querySelector('#year_menu'), yearList: document.querySelector('#year_list'),
-  tripList: document.querySelector('#trip_list'), homeEmpty: document.querySelector('#home_empty'), scrim: document.querySelector('#sheet_scrim'),
+  tripList: document.querySelector('#trip_list'), homeEmpty: document.querySelector('#home_empty'), scrim: document.querySelector('#sheet_scrim'), tripEditFooter: document.querySelector('#trip_edit_footer'), deleteSelectedTrips: document.querySelector('#delete_selected_trips'),
   newTripSheet: document.querySelector('#home_new_trip'), newTripForm: document.querySelector('#new_trip_form'), closeNewTrip: document.querySelector('#close_new_trip'), saveNewTrip: document.querySelector('#save_new_trip'), newTripMessage: document.querySelector('#new_trip_message'), coverInput: document.querySelector('#cover-image'), coverPreview: document.querySelector('#cover_preview_image'), tripColorValue: document.querySelector('#trip-color-value'), tripColorPalette: document.querySelector('#trip_color_palette'), tripColorCustom: document.querySelector('#trip-color-custom'), newTripPassengerList: document.querySelector('#new_trip_passenger_list'), addTripPassenger: document.querySelector('#add_trip_passenger'),
   profileSheet: document.querySelector('#profile-sheet'), profileForm: document.querySelector('#profile_form'), closeProfile: document.querySelector('#close_profile'), saveProfile: document.querySelector('#save_profile'), profileMessage: document.querySelector('#profile_message'), profileEditorImage: document.querySelector('#profile_editor_image'), profilePhotoInput: document.querySelector('#profile-photo'), profileDisplayName: document.querySelector('#profile_display_name'), profileEmail: document.querySelector('#profile_email'), profileNameInput: document.querySelector('#profile-name'), birthDateInput: document.querySelector('#birth-date'), profileAge: document.querySelector('#profile_age'), profileCreatedAt: document.querySelector('#profile_created_at'), logoutButton: document.querySelector('#logout_button'), deleteAccountButton: document.querySelector('#delete_account_button')
 };
@@ -148,7 +149,10 @@ function createTripNode(trip) {
   button.addEventListener('pointerdown', () => { article.dataset.pressed = 'true'; });
   button.addEventListener('pointerup', releasePress);
   button.addEventListener('pointercancel', releasePress);
-  button.addEventListener('click', () => button.blur());
+  button.addEventListener('click', () => {
+    button.blur();
+    if (state.editing) toggleTripSelection(button.dataset.tripId);
+  });
   const owner = document.createElement('span'); owner.className = 'trip-owner-flag';
   const timing = document.createElement('span'); timing.className = 'trip-status';
   const copy = document.createElement('span'); copy.className = 'trip-copy';
@@ -157,8 +161,9 @@ function createTripNode(trip) {
   const footer = document.createElement('span'); footer.className = 'trip-footer';
   const stack = document.createElement('span'); stack.className = 'passenger-stack';
   const count = document.createElement('span'); count.className = 'passenger-count'; stack._count = count; stack.append(count);
-  footer.append(stack); copy.append(title, dates, footer); button.append(owner, timing, copy); article.append(button); item.append(article);
-  item._refs = { article, button, owner, timing, title, dates, stack };
+  const selection = document.createElement('span'); selection.className = 'trip-selection-control'; selection.setAttribute('aria-hidden', 'true'); selection.dataset.selected = 'false';
+  footer.append(stack); copy.append(title, dates, footer); button.append(owner, timing, copy, selection); article.append(button); item.append(article);
+  item._refs = { article, button, owner, timing, title, dates, stack, selection };
   updateTripNode(item, trip);
   return item;
 }
@@ -175,7 +180,48 @@ function updateTripNode(item, trip) {
   refs.timing.textContent = tripTiming(trip);
   refs.title.textContent = trip.name;
   refs.dates.textContent = `${displayDate(trip.start_date)} — ${displayDate(trip.end_date)}`;
+  refs.selection.dataset.selected = String(state.selectedTripIds.has(String(trip.id)));
   syncPassengerList(refs.stack, state.passengers.get(trip.id) || []);
+}
+
+function syncTripSelectionUI() {
+  for (const item of dom.tripList.children) {
+    const selected = state.selectedTripIds.has(String(item.dataset.tripId));
+    if (item._refs?.selection) item._refs.selection.dataset.selected = String(selected);
+    item._refs?.button?.setAttribute('aria-pressed', String(selected));
+  }
+  dom.deleteSelectedTrips.disabled = state.selectedTripIds.size === 0;
+}
+
+function toggleTripSelection(tripId) {
+  const id = String(tripId);
+  if (state.selectedTripIds.has(id)) state.selectedTripIds.delete(id);
+  else state.selectedTripIds.add(id);
+  syncTripSelectionUI();
+}
+
+function setEditingMode(editing) {
+  state.editing = editing;
+  if (!editing) state.selectedTripIds.clear();
+  document.body.dataset.editing = String(editing);
+  dom.editTripsButton.textContent = editing ? 'OK' : 'Editar';
+  dom.tripEditFooter.setAttribute('aria-hidden', String(!editing));
+  syncTripSelectionUI();
+}
+
+async function softDeleteSelectedTrips() {
+  if (!state.selectedTripIds.size) return;
+  const ids = [...state.selectedTripIds];
+  dom.deleteSelectedTrips.disabled = true;
+  const result = await supabase.from('trips').update({ deleted_at: new Date().toISOString() }).in('id', ids).eq('user_id', state.user.id);
+  if (result.error) {
+    dom.deleteSelectedTrips.textContent = result.error.message;
+    dom.deleteSelectedTrips.disabled = false;
+    return;
+  }
+  setEditingMode(false);
+  await loadTrips();
+  dom.deleteSelectedTrips.textContent = 'Excluir selecionadas';
 }
 
 function syncTripList() {
@@ -187,6 +233,7 @@ function syncTripList() {
     if (!item) item = createTripNode(trip); else updateTripNode(item, trip);
     dom.tripList.append(item);
   }
+  syncTripSelectionUI();
   const empty = visibleTrips.length === 0;
   dom.homeEmpty.setAttribute('aria-hidden', String(!empty));
   dom.tripList.setAttribute('aria-hidden', String(empty));
@@ -229,7 +276,7 @@ function syncYearList() {
 }
 
 async function loadTrips() {
-  const result = await supabase.from('trips').select('*').order('start_date', { ascending: true });
+  const result = await supabase.from('trips').select('*').is('deleted_at', null).order('start_date', { ascending: true });
   if (result.error) throw result.error;
   state.trips = result.data || [];
   state.passengers.clear();
@@ -451,7 +498,8 @@ dom.emptyNewTripButton.addEventListener('click', openNewTrip);
 dom.closeNewTrip.addEventListener('click', closeSheets);
 dom.closeProfile.addEventListener('click', closeSheets);
 dom.scrim.addEventListener('click', closeSheets);
-dom.editTripsButton.addEventListener('click', () => { state.editing = !state.editing; document.body.dataset.editing = String(state.editing); dom.editTripsButton.textContent = state.editing ? 'OK' : 'Editar'; });
+dom.editTripsButton.addEventListener('click', () => setEditingMode(!state.editing));
+dom.deleteSelectedTrips.addEventListener('click', softDeleteSelectedTrips);
 dom.yearButton.addEventListener('click', () => setYearMenu(document.body.dataset.yearMenu !== 'open'));
 document.addEventListener('click', event => { if (document.body.dataset.yearMenu === 'open' && !dom.tripHeading.contains(event.target)) setYearMenu(false); });
 dom.birthDateInput.addEventListener('input', syncAge);
