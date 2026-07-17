@@ -424,6 +424,9 @@ async function saveTrip() {
     failure = days.error;
   }
   if (failure) {
+    await supabase.from('trip_days').delete().eq('trip_id', trip.id);
+    await supabase.from('passengers').delete().eq('trip_id', trip.id);
+    await supabase.from('trip_members').delete().eq('trip_id', trip.id);
     await supabase.from('trips').delete().eq('id', trip.id);
     dom.newTripMessage.textContent = failure.message;
   } else {
