@@ -15,7 +15,8 @@ const state = {
   selectedYear: null,
   saving: false,
   editing: false,
-  tripColor: '#4775d1'
+  tripColor: '#4775d1',
+  newTripPassengers: []
 };
 
 const dom = {
@@ -312,49 +313,117 @@ function selectTripColor(color, custom = false) {
   dom.tripColorCustom.parentElement.dataset.selected = String(custom);
 }
 
-function createTripPassengerRow({ name = '', session = false } = {}) {
+function createTripPassengerRow(passenger) {
   const row = document.createElement('div');
   row.className = 'new-trip-passenger-row';
-  row.dataset.session = String(session);
-  const avatar = document.createElement('span');
+
+  const avatar = document.createElement('label');
   avatar.className = 'new-trip-passenger-avatar';
-  if (session) {
-    const image = document.createElement('img');
-    image.src = profileImage();
-    image.alt = '';
-    avatar.append(image);
+  avatar.setAttribute('aria-label', `Escolher foto de ${passenger.name || 'passageiro'}`);
+  const image = document.createElement('img');
+  image.alt = '';
+  const initial = document.createElement('span');
+  initial.textContent = passenger.name.trim()[0]?.toUpperCase() || '＋';
+  const photoInput = document.createElement('input');
+  photoInput.type = 'file';
+  photoInput.accept = 'image/*';
+  if (passenger.photoUrl) {
+    image.src = passenger.photoUrl;
+    image.hidden = false;
+    initial.hidden = true;
   } else {
-    avatar.textContent = name.trim()[0]?.toUpperCase() || '＋';
+    image.hidden = true;
   }
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.name = 'passenger_name';
-  input.placeholder = 'Nome do passageiro';
-  input.autocomplete = 'off';
-  input.value = name;
-  input.required = true;
-  if (session) input.readOnly = true;
-  const control = document.createElement(session ? 'span' : 'button');
-  if (session) {
+  photoInput.addEventListener('change', async () => {
+    const file = photoInput.files?.[0];
+    if (!file) return;
+    try {
+      passenger.photoUrl = await compressPassengerPhoto(file);
+      image.src = passenger.photoUrl;
+      image.hidden = false;
+      initial.hidden = true;
+    } catch {
+      dom.newTripMessage.textContent = 'Não foi possível preparar a foto do passageiro.';
+    }
+  });
+  avatar.append(image, initial, photoInput);
+
+  const fields = document.createElement('div');
+  fields.className = 'new-trip-passenger-fields';
+  const nameField = document.createElement('label');
+  nameField.className = 'new-trip-passenger-field';
+  nameField.innerHTML = '<span>Nome</span>';
+  const nameInput = document.createElement('input');
+  nameInput.type = 'text';
+  nameInput.placeholder = 'Nome do passageiro';
+  nameInput.autocomplete = 'off';
+  nameInput.value = passenger.name;
+  nameInput.required = true;
+  nameInput.addEventListener('input', () => {
+    passenger.name = nameInput.value;
+    initial.textContent = passenger.name.trim()[0]?.toUpperCase() || '＋';
+    avatar.setAttribute('aria-label', `Escolher foto de ${passenger.name || 'passageiro'}`);
+  });
+  nameField.append(nameInput);
+
+  const birthField = document.createElement('label');
+  birthField.className = 'new-trip-passenger-field';
+  birthField.innerHTML = '<span>Nascimento</span>';
+  const birthInput = document.createElement('input');
+  birthInput.type = 'date';
+  birthInput.value = passenger.birthDate || '';
+  birthInput.addEventListener('input', () => { passenger.birthDate = birthInput.value; });
+  birthField.append(birthInput);
+  fields.append(nameField, birthField);
+
+  const control = document.createElement(passenger.session ? 'span' : 'button');
+  if (passenger.session) {
     control.className = 'new-trip-passenger-session-mark';
     control.textContent = '✓';
-    control.setAttribute('aria-label', 'Passageiro selecionado');
+    control.setAttribute('aria-label', 'Pessoa da sessão incluída');
   } else {
     control.className = 'new-trip-passenger-remove';
     control.type = 'button';
     control.textContent = '×';
     control.setAttribute('aria-label', 'Remover passageiro');
-    control.addEventListener('click', () => row.remove());
-    input.addEventListener('input', () => { avatar.textContent = input.value.trim()[0]?.toUpperCase() || '＋'; });
+    control.addEventListener('click', () => {
+      state.newTripPassengers = state.newTripPassengers.filter(item => item.id !== passenger.id);
+      renderTripPassengers();
+    });
   }
-  row.append(avatar, input, control);
+
+  row.append(avatar, fields, control);
   dom.newTripPassengerList.append(row);
-  if (!session) input.focus({ preventScroll: true });
+}
+
+function renderTripPassengers(focusLast = false) {
+  dom.newTripPassengerList.replaceChildren();
+  for (const passenger of state.newTripPassengers) createTripPassengerRow(passenger);
+  if (focusLast) dom.newTripPassengerList.lastElementChild?.querySelector('input[type="text"]')?.focus({ preventScroll: true });
+}
+
+function addTripPassenger() {
+  state.newTripPassengers.push({
+    id: crypto.randomUUID(),
+    session: false,
+    userId: null,
+    name: '',
+    birthDate: '',
+    photoUrl: ''
+  });
+  renderTripPassengers(true);
 }
 
 function resetTripPassengers() {
-  dom.newTripPassengerList.replaceChildren();
-  createTripPassengerRow({ name: profileName(), session: true });
+  state.newTripPassengers = [{
+    id: crypto.randomUUID(),
+    session: true,
+    userId: state.user.id,
+    name: profileName(),
+    birthDate: state.profile?.birth_date || '',
+    photoUrl: profileImage()
+  }];
+  renderTripPassengers();
 }
 
 function openNewTrip() {
@@ -392,6 +461,17 @@ async function compressImage(file) {
   const canvas = document.createElement('canvas'); canvas.width = Math.round(bitmap.width * scale); canvas.height = Math.round(bitmap.height * scale);
   canvas.getContext('2d', { alpha: false }).drawImage(bitmap, 0, 0, canvas.width, canvas.height); bitmap.close();
   return canvas.toDataURL('image/webp', .78);
+}
+
+async function compressPassengerPhoto(file) {
+  const bitmap = await createImageBitmap(file);
+  const size = Math.min(bitmap.width, bitmap.height);
+  const canvas = document.createElement('canvas');
+  canvas.width = 320;
+  canvas.height = 320;
+  canvas.getContext('2d', { alpha: false }).drawImage(bitmap, (bitmap.width - size) / 2, (bitmap.height - size) / 2, size, size, 0, 0, 320, 320);
+  bitmap.close();
+  return canvas.toDataURL('image/jpeg', .82);
 }
 
 async function prepareAvatar(file) {
@@ -453,13 +533,13 @@ async function saveTrip() {
   const member = await supabase.from('trip_members').insert({ trip_id: trip.id, user_id: state.user.id, role: 'owner' });
   let failure = member.error;
   if (!failure) {
-    const passengerRows = [...dom.newTripPassengerList.querySelectorAll('.new-trip-passenger-row')];
-    const passengerPayload = passengerRows.map(row => ({
+    const passengerPayload = state.newTripPassengers.map(passenger => ({
       trip_id: trip.id,
-      user_id: row.dataset.session === 'true' ? state.user.id : null,
-      name: row.querySelector('input').value.trim(),
-      photo_url: null,
-      age: row.dataset.session === 'true' ? ageFromBirthDate(state.profile?.birth_date) : null
+      user_id: passenger.session ? state.user.id : null,
+      name: passenger.name.trim(),
+      birth_date: passenger.birthDate || null,
+      photo_url: passenger.photoUrl || null,
+      age: ageFromBirthDate(passenger.birthDate)
     })).filter(passenger => passenger.name);
     if (passengerPayload.length) {
       const passengers = await supabase.from('passengers').insert(passengerPayload);
@@ -508,7 +588,7 @@ dom.deleteAccountButton.addEventListener('click', deleteAccount);
 
 for (const option of dom.tripColorPalette.querySelectorAll('.trip-color-option')) option.addEventListener('click', () => selectTripColor(option.dataset.color));
 dom.tripColorCustom.addEventListener('input', () => selectTripColor(dom.tripColorCustom.value, true));
-dom.addTripPassenger.addEventListener('click', () => createTripPassengerRow());
+dom.addTripPassenger.addEventListener('click', addTripPassenger);
 
 dom.coverInput.addEventListener('change', async () => {
   const file = dom.coverInput.files?.[0]; if (!file) return;
