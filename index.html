@@ -36,7 +36,7 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20260717-22" as="style">
+  <link rel="preload" href="style.css?v=20260717-23" as="style">
   <link rel="stylesheet" href="style.css?v=20260717-22" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
   <noscript><link rel="stylesheet" href="style.css?v=20260717-22"></noscript>
 </head>
@@ -194,10 +194,10 @@
           <div class="form-row"><label for="day-title-input">Título</label><input id="day-title-input" type="text" autocomplete="off" placeholder="Primeiro dia em Lisboa"></div>
         </div></section>
 
-        <section class="form-section"><h3>Local principal</h3><div class="form-group">
-          <div class="form-row"><label for="day-place-input">Local</label><input id="day-place-input" type="text" autocomplete="off" placeholder="Praça do Comércio"></div>
-          <label class="form-row upload-row" for="day-photo-input"><span class="upload-copy">Foto do dia<small>Imagem do primeiro local</small></span><span id="day_photo_preview" class="upload-preview" data-has-image="false"><img id="day_photo_preview_image" alt=""><span class="upload-placeholder">＋</span></span><input id="day-photo-input" type="file" accept="image/*"></label>
-        </div></section>
+        <section class="form-section"><h3>Locais</h3><div class="form-group day-locations-group">
+          <div id="day_locations_editor" class="day-locations-editor"></div>
+          <button id="add_day_location" class="add-trip-passenger" type="button"><span>＋</span>Adicionar local</button>
+        </div><p class="form-note">O primeiro local define a imagem principal do card do dia.</p></section>
 
         <section class="form-section"><h3>Agenda</h3><div class="form-group day-agenda-group">
           <div id="day_agenda_editor" class="day-agenda-editor"></div>
@@ -214,7 +214,7 @@
       <button id="delete_selected_trips" type="button" disabled>Excluir selecionadas</button>
     </footer>
   </main>
-  <script type="module" src="src/main.js?v=20260717-20"></script>
-  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260717-27');</script>
+  <script type="module" src="src/main.js?v=20260717-21"></script>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260717-28');</script>
 </body>
 </html>
