@@ -20,3 +20,11 @@ A aplicação usa a URL do projeto e a chave publishable/anon, que podem aparece
 - isolamento por usuário usando Row Level Security.
 
 O próximo passo é transformar cada viagem em um conjunto de tabelas: roteiro por dia, checklist, orçamento e reservas, todas ligadas a trip_id e protegidas pelas mesmas regras.
+
+## Fotos do Unsplash
+
+1. Execute `supabase/migrations/20260717_unsplash_photos.sql` no SQL Editor.
+2. Cadastre a chave pública da aplicação como secret: `supabase secrets set UNSPLASH_ACCESS_KEY=...`.
+3. Publique a função autenticada: `supabase functions deploy unsplash-photos`.
+
+A chave fica somente na Edge Function. A interface oculta as sugestões quando a cota não está disponível e mantém o envio de foto do aparelho.
