@@ -219,7 +219,7 @@ function renderTripDays(days, activitiesByDay = new Map(), locationsByDay = new 
         const item = document.createElement('li');
         if (activity.starts_at) {
           const time = document.createElement('time');
-          time.textContent = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(new Date(activity.starts_at));
+          time.textContent = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }).format(new Date(activity.starts_at));
           item.append(time);
         }
         const text = document.createElement('span');
