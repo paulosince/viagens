@@ -388,6 +388,107 @@ body[data-editing="true"] .trip-edit-footer { transform: translateY(0); }
 .trip-list[aria-hidden="true"],
 .home-empty[aria-hidden="true"] { display: none; }
 
+.trip-page {
+  --trip-page-color: #4775d1;
+  position: fixed;
+  z-index: 50;
+  inset: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  color: white;
+  background: var(--trip-page-color);
+  box-shadow: -22px 0 48px rgba(0,0,0,.28);
+  visibility: hidden;
+  transform: translateX(105%);
+  transition: transform .3s ease-in-out, visibility 0s linear .3s;
+  overscroll-behavior: contain;
+}
+body[data-trip-page="open"] { overflow: hidden; }
+body[data-trip-page="open"] .trip-page {
+  visibility: visible;
+  transform: translateX(0);
+  transition-delay: 0s;
+}
+.trip-page-hero {
+  position: relative;
+  min-height: 390px;
+  overflow: hidden;
+  border-bottom: 5px solid var(--trip-page-color);
+  background: #5f7380 center / cover no-repeat;
+  box-shadow: 0 22px 44px color-mix(in srgb, var(--trip-page-color) 72%, rgba(0,0,0,.35));
+}
+.trip-page-hero::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background: linear-gradient(to top, color-mix(in srgb, var(--trip-page-color) 78%, transparent) 0%, rgba(0,0,0,.12) 50%, rgba(0,0,0,.28) 100%);
+}
+.trip-page-back {
+  position: absolute;
+  z-index: 3;
+  top: max(18px, env(safe-area-inset-top));
+  left: 18px;
+  display: grid;
+  width: 50px;
+  height: 50px;
+  padding: 0 3px 3px 0;
+  place-items: center;
+  border: 1px solid rgba(255,255,255,.55);
+  border-radius: 50%;
+  color: white;
+  background: rgba(20,20,24,.25);
+  box-shadow: 0 8px 22px rgba(0,0,0,.18);
+  font-size: 42px;
+  line-height: 1;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.trip-page-hero-copy {
+  position: absolute;
+  z-index: 2;
+  right: 24px;
+  bottom: 26px;
+  left: 24px;
+  text-shadow: 0 3px 14px rgba(0,0,0,.42);
+}
+.trip-page-hero-copy h1 { margin: 0 0 7px; font-size: clamp(38px, 10vw, 58px); line-height: .96; letter-spacing: -.045em; }
+.trip-page-hero-copy p { margin: 0 0 18px; font-size: 16px; font-weight: 600; }
+.trip-page-passengers { min-height: 36px; }
+.trip-page-content {
+  width: min(100%, 796px);
+  min-height: calc(100svh - 390px);
+  margin: 0 auto;
+  padding: 28px 18px calc(42px + env(safe-area-inset-bottom));
+}
+.trip-day-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.trip-day-card {
+  min-height: 180px;
+  padding: 22px;
+  border: 1px solid rgba(255,255,255,.4);
+  border-radius: 26px;
+  color: var(--text);
+  background: rgba(255,255,255,.86);
+  box-shadow: 0 14px 28px color-mix(in srgb, var(--trip-page-color) 55%, rgba(0,0,0,.18));
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.trip-day-label { display: block; color: var(--secondary); font-size: 14px; font-weight: 700; letter-spacing: .02em; text-transform: lowercase; }
+.trip-day-number { display: block; margin-top: -3px; font-size: 78px; line-height: .95; letter-spacing: -.06em; }
+.trip-day-date { display: block; margin-top: 14px; color: var(--secondary); font-size: 14px; font-weight: 600; }
+.trip-day-message { margin: 24px 4px; color: rgba(255,255,255,.86); text-align: center; }
+.trip-day-message:empty { display: none; }
+
+@media (min-width: 720px) {
+  .trip-day-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
 .scrim {
   position: fixed;
   z-index: 20;
