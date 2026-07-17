@@ -155,7 +155,25 @@ function updatePassengerNode(node, passenger) {
   else { node._refs.image.removeAttribute('src'); node._refs.image.hidden = true; node._refs.initial.hidden = false; }
 }
 
+function passengerRecordKey(passenger) {
+  if (passenger.user_id) return `user:${passenger.user_id}`;
+  return [passenger.name, passenger.birth_date, passenger.photo_url]
+    .map(value => String(value || '').trim().toLocaleLowerCase('pt-BR'))
+    .join('|');
+}
+
+function uniquePassengerRecords(passengers) {
+  const keys = new Set();
+  return passengers.filter(passenger => {
+    const key = passengerRecordKey(passenger);
+    if (!passenger.name?.trim() || keys.has(key)) return false;
+    keys.add(key);
+    return true;
+  });
+}
+
 function syncPassengerList(container, passengers) {
+  passengers = uniquePassengerRecords(passengers);
   const wanted = new Set(passengers.slice(0, 5).map(item => String(item.id || item.name)));
   for (const node of [...container.querySelectorAll('.passenger-photo')]) if (!wanted.has(node.dataset.passengerId)) node.remove();
   for (const passenger of passengers.slice(0, 5)) {
@@ -1241,7 +1259,11 @@ async function saveTrip() {
       const editedPassengers = uniqueTripPassengers(state.newTripPassengers);
       const retainedIds = new Set(editedPassengers.filter(passenger => existingIds.has(String(passenger.id))).map(passenger => String(passenger.id)));
       const removedIds = existingPassengers.filter(passenger => !retainedIds.has(String(passenger.id))).map(passenger => passenger.id);
-      if (removedIds.length) failure = (await supabase.from('passengers').delete().in('id', removedIds).eq('trip_id', tripId)).error;
+      if (removedIds.length) {
+        const removed = await supabase.from('passengers').delete().in('id', removedIds).eq('trip_id', tripId).select('id');
+        failure = removed.error;
+        if (!failure && (removed.data || []).length !== removedIds.length) failure = new Error('Não foi possível remover todos os passageiros duplicados.');
+      }
       for (const passenger of editedPassengers) {
         if (failure) break;
         const payload = { user_id: passenger.session ? state.user.id : passenger.userId || null, name: passenger.name.trim(), birth_date: passenger.birthDate || null, photo_url: passenger.photoUrl || null, age: ageFromBirthDate(passenger.birthDate) };
