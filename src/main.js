@@ -16,14 +16,15 @@ const state = {
   saving: false,
   editing: false,
   tripColor: '#4775d1',
-  newTripPassengers: []
+  newTripPassengers: [],
+  activeTripId: null
 };
 
 const dom = {
   authView: document.querySelector('#auth_view'), authForm: document.querySelector('#auth_form'), authMessage: document.querySelector('#auth_message'),
   home: document.querySelector('#user_home'), profileButton: document.querySelector('#profile_button'), headerProfileImage: document.querySelector('#header_profile_image'), headerProfileFallback: document.querySelector('#header_profile_fallback'),
   editTripsButton: document.querySelector('#edit_trips_button'), newTripButton: document.querySelector('#new_trip_button'), emptyNewTripButton: document.querySelector('#empty_new_trip_button'), sessionEmail: document.querySelector('#session_email'), tripHeading: document.querySelector('#trip_heading'), yearButton: document.querySelector('#year_selector_button'), currentYear: document.querySelector('#current_year'), yearMenu: document.querySelector('#year_menu'), yearList: document.querySelector('#year_list'),
-  tripList: document.querySelector('#trip_list'), homeEmpty: document.querySelector('#home_empty'), scrim: document.querySelector('#sheet_scrim'), tripEditFooter: document.querySelector('#trip_edit_footer'), deleteSelectedTrips: document.querySelector('#delete_selected_trips'),
+  tripList: document.querySelector('#trip_list'), homeEmpty: document.querySelector('#home_empty'), scrim: document.querySelector('#sheet_scrim'), tripEditFooter: document.querySelector('#trip_edit_footer'), deleteSelectedTrips: document.querySelector('#delete_selected_trips'), tripPage: document.querySelector('#trip_page'), closeTripPage: document.querySelector('#close_trip_page'), tripPageHero: document.querySelector('#trip_page_hero'), tripPageTitle: document.querySelector('#trip_page_title'), tripPageDates: document.querySelector('#trip_page_dates'), tripPagePassengers: document.querySelector('#trip_page_passengers'), tripPagePassengerCount: document.querySelector('#trip_page_passenger_count'), tripDayList: document.querySelector('#trip_day_list'), tripDayMessage: document.querySelector('#trip_day_message'),
   newTripSheet: document.querySelector('#home_new_trip'), newTripForm: document.querySelector('#new_trip_form'), closeNewTrip: document.querySelector('#close_new_trip'), saveNewTrip: document.querySelector('#save_new_trip'), newTripMessage: document.querySelector('#new_trip_message'), coverInput: document.querySelector('#cover-image'), coverPreview: document.querySelector('#cover_preview_image'), tripColorValue: document.querySelector('#trip-color-value'), tripColorPalette: document.querySelector('#trip_color_palette'), tripColorCustom: document.querySelector('#trip-color-custom'), newTripPassengerList: document.querySelector('#new_trip_passenger_list'), addTripPassenger: document.querySelector('#add_trip_passenger'),
   profileSheet: document.querySelector('#profile-sheet'), profileForm: document.querySelector('#profile_form'), closeProfile: document.querySelector('#close_profile'), saveProfile: document.querySelector('#save_profile'), profileMessage: document.querySelector('#profile_message'), profileEditorImage: document.querySelector('#profile_editor_image'), profilePhotoInput: document.querySelector('#profile-photo'), profileDisplayName: document.querySelector('#profile_display_name'), profileEmail: document.querySelector('#profile_email'), profileNameInput: document.querySelector('#profile-name'), birthDateInput: document.querySelector('#birth-date'), profileAge: document.querySelector('#profile_age'), profileCreatedAt: document.querySelector('#profile_created_at'), logoutButton: document.querySelector('#logout_button'), deleteAccountButton: document.querySelector('#delete_account_button')
 };
@@ -142,6 +143,57 @@ function syncPassengerList(container, passengers) {
   container._count.textContent = `${passengers.length} ${passengers.length === 1 ? 'passageiro' : 'passageiros'}`;
 }
 
+function renderTripDays(days) {
+  dom.tripDayList.replaceChildren();
+  for (const day of days) {
+    const card = document.createElement('li');
+    card.className = 'trip-day-card';
+    const label = document.createElement('span');
+    label.className = 'trip-day-label';
+    label.textContent = 'dia';
+    const number = document.createElement('strong');
+    number.className = 'trip-day-number';
+    number.textContent = String(day.day_number);
+    const date = document.createElement('span');
+    date.className = 'trip-day-date';
+    date.textContent = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' }).format(new Date(`${day.date}T12:00:00`));
+    card.append(label, number, date);
+    dom.tripDayList.append(card);
+  }
+  dom.tripDayMessage.textContent = days.length ? '' : 'Nenhum dia encontrado para esta viagem.';
+}
+
+async function openTrip(tripId) {
+  const trip = state.trips.find(item => String(item.id) === String(tripId));
+  if (!trip) return;
+  state.activeTripId = String(trip.id);
+  const accent = /^#[0-9a-f]{6}$/i.test(trip.secondary_color || '') ? trip.secondary_color : '#4775d1';
+  dom.tripPage.style.setProperty('--trip-page-color', accent);
+  dom.tripPageHero.style.backgroundImage = trip.cover_url ? `url("${trip.cover_url.replaceAll('"', '%22')}")` : '';
+  dom.tripPageTitle.textContent = trip.name;
+  dom.tripPageDates.textContent = `${displayDate(trip.start_date)} — ${displayDate(trip.end_date)}`;
+  dom.tripPagePassengers._count = dom.tripPagePassengerCount;
+  syncPassengerList(dom.tripPagePassengers, state.passengers.get(trip.id) || []);
+  dom.tripDayList.replaceChildren();
+  dom.tripDayMessage.textContent = 'Carregando dias…';
+  dom.tripPage.setAttribute('aria-hidden', 'false');
+  document.body.dataset.tripPage = 'open';
+
+  const result = await supabase.from('trip_days').select('*').eq('trip_id', trip.id).order('day_number');
+  if (state.activeTripId !== String(trip.id)) return;
+  if (result.error) {
+    dom.tripDayMessage.textContent = result.error.message;
+    return;
+  }
+  renderTripDays(result.data || []);
+}
+
+function closeTripPage() {
+  state.activeTripId = null;
+  document.body.dataset.tripPage = 'closed';
+  dom.tripPage.setAttribute('aria-hidden', 'true');
+}
+
 function createTripNode(trip) {
   const item = document.createElement('li');
   const article = document.createElement('article'); article.className = 'trip-card'; article.dataset.pressed = 'false';
@@ -153,6 +205,7 @@ function createTripNode(trip) {
   button.addEventListener('click', () => {
     button.blur();
     if (state.editing) toggleTripSelection(button.dataset.tripId);
+    else openTrip(button.dataset.tripId);
   });
   const owner = document.createElement('span'); owner.className = 'trip-owner-flag';
   const timing = document.createElement('span'); timing.className = 'trip-status';
@@ -573,6 +626,7 @@ async function deleteAccount() {
   await supabase.auth.signOut();
 }
 
+dom.closeTripPage.addEventListener('click', closeTripPage);
 dom.profileButton.addEventListener('click', openProfile);
 dom.newTripButton.addEventListener('click', openNewTrip);
 dom.emptyNewTripButton.addEventListener('click', openNewTrip);
