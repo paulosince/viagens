@@ -142,14 +142,23 @@ button { -webkit-tap-highlight-color: transparent; }
   gap: .14em;
   padding: 0;
   border: 0;
+  outline: 0;
   color: inherit;
   background: transparent !important;
-  box-shadow: none;
+  box-shadow: none !important;
   appearance: none;
   -webkit-appearance: none;
   font: inherit;
   font-weight: 700;
   letter-spacing: inherit;
+}
+.home-title button:hover,
+.home-title button:focus,
+.home-title button:focus-visible,
+.home-title button:active {
+  outline: 0;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 .year-chevron {
   position: relative;
@@ -158,26 +167,25 @@ button { -webkit-tap-highlight-color: transparent; }
   height: .42em;
   flex: 0 0 .42em;
   align-self: center;
-  overflow: hidden;
-  color: transparent;
+  overflow: visible;
   background: transparent !important;
-  font-size: .66em;
+  font-size: inherit;
   line-height: 0;
-  transform: translateY(-.02em) rotate(0);
-  transition: transform .25s ease;
 }
 .year-chevron::before {
   position: absolute;
-  top: 42%;
-  left: 50%;
-  width: 58%;
-  height: 58%;
-  border-right: .12em solid var(--text);
-  border-bottom: .12em solid var(--text);
+  top: 5%;
+  left: 15%;
+  width: 56%;
+  height: 56%;
+  border-right: .055em solid currentColor;
+  border-bottom: .055em solid currentColor;
   content: "";
-  transform: translate(-50%, -50%) rotate(45deg);
+  transform: rotate(45deg);
+  transform-origin: 50% 50%;
+  transition: transform .25s ease;
 }
-body[data-year-menu="open"] .year-chevron { transform: translateY(-.02em) rotate(180deg); }
+body[data-year-menu="open"] .year-chevron::before { transform: rotate(225deg); }
 .year-menu { --year-menu-radius: 2rem; --year-menu-padding: 1rem; position: absolute; z-index: 8; top: calc(100% - 2px); left: 0; min-width: 150px; padding: var(--year-menu-padding); border: 1px solid rgba(0,0,0,.2); border-radius: var(--year-menu-radius); background: rgba(255,255,255,.78); box-shadow: 0 14px 35px rgba(0,0,0,.14); opacity: 0; visibility: hidden; pointer-events: none; transform: translateY(-8px) scale(.96); transform-origin: top left; transition: opacity .22s ease, transform .22s ease, visibility 0s linear .22s; backdrop-filter: blur(40px) saturate(150%); }
 body[data-year-menu="open"] .year-menu { opacity: 1; visibility: visible; pointer-events: auto; transform: translateY(0) scale(1); transition-delay: 0s; }
 .year-menu ol { margin: 0; padding: 0; list-style: none; }
