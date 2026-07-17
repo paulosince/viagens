@@ -36,9 +36,9 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20260717-26" as="style">
-  <link rel="stylesheet" href="style.css?v=20260717-26" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20260717-26"></noscript>
+  <link rel="preload" href="style.css?v=20260717-27" as="style">
+  <link rel="stylesheet" href="style.css?v=20260717-27" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20260717-27"></noscript>
 </head>
 <body data-session="loading" data-active-sheet="none" data-editing="false" data-year-menu="closed" data-trip-page="closed" data-app-ready="false">
   <div id="app_splash" class="app-splash" aria-label="Carregando Viaggio">
@@ -225,6 +225,11 @@
         </div>
         <p id="place_search_message" class="place-search-message" role="status"></p>
         <ol id="place_search_results" class="place-search-results"></ol>
+        <section id="place_photo_section" class="place-photo-section" hidden>
+          <div class="place-photo-heading"><h3>Escolha uma foto</h3><span>opcional</span></div>
+          <p id="place_photo_message" class="place-search-message" role="status"></p>
+          <div id="place_photo_results" class="place-photo-results"></div>
+        </section>
         <p class="map-attribution place-search-attribution">Resultados de <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a></p>
       </form>
     </section>
@@ -233,7 +238,7 @@
       <button id="delete_selected_trips" type="button" disabled>Excluir selecionadas</button>
     </footer>
   </main>
-  <script type="module" src="src/main.js?v=20260717-25"></script>
-  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260717-32');</script>
+  <script type="module" src="src/main.js?v=20260717-26"></script>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260717-33');</script>
 </body>
 </html>
