@@ -928,9 +928,11 @@ async function boot() {
     dom.authMessage.textContent = error.message || 'Não foi possível iniciar o aplicativo.';
     setSessionView('anonymous');
   } finally {
-    requestAnimationFrame(() => requestAnimationFrame(() => {
+    const revealApp = () => requestAnimationFrame(() => requestAnimationFrame(() => {
       document.body.dataset.appReady = 'true';
     }));
+    if (window.__appStylesReady) revealApp();
+    else document.addEventListener('appstylesready', revealApp, { once: true });
   }
 }
 
