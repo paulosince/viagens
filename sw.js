@@ -1,9 +1,9 @@
-const CACHE_NAME = 'viagens-home-v17';
+const CACHE_NAME = 'viagens-home-v18';
 const APP_SHELL = [
   './',
   './index.html',
   './style.css?v=20260717-31',
-  './src/main.js?v=20260717-28',
+  './src/main.js?v=20260717-29',
   './manifest.webmanifest',
   './assets/app-icon.svg',
   './assets/cintia.png'

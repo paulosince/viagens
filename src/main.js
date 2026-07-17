@@ -1073,6 +1073,23 @@ function resetTripPassengers() {
   renderTripPassengers();
 }
 
+function passengerEditorKey(passenger) {
+  if (passenger.userId) return `user:${passenger.userId}`;
+  return [passenger.name, passenger.birthDate, passenger.photoUrl]
+    .map(value => String(value || '').trim().toLocaleLowerCase('pt-BR'))
+    .join('|');
+}
+
+function uniqueTripPassengers(passengers) {
+  const keys = new Set();
+  return passengers.filter(passenger => {
+    const key = passengerEditorKey(passenger);
+    if (!passenger.name.trim() || keys.has(key)) return false;
+    keys.add(key);
+    return true;
+  });
+}
+
 function openNewTrip() {
   setYearMenu(false);
   state.editingTripId = null;
@@ -1102,14 +1119,14 @@ function openTripEditor() {
   dom.newTripForm.elements.arrival_method.value = trip.arrival_method || 'avião';
   dom.newTripForm.elements.location_label.value = trip.location_label || '';
   selectTripColor(trip.secondary_color || '#4775d1');
-  state.newTripPassengers = (state.passengers.get(trip.id) || []).map(passenger => ({
+  state.newTripPassengers = uniqueTripPassengers((state.passengers.get(trip.id) || []).map(passenger => ({
     id: passenger.id || crypto.randomUUID(),
     session: String(passenger.user_id || '') === String(state.user.id),
     userId: passenger.user_id || null,
     name: passenger.name || '',
     birthDate: passenger.birth_date || '',
     photoUrl: passenger.photo_url || ''
-  }));
+  })));
   renderTripPassengers();
   if (state.imageData) {
     dom.coverPreview.src = state.imageData;
@@ -1219,12 +1236,19 @@ async function saveTrip() {
     const updated = await supabase.from('trips').update(payload).eq('id', tripId);
     let failure = updated.error;
     if (!failure) {
-      const removed = await supabase.from('passengers').delete().eq('trip_id', tripId);
-      failure = removed.error;
-    }
-    if (!failure) {
-      const passengerPayload = state.newTripPassengers.map(passenger => ({ trip_id: tripId, user_id: passenger.session ? state.user.id : passenger.userId || null, name: passenger.name.trim(), birth_date: passenger.birthDate || null, photo_url: passenger.photoUrl || null, age: ageFromBirthDate(passenger.birthDate) })).filter(passenger => passenger.name);
-      if (passengerPayload.length) failure = (await supabase.from('passengers').insert(passengerPayload)).error;
+      const existingPassengers = state.passengers.get(tripId) || [];
+      const existingIds = new Set(existingPassengers.map(passenger => String(passenger.id)));
+      const editedPassengers = uniqueTripPassengers(state.newTripPassengers);
+      const retainedIds = new Set(editedPassengers.filter(passenger => existingIds.has(String(passenger.id))).map(passenger => String(passenger.id)));
+      const removedIds = existingPassengers.filter(passenger => !retainedIds.has(String(passenger.id))).map(passenger => passenger.id);
+      if (removedIds.length) failure = (await supabase.from('passengers').delete().in('id', removedIds).eq('trip_id', tripId)).error;
+      for (const passenger of editedPassengers) {
+        if (failure) break;
+        const payload = { user_id: passenger.session ? state.user.id : passenger.userId || null, name: passenger.name.trim(), birth_date: passenger.birthDate || null, photo_url: passenger.photoUrl || null, age: ageFromBirthDate(passenger.birthDate) };
+        failure = existingIds.has(String(passenger.id))
+          ? (await supabase.from('passengers').update(payload).eq('id', passenger.id).eq('trip_id', tripId)).error
+          : (await supabase.from('passengers').insert({ ...payload, trip_id: tripId })).error;
+      }
     }
     if (!failure) {
       const existing = await supabase.from('trip_days').select('id,date').eq('trip_id', tripId);
