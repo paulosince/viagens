@@ -290,8 +290,11 @@ function openDayEditor(day) {
     notes: day.summary || '',
     activities: [{ id: crypto.randomUUID(), time: '09:00', text: '' }]
   };
+  const trip = state.trips.find(item => String(item.id) === String(state.activeTripId));
+  const destination = trip?.destination?.trim() || trip?.name?.trim() || 'seu destino';
   dom.dayEditTitle.textContent = `Dia ${day.day_number}`;
   dom.dayEditDate.textContent = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' }).format(new Date(`${day.date}T12:00:00`));
+  dom.dayTitleInput.placeholder = `Primeiro dia em ${destination}`;
   dom.dayTitleInput.value = state.dayEditor.title;
   dom.dayPlaceInput.value = state.dayEditor.place;
   dom.dayNotesInput.value = state.dayEditor.notes;
