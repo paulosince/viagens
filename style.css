@@ -214,11 +214,11 @@ body[data-year-menu="open"] .year-menu { opacity: 1; visibility: visible; pointe
   -webkit-touch-callout: none;
 }
 
+.trip-card[data-pressed="true"],
 .trip-card:active,
 .trip-card:has(.trip-card-button:active) {
   box-shadow: 0 8px 20px color-mix(in srgb, var(--card-accent, #4775d1) 28%, transparent);
   transform: scale(.9);
-  transition-duration: .08s;
 }
 
 .trip-card::after {
@@ -252,6 +252,14 @@ body[data-year-menu="open"] .year-menu { opacity: 1; visibility: visible; pointe
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
+}
+.trip-card-button:hover,
+.trip-card-button:focus,
+.trip-card-button:focus-visible,
+.trip-card-button:active {
+  outline: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 .trip-card *,
 .trip-card-button * {
