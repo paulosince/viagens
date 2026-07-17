@@ -133,7 +133,7 @@
             <p class="form-note">Você já está incluído nesta viagem.</p>
           </section>
           <section class="form-section"><h3>Imagem</h3><div class="form-group">
-            <label class="form-row upload-row" for="cover-image"><span class="upload-copy">Foto da viagem<small>Escolha uma imagem do aparelho</small></span><span class="upload-preview" data-has-image="false"><img id="cover_preview_image" alt="Prévia da imagem"><span class="upload-placeholder">＋</span></span><input id="cover-image" name="cover" type="file" accept="image/*" required></label>
+            <label class="form-row upload-row" for="cover-image"><span class="upload-copy">Foto da viagem<small>Escolha uma imagem do aparelho</small></span><span class="upload-preview" data-has-image="false"><img id="cover_preview_image" alt="Prévia da imagem"><span class="upload-placeholder">＋</span></span><input id="cover-image" name="cover" type="file" accept="image/*"></label>
           </div><p class="form-note">A imagem será ajustada para o card antes de ser salva.</p><p id="new_trip_message" class="form-message" role="status"></p></section>
         </form>
       </section>
@@ -167,6 +167,7 @@
     <section id="trip_page" class="trip-page" aria-hidden="true">
       <nav class="trip-page-nav" aria-label="Navegação da viagem">
         <button id="close_trip_page" class="trip-page-back" type="button" aria-label="Voltar">‹</button>
+        <button id="edit_trip_button" class="trip-page-edit" type="button" aria-label="Editar viagem">✎</button>
       </nav>
       <header id="trip_page_hero" class="trip-page-hero">
         <div class="trip-page-hero-copy">
@@ -238,7 +239,7 @@
       <button id="delete_selected_trips" type="button" disabled>Excluir selecionadas</button>
     </footer>
   </main>
-  <script type="module" src="src/main.js?v=20260717-26"></script>
+  <script type="module" src="src/main.js?v=20260717-27"></script>
   <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260717-33');</script>
 </body>
 </html>

@@ -498,8 +498,8 @@ body[data-trip-page="open"] .trip-page {
   height: 0;
 }
 .trip-page-back {
-  position: relative;
-  top: max(18px, env(safe-area-inset-top));
+  position: absolute;
+  top: calc(max(18px, env(safe-area-inset-top)) + 1rem);
   left: 18px;
   display: grid;
   width: 50px;
@@ -512,6 +512,25 @@ body[data-trip-page="open"] .trip-page {
   background: rgba(20,20,24,.25);
   box-shadow: 0 8px 22px rgba(0,0,0,.18);
   font-size: 42px;
+  line-height: 1;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.trip-page-edit {
+  position: absolute;
+  top: calc(max(18px, env(safe-area-inset-top)) + 1rem);
+  right: 18px;
+  display: grid;
+  width: 50px;
+  height: 50px;
+  padding: 0 0 2px;
+  place-items: center;
+  border: 1px solid rgba(255,255,255,.55);
+  border-radius: 50%;
+  color: white;
+  background: rgba(20,20,24,.25);
+  box-shadow: 0 8px 22px rgba(0,0,0,.18);
+  font-size: 28px;
   line-height: 1;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -550,6 +569,18 @@ body[data-trip-page="open"] .trip-page {
   box-shadow: 0 16px 34px color-mix(in srgb, var(--trip-page-color) 58%, rgba(0,0,0,.2));
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
+  transform: scale(1);
+  transition: transform .3s ease, box-shadow .3s ease;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.trip-day-card[data-pressed="true"],
+.trip-day-card:active,
+.trip-day-card:has(.trip-day-card-button:active) {
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--trip-page-color) 38%, rgba(0,0,0,.16));
+  transform: scale(.9);
 }
 .trip-day-card-button {
   display: block;
@@ -561,7 +592,16 @@ body[data-trip-page="open"] .trip-page {
   text-align: left;
   appearance: none;
   -webkit-appearance: none;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
+.trip-day-card-button:hover,
+.trip-day-card-button:focus,
+.trip-day-card-button:focus-visible,
+.trip-day-card-button:active { outline: 0; background: transparent; box-shadow: none; }
 .trip-day-image {
   position: relative;
   min-height: 210px;

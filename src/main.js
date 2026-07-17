@@ -19,6 +19,7 @@ const state = {
   editing: false,
   tripColor: '#4775d1',
   newTripPassengers: [],
+  editingTripId: null,
   activeTripId: null,
   dayEditor: null,
   placeSearch: null
@@ -28,8 +29,8 @@ const dom = {
   authView: document.querySelector('#auth_view'), authForm: document.querySelector('#auth_form'), authMessage: document.querySelector('#auth_message'),
   home: document.querySelector('#user_home'), profileButton: document.querySelector('#profile_button'), headerProfileImage: document.querySelector('#header_profile_image'), headerProfileFallback: document.querySelector('#header_profile_fallback'),
   editTripsButton: document.querySelector('#edit_trips_button'), newTripButton: document.querySelector('#new_trip_button'), emptyNewTripButton: document.querySelector('#empty_new_trip_button'), sessionEmail: document.querySelector('#session_email'), tripHeading: document.querySelector('#trip_heading'), yearButton: document.querySelector('#year_selector_button'), currentYear: document.querySelector('#current_year'), yearMenu: document.querySelector('#year_menu'), yearList: document.querySelector('#year_list'),
-  tripList: document.querySelector('#trip_list'), homeEmpty: document.querySelector('#home_empty'), scrim: document.querySelector('#sheet_scrim'), tripEditFooter: document.querySelector('#trip_edit_footer'), deleteSelectedTrips: document.querySelector('#delete_selected_trips'), tripPage: document.querySelector('#trip_page'), closeTripPage: document.querySelector('#close_trip_page'), tripPageHero: document.querySelector('#trip_page_hero'), tripPageTitle: document.querySelector('#trip_page_title'), tripPageDates: document.querySelector('#trip_page_dates'), tripPagePassengers: document.querySelector('#trip_page_passengers'), tripPagePassengerCount: document.querySelector('#trip_page_passenger_count'), tripDayList: document.querySelector('#trip_day_list'), tripDayMessage: document.querySelector('#trip_day_message'),
-  newTripSheet: document.querySelector('#home_new_trip'), newTripForm: document.querySelector('#new_trip_form'), closeNewTrip: document.querySelector('#close_new_trip'), saveNewTrip: document.querySelector('#save_new_trip'), newTripMessage: document.querySelector('#new_trip_message'), coverInput: document.querySelector('#cover-image'), coverPreview: document.querySelector('#cover_preview_image'), tripColorValue: document.querySelector('#trip-color-value'), tripColorPalette: document.querySelector('#trip_color_palette'), tripColorCustom: document.querySelector('#trip-color-custom'), newTripPassengerList: document.querySelector('#new_trip_passenger_list'), addTripPassenger: document.querySelector('#add_trip_passenger'),
+  tripList: document.querySelector('#trip_list'), homeEmpty: document.querySelector('#home_empty'), scrim: document.querySelector('#sheet_scrim'), tripEditFooter: document.querySelector('#trip_edit_footer'), deleteSelectedTrips: document.querySelector('#delete_selected_trips'), tripPage: document.querySelector('#trip_page'), closeTripPage: document.querySelector('#close_trip_page'), editTripButton: document.querySelector('#edit_trip_button'), tripPageHero: document.querySelector('#trip_page_hero'), tripPageTitle: document.querySelector('#trip_page_title'), tripPageDates: document.querySelector('#trip_page_dates'), tripPagePassengers: document.querySelector('#trip_page_passengers'), tripPagePassengerCount: document.querySelector('#trip_page_passenger_count'), tripDayList: document.querySelector('#trip_day_list'), tripDayMessage: document.querySelector('#trip_day_message'),
+  newTripSheet: document.querySelector('#home_new_trip'), newTripForm: document.querySelector('#new_trip_form'), newTripTitle: document.querySelector('#new-trip-title'), closeNewTrip: document.querySelector('#close_new_trip'), saveNewTrip: document.querySelector('#save_new_trip'), newTripMessage: document.querySelector('#new_trip_message'), coverInput: document.querySelector('#cover-image'), coverPreview: document.querySelector('#cover_preview_image'), tripColorValue: document.querySelector('#trip-color-value'), tripColorPalette: document.querySelector('#trip_color_palette'), tripColorCustom: document.querySelector('#trip-color-custom'), newTripPassengerList: document.querySelector('#new_trip_passenger_list'), addTripPassenger: document.querySelector('#add_trip_passenger'),
   dayEditSheet: document.querySelector('#day_edit_sheet'), daySheetScrim: document.querySelector('#day_sheet_scrim'), dayEditForm: document.querySelector('#day_edit_form'), closeDayEdit: document.querySelector('#close_day_edit'), saveDayEdit: document.querySelector('#save_day_edit'), dayEditTitle: document.querySelector('#day_edit_title'), dayEditDate: document.querySelector('#day_edit_date'), dayTitleInput: document.querySelector('#day-title-input'), dayLocationsEditor: document.querySelector('#day_locations_editor'), addDayLocation: document.querySelector('#add_day_location'), dayAgendaEditor: document.querySelector('#day_agenda_editor'), addDayActivity: document.querySelector('#add_day_activity'), dayNotesInput: document.querySelector('#day-notes-input'), dayEditMessage: document.querySelector('#day_edit_message'),
   placeSearchSheet: document.querySelector('#place_search_sheet'), placeSearchScrim: document.querySelector('#place_search_scrim'), placeSearchForm: document.querySelector('#place_search_form'), closePlaceSearch: document.querySelector('#close_place_search'), confirmPlaceSearch: document.querySelector('#confirm_place_search'), placeSearchInput: document.querySelector('#place_search_input'), runPlaceSearch: document.querySelector('#run_place_search'), placeSearchMessage: document.querySelector('#place_search_message'), placeSearchResults: document.querySelector('#place_search_results'), placePhotoSection: document.querySelector('#place_photo_section'), placePhotoMessage: document.querySelector('#place_photo_message'), placePhotoResults: document.querySelector('#place_photo_results'),
   profileSheet: document.querySelector('#profile-sheet'), profileForm: document.querySelector('#profile_form'), closeProfile: document.querySelector('#close_profile'), saveProfile: document.querySelector('#save_profile'), profileMessage: document.querySelector('#profile_message'), profileEditorImage: document.querySelector('#profile_editor_image'), profilePhotoInput: document.querySelector('#profile-photo'), profileDisplayName: document.querySelector('#profile_display_name'), profileEmail: document.querySelector('#profile_email'), profileNameInput: document.querySelector('#profile-name'), birthDateInput: document.querySelector('#birth-date'), profileAge: document.querySelector('#profile_age'), profileCreatedAt: document.querySelector('#profile_created_at'), logoutButton: document.querySelector('#logout_button'), deleteAccountButton: document.querySelector('#delete_account_button')
@@ -175,6 +176,7 @@ function renderTripDays(days, activitiesByDay = new Map(), locationsByDay = new 
 
     const card = document.createElement('li');
     card.className = 'trip-day-card';
+    card.dataset.pressed = 'false';
 
     const image = document.createElement('div');
     image.className = 'trip-day-image';
@@ -244,9 +246,14 @@ function renderTripDays(days, activitiesByDay = new Map(), locationsByDay = new 
     const button = document.createElement('button');
     button.className = 'trip-day-card-button';
     button.type = 'button';
+    const releasePress = () => { card.dataset.pressed = 'false'; };
+    button.addEventListener('pointerdown', () => { card.dataset.pressed = 'true'; });
+    button.addEventListener('pointerup', releasePress);
+    button.addEventListener('pointercancel', releasePress);
     const empty = !day.title && !day.summary && !day.main_place_name && !day.photo_url && activities.length === 0 && locations.length === 0;
     button.setAttribute('aria-label', empty ? `Preencher dia ${day.day_number}` : `Abrir dia ${day.day_number}`);
     button.addEventListener('click', () => {
+      button.blur();
       if (empty) openDayEditor(day);
     });
     button.append(image, body);
@@ -1064,8 +1071,11 @@ function resetTripPassengers() {
 
 function openNewTrip() {
   setYearMenu(false);
+  state.editingTripId = null;
   state.imageData = '';
   dom.newTripForm.reset();
+  dom.newTripTitle.textContent = 'Nova viagem';
+  dom.saveNewTrip.setAttribute('aria-label', 'Criar viagem');
   selectTripColor('#4775d1');
   resetTripPassengers();
   dom.coverPreview.removeAttribute('src');
@@ -1073,6 +1083,41 @@ function openNewTrip() {
   dom.newTripMessage.textContent = '';
   setActiveSheet('new-trip');
   requestAnimationFrame(() => document.querySelector('#trip-name').focus({ preventScroll: true }));
+}
+
+function openTripEditor() {
+  const trip = state.trips.find(item => String(item.id) === String(state.activeTripId));
+  if (!trip) return;
+  state.editingTripId = String(trip.id);
+  state.imageData = trip.cover_url || '';
+  dom.newTripForm.reset();
+  dom.newTripForm.elements.name.value = trip.name || '';
+  dom.newTripForm.elements.destination.value = trip.destination || '';
+  dom.newTripForm.elements.start_date.value = trip.start_date || '';
+  dom.newTripForm.elements.end_date.value = trip.end_date || '';
+  dom.newTripForm.elements.arrival_method.value = trip.arrival_method || 'avião';
+  dom.newTripForm.elements.location_label.value = trip.location_label || '';
+  selectTripColor(trip.secondary_color || '#4775d1');
+  state.newTripPassengers = (state.passengers.get(trip.id) || []).map(passenger => ({
+    id: passenger.id || crypto.randomUUID(),
+    session: String(passenger.user_id || '') === String(state.user.id),
+    userId: passenger.user_id || null,
+    name: passenger.name || '',
+    birthDate: passenger.birth_date || '',
+    photoUrl: passenger.photo_url || ''
+  }));
+  renderTripPassengers();
+  if (state.imageData) {
+    dom.coverPreview.src = state.imageData;
+    dom.coverPreview.parentElement.dataset.hasImage = 'true';
+  } else {
+    dom.coverPreview.removeAttribute('src');
+    dom.coverPreview.parentElement.dataset.hasImage = 'false';
+  }
+  dom.newTripTitle.textContent = 'Editar viagem';
+  dom.saveNewTrip.setAttribute('aria-label', 'Salvar viagem');
+  dom.newTripMessage.textContent = '';
+  setActiveSheet('new-trip');
 }
 
 function openProfile() {
@@ -1089,6 +1134,7 @@ function closeSheets() {
   if (state.saving) return;
   if (state.avatarPreview) URL.revokeObjectURL(state.avatarPreview);
   state.avatarFile = null; state.avatarPreview = ''; state.imageData = '';
+  state.editingTripId = null;
   setActiveSheet('none');
 }
 
@@ -1163,6 +1209,48 @@ async function saveTrip() {
   if (values.end_date < values.start_date) { dom.newTripMessage.textContent = 'A data final deve ser igual ou posterior à inicial.'; return; }
   if (!state.imageData) { dom.newTripMessage.textContent = 'Escolha a imagem da viagem.'; return; }
   state.saving = true; setLoading(dom.saveNewTrip, true);
+  if (state.editingTripId) {
+    const tripId = state.editingTripId;
+    const payload = { name: values.name.trim(), destination: values.destination.trim(), start_date: values.start_date, end_date: values.end_date, arrival_method: values.arrival_method, location_label: values.location_label.trim() || null, cover_url: state.imageData, secondary_color: state.tripColor };
+    const updated = await supabase.from('trips').update(payload).eq('id', tripId);
+    let failure = updated.error;
+    if (!failure) {
+      const removed = await supabase.from('passengers').delete().eq('trip_id', tripId);
+      failure = removed.error;
+    }
+    if (!failure) {
+      const passengerPayload = state.newTripPassengers.map(passenger => ({ trip_id: tripId, user_id: passenger.session ? state.user.id : passenger.userId || null, name: passenger.name.trim(), birth_date: passenger.birthDate || null, photo_url: passenger.photoUrl || null, age: ageFromBirthDate(passenger.birthDate) })).filter(passenger => passenger.name);
+      if (passengerPayload.length) failure = (await supabase.from('passengers').insert(passengerPayload)).error;
+    }
+    if (!failure) {
+      const existing = await supabase.from('trip_days').select('id,date').eq('trip_id', tripId);
+      failure = existing.error;
+      if (!failure) {
+        const wanted = createDays(tripId, values.start_date, values.end_date);
+        const wantedDates = new Set(wanted.map(day => day.date));
+        const obsoleteIds = (existing.data || []).filter(day => !wantedDates.has(day.date)).map(day => day.id);
+        if (obsoleteIds.length) failure = (await supabase.from('trip_days').delete().in('id', obsoleteIds)).error;
+        const existingByDate = new Map((existing.data || []).map(day => [day.date, day]));
+        for (const day of wanted) {
+          if (failure) break;
+          const current = existingByDate.get(day.date);
+          failure = current
+            ? (await supabase.from('trip_days').update({ day_number: day.day_number }).eq('id', current.id)).error
+            : (await supabase.from('trip_days').insert(day)).error;
+        }
+      }
+    }
+    if (failure) dom.newTripMessage.textContent = failure.message;
+    else {
+      state.selectedYear = Number(String(values.start_date).slice(0, 4));
+      await loadTrips();
+      state.saving = false;
+      closeSheets();
+      await openTrip(tripId, { pushHistory: false });
+    }
+    state.saving = false; setLoading(dom.saveNewTrip, false);
+    return;
+  }
   const created = await supabase.from('trips').insert({ user_id: state.user.id, name: values.name.trim(), destination: values.destination.trim(), start_date: values.start_date, end_date: values.end_date, arrival_method: values.arrival_method, location_label: values.location_label.trim() || null, cover_url: state.imageData, secondary_color: state.tripColor }).select().single();
   if (created.error) { dom.newTripMessage.textContent = created.error.message; state.saving = false; setLoading(dom.saveNewTrip, false); return; }
   const trip = created.data;
@@ -1226,6 +1314,7 @@ dom.dayNotesInput.addEventListener('input', () => { if (state.dayEditor) state.d
 dom.dayEditForm.addEventListener('submit', event => { event.preventDefault(); saveDayEditor(); });
 
 dom.closeTripPage.addEventListener('click', navigateBackFromTrip);
+dom.editTripButton.addEventListener('click', openTripEditor);
 window.addEventListener('popstate', event => {
   if (event.state?.view === 'trip' && event.state.tripId) openTrip(event.state.tripId, { pushHistory: false });
   else closeTripPage();
