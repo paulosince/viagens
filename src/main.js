@@ -13,7 +13,8 @@ const state = {
   avatarPreview: '',
   selectedYear: null,
   saving: false,
-  editing: false
+  editing: false,
+  tripColor: '#4775d1'
 };
 
 const dom = {
@@ -21,7 +22,7 @@ const dom = {
   home: document.querySelector('#user_home'), profileButton: document.querySelector('#profile_button'), headerProfileImage: document.querySelector('#header_profile_image'), headerProfileFallback: document.querySelector('#header_profile_fallback'),
   editTripsButton: document.querySelector('#edit_trips_button'), newTripButton: document.querySelector('#new_trip_button'), emptyNewTripButton: document.querySelector('#empty_new_trip_button'), sessionEmail: document.querySelector('#session_email'), tripHeading: document.querySelector('#trip_heading'), yearButton: document.querySelector('#year_selector_button'), currentYear: document.querySelector('#current_year'), yearMenu: document.querySelector('#year_menu'), yearList: document.querySelector('#year_list'),
   tripList: document.querySelector('#trip_list'), homeEmpty: document.querySelector('#home_empty'), scrim: document.querySelector('#sheet_scrim'),
-  newTripSheet: document.querySelector('#home_new_trip'), newTripForm: document.querySelector('#new_trip_form'), closeNewTrip: document.querySelector('#close_new_trip'), saveNewTrip: document.querySelector('#save_new_trip'), newTripMessage: document.querySelector('#new_trip_message'), coverInput: document.querySelector('#cover-image'), coverPreview: document.querySelector('#cover_preview_image'),
+  newTripSheet: document.querySelector('#home_new_trip'), newTripForm: document.querySelector('#new_trip_form'), closeNewTrip: document.querySelector('#close_new_trip'), saveNewTrip: document.querySelector('#save_new_trip'), newTripMessage: document.querySelector('#new_trip_message'), coverInput: document.querySelector('#cover-image'), coverPreview: document.querySelector('#cover_preview_image'), tripColorValue: document.querySelector('#trip-color-value'), tripColorPalette: document.querySelector('#trip_color_palette'), tripColorCustom: document.querySelector('#trip-color-custom'), newTripPassengerList: document.querySelector('#new_trip_passenger_list'), addTripPassenger: document.querySelector('#add_trip_passenger'),
   profileSheet: document.querySelector('#profile-sheet'), profileForm: document.querySelector('#profile_form'), closeProfile: document.querySelector('#close_profile'), saveProfile: document.querySelector('#save_profile'), profileMessage: document.querySelector('#profile_message'), profileEditorImage: document.querySelector('#profile_editor_image'), profilePhotoInput: document.querySelector('#profile-photo'), profileDisplayName: document.querySelector('#profile_display_name'), profileEmail: document.querySelector('#profile_email'), profileNameInput: document.querySelector('#profile-name'), birthDateInput: document.querySelector('#birth-date'), profileAge: document.querySelector('#profile_age'), profileCreatedAt: document.querySelector('#profile_created_at'), logoutButton: document.querySelector('#logout_button'), deleteAccountButton: document.querySelector('#delete_account_button')
 };
 
@@ -256,10 +257,65 @@ async function loadProfile() {
   syncProfileUI();
 }
 
+function selectTripColor(color, custom = false) {
+  state.tripColor = color;
+  dom.tripColorValue.value = color;
+  dom.tripColorCustom.value = color;
+  for (const option of dom.tripColorPalette.querySelectorAll('.trip-color-option')) option.setAttribute('aria-pressed', String(!custom && option.dataset.color === color));
+  dom.tripColorCustom.parentElement.dataset.selected = String(custom);
+}
+
+function createTripPassengerRow({ name = '', session = false } = {}) {
+  const row = document.createElement('div');
+  row.className = 'new-trip-passenger-row';
+  row.dataset.session = String(session);
+  const avatar = document.createElement('span');
+  avatar.className = 'new-trip-passenger-avatar';
+  if (session) {
+    const image = document.createElement('img');
+    image.src = profileImage();
+    image.alt = '';
+    avatar.append(image);
+  } else {
+    avatar.textContent = name.trim()[0]?.toUpperCase() || '＋';
+  }
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.name = 'passenger_name';
+  input.placeholder = 'Nome do passageiro';
+  input.autocomplete = 'off';
+  input.value = name;
+  input.required = true;
+  if (session) input.readOnly = true;
+  const control = document.createElement(session ? 'span' : 'button');
+  if (session) {
+    control.className = 'new-trip-passenger-session-mark';
+    control.textContent = '✓';
+    control.setAttribute('aria-label', 'Passageiro selecionado');
+  } else {
+    control.className = 'new-trip-passenger-remove';
+    control.type = 'button';
+    control.textContent = '×';
+    control.setAttribute('aria-label', 'Remover passageiro');
+    control.addEventListener('click', () => row.remove());
+    input.addEventListener('input', () => { avatar.textContent = input.value.trim()[0]?.toUpperCase() || '＋'; });
+  }
+  row.append(avatar, input, control);
+  dom.newTripPassengerList.append(row);
+  if (!session) input.focus({ preventScroll: true });
+}
+
+function resetTripPassengers() {
+  dom.newTripPassengerList.replaceChildren();
+  createTripPassengerRow({ name: profileName(), session: true });
+}
+
 function openNewTrip() {
   setYearMenu(false);
   state.imageData = '';
   dom.newTripForm.reset();
+  selectTripColor('#4775d1');
+  resetTripPassengers();
   dom.coverPreview.removeAttribute('src');
   dom.coverPreview.parentElement.dataset.hasImage = 'false';
   dom.newTripMessage.textContent = '';
@@ -344,16 +400,38 @@ async function saveTrip() {
   if (values.end_date < values.start_date) { dom.newTripMessage.textContent = 'A data final deve ser igual ou posterior à inicial.'; return; }
   if (!state.imageData) { dom.newTripMessage.textContent = 'Escolha a imagem da viagem.'; return; }
   state.saving = true; setLoading(dom.saveNewTrip, true);
-  const created = await supabase.from('trips').insert({ user_id: state.user.id, name: values.name.trim(), destination: values.destination.trim(), start_date: values.start_date, end_date: values.end_date, arrival_method: values.arrival_method, location_label: values.location_label.trim() || null, cover_url: state.imageData }).select().single();
+  const created = await supabase.from('trips').insert({ user_id: state.user.id, name: values.name.trim(), destination: values.destination.trim(), start_date: values.start_date, end_date: values.end_date, arrival_method: values.arrival_method, location_label: values.location_label.trim() || null, cover_url: state.imageData, secondary_color: state.tripColor }).select().single();
   if (created.error) { dom.newTripMessage.textContent = created.error.message; state.saving = false; setLoading(dom.saveNewTrip, false); return; }
   const trip = created.data;
-  const results = await Promise.all([
-    supabase.from('trip_members').insert({ trip_id: trip.id, user_id: state.user.id, role: 'owner' }),
-    supabase.from('trip_days').insert(createDays(trip.id, values.start_date, values.end_date))
-  ]);
-  const failure = results.find(result => result.error);
-  if (failure) dom.newTripMessage.textContent = failure.error.message;
-  else { state.selectedYear = Number(String(values.start_date).slice(0, 4)); await loadTrips(); state.saving = false; closeSheets(); }
+  const member = await supabase.from('trip_members').insert({ trip_id: trip.id, user_id: state.user.id, role: 'owner' });
+  let failure = member.error;
+  if (!failure) {
+    const passengerRows = [...dom.newTripPassengerList.querySelectorAll('.new-trip-passenger-row')];
+    const passengerPayload = passengerRows.map(row => ({
+      trip_id: trip.id,
+      user_id: row.dataset.session === 'true' ? state.user.id : null,
+      name: row.querySelector('input').value.trim(),
+      photo_url: null,
+      age: row.dataset.session === 'true' ? ageFromBirthDate(state.profile?.birth_date) : null
+    })).filter(passenger => passenger.name);
+    if (passengerPayload.length) {
+      const passengers = await supabase.from('passengers').insert(passengerPayload);
+      failure = passengers.error;
+    }
+  }
+  if (!failure) {
+    const days = await supabase.from('trip_days').insert(createDays(trip.id, values.start_date, values.end_date));
+    failure = days.error;
+  }
+  if (failure) {
+    await supabase.from('trips').delete().eq('id', trip.id);
+    dom.newTripMessage.textContent = failure.message;
+  } else {
+    state.selectedYear = Number(String(values.start_date).slice(0, 4));
+    await loadTrips();
+    state.saving = false;
+    closeSheets();
+  }
   state.saving = false; setLoading(dom.saveNewTrip, false);
 }
 
@@ -376,6 +454,10 @@ document.addEventListener('click', event => { if (document.body.dataset.yearMenu
 dom.birthDateInput.addEventListener('input', syncAge);
 dom.logoutButton.addEventListener('click', () => supabase.auth.signOut());
 dom.deleteAccountButton.addEventListener('click', deleteAccount);
+
+for (const option of dom.tripColorPalette.querySelectorAll('.trip-color-option')) option.addEventListener('click', () => selectTripColor(option.dataset.color));
+dom.tripColorCustom.addEventListener('input', () => selectTripColor(dom.tripColorCustom.value, true));
+dom.addTripPassenger.addEventListener('click', () => createTripPassengerRow());
 
 dom.coverInput.addEventListener('change', async () => {
   const file = dom.coverInput.files?.[0]; if (!file) return;
