@@ -193,7 +193,8 @@ body[data-year-menu="open"] .year-menu { opacity: 1; visibility: visible; pointe
 .year-menu button[aria-current="true"] { color: var(--ios-blue); background: transparent; font-weight: 600; }
 .year-menu button:active { background: rgba(0,0,0,.2); }
 
-.trip-list { display: grid; gap: 18px; margin-block: 0; padding: 0; list-style-position: inside; }
+.trip-list { display: grid; gap: 18px; margin-block: 0; padding: 0; background: transparent; list-style-position: inside; }
+.trip-list > li { background: transparent; }
 .trip-list::marker, .trip-list > li::marker { color: transparent; font-size: 0; }
 
 .trip-card {
@@ -216,7 +217,8 @@ body[data-year-menu="open"] .year-menu { opacity: 1; visibility: visible; pointe
 .trip-card:active,
 .trip-card:has(.trip-card-button:active) {
   box-shadow: 0 8px 20px color-mix(in srgb, var(--card-accent, #4775d1) 28%, transparent);
-  transform: scale(.8);
+  transform: scale(.9);
+  transition-duration: .08s;
 }
 
 .trip-card::after {
@@ -240,7 +242,10 @@ body[data-year-menu="open"] .year-menu { opacity: 1; visibility: visible; pointe
   padding: 27px;
   border: 0;
   color: inherit;
-  background: transparent;
+  background: transparent !important;
+  box-shadow: none;
+  appearance: none;
+  -webkit-appearance: none;
   text-align: left;
   cursor: pointer;
   touch-action: manipulation;
@@ -269,8 +274,8 @@ body[data-year-menu="open"] .year-menu { opacity: 1; visibility: visible; pointe
 
 .trip-owner-flag {
   position: absolute;
-  top: -5px;
-  left: -5px;
+  top: 0;
+  left: 0;
   padding: 8px 15px 9px;
   border-radius: 26px 0 18px 0;
   color: white;
