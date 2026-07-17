@@ -50,6 +50,19 @@ function tripTiming(trip) {
   return days === 1 ? 'amanhã' : `em ${days} dias`;
 }
 
+function dayTiming(value) {
+  const [year, month, day] = String(value).split('-').map(Number);
+  const now = new Date();
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  const target = Date.UTC(year, month - 1, day);
+  const difference = Math.round((target - today) / 86400000);
+  if (difference === 0) return { label: 'HOJE', today: true };
+  if (difference === 1) return { label: 'em 1 dia', today: false };
+  if (difference > 1) return { label: `em ${difference} dias`, today: false };
+  if (difference === -1) return { label: 'há 1 dia', today: false };
+  return { label: `há ${Math.abs(difference)} dias`, today: false };
+}
+
 function setSessionView(session) {
   document.body.dataset.session = session;
   dom.authView.setAttribute('aria-hidden', String(session !== 'anonymous'));
@@ -168,7 +181,12 @@ function renderTripDays(days, activitiesByDay = new Map()) {
     number.className = 'trip-day-number';
     number.textContent = String(day.day_number);
     badge.append(label, number);
-    image.append(badge);
+    const timingData = dayTiming(day.date);
+    const timing = document.createElement('span');
+    timing.className = 'trip-day-timing';
+    timing.textContent = timingData.label;
+    timing.dataset.today = String(timingData.today);
+    image.append(badge, timing);
 
     const body = document.createElement('div');
     body.className = 'trip-day-body';
@@ -211,9 +229,12 @@ function renderTripDays(days, activitiesByDay = new Map()) {
   dom.tripDayMessage.textContent = days.length ? '' : 'Nenhum dia encontrado para esta viagem.';
 }
 
-async function openTrip(tripId) {
+async function openTrip(tripId, { pushHistory = true } = {}) {
   const trip = state.trips.find(item => String(item.id) === String(tripId));
   if (!trip) return;
+  if (pushHistory && (document.body.dataset.tripPage !== 'open' || state.activeTripId !== String(trip.id))) {
+    window.history.pushState({ view: 'trip', tripId: String(trip.id) }, '', `#trip-${trip.id}`);
+  }
   state.activeTripId = String(trip.id);
   const accent = /^#[0-9a-f]{6}$/i.test(trip.secondary_color || '') ? trip.secondary_color : '#4775d1';
   dom.tripPage.style.setProperty('--trip-page-color', accent);
@@ -256,6 +277,11 @@ function closeTripPage() {
   state.activeTripId = null;
   document.body.dataset.tripPage = 'closed';
   dom.tripPage.setAttribute('aria-hidden', 'true');
+}
+
+function navigateBackFromTrip() {
+  if (window.history.state?.view === 'trip') window.history.back();
+  else closeTripPage();
 }
 
 function createTripNode(trip) {
@@ -690,7 +716,11 @@ async function deleteAccount() {
   await supabase.auth.signOut();
 }
 
-dom.closeTripPage.addEventListener('click', closeTripPage);
+dom.closeTripPage.addEventListener('click', navigateBackFromTrip);
+window.addEventListener('popstate', event => {
+  if (event.state?.view === 'trip' && event.state.tripId) openTrip(event.state.tripId, { pushHistory: false });
+  else closeTripPage();
+});
 dom.profileButton.addEventListener('click', openProfile);
 dom.newTripButton.addEventListener('click', openNewTrip);
 dom.emptyNewTripButton.addEventListener('click', openNewTrip);
