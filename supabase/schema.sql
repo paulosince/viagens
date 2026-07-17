@@ -70,9 +70,24 @@ create table if not exists public.day_locations (
   day_id uuid not null references public.trip_days(id) on delete cascade,
   position integer not null default 0,
   name text not null,
+  provider text,
+  provider_place_id text,
+  formatted_address text,
+  latitude double precision,
+  longitude double precision,
+  category text,
+  place_type text,
   photo_url text,
   created_at timestamptz not null default now()
 );
+
+alter table public.day_locations add column if not exists provider text;
+alter table public.day_locations add column if not exists provider_place_id text;
+alter table public.day_locations add column if not exists formatted_address text;
+alter table public.day_locations add column if not exists latitude double precision;
+alter table public.day_locations add column if not exists longitude double precision;
+alter table public.day_locations add column if not exists category text;
+alter table public.day_locations add column if not exists place_type text;
 
 create table if not exists public.activities (
   id uuid primary key default gen_random_uuid(),
