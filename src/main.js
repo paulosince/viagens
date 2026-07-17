@@ -141,8 +141,13 @@ function syncPassengerList(container, passengers) {
 
 function createTripNode(trip) {
   const item = document.createElement('li');
-  const article = document.createElement('article'); article.className = 'trip-card';
+  const article = document.createElement('article'); article.className = 'trip-card'; article.dataset.pressed = 'false';
   const button = document.createElement('button'); button.className = 'trip-card-button'; button.type = 'button';
+  const releasePress = () => { article.dataset.pressed = 'false'; button.blur(); };
+  button.addEventListener('pointerdown', () => { article.dataset.pressed = 'true'; });
+  button.addEventListener('pointerup', releasePress);
+  button.addEventListener('pointercancel', releasePress);
+  button.addEventListener('click', () => button.blur());
   const owner = document.createElement('span'); owner.className = 'trip-owner-flag';
   const timing = document.createElement('span'); timing.className = 'trip-status';
   const copy = document.createElement('span'); copy.className = 'trip-copy';
@@ -344,7 +349,6 @@ async function saveTrip() {
   const trip = created.data;
   const results = await Promise.all([
     supabase.from('trip_members').insert({ trip_id: trip.id, user_id: state.user.id, role: 'owner' }),
-    supabase.from('passengers').insert({ trip_id: trip.id, user_id: state.user.id, name: profileName(), photo_url: null, age: ageFromBirthDate(state.profile?.birth_date) }),
     supabase.from('trip_days').insert(createDays(trip.id, values.start_date, values.end_date))
   ]);
   const failure = results.find(result => result.error);
