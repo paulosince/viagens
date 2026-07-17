@@ -10,7 +10,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="assets/app-icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon-180.PNG">
-  <link rel="stylesheet" href="style.css?v=20260717-05">
+  <link rel="stylesheet" href="style.css?v=20260717-06">
 </head>
 <body data-session="loading" data-active-sheet="none" data-editing="false" data-year-menu="closed">
   <main id="app" aria-live="polite">
@@ -71,6 +71,28 @@
             <div class="form-row"><label for="arrival-method">Transporte</label><select id="arrival-method" name="arrival_method"><option value="avião">Avião</option><option value="trem">Trem</option><option value="carro">Carro</option><option value="ônibus">Ônibus</option><option value="navio">Navio</option><option value="outro">Outro</option></select></div>
             <div class="form-row"><label for="arrival-place">Local</label><input id="arrival-place" name="location_label" autocomplete="off" placeholder="Aeroporto de Lisboa"></div>
           </div></section>
+          <section class="form-section"><h3>Cor da viagem</h3>
+            <div class="form-group trip-color-group">
+              <input id="trip-color-value" name="secondary_color" type="hidden" value="#4775d1">
+              <div id="trip_color_palette" class="trip-color-palette" aria-label="Escolha a cor da viagem">
+                <button class="trip-color-option" type="button" data-color="#4775d1" style="--swatch:#4775d1" aria-label="Azul" aria-pressed="true"></button>
+                <button class="trip-color-option" type="button" data-color="#2f9c95" style="--swatch:#2f9c95" aria-label="Turquesa" aria-pressed="false"></button>
+                <button class="trip-color-option" type="button" data-color="#5a8f5a" style="--swatch:#5a8f5a" aria-label="Verde" aria-pressed="false"></button>
+                <button class="trip-color-option" type="button" data-color="#c6a85b" style="--swatch:#c6a85b" aria-label="Dourado" aria-pressed="false"></button>
+                <button class="trip-color-option" type="button" data-color="#d66d5d" style="--swatch:#d66d5d" aria-label="Coral" aria-pressed="false"></button>
+                <button class="trip-color-option" type="button" data-color="#c06c84" style="--swatch:#c06c84" aria-label="Rosa" aria-pressed="false"></button>
+                <button class="trip-color-option" type="button" data-color="#7967c3" style="--swatch:#7967c3" aria-label="Violeta" aria-pressed="false"></button>
+                <label class="trip-color-custom" aria-label="Escolher outra cor"><input id="trip-color-custom" type="color" value="#4775d1"><span aria-hidden="true"></span></label>
+              </div>
+            </div>
+          </section>
+          <section class="form-section"><h3>Passageiros</h3>
+            <div class="form-group passenger-form-group">
+              <div id="new_trip_passenger_list" class="new-trip-passenger-list"></div>
+              <button id="add_trip_passenger" class="add-trip-passenger" type="button"><span>＋</span>Adicionar passageiro</button>
+            </div>
+            <p class="form-note">Você já está incluído nesta viagem.</p>
+          </section>
           <section class="form-section"><h3>Imagem</h3><div class="form-group">
             <label class="form-row upload-row" for="cover-image"><span class="upload-copy">Foto da viagem<small>Escolha uma imagem do aparelho</small></span><span class="upload-preview" data-has-image="false"><img id="cover_preview_image" alt="Prévia da imagem"><span class="upload-placeholder">＋</span></span><input id="cover-image" name="cover" type="file" accept="image/*" required></label>
           </div><p class="form-note">A imagem será ajustada para o card antes de ser salva.</p><p id="new_trip_message" class="form-message" role="status"></p></section>
@@ -103,7 +125,7 @@
       </section>
     </section>
   </main>
-  <script type="module" src="src/main.js?v=20260717-01"></script>
-  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260717-05');</script>
+  <script type="module" src="src/main.js?v=20260717-02"></script>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260717-06');</script>
 </body>
 </html>
