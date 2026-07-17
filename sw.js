@@ -1,4 +1,4 @@
-const CACHE_NAME = 'viagens-home-v19';
+const CACHE_NAME = 'viaggio-home-v20';
 const APP_SHELL = [
   './',
   './index.html',

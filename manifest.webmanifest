@@ -1,6 +1,6 @@
 {
-  "name":"Viagens — seus Books",
-  "short_name":"Viagens",
+  "name":"Viaggio",
+  "short_name":"Viaggio",
   "description":"Crie e viva seus Books de viagem.",
   "start_url":"/viagens/",
   "scope":"/viagens/",
