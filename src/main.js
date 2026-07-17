@@ -298,13 +298,6 @@ function renderDayLocationsEditor(focusLast = false) {
       location.name = name.value;
       syncDayActivityLocationSelects();
     });
-    const location = document.createElement('select');
-    location.className = 'day-activity-location';
-    location.dataset.activityId = activity.id;
-    location.append(new Option('Sem local', ''));
-    state.dayEditor.locations.forEach((item, index) => location.add(new Option(item.name.trim() || `Local ${index + 1}`, item.id)));
-    location.value = activity.locationId || '';
-    location.addEventListener('change', () => { activity.locationId = location.value; });
     const remove = document.createElement('button');
     remove.className = 'new-trip-passenger-remove';
     remove.type = 'button';
@@ -342,6 +335,13 @@ function renderDayAgendaEditor(focusLast = false) {
     text.placeholder = 'O que está programado?';
     text.value = activity.text;
     text.addEventListener('input', () => { activity.text = text.value; });
+    const locationSelect = document.createElement('select');
+    locationSelect.className = 'day-activity-location';
+    locationSelect.dataset.activityId = activity.id;
+    locationSelect.append(new Option('Sem local', ''));
+    state.dayEditor.locations.forEach((item, index) => locationSelect.add(new Option(item.name.trim() || `Local ${index + 1}`, item.id)));
+    locationSelect.value = activity.locationId || '';
+    locationSelect.addEventListener('change', () => { activity.locationId = locationSelect.value; });
     const remove = document.createElement('button');
     remove.className = 'new-trip-passenger-remove';
     remove.type = 'button';
@@ -351,7 +351,7 @@ function renderDayAgendaEditor(focusLast = false) {
       state.dayEditor.activities = state.dayEditor.activities.filter(item => item.id !== activity.id);
       renderDayAgendaEditor();
     });
-    row.append(time, text, remove, location);
+    row.append(time, text, remove, locationSelect);
     dom.dayAgendaEditor.append(row);
   }
   if (focusLast) dom.dayAgendaEditor.lastElementChild?.querySelector('input[type="text"]')?.focus({ preventScroll: true });
