@@ -759,6 +759,130 @@ body[data-day-sheet="open"] .day-edit-sheet { visibility: visible; transform: tr
 .day-location-result span { margin-top: 2px; color: var(--secondary); font-size: 10px; line-height: 1.3; }
 .map-attribution { margin: 5px 14px 0; color: #8e8e93; font-size: 10px; }
 .map-attribution a { color: inherit; }
+.place-search-scrim {
+  position: fixed;
+  z-index: 70;
+  inset: 0;
+  border: 0;
+  background: rgba(0,0,0,.12);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  backdrop-filter: blur(8px);
+  transition: opacity .3s ease-in-out, visibility 0s linear .3s;
+}
+.place-search-sheet {
+  position: fixed;
+  z-index: 71;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  min-height: min(78svh, 720px);
+  max-height: calc(100svh - max(18px, env(safe-area-inset-top)));
+  overflow: auto;
+  padding: 13px 14px calc(26px + env(safe-area-inset-bottom));
+  border-radius: 36px 36px 0 0;
+  color: var(--text);
+  background: var(--sheet);
+  box-shadow: 0 -22px 58px rgba(0,0,0,.22);
+  visibility: hidden;
+  transform: translateY(105%);
+  transition: transform .3s ease-in-out, visibility 0s linear .3s;
+  overscroll-behavior: contain;
+}
+body[data-place-search="open"] { overflow: hidden; }
+body[data-place-search="open"] .place-search-scrim { opacity: 1; visibility: visible; pointer-events: auto; transition-delay: 0s; }
+body[data-place-search="open"] .place-search-sheet { visibility: visible; transform: translateY(0); transition-delay: 0s; }
+.place-search-header { top: -13px; }
+.place-search-field {
+  display: grid;
+  grid-template-columns: 24px minmax(0,1fr) auto;
+  gap: 10px;
+  align-items: center;
+  width: min(100%, 660px);
+  min-height: 56px;
+  margin: 4px auto 0;
+  padding: 0 12px 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 19px;
+  background: var(--surface);
+}
+.place-search-field > span {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  border: 3px solid var(--text);
+  border-radius: 50%;
+}
+.place-search-field > span::after {
+  position: absolute;
+  right: -7px;
+  bottom: -5px;
+  width: 8px;
+  height: 3px;
+  border-radius: 3px;
+  background: var(--text);
+  content: '';
+  transform: rotate(45deg);
+}
+.place-search-field input {
+  width: 100%;
+  min-width: 0;
+  height: 54px;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  color: var(--text);
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+}
+.place-search-field button {
+  min-width: 64px;
+  height: 38px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 12px;
+  color: var(--ios-blue);
+  background: rgba(0,122,255,.1);
+  font-size: 13px;
+  font-weight: 700;
+}
+.place-search-field button:disabled { opacity: .5; }
+.place-search-message { width: min(calc(100% - 28px), 632px); min-height: 18px; margin: 9px auto 4px; color: var(--secondary); font-size: 12px; }
+.place-search-message[data-kind="error"] { color: var(--ios-red); }
+.place-search-results {
+  width: min(100%, 660px);
+  margin: 0 auto;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 22px;
+  background: var(--surface);
+  list-style: none;
+}
+.place-search-result {
+  display: grid;
+  grid-template-columns: 26px minmax(0,1fr);
+  gap: 12px;
+  align-items: center;
+  width: calc(100% - 16px);
+  min-height: 72px;
+  margin-left: 16px;
+  padding: 10px 14px 10px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+  background: transparent;
+  text-align: left;
+}
+.place-search-results li:last-child .place-search-result { border-bottom: 0; }
+.place-search-result-marker { width: 22px; height: 22px; border: 2px solid #c7c7cc; border-radius: 50%; }
+.place-search-result[aria-pressed="true"] .place-search-result-marker { border: 7px solid var(--ios-blue); }
+.place-search-result strong,
+.place-search-result small { display: block; }
+.place-search-result strong { font-size: 15px; line-height: 1.25; }
+.place-search-result small { margin-top: 4px; color: var(--secondary); font-size: 11px; line-height: 1.35; }
+.place-search-attribution { width: min(calc(100% - 28px), 632px); margin: 10px auto 0; }
 .day-agenda-editor { padding-left: 16px; }
 .day-agenda-row {
   display: grid;
