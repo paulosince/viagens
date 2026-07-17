@@ -327,8 +327,9 @@ function createTripPassengerRow(passenger) {
   const photoInput = document.createElement('input');
   photoInput.type = 'file';
   photoInput.accept = 'image/*';
-  if (passenger.photoUrl) {
-    image.src = passenger.photoUrl;
+  const photoSource = passenger.photoUrl || (passenger.session ? profileImage() : '');
+  if (photoSource) {
+    image.src = photoSource;
     image.hidden = false;
     initial.hidden = true;
   } else {
@@ -421,7 +422,7 @@ function resetTripPassengers() {
     userId: state.user.id,
     name: profileName(),
     birthDate: state.profile?.birth_date || '',
-    photoUrl: profileImage()
+    photoUrl: ''
   }];
   renderTripPassengers();
 }
