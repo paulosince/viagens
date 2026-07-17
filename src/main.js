@@ -198,7 +198,7 @@ function createTripNode(trip) {
   const item = document.createElement('li');
   const article = document.createElement('article'); article.className = 'trip-card'; article.dataset.pressed = 'false';
   const button = document.createElement('button'); button.className = 'trip-card-button'; button.type = 'button';
-  const releasePress = () => { article.dataset.pressed = 'false'; button.blur(); };
+  const releasePress = () => { article.dataset.pressed = 'false'; };
   button.addEventListener('pointerdown', () => { article.dataset.pressed = 'true'; });
   button.addEventListener('pointerup', releasePress);
   button.addEventListener('pointercancel', releasePress);
@@ -671,10 +671,29 @@ dom.authForm.addEventListener('submit', async event => {
 });
 
 async function boot() {
-  const { data } = await supabase.auth.getSession(); state.user = data.session?.user || null;
-  if (!state.user) { setSessionView('anonymous'); return; }
-  try { await loadProfile(); await loadTrips(); setSessionView('authenticated'); }
-  catch (error) { dom.authMessage.textContent = error.message; setSessionView('anonymous'); }
+  try {
+    const { data } = await supabase.auth.getSession();
+    state.user = data.session?.user || null;
+    if (!state.user) {
+      setSessionView('anonymous');
+      return;
+    }
+    try {
+      await loadProfile();
+      await loadTrips();
+      setSessionView('authenticated');
+    } catch (error) {
+      dom.authMessage.textContent = error.message;
+      setSessionView('anonymous');
+    }
+  } catch (error) {
+    dom.authMessage.textContent = error.message || 'Não foi possível iniciar o aplicativo.';
+    setSessionView('anonymous');
+  } finally {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      document.body.dataset.appReady = 'true';
+    }));
+  }
 }
 
 supabase.auth.onAuthStateChange((_event, session) => {
