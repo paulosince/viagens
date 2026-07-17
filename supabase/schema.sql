@@ -42,11 +42,14 @@ create table if not exists public.passengers (
   id uuid primary key default gen_random_uuid(),
   trip_id uuid not null references public.trips(id) on delete cascade,
   name text not null,
+  birth_date date,
   age integer,
   gender text,
   photo_url text,
   created_at timestamptz not null default now()
 );
+
+alter table public.passengers add column if not exists birth_date date;
 
 create table if not exists public.trip_days (
   id uuid primary key default gen_random_uuid(),
