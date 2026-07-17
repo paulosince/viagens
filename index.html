@@ -36,9 +36,9 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20260717-25" as="style">
-  <link rel="stylesheet" href="style.css?v=20260717-25" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20260717-25"></noscript>
+  <link rel="preload" href="style.css?v=20260717-26" as="style">
+  <link rel="stylesheet" href="style.css?v=20260717-26" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20260717-26"></noscript>
 </head>
 <body data-session="loading" data-active-sheet="none" data-editing="false" data-year-menu="closed" data-trip-page="closed" data-app-ready="false">
   <div id="app_splash" class="app-splash" aria-label="Carregando Viaggio">
@@ -210,11 +210,30 @@
       </form>
     </section>
 
+    <button id="place_search_scrim" class="place-search-scrim" type="button" aria-label="Fechar busca de locais"></button>
+    <section id="place_search_sheet" class="place-search-sheet" aria-hidden="true" aria-labelledby="place-search-title">
+      <form id="place_search_form">
+        <header class="sheet-header place-search-header">
+          <button id="close_place_search" class="sheet-control" type="button" aria-label="Cancelar busca">×</button>
+          <div class="day-edit-heading"><h2 id="place-search-title">Escolher local</h2><span>OpenStreetMap</span></div>
+          <button id="confirm_place_search" class="sheet-control confirm" type="submit" aria-label="Confirmar local" disabled><span class="confirm-check">✓</span><span class="confirm-spinner" aria-hidden="true"></span></button>
+        </header>
+        <div class="place-search-field">
+          <span aria-hidden="true"></span>
+          <input id="place_search_input" type="search" autocomplete="off" enterkeyhint="search" placeholder="Buscar local">
+          <button id="run_place_search" type="button">Buscar</button>
+        </div>
+        <p id="place_search_message" class="place-search-message" role="status"></p>
+        <ol id="place_search_results" class="place-search-results"></ol>
+        <p class="map-attribution place-search-attribution">Resultados de <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a></p>
+      </form>
+    </section>
+
     <footer id="trip_edit_footer" class="trip-edit-footer" aria-hidden="true">
       <button id="delete_selected_trips" type="button" disabled>Excluir selecionadas</button>
     </footer>
   </main>
-  <script type="module" src="src/main.js?v=20260717-23"></script>
-  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260717-30');</script>
+  <script type="module" src="src/main.js?v=20260717-24"></script>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260717-31');</script>
 </body>
 </html>
