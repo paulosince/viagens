@@ -10,7 +10,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="assets/app-icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon-180.PNG">
-  <link rel="stylesheet" href="style.css?v=20260717-10">
+  <link rel="stylesheet" href="style.css?v=20260717-11">
 </head>
 <body data-session="loading" data-active-sheet="none" data-editing="false" data-year-menu="closed">
   <main id="app" aria-live="polite">
@@ -51,10 +51,6 @@
         <p>Sua próxima história começa aqui.</p>
         <button id="empty_new_trip_button" class="glass-button" type="button">Criar viagem</button>
       </section>
-
-      <footer id="trip_edit_footer" class="trip-edit-footer" aria-hidden="true">
-        <button id="delete_selected_trips" type="button" disabled>Excluir selecionadas</button>
-      </footer>
 
       <button id="sheet_scrim" class="scrim" type="button" aria-label="Fechar formulário"></button>
 
@@ -128,8 +124,12 @@
         </form>
       </section>
     </section>
+
+    <footer id="trip_edit_footer" class="trip-edit-footer" aria-hidden="true">
+      <button id="delete_selected_trips" type="button" disabled>Excluir selecionadas</button>
+    </footer>
   </main>
   <script type="module" src="src/main.js?v=20260717-07"></script>
-  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260717-11');</script>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260717-12');</script>
 </body>
 </html>
