@@ -357,16 +357,17 @@ body[data-editing="true"] .trip-status { opacity: 0; }
 
 .trip-edit-footer {
   position: fixed;
-  z-index: 15;
+  z-index: 19;
   right: 0;
   bottom: 0;
   left: 0;
   padding: 13px 18px calc(13px + env(safe-area-inset-bottom));
   border-top: 1px solid var(--line);
-  background: rgba(245,245,248,.82);
+  background: rgba(245,245,248,.72);
   transform: translateY(110%);
   transition: transform .36s cubic-bezier(.22,.8,.25,1);
-  backdrop-filter: blur(30px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(160%);
 }
 body[data-editing="true"] .trip-edit-footer { transform: translateY(0); }
 .trip-edit-footer button {
