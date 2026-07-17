@@ -15,6 +15,7 @@ create table if not exists public.trips (
   theme_id text not null default 'classic',
   primary_color text not null default '#14212b',
   secondary_color text not null default '#b89d63',
+  deleted_at timestamptz,
   created_at timestamptz not null default now(),
   constraint trips_dates_valid check (end_date >= start_date)
 );
@@ -35,6 +36,7 @@ alter table public.trips add column if not exists cover_url text;
 alter table public.trips add column if not exists theme_id text not null default 'classic';
 alter table public.trips add column if not exists primary_color text not null default '#14212b';
 alter table public.trips add column if not exists secondary_color text not null default '#b89d63';
+alter table public.trips add column if not exists deleted_at timestamptz;
 
 create table if not exists public.passengers (
   id uuid primary key default gen_random_uuid(),
