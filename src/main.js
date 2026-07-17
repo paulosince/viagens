@@ -31,7 +31,7 @@ const dom = {
   tripList: document.querySelector('#trip_list'), homeEmpty: document.querySelector('#home_empty'), scrim: document.querySelector('#sheet_scrim'), tripEditFooter: document.querySelector('#trip_edit_footer'), deleteSelectedTrips: document.querySelector('#delete_selected_trips'), tripPage: document.querySelector('#trip_page'), closeTripPage: document.querySelector('#close_trip_page'), tripPageHero: document.querySelector('#trip_page_hero'), tripPageTitle: document.querySelector('#trip_page_title'), tripPageDates: document.querySelector('#trip_page_dates'), tripPagePassengers: document.querySelector('#trip_page_passengers'), tripPagePassengerCount: document.querySelector('#trip_page_passenger_count'), tripDayList: document.querySelector('#trip_day_list'), tripDayMessage: document.querySelector('#trip_day_message'),
   newTripSheet: document.querySelector('#home_new_trip'), newTripForm: document.querySelector('#new_trip_form'), closeNewTrip: document.querySelector('#close_new_trip'), saveNewTrip: document.querySelector('#save_new_trip'), newTripMessage: document.querySelector('#new_trip_message'), coverInput: document.querySelector('#cover-image'), coverPreview: document.querySelector('#cover_preview_image'), tripColorValue: document.querySelector('#trip-color-value'), tripColorPalette: document.querySelector('#trip_color_palette'), tripColorCustom: document.querySelector('#trip-color-custom'), newTripPassengerList: document.querySelector('#new_trip_passenger_list'), addTripPassenger: document.querySelector('#add_trip_passenger'),
   dayEditSheet: document.querySelector('#day_edit_sheet'), daySheetScrim: document.querySelector('#day_sheet_scrim'), dayEditForm: document.querySelector('#day_edit_form'), closeDayEdit: document.querySelector('#close_day_edit'), saveDayEdit: document.querySelector('#save_day_edit'), dayEditTitle: document.querySelector('#day_edit_title'), dayEditDate: document.querySelector('#day_edit_date'), dayTitleInput: document.querySelector('#day-title-input'), dayLocationsEditor: document.querySelector('#day_locations_editor'), addDayLocation: document.querySelector('#add_day_location'), dayAgendaEditor: document.querySelector('#day_agenda_editor'), addDayActivity: document.querySelector('#add_day_activity'), dayNotesInput: document.querySelector('#day-notes-input'), dayEditMessage: document.querySelector('#day_edit_message'),
-  placeSearchSheet: document.querySelector('#place_search_sheet'), placeSearchScrim: document.querySelector('#place_search_scrim'), placeSearchForm: document.querySelector('#place_search_form'), closePlaceSearch: document.querySelector('#close_place_search'), confirmPlaceSearch: document.querySelector('#confirm_place_search'), placeSearchInput: document.querySelector('#place_search_input'), runPlaceSearch: document.querySelector('#run_place_search'), placeSearchMessage: document.querySelector('#place_search_message'), placeSearchResults: document.querySelector('#place_search_results'),
+  placeSearchSheet: document.querySelector('#place_search_sheet'), placeSearchScrim: document.querySelector('#place_search_scrim'), placeSearchForm: document.querySelector('#place_search_form'), closePlaceSearch: document.querySelector('#close_place_search'), confirmPlaceSearch: document.querySelector('#confirm_place_search'), placeSearchInput: document.querySelector('#place_search_input'), runPlaceSearch: document.querySelector('#run_place_search'), placeSearchMessage: document.querySelector('#place_search_message'), placeSearchResults: document.querySelector('#place_search_results'), placePhotoSection: document.querySelector('#place_photo_section'), placePhotoMessage: document.querySelector('#place_photo_message'), placePhotoResults: document.querySelector('#place_photo_results'),
   profileSheet: document.querySelector('#profile-sheet'), profileForm: document.querySelector('#profile_form'), closeProfile: document.querySelector('#close_profile'), saveProfile: document.querySelector('#save_profile'), profileMessage: document.querySelector('#profile_message'), profileEditorImage: document.querySelector('#profile_editor_image'), profilePhotoInput: document.querySelector('#profile-photo'), profileDisplayName: document.querySelector('#profile_display_name'), profileEmail: document.querySelector('#profile_email'), profileNameInput: document.querySelector('#profile-name'), birthDateInput: document.querySelector('#birth-date'), profileAge: document.querySelector('#profile_age'), profileCreatedAt: document.querySelector('#profile_created_at'), logoutButton: document.querySelector('#logout_button'), deleteAccountButton: document.querySelector('#delete_account_button')
 };
 
@@ -195,6 +195,16 @@ function renderTripDays(days, activitiesByDay = new Map(), locationsByDay = new 
     timing.textContent = timingData.label;
     timing.dataset.today = String(timingData.today);
     image.append(badge, timing);
+    if (firstLocation?.photo_provider === 'unsplash' && firstLocation.photo_author) {
+      const credit = document.createElement('a');
+      credit.className = 'trip-day-photo-credit';
+      credit.href = `${firstLocation.photo_author_url || 'https://unsplash.com'}${(firstLocation.photo_author_url || '').includes('?') ? '&' : '?'}utm_source=viaggio&utm_medium=referral`;
+      credit.target = '_blank';
+      credit.rel = 'noopener';
+      credit.textContent = `Foto: ${firstLocation.photo_author} · Unsplash`;
+      credit.addEventListener('click', event => event.stopPropagation());
+      image.append(credit);
+    }
 
     const body = document.createElement('div');
     body.className = 'trip-day-body';
@@ -298,8 +308,64 @@ function closePlaceSearch() {
   dom.confirmPlaceSearch.disabled = true;
 }
 
+function unsplashQuery(result) {
+  const address = result.address || {};
+  const city = address.city || address.town || address.village || address.municipality || '';
+  const country = address.country || '';
+  return [placeResultName(result), city, country].filter(Boolean).join(', ');
+}
+
+function renderPlacePhotos(photos) {
+  dom.placePhotoResults.replaceChildren();
+  for (const [index, photo] of photos.entries()) {
+    const option = document.createElement('button');
+    option.type = 'button';
+    option.className = 'place-photo-option';
+    option.setAttribute('aria-pressed', String(index === state.placeSearch.selectedPhotoIndex));
+    const image = document.createElement('img');
+    image.src = photo.thumbUrl;
+    image.alt = photo.description || `Foto de ${placeResultName(state.placeSearch.results[state.placeSearch.selectedIndex])}`;
+    const credit = document.createElement('span');
+    credit.textContent = photo.author ? `por ${photo.author}` : 'Unsplash';
+    option.append(image, credit);
+    option.addEventListener('click', () => {
+      state.placeSearch.selectedPhotoIndex = index === state.placeSearch.selectedPhotoIndex ? -1 : index;
+      renderPlacePhotos(photos);
+    });
+    dom.placePhotoResults.append(option);
+  }
+}
+
+async function loadPlacePhotos(result) {
+  if (!state.placeSearch) return;
+  state.placeSearch.photos = [];
+  state.placeSearch.selectedPhotoIndex = -1;
+  dom.placePhotoSection.hidden = false;
+  dom.placePhotoResults.replaceChildren();
+  dom.placePhotoMessage.textContent = 'Buscando fotos…';
+  dom.placePhotoMessage.dataset.kind = '';
+  const currentPlaceId = `${result.osm_type}/${result.osm_id}`;
+  try {
+    const { data, error } = await supabase.functions.invoke('unsplash-photos', { body: { action: 'search', query: unsplashQuery(result) } });
+    const selected = state.placeSearch?.results?.[state.placeSearch.selectedIndex];
+    if (!selected || `${selected.osm_type}/${selected.osm_id}` !== currentPlaceId) return;
+    if (error) throw error;
+    if (data?.quotaExceeded) {
+      dom.placePhotoSection.hidden = true;
+      return;
+    }
+    const photos = data?.photos || [];
+    state.placeSearch.photos = photos;
+    dom.placePhotoMessage.textContent = photos.length ? 'Toque numa foto para usá-la. Você também pode enviar a sua.' : 'Nenhuma foto encontrada. Você poderá enviar uma do aparelho.';
+    renderPlacePhotos(photos);
+  } catch {
+    dom.placePhotoSection.hidden = true;
+  }
+}
+
 function renderPlaceSearchResults(results) {
   dom.placeSearchResults.replaceChildren();
+  dom.placePhotoSection.hidden = true;
   for (const [index, result] of results.entries()) {
     const item = document.createElement('li');
     const option = document.createElement('button');
@@ -318,8 +384,11 @@ function renderPlaceSearchResults(results) {
     option.append(marker, copy);
     option.addEventListener('click', () => {
       state.placeSearch.selectedIndex = index;
+      state.placeSearch.photos = [];
+      state.placeSearch.selectedPhotoIndex = -1;
       dom.confirmPlaceSearch.disabled = false;
       renderPlaceSearchResults(results);
+      loadPlacePhotos(result);
     });
     item.append(option);
     dom.placeSearchResults.append(item);
@@ -358,11 +427,13 @@ async function runPlaceSearch() {
 }
 
 function openPlaceSearch(location) {
-  state.placeSearch = { location, results: [], selectedIndex: -1 };
+  state.placeSearch = { location, results: [], selectedIndex: -1, photos: [], selectedPhotoIndex: -1 };
   dom.placeSearchInput.value = location.name || '';
   dom.placeSearchMessage.textContent = '';
   dom.placeSearchMessage.dataset.kind = '';
   dom.placeSearchResults.replaceChildren();
+  dom.placePhotoSection.hidden = true;
+  dom.placePhotoResults.replaceChildren();
   dom.confirmPlaceSearch.disabled = true;
   dom.placeSearchSheet.setAttribute('aria-hidden', 'false');
   document.body.dataset.placeSearch = 'open';
@@ -384,6 +455,15 @@ function confirmPlaceSearch() {
   location.longitude = Number(match.lon);
   location.category = match.category || match.class || '';
   location.placeType = match.type || '';
+  const photo = search.photos?.[search.selectedPhotoIndex];
+  if (photo) {
+    location.photoUrl = photo.imageUrl;
+    location.photoProvider = 'unsplash';
+    location.photoAuthor = photo.author || '';
+    location.photoAuthorUrl = photo.authorUrl || '';
+    location.photoSourceUrl = photo.sourceUrl || '';
+    if (photo.downloadLocation) supabase.functions.invoke('unsplash-photos', { body: { action: 'track', downloadLocation: photo.downloadLocation } });
+  }
   closePlaceSearch();
   renderDayLocationsEditor();
   syncDayActivityLocationSelects();
@@ -413,6 +493,10 @@ function renderDayLocationsEditor(focusLast = false) {
       if (!selected) return;
       try {
         location.photoUrl = await compressImage(selected);
+        location.photoProvider = '';
+        location.photoAuthor = '';
+        location.photoAuthorUrl = '';
+        location.photoSourceUrl = '';
         image.src = location.photoUrl;
         image.hidden = false;
         placeholder.hidden = true;
@@ -584,6 +668,10 @@ async function saveDayEditor() {
     longitude: location.longitude,
     category: location.category || null,
     place_type: location.placeType || null,
+    photo_provider: location.photoProvider || null,
+    photo_author: location.photoAuthor || null,
+    photo_author_url: location.photoAuthorUrl || null,
+    photo_source_url: location.photoSourceUrl || null,
     photo_url: location.photoUrl || null
   }));
   if (locations.length) {
