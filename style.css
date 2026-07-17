@@ -883,6 +883,26 @@ body[data-place-search="open"] .place-search-sheet { visibility: visible; transf
 .place-search-result strong { font-size: 15px; line-height: 1.25; }
 .place-search-result small { margin-top: 4px; color: var(--secondary); font-size: 11px; line-height: 1.35; }
 .place-search-attribution { width: min(calc(100% - 28px), 632px); margin: 10px auto 0; }
+.place-photo-section { width: min(100%, 660px); margin: 20px auto 0; }
+.place-photo-heading { display: flex; align-items: baseline; justify-content: space-between; margin: 0 14px 8px; }
+.place-photo-heading h3 { margin: 0; font-size: 15px; }
+.place-photo-heading span { color: var(--secondary); font-size: 11px; font-weight: 600; }
+.place-photo-section .place-search-message { width: auto; margin-inline: 14px; }
+.place-photo-results { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 9px; }
+.place-photo-option {
+  position: relative;
+  min-width: 0;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  padding: 0;
+  border: 3px solid transparent;
+  border-radius: 17px;
+  background: #d9d9de;
+}
+.place-photo-option[aria-pressed="true"] { border-color: var(--ios-blue); box-shadow: 0 0 0 2px var(--surface); }
+.place-photo-option img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.place-photo-option span { position: absolute; right: 0; bottom: 0; left: 0; padding: 18px 7px 6px; color: white; background: linear-gradient(transparent, rgba(0,0,0,.68)); font-size: 9px; font-weight: 700; text-align: left; }
+.trip-day-photo-credit { position: absolute; z-index: 2; right: 10px; bottom: 8px; padding: 4px 7px; border-radius: 8px; color: white; background: rgba(0,0,0,.45); font-size: 8px; font-weight: 600; text-decoration: none; backdrop-filter: blur(8px); }
 .day-agenda-editor { padding-left: 16px; }
 .day-agenda-row {
   display: grid;
