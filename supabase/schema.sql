@@ -65,6 +65,15 @@ create table if not exists public.trip_days (
   unique(trip_id, date)
 );
 
+create table if not exists public.day_locations (
+  id uuid primary key default gen_random_uuid(),
+  day_id uuid not null references public.trip_days(id) on delete cascade,
+  position integer not null default 0,
+  name text not null,
+  photo_url text,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists public.activities (
   id uuid primary key default gen_random_uuid(),
   day_id uuid not null references public.trip_days(id) on delete cascade,
@@ -137,6 +146,7 @@ $$;
 alter table public.trips enable row level security;
 alter table public.passengers enable row level security;
 alter table public.trip_days enable row level security;
+alter table public.day_locations enable row level security;
 alter table public.activities enable row level security;
 alter table public.checklist_items enable row level security;
 alter table public.budget_items enable row level security;
@@ -155,6 +165,11 @@ create policy "passengers read" on public.passengers for select using (public.is
 create policy "passengers edit" on public.passengers for all using (public.is_trip_member(trip_id,'editor')) with check (public.is_trip_member(trip_id,'editor'));
 create policy "days read" on public.trip_days for select using (public.is_trip_member(trip_id));
 create policy "days edit" on public.trip_days for all using (public.is_trip_member(trip_id,'editor')) with check (public.is_trip_member(trip_id,'editor'));
+drop policy if exists "locations read" on public.day_locations;
+create policy "locations read" on public.day_locations for select using (public.is_trip_member((select trip_id from public.trip_days d where d.id = day_id)));
+drop policy if exists "locations edit" on public.day_locations;
+create policy "locations edit" on public.day_locations for all using (public.is_trip_member((select trip_id from public.trip_days d where d.id = day_id),'editor')) with check (public.is_trip_member((select trip_id from public.trip_days d where d.id = day_id),'editor'));
+
 create policy "activities read" on public.activities for select using (public.is_trip_member((select trip_id from public.trip_days d where d.id = day_id)));
 create policy "activities edit" on public.activities for all using (public.is_trip_member((select trip_id from public.trip_days d where d.id = day_id),'editor')) with check (public.is_trip_member((select trip_id from public.trip_days d where d.id = day_id),'editor'));
 create policy "checklist read" on public.checklist_items for select using (public.is_trip_member(trip_id));
