@@ -20,7 +20,8 @@ const state = {
   tripColor: '#4775d1',
   newTripPassengers: [],
   activeTripId: null,
-  dayEditor: null
+  dayEditor: null,
+  placeSearch: null
 };
 
 const dom = {
@@ -30,6 +31,7 @@ const dom = {
   tripList: document.querySelector('#trip_list'), homeEmpty: document.querySelector('#home_empty'), scrim: document.querySelector('#sheet_scrim'), tripEditFooter: document.querySelector('#trip_edit_footer'), deleteSelectedTrips: document.querySelector('#delete_selected_trips'), tripPage: document.querySelector('#trip_page'), closeTripPage: document.querySelector('#close_trip_page'), tripPageHero: document.querySelector('#trip_page_hero'), tripPageTitle: document.querySelector('#trip_page_title'), tripPageDates: document.querySelector('#trip_page_dates'), tripPagePassengers: document.querySelector('#trip_page_passengers'), tripPagePassengerCount: document.querySelector('#trip_page_passenger_count'), tripDayList: document.querySelector('#trip_day_list'), tripDayMessage: document.querySelector('#trip_day_message'),
   newTripSheet: document.querySelector('#home_new_trip'), newTripForm: document.querySelector('#new_trip_form'), closeNewTrip: document.querySelector('#close_new_trip'), saveNewTrip: document.querySelector('#save_new_trip'), newTripMessage: document.querySelector('#new_trip_message'), coverInput: document.querySelector('#cover-image'), coverPreview: document.querySelector('#cover_preview_image'), tripColorValue: document.querySelector('#trip-color-value'), tripColorPalette: document.querySelector('#trip_color_palette'), tripColorCustom: document.querySelector('#trip-color-custom'), newTripPassengerList: document.querySelector('#new_trip_passenger_list'), addTripPassenger: document.querySelector('#add_trip_passenger'),
   dayEditSheet: document.querySelector('#day_edit_sheet'), daySheetScrim: document.querySelector('#day_sheet_scrim'), dayEditForm: document.querySelector('#day_edit_form'), closeDayEdit: document.querySelector('#close_day_edit'), saveDayEdit: document.querySelector('#save_day_edit'), dayEditTitle: document.querySelector('#day_edit_title'), dayEditDate: document.querySelector('#day_edit_date'), dayTitleInput: document.querySelector('#day-title-input'), dayLocationsEditor: document.querySelector('#day_locations_editor'), addDayLocation: document.querySelector('#add_day_location'), dayAgendaEditor: document.querySelector('#day_agenda_editor'), addDayActivity: document.querySelector('#add_day_activity'), dayNotesInput: document.querySelector('#day-notes-input'), dayEditMessage: document.querySelector('#day_edit_message'),
+  placeSearchSheet: document.querySelector('#place_search_sheet'), placeSearchScrim: document.querySelector('#place_search_scrim'), placeSearchForm: document.querySelector('#place_search_form'), closePlaceSearch: document.querySelector('#close_place_search'), confirmPlaceSearch: document.querySelector('#confirm_place_search'), placeSearchInput: document.querySelector('#place_search_input'), runPlaceSearch: document.querySelector('#run_place_search'), placeSearchMessage: document.querySelector('#place_search_message'), placeSearchResults: document.querySelector('#place_search_results'),
   profileSheet: document.querySelector('#profile-sheet'), profileForm: document.querySelector('#profile_form'), closeProfile: document.querySelector('#close_profile'), saveProfile: document.querySelector('#save_profile'), profileMessage: document.querySelector('#profile_message'), profileEditorImage: document.querySelector('#profile_editor_image'), profilePhotoInput: document.querySelector('#profile-photo'), profileDisplayName: document.querySelector('#profile_display_name'), profileEmail: document.querySelector('#profile_email'), profileNameInput: document.querySelector('#profile-name'), birthDateInput: document.querySelector('#birth-date'), profileAge: document.querySelector('#profile_age'), profileCreatedAt: document.querySelector('#profile_created_at'), logoutButton: document.querySelector('#logout_button'), deleteAccountButton: document.querySelector('#delete_account_button')
 };
 
@@ -289,6 +291,104 @@ function clearLocationGeography(location) {
   location.placeType = '';
 }
 
+function closePlaceSearch() {
+  state.placeSearch = null;
+  document.body.dataset.placeSearch = 'closed';
+  dom.placeSearchSheet.setAttribute('aria-hidden', 'true');
+  dom.confirmPlaceSearch.disabled = true;
+}
+
+function renderPlaceSearchResults(results) {
+  dom.placeSearchResults.replaceChildren();
+  for (const [index, result] of results.entries()) {
+    const item = document.createElement('li');
+    const option = document.createElement('button');
+    option.type = 'button';
+    option.className = 'place-search-result';
+    option.setAttribute('aria-pressed', String(index === state.placeSearch.selectedIndex));
+    const marker = document.createElement('span');
+    marker.className = 'place-search-result-marker';
+    marker.setAttribute('aria-hidden', 'true');
+    const copy = document.createElement('span');
+    const title = document.createElement('strong');
+    title.textContent = placeResultName(result);
+    const address = document.createElement('small');
+    address.textContent = result.display_name;
+    copy.append(title, address);
+    option.append(marker, copy);
+    option.addEventListener('click', () => {
+      state.placeSearch.selectedIndex = index;
+      dom.confirmPlaceSearch.disabled = false;
+      renderPlaceSearchResults(results);
+    });
+    item.append(option);
+    dom.placeSearchResults.append(item);
+  }
+}
+
+async function runPlaceSearch() {
+  if (!state.placeSearch) return;
+  const query = dom.placeSearchInput.value.trim();
+  if (query.length < 3) {
+    dom.placeSearchMessage.textContent = 'Digite pelo menos 3 caracteres.';
+    dom.placeSearchMessage.dataset.kind = 'error';
+    return;
+  }
+  dom.runPlaceSearch.disabled = true;
+  dom.runPlaceSearch.textContent = 'Buscando…';
+  dom.confirmPlaceSearch.disabled = true;
+  dom.placeSearchMessage.textContent = 'Buscando locais…';
+  dom.placeSearchMessage.dataset.kind = '';
+  dom.placeSearchResults.replaceChildren();
+  try {
+    const results = await searchOpenStreetMap(query);
+    if (!state.placeSearch) return;
+    state.placeSearch.results = results;
+    state.placeSearch.selectedIndex = -1;
+    dom.placeSearchMessage.textContent = results.length ? `${results.length} ${results.length === 1 ? 'local encontrado' : 'locais encontrados'}` : 'Nenhum local encontrado. Tente incluir a cidade ou o país.';
+    dom.placeSearchMessage.dataset.kind = results.length ? '' : 'error';
+    renderPlaceSearchResults(results);
+  } catch (error) {
+    dom.placeSearchMessage.textContent = error.message || 'Não foi possível buscar os locais.';
+    dom.placeSearchMessage.dataset.kind = 'error';
+  } finally {
+    dom.runPlaceSearch.disabled = false;
+    dom.runPlaceSearch.textContent = 'Buscar';
+  }
+}
+
+function openPlaceSearch(location) {
+  state.placeSearch = { location, results: [], selectedIndex: -1 };
+  dom.placeSearchInput.value = location.name || '';
+  dom.placeSearchMessage.textContent = '';
+  dom.placeSearchMessage.dataset.kind = '';
+  dom.placeSearchResults.replaceChildren();
+  dom.confirmPlaceSearch.disabled = true;
+  dom.placeSearchSheet.setAttribute('aria-hidden', 'false');
+  document.body.dataset.placeSearch = 'open';
+  requestAnimationFrame(() => dom.placeSearchInput.focus({ preventScroll: true }));
+  if (dom.placeSearchInput.value.trim().length >= 3) runPlaceSearch();
+}
+
+function confirmPlaceSearch() {
+  const search = state.placeSearch;
+  const match = search?.results?.[search.selectedIndex];
+  if (!match) return;
+  const location = search.location;
+  location.name = placeResultName(match);
+  location.selectedName = location.name;
+  location.provider = 'openstreetmap';
+  location.providerPlaceId = `${match.osm_type}/${match.osm_id}`;
+  location.formattedAddress = match.display_name;
+  location.latitude = Number(match.lat);
+  location.longitude = Number(match.lon);
+  location.category = match.category || match.class || '';
+  location.placeType = match.type || '';
+  closePlaceSearch();
+  renderDayLocationsEditor();
+  syncDayActivityLocationSelects();
+}
+
 function renderDayLocationsEditor(focusLast = false) {
   dom.dayLocationsEditor.replaceChildren();
   for (const [index, location] of state.dayEditor.locations.entries()) {
@@ -341,67 +441,17 @@ function renderDayLocationsEditor(focusLast = false) {
     const status = document.createElement('span');
     status.className = 'day-location-search-status';
     if (location.formattedAddress) status.textContent = location.formattedAddress;
-    const results = document.createElement('div');
-    results.className = 'day-location-results';
-    results.hidden = true;
-    search.addEventListener('click', async () => {
+    search.addEventListener('click', () => {
       const query = name.value.trim();
       if (query.length < 3) {
         status.textContent = 'Digite pelo menos 3 caracteres.';
         status.dataset.kind = 'error';
         return;
       }
-      search.disabled = true;
-      search.textContent = 'Buscando…';
-      status.textContent = '';
-      status.dataset.kind = '';
-      results.hidden = true;
-      results.replaceChildren();
-      try {
-        const matches = await searchOpenStreetMap(query);
-        if (!matches.length) {
-          status.textContent = 'Nenhum local encontrado. Tente incluir a cidade ou o país.';
-          status.dataset.kind = 'error';
-        } else {
-          for (const match of matches) {
-            const option = document.createElement('button');
-            option.type = 'button';
-            option.className = 'day-location-result';
-            const title = document.createElement('strong');
-            title.textContent = placeResultName(match);
-            const address = document.createElement('span');
-            address.textContent = match.display_name;
-            option.append(title, address);
-            option.addEventListener('click', () => {
-              location.name = placeResultName(match);
-              location.selectedName = location.name;
-              location.provider = 'openstreetmap';
-              location.providerPlaceId = `${match.osm_type}/${match.osm_id}`;
-              location.formattedAddress = match.display_name;
-              location.latitude = Number(match.lat);
-              location.longitude = Number(match.lon);
-              location.category = match.category || match.class || '';
-              location.placeType = match.type || '';
-              name.value = location.name;
-              status.textContent = location.formattedAddress;
-              status.dataset.kind = 'selected';
-              results.hidden = true;
-              syncDayActivityLocationSelects();
-            });
-            results.append(option);
-          }
-          results.hidden = false;
-        }
-      } catch (error) {
-        status.textContent = error.message || 'Não foi possível buscar os locais.';
-        status.dataset.kind = 'error';
-      } finally {
-        search.disabled = false;
-        search.textContent = 'Buscar';
-      }
+      openPlaceSearch(location);
     });
     searchLine.append(name, search);
-    editor.append(searchLine, status, results);
+    editor.append(searchLine, status);
     const remove = document.createElement('button');
     remove.className = 'new-trip-passenger-remove';
     remove.type = 'button';
@@ -490,6 +540,7 @@ function openDayEditor(day) {
 
 function closeDayEditor() {
   if (state.saving) return;
+  if (state.placeSearch) closePlaceSearch();
   state.dayEditor = null;
   document.body.dataset.daySheet = 'closed';
   dom.dayEditSheet.setAttribute('aria-hidden', 'true');
@@ -1071,6 +1122,15 @@ async function deleteAccount() {
 
 dom.closeDayEdit.addEventListener('click', closeDayEditor);
 dom.daySheetScrim.addEventListener('click', closeDayEditor);
+dom.closePlaceSearch.addEventListener('click', closePlaceSearch);
+dom.placeSearchScrim.addEventListener('click', closePlaceSearch);
+dom.runPlaceSearch.addEventListener('click', runPlaceSearch);
+dom.placeSearchForm.addEventListener('submit', event => {
+  event.preventDefault();
+  if (state.placeSearch?.selectedIndex >= 0) confirmPlaceSearch();
+  else runPlaceSearch();
+});
+dom.placeSearchInput.addEventListener('search', () => { if (dom.placeSearchInput.value.trim().length >= 3) runPlaceSearch(); });
 dom.addDayLocation.addEventListener('click', addDayLocation);
 dom.addDayActivity.addEventListener('click', addDayAgendaActivity);
 dom.dayTitleInput.addEventListener('input', () => { if (state.dayEditor) state.dayEditor.title = dom.dayTitleInput.value; });
