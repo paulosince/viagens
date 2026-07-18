@@ -828,10 +828,6 @@ async function saveDayEditor() {
     longitude: location.longitude,
     category: location.category || null,
     place_type: location.placeType || null,
-    photo_provider: location.photoProvider || null,
-    photo_author: location.photoAuthor || null,
-    photo_author_url: location.photoAuthorUrl || null,
-    photo_source_url: location.photoSourceUrl || null,
     photo_url: location.photoUrl || null
   }));
   const activities = editor.activities.filter(activity => activity.text.trim()).map((activity, position) => ({
@@ -852,15 +848,6 @@ async function saveDayEditor() {
   const savedLocationIds = new Set((state.dayLocations.get(String(editor.day.id)) || []).map(location => String(location.id)));
   const retainedLocationIds = new Set(locations.filter(location => savedLocationIds.has(String(location.id))).map(location => String(location.id)));
   const removedLocationIds = [...savedLocationIds].filter(id => !retainedLocationIds.has(id));
-  if (removedLocationIds.length) {
-    const removed = await supabase.from('day_locations').delete().in('id', removedLocationIds).eq('day_id', editor.day.id);
-    if (removed.error) {
-      dom.dayEditMessage.textContent = removed.error.message;
-      state.saving = false;
-      setLoading(dom.saveDayEdit, false);
-      return;
-    }
-  }
   for (const location of locations) {
     const payload = Object.fromEntries(Object.entries(location).filter(([key]) => !['id', 'day_id'].includes(key)));
     const result = savedLocationIds.has(String(location.id))
@@ -877,6 +864,18 @@ async function saveDayEditor() {
   const savedActivityIds = new Set((state.dayActivities.get(String(editor.day.id)) || []).map(activity => String(activity.id)));
   const retainedActivityIds = new Set(activities.filter(activity => savedActivityIds.has(String(activity.id))).map(activity => String(activity.id)));
   const removedActivityIds = [...savedActivityIds].filter(id => !retainedActivityIds.has(id));
+  for (const activity of activities) {
+    const payload = Object.fromEntries(Object.entries(activity).filter(([key]) => !['id', 'day_id'].includes(key)));
+    const result = savedActivityIds.has(String(activity.id))
+      ? await supabase.from('activities').update(payload).eq('id', activity.id).eq('day_id', editor.day.id)
+      : await supabase.from('activities').insert(activity);
+    if (result.error) {
+      dom.dayEditMessage.textContent = result.error.message;
+      state.saving = false;
+      setLoading(dom.saveDayEdit, false);
+      return;
+    }
+  }
   if (removedActivityIds.length) {
     const removed = await supabase.from('activities').delete().in('id', removedActivityIds).eq('day_id', editor.day.id);
     if (removed.error) {
@@ -886,13 +885,10 @@ async function saveDayEditor() {
       return;
     }
   }
-  for (const activity of activities) {
-    const payload = Object.fromEntries(Object.entries(activity).filter(([key]) => !['id', 'day_id'].includes(key)));
-    const result = savedActivityIds.has(String(activity.id))
-      ? await supabase.from('activities').update(payload).eq('id', activity.id).eq('day_id', editor.day.id)
-      : await supabase.from('activities').insert(activity);
-    if (result.error) {
-      dom.dayEditMessage.textContent = result.error.message;
+  if (removedLocationIds.length) {
+    const removed = await supabase.from('day_locations').delete().in('id', removedLocationIds).eq('day_id', editor.day.id);
+    if (removed.error) {
+      dom.dayEditMessage.textContent = removed.error.message;
       state.saving = false;
       setLoading(dom.saveDayEdit, false);
       return;
