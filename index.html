@@ -40,11 +40,11 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20260717-31" as="style">
-  <link rel="stylesheet" href="style.css?v=20260717-31" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20260717-31"></noscript>
+  <link rel="preload" href="style.css?v=20260717-32" as="style">
+  <link rel="stylesheet" href="style.css?v=20260717-32" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20260717-32"></noscript>
 </head>
-<body data-session="loading" data-active-sheet="none" data-editing="false" data-year-menu="closed" data-trip-page="closed" data-app-ready="false">
+<body data-session="loading" data-active-sheet="none" data-editing="false" data-year-menu="closed" data-trip-page="closed" data-day-page="closed" data-app-ready="false">
   <div id="app_splash" class="app-splash" aria-label="Carregando Viaggio">
     <span class="splash-cloud splash-cloud-one" aria-hidden="true"></span>
     <span class="splash-cloud splash-cloud-two" aria-hidden="true"></span>
@@ -186,6 +186,32 @@
       </div>
     </section>
 
+    <section id="day_page" class="day-page" aria-hidden="true">
+      <nav class="trip-page-nav day-page-nav" aria-label="Navegação do dia">
+        <button id="close_day_page" class="trip-page-control trip-page-back" type="button" aria-label="Voltar">‹</button>
+        <button id="edit_day_button" class="trip-page-control trip-page-edit" type="button" aria-label="Editar dia"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4.2L19 9.2 14.8 5 4 15.8V20Zm12-16.2L20.2 8 22 6.2a1.4 1.4 0 0 0 0-2L19.8 2a1.4 1.4 0 0 0-2 0L16 3.8Z"/></svg></button>
+      </nav>
+      <header id="day_page_hero" class="day-page-hero">
+        <div class="trip-page-hero-copy day-page-hero-copy">
+          <span id="day_page_badge" class="day-page-badge"></span>
+          <h1 id="day_page_title"></h1>
+          <p id="day_page_date"></p>
+        </div>
+      </header>
+      <div class="day-page-content">
+        <section class="day-view-section">
+          <h2>Agenda</h2>
+          <ol id="day_page_agenda" class="day-view-agenda"></ol>
+          <p id="day_page_empty" class="day-view-empty"></p>
+        </section>
+        <section class="day-view-section day-map-section">
+          <h2>Mapa</h2>
+          <div id="day_page_map" class="day-view-map"></div>
+          <div id="day_page_directions" class="day-view-directions"></div>
+        </section>
+      </div>
+    </section>
+
     <button id="day_sheet_scrim" class="day-sheet-scrim" type="button" aria-label="Fechar edição do dia"></button>
     <section id="day_edit_sheet" class="day-edit-sheet" aria-hidden="true">
       <form id="day_edit_form">
@@ -243,7 +269,7 @@
       <button id="delete_selected_trips" type="button" disabled>Excluir selecionadas</button>
     </footer>
   </main>
-  <script type="module" src="src/main.js?v=20260717-30"></script>
-  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260717-40');</script>
+  <script type="module" src="src/main.js?v=20260717-31"></script>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260717-41');</script>
 </body>
 </html>
