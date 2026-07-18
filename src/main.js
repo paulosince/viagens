@@ -816,20 +816,6 @@ async function saveDayEditor() {
     setLoading(dom.saveDayEdit, false);
     return;
   }
-  const deletedActivities = await supabase.from('activities').delete().eq('day_id', editor.day.id);
-  if (deletedActivities.error) {
-    dom.dayEditMessage.textContent = deletedActivities.error.message;
-    state.saving = false;
-    setLoading(dom.saveDayEdit, false);
-    return;
-  }
-  const deletedLocations = await supabase.from('day_locations').delete().eq('day_id', editor.day.id);
-  if (deletedLocations.error) {
-    dom.dayEditMessage.textContent = deletedLocations.error.message;
-    state.saving = false;
-    setLoading(dom.saveDayEdit, false);
-    return;
-  }
   const locations = editor.locations.filter(location => location.name.trim()).map((location, position) => ({
     id: location.id,
     day_id: editor.day.id,
@@ -848,16 +834,8 @@ async function saveDayEditor() {
     photo_source_url: location.photoSourceUrl || null,
     photo_url: location.photoUrl || null
   }));
-  if (locations.length) {
-    const insertedLocations = await supabase.from('day_locations').insert(locations);
-    if (insertedLocations.error) {
-      dom.dayEditMessage.textContent = insertedLocations.error.message;
-      state.saving = false;
-      setLoading(dom.saveDayEdit, false);
-      return;
-    }
-  }
   const activities = editor.activities.filter(activity => activity.text.trim()).map((activity, position) => ({
+    id: activity.id,
     day_id: editor.day.id,
     period: periodFromTime(activity.time),
     position,
@@ -870,10 +848,51 @@ async function saveDayEditor() {
     longitude: editor.locations.find(location => location.id === activity.locationId)?.longitude || null,
     photo_url: editor.locations.find(location => location.id === activity.locationId)?.photoUrl || null
   }));
-  if (activities.length) {
-    const inserted = await supabase.from('activities').insert(activities);
-    if (inserted.error) {
-      dom.dayEditMessage.textContent = inserted.error.message;
+
+  const savedLocationIds = new Set((state.dayLocations.get(String(editor.day.id)) || []).map(location => String(location.id)));
+  const retainedLocationIds = new Set(locations.filter(location => savedLocationIds.has(String(location.id))).map(location => String(location.id)));
+  const removedLocationIds = [...savedLocationIds].filter(id => !retainedLocationIds.has(id));
+  if (removedLocationIds.length) {
+    const removed = await supabase.from('day_locations').delete().in('id', removedLocationIds).eq('day_id', editor.day.id);
+    if (removed.error) {
+      dom.dayEditMessage.textContent = removed.error.message;
+      state.saving = false;
+      setLoading(dom.saveDayEdit, false);
+      return;
+    }
+  }
+  for (const location of locations) {
+    const payload = Object.fromEntries(Object.entries(location).filter(([key]) => !['id', 'day_id'].includes(key)));
+    const result = savedLocationIds.has(String(location.id))
+      ? await supabase.from('day_locations').update(payload).eq('id', location.id).eq('day_id', editor.day.id)
+      : await supabase.from('day_locations').insert(location);
+    if (result.error) {
+      dom.dayEditMessage.textContent = result.error.message;
+      state.saving = false;
+      setLoading(dom.saveDayEdit, false);
+      return;
+    }
+  }
+
+  const savedActivityIds = new Set((state.dayActivities.get(String(editor.day.id)) || []).map(activity => String(activity.id)));
+  const retainedActivityIds = new Set(activities.filter(activity => savedActivityIds.has(String(activity.id))).map(activity => String(activity.id)));
+  const removedActivityIds = [...savedActivityIds].filter(id => !retainedActivityIds.has(id));
+  if (removedActivityIds.length) {
+    const removed = await supabase.from('activities').delete().in('id', removedActivityIds).eq('day_id', editor.day.id);
+    if (removed.error) {
+      dom.dayEditMessage.textContent = removed.error.message;
+      state.saving = false;
+      setLoading(dom.saveDayEdit, false);
+      return;
+    }
+  }
+  for (const activity of activities) {
+    const payload = Object.fromEntries(Object.entries(activity).filter(([key]) => !['id', 'day_id'].includes(key)));
+    const result = savedActivityIds.has(String(activity.id))
+      ? await supabase.from('activities').update(payload).eq('id', activity.id).eq('day_id', editor.day.id)
+      : await supabase.from('activities').insert(activity);
+    if (result.error) {
+      dom.dayEditMessage.textContent = result.error.message;
       state.saving = false;
       setLoading(dom.saveDayEdit, false);
       return;
