@@ -3,6 +3,7 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 const supabase = createClient('https://siabldasqinpfmxslwji.supabase.co', 'sb_publishable_UgbBIOq1TnInuPRrQpAFag_JLIzYuFf');
 const profilePhoto = 'assets/cintia.png';
 const placeSearchCache = new Map();
+const TRIP_CACHE_FRESH_MS = 60_000;
 let lastPlaceSearchAt = 0;
 
 const state = {
@@ -25,6 +26,9 @@ const state = {
   tripDays: [],
   dayActivities: new Map(),
   dayLocations: new Map(),
+  tripDataCache: new Map(),
+  tripDataLoads: new Map(),
+  activeTripDataVersion: 0,
   dayEditor: null,
   placeSearch: null
 };
@@ -666,6 +670,12 @@ function openDayPage(dayId, { pushHistory = true } = {}) {
   if (!day) return;
   if (pushHistory) window.history.pushState({ view: 'day', tripId: String(state.activeTripId), dayId: String(day.id) }, '', `#day-${day.id}`);
   state.activeDayId = String(day.id);
+  const renderKey = `${state.activeTripId}:${day.id}:${state.activeTripDataVersion}`;
+  if (dom.dayPage.dataset.renderKey === renderKey) {
+    dom.dayPage.setAttribute('aria-hidden', 'false');
+    document.body.dataset.dayPage = 'open';
+    return;
+  }
   const activities = state.dayActivities.get(String(day.id)) || [];
   const locations = state.dayLocations.get(String(day.id)) || [];
   const photo = dayPhoto(day, activities, locations);
@@ -675,6 +685,7 @@ function openDayPage(dayId, { pushHistory = true } = {}) {
   dom.dayPageDate.textContent = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' }).format(new Date(`${day.date}T12:00:00`));
   renderDayPageAgenda(day, activities, locations);
   renderDayPageMap(locations);
+  dom.dayPage.dataset.renderKey = renderKey;
   dom.dayPage.setAttribute('aria-hidden', 'false');
   document.body.dataset.dayPage = 'open';
 }
@@ -698,11 +709,27 @@ function renderDayPageAgenda(day, activities, locations) {
     const place = document.createElement('span');
     place.textContent = location?.name || activity.place_name || 'Sem local definido';
     copy.append(title, place);
-    const photo = document.createElement('div');
-    photo.className = 'day-view-place-photo';
+    if (activity.description) {
+      const description = document.createElement('p');
+      description.className = 'day-view-agenda-description';
+      description.textContent = activity.description;
+      copy.append(description);
+    }
     const photoUrl = location?.photo_url || activity.photo_url || '';
-    if (photoUrl) photo.style.backgroundImage = `url("${String(photoUrl).replaceAll('"', '%22')}")`;
-    item.append(time, pin, copy, photo);
+    item.dataset.hasPhoto = String(Boolean(photoUrl));
+    item.append(time, pin, copy);
+    if (photoUrl) {
+      const photo = document.createElement(location?.photo_source_url ? 'a' : 'div');
+      photo.className = 'day-view-place-photo';
+      photo.style.backgroundImage = `url("${String(photoUrl).replaceAll('"', '%22')}")`;
+      if (location?.photo_source_url) {
+        photo.href = location.photo_source_url;
+        photo.target = '_blank';
+        photo.rel = 'noopener';
+        photo.setAttribute('aria-label', `Abrir fonte da foto de ${location.name || activity.title}`);
+      }
+      item.append(photo);
+    }
     dom.dayPageAgenda.append(item);
   }
   dom.dayPageEmpty.textContent = ordered.length ? '' : `Nenhum horário planejado para o dia ${day.day_number}.`;
@@ -897,10 +924,63 @@ async function saveDayEditor() {
   state.saving = false;
   setLoading(dom.saveDayEdit, false);
   closeDayEditor();
-  if (state.activeTripId) await openTrip(state.activeTripId, { pushHistory: false });
+  if (state.activeTripId) {
+    state.tripDataCache.delete(String(state.activeTripId));
+    await openTrip(state.activeTripId, { pushHistory: false, forceRefresh: true });
+  }
 }
 
-async function openTrip(tripId, { pushHistory = true } = {}) {
+function groupByDay(records = []) {
+  const grouped = new Map();
+  for (const record of records) {
+    const key = String(record.day_id);
+    const list = grouped.get(key) || [];
+    list.push(record);
+    grouped.set(key, list);
+  }
+  return grouped;
+}
+
+function applyTripData(data) {
+  state.tripDays = data.days;
+  state.dayActivities = data.activitiesByDay;
+  state.dayLocations = data.locationsByDay;
+  state.activeTripDataVersion = data.version;
+  renderTripDays(data.days, data.activitiesByDay, data.locationsByDay);
+}
+
+async function fetchTripData(tripId) {
+  const key = String(tripId);
+  if (state.tripDataLoads.has(key)) return state.tripDataLoads.get(key);
+  const load = (async () => {
+    const result = await supabase.from('trip_days').select('*').eq('trip_id', tripId).order('day_number');
+    if (result.error) throw result.error;
+    const days = result.data || [];
+    let activities = [], locations = [];
+    if (days.length) {
+      const [activityResult, locationResult] = await Promise.all([
+        supabase.from('activities').select('*').in('day_id', days.map(day => day.id)).order('position'),
+        supabase.from('day_locations').select('*').in('day_id', days.map(day => day.id)).order('position')
+      ]);
+      if (activityResult.error || locationResult.error) throw activityResult.error || locationResult.error;
+      activities = activityResult.data || [];
+      locations = locationResult.data || [];
+    }
+    const data = {
+      days,
+      activitiesByDay: groupByDay(activities),
+      locationsByDay: groupByDay(locations),
+      loadedAt: Date.now(),
+      version: Date.now()
+    };
+    state.tripDataCache.set(key, data);
+    return data;
+  })().finally(() => state.tripDataLoads.delete(key));
+  state.tripDataLoads.set(key, load);
+  return load;
+}
+
+async function openTrip(tripId, { pushHistory = true, forceRefresh = false } = {}) {
   const trip = state.trips.find(item => String(item.id) === String(tripId));
   if (!trip) return;
   if (pushHistory && (document.body.dataset.tripPage !== 'open' || state.activeTripId !== String(trip.id))) {
@@ -914,48 +994,28 @@ async function openTrip(tripId, { pushHistory = true } = {}) {
   dom.tripPageDates.textContent = `${displayDate(trip.start_date)} — ${displayDate(trip.end_date)}`;
   dom.tripPagePassengers._count = dom.tripPagePassengerCount;
   syncPassengerList(dom.tripPagePassengers, state.passengers.get(trip.id) || []);
-  dom.tripDayList.replaceChildren();
-  dom.tripDayMessage.textContent = 'Carregando dias…';
   dom.tripPage.setAttribute('aria-hidden', 'false');
   document.body.dataset.tripPage = 'open';
-
-  const result = await supabase.from('trip_days').select('*').eq('trip_id', trip.id).order('day_number');
-  if (state.activeTripId !== String(trip.id)) return;
-  if (result.error) {
-    dom.tripDayMessage.textContent = result.error.message;
-    return;
+  const key = String(trip.id);
+  const cached = forceRefresh ? null : state.tripDataCache.get(key);
+  if (cached) {
+    applyTripData(cached);
+    dom.tripDayMessage.textContent = '';
+    if (state.activeDayId && cached.days.some(day => String(day.id) === String(state.activeDayId))) openDayPage(state.activeDayId, { pushHistory: false });
+    if (Date.now() - cached.loadedAt < TRIP_CACHE_FRESH_MS) return;
+  } else {
+    dom.tripDayList.replaceChildren();
+    dom.tripDayMessage.textContent = 'Carregando dias…';
   }
-  const days = result.data || [];
-  const activitiesByDay = new Map();
-  const locationsByDay = new Map();
-  if (days.length) {
-    const [activityResult, locationResult] = await Promise.all([
-      supabase.from('activities').select('*').in('day_id', days.map(day => day.id)).order('position'),
-      supabase.from('day_locations').select('*').in('day_id', days.map(day => day.id)).order('position')
-    ]);
-    if (state.activeTripId !== String(trip.id)) return;
-    if (activityResult.error || locationResult.error) {
-      dom.tripDayMessage.textContent = activityResult.error?.message || locationResult.error?.message;
-      return;
-    }
-    for (const activity of activityResult.data || []) {
-      const key = String(activity.day_id);
-      const list = activitiesByDay.get(key) || [];
-      list.push(activity);
-      activitiesByDay.set(key, list);
-    }
-    for (const location of locationResult.data || []) {
-      const key = String(location.day_id);
-      const list = locationsByDay.get(key) || [];
-      list.push(location);
-      locationsByDay.set(key, list);
-    }
+  try {
+    const data = await fetchTripData(trip.id);
+    if (state.activeTripId !== key) return;
+    applyTripData(data);
+    dom.tripDayMessage.textContent = '';
+    if (state.activeDayId && data.days.some(day => String(day.id) === String(state.activeDayId))) openDayPage(state.activeDayId, { pushHistory: false });
+  } catch (error) {
+    if (state.activeTripId === key && !cached) dom.tripDayMessage.textContent = error.message;
   }
-  state.tripDays = days;
-  state.dayActivities = activitiesByDay;
-  state.dayLocations = locationsByDay;
-  renderTripDays(days, activitiesByDay, locationsByDay);
-  if (state.activeDayId && days.some(day => String(day.id) === String(state.activeDayId))) openDayPage(state.activeDayId, { pushHistory: false });
 }
 
 function closeTripPage() {
@@ -1461,6 +1521,7 @@ async function saveTrip() {
     if (failure) dom.newTripMessage.textContent = failure.message;
     else {
       state.selectedYear = Number(String(values.start_date).slice(0, 4));
+      state.tripDataCache.delete(String(tripId));
       await loadTrips();
       state.saving = false;
       closeSheets();
@@ -1544,7 +1605,7 @@ window.addEventListener('popstate', event => {
     else openDayPage(event.state.dayId, { pushHistory: false });
   } else if (event.state?.view === 'trip' && event.state.tripId) {
     closeDayPage();
-    openTrip(event.state.tripId, { pushHistory: false });
+    if (String(state.activeTripId) !== String(event.state.tripId) || !state.tripDays.length) openTrip(event.state.tripId, { pushHistory: false });
   } else closeTripPage();
 });
 dom.profileButton.addEventListener('click', openProfile);
@@ -1620,7 +1681,7 @@ async function boot() {
 
 supabase.auth.onAuthStateChange((_event, session) => {
   if (session) return;
-  state.user = null; state.profile = null; state.trips = []; state.passengers.clear();
+  state.user = null; state.profile = null; state.trips = []; state.passengers.clear(); state.tripDataCache.clear(); state.tripDataLoads.clear();
   syncTripList(); closeSheets(); setSessionView('anonymous');
 });
 

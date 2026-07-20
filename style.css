@@ -739,15 +739,17 @@ body[data-day-page="open"] .day-page {
 }
 .day-view-agenda-item {
   display: grid;
-  grid-template-columns: 58px 24px minmax(0, 1fr) 76px;
-  align-items: center;
+  grid-template-columns: 58px 24px minmax(0, 1fr) 92px;
+  align-items: start;
   gap: 10px;
-  min-height: 94px;
-  padding: 10px 12px;
+  min-height: 112px;
+  padding: 16px 12px;
   border-bottom: 1px solid #d7d7dc;
 }
+.day-view-agenda-item[data-has-photo="false"] { grid-template-columns: 58px 24px minmax(0, 1fr); }
 .day-view-agenda-item:last-child { border-bottom: 0; }
 .day-view-agenda-item time {
+  padding-top: 2px;
   color: var(--ios-blue);
   font-size: 15px;
   font-weight: 800;
@@ -759,6 +761,7 @@ body[data-day-page="open"] .day-page {
   border: 2px solid var(--ios-blue);
   border-radius: 50% 50% 50% 0;
   transform: rotate(-45deg);
+  margin-top: 1px;
 }
 .day-view-pin::after {
   position: absolute;
@@ -773,13 +776,10 @@ body[data-day-page="open"] .day-page {
 .day-view-agenda-copy strong,
 .day-view-agenda-copy span {
   display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .day-view-agenda-copy strong {
   font-size: 17px;
-  line-height: 1.15;
+  line-height: 1.22;
 }
 .day-view-agenda-copy span {
   margin-top: 5px;
@@ -787,9 +787,16 @@ body[data-day-page="open"] .day-page {
   font-size: 13px;
   font-weight: 600;
 }
+.day-view-agenda-description {
+  margin: 11px 0 0;
+  color: #3f3f45;
+  font-size: 14px;
+  line-height: 1.48;
+}
 .day-view-place-photo {
-  width: 76px;
-  height: 64px;
+  display: block;
+  width: 92px;
+  height: 82px;
   border-radius: 14px;
   background: #e5e5ea center / cover no-repeat;
 }
@@ -876,12 +883,20 @@ body[data-day-page="open"] .day-page {
   .day-page-hero { min-height: 360px; }
   .day-page-content { min-height: calc(100svh - 360px); }
   .day-view-agenda-item {
-    grid-template-columns: 50px 22px minmax(0, 1fr) 62px;
+    grid-template-columns: 50px 22px minmax(0, 1fr);
     gap: 8px;
-    padding: 9px 10px;
+    padding: 15px 10px;
   }
-  .day-view-place-photo { width: 62px; height: 58px; }
+  .day-view-agenda-item[data-has-photo="false"] { grid-template-columns: 50px 22px minmax(0, 1fr); }
+  .day-view-place-photo {
+    grid-column: 3;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
+    margin-top: 4px;
+  }
   .day-view-agenda-copy strong { font-size: 16px; }
+  .day-view-agenda-description { font-size: 13px; line-height: 1.45; }
   .day-view-map { height: 250px; }
 }
 
