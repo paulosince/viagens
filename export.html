@@ -38,10 +38,19 @@
     const status = document.querySelector('#status');
     const output = document.querySelector('#output');
 
-    async function select(table, configure = query => query) {
-      const result = await configure(supabase.from(table).select('*'));
-      if (result.error) throw new Error(`${table}: ${result.error.message}`);
-      return result.data || [];
+    const failures = [];
+
+    async function select(table, configure = query => query, { required = false } = {}) {
+      try {
+        const result = await configure(supabase.from(table).select('*'));
+        if (result.error) throw new Error(result.error.message);
+        return result.data || [];
+      } catch (error) {
+        const message = error?.message || String(error);
+        failures.push({ table, message, required });
+        if (required) throw new Error(`${table}: ${message}`);
+        return [];
+      }
     }
 
     async function exportData() {
@@ -55,25 +64,21 @@
         if (!sessionData.session?.user) throw new Error('Nenhuma sessão do Viaggio foi encontrada neste navegador. Abra o app, faça login e volte a esta página.');
 
         status.textContent = 'Carregando viagens…';
-        const trips = await select('trips', q => q.is('deleted_at', null).order('start_date'));
+        const trips = await select('trips', q => q.is('deleted_at', null).order('start_date'), { required: true });
         const tripIds = trips.map(item => item.id);
 
         let passengers = [], days = [], checklist = [], budget = [], members = [], activities = [], locations = [];
         if (tripIds.length) {
-          [passengers, days, checklist, budget, members] = await Promise.all([
-            select('passengers', q => q.in('trip_id', tripIds)),
-            select('trip_days', q => q.in('trip_id', tripIds).order('date')),
-            select('checklist_items', q => q.in('trip_id', tripIds)),
-            select('budget_items', q => q.in('trip_id', tripIds)),
-            select('trip_members', q => q.in('trip_id', tripIds))
-          ]);
+          passengers = await select('passengers', q => q.in('trip_id', tripIds));
+          days = await select('trip_days', q => q.in('trip_id', tripIds).order('date'), { required: true });
+          checklist = await select('checklist_items', q => q.in('trip_id', tripIds));
+          budget = await select('budget_items', q => q.in('trip_id', tripIds));
+          members = await select('trip_members', q => q.in('trip_id', tripIds));
 
           const dayIds = days.map(item => item.id);
           if (dayIds.length) {
-            [activities, locations] = await Promise.all([
-              select('activities', q => q.in('day_id', dayIds).order('starts_at')),
-              select('day_locations', q => q.in('day_id', dayIds).order('position'))
-            ]);
+            activities = await select('activities', q => q.in('day_id', dayIds).order('starts_at'));
+            locations = await select('day_locations', q => q.in('day_id', dayIds).order('position'), { required: true });
           }
         }
 
@@ -97,7 +102,9 @@
 
         try {
           await navigator.clipboard.writeText(text);
-          status.textContent = `Pronto. ${trips.length} viagem(ns) exportada(s) e copiadas para a área de transferência.`;
+          status.textContent = failures.length
+            ? `Pronto. ${trips.length} viagem(ns) exportada(s), mas algumas tabelas não puderam ser carregadas: ${failures.map(item => item.table).join(", ")}.`
+            : `Pronto. ${trips.length} viagem(ns) exportada(s) e copiadas para a área de transferência.`;
         } catch {
           status.textContent = `Pronto. ${trips.length} viagem(ns) exportada(s). Se não tiver sido copiado automaticamente, toque no texto e use “Selecionar Tudo” → “Copiar”.`;
         }
