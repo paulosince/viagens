@@ -11,8 +11,12 @@
     main { max-width:720px; margin:0 auto; padding:calc(24px + env(safe-area-inset-top)) 20px calc(32px + env(safe-area-inset-bottom)); }
     h1 { margin:0 0 8px; font-size:32px; letter-spacing:-.03em; }
     p { color:#666; line-height:1.45; }
-    button { width:100%; border:0; border-radius:14px; padding:15px 18px; font:inherit; font-weight:700; background:#007aff; color:#fff; margin:12px 0; }
-    button:disabled { opacity:.5; }
+    button { width:100%; border:0; border-radius:14px; padding:15px 18px; font:inherit; font-weight:700; background:#007aff; color:#fff; margin:12px 0; position:relative; overflow:hidden; isolation:isolate; }
+    button::before { content:""; position:absolute; z-index:-1; inset:0 auto 0 0; width:var(--progress,0%); background:rgba(0,0,0,.18); transition:width .25s ease; }
+    button:disabled { opacity:.85; }
+    button span { position:relative; z-index:1; }
+    #copy { display:none; background:#34c759; }
+    #copy.visible { display:block; }
     #status { min-height:24px; font-size:14px; }
     textarea { width:100%; box-sizing:border-box; min-height:320px; border:1px solid #d1d1d6; border-radius:14px; padding:14px; background:#fff; color:#111; font:12px ui-monospace,SFMono-Regular,Menlo,monospace; resize:vertical; }
   </style>
@@ -21,7 +25,8 @@
   <main>
     <h1>Exportar viagem</h1>
     <p>Exportação segura e limitada dos dados acessíveis pela sua sessão. O limite evita que o navegador trave com tabelas muito grandes.</p>
-    <button id="export" type="button">Carregar dados</button>
+    <button id="export" type="button"><span>Carregar dados</span></button>
+    <button id="copy" type="button"><span>Copiar JSON</span></button>
     <p id="status" role="status"></p>
     <textarea id="output" readonly placeholder="Os dados aparecerão aqui."></textarea>
   </main>
@@ -35,10 +40,19 @@
     );
 
     const button = document.querySelector('#export');
+    const copyButton = document.querySelector('#copy');
+    const buttonLabel = button.querySelector('span');
+    const copyLabel = copyButton.querySelector('span');
     const status = document.querySelector('#status');
     const output = document.querySelector('#output');
     const failures = [];
     const LIMIT = 250;
+    let exportText = '';
+
+    function progress(label, value) {
+      button.style.setProperty('--progress', value + '%');
+      buttonLabel.textContent = label;
+    }
 
     async function select(table, configure = query => query) {
       try {
@@ -54,39 +68,47 @@
     async function exportData() {
       if (button.disabled) return;
       button.disabled = true;
+      copyButton.classList.remove('visible');
       output.value = '';
+      exportText = '';
       failures.length = 0;
 
       try {
-        status.textContent = 'Verificando sessão…';
+        progress('Verificando sessão…', 5);
         const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
         if (sessionError) throw sessionError;
         if (!sessionData.session?.user) {
           throw new Error('Nenhuma sessão encontrada. Abra o app, faça login e volte a esta página.');
         }
 
-        status.textContent = 'Carregando viagens…';
+        progress('Carregando viagens…', 15);
         const trips = await select('trips', q => q.is('deleted_at', null).order('start_date'));
         const tripIds = trips.map(item => item.id);
 
         let passengers = [], days = [], checklist = [], budget = [], members = [], activities = [], locations = [];
         if (tripIds.length) {
-          status.textContent = 'Carregando dias e locais…';
+          progress('Carregando passageiros…', 25);
           passengers = await select('passengers', q => q.in('trip_id', tripIds));
+          progress('Carregando dias…', 35);
           days = await select('trip_days', q => q.in('trip_id', tripIds).order('date'));
 
           const dayIds = days.map(item => item.id);
           if (dayIds.length) {
+            progress('Carregando atividades…', 48);
             activities = await select('activities', q => q.in('day_id', dayIds).order('starts_at'));
+            progress('Carregando locais…', 60);
             locations = await select('day_locations', q => q.in('day_id', dayIds).order('position'));
           }
 
-          status.textContent = 'Carregando dados complementares…';
+          progress('Carregando checklist…', 72);
           checklist = await select('checklist_items', q => q.in('trip_id', tripIds));
+          progress('Carregando orçamento…', 82);
           budget = await select('budget_items', q => q.in('trip_id', tripIds));
+          progress('Carregando participantes…', 90);
           members = await select('trip_members', q => q.in('trip_id', tripIds));
         }
 
+        progress('Montando exportação…', 96);
         const exportObject = {
           exported_at: new Date().toISOString(),
           user: { id: sessionData.session.user.id, email: sessionData.session.user.email },
@@ -96,25 +118,43 @@
           _failures: failures
         };
 
-        const text = JSON.stringify(exportObject, null, 2);
-        output.value = text;
-
-        try {
-          await navigator.clipboard.writeText(text);
-          status.textContent = failures.length
-            ? 'Concluído, com falhas em: ' + failures.map(item => item.table).join(', ') + '.'
-            : 'Concluído e copiado para a área de transferência.';
-        } catch {
-          status.textContent = 'Concluído. Toque no texto, escolha “Selecionar Tudo” e depois “Copiar”.';
-        }
+        exportText = JSON.stringify(exportObject, null, 2);
+        output.value = exportText;
+        progress('Exportação concluída', 100);
+        copyButton.classList.add('visible');
+        status.textContent = failures.length
+          ? 'Concluído, com falhas em: ' + failures.map(item => item.table).join(', ') + '.'
+          : 'Concluído. Toque em “Copiar JSON” para copiar os dados.';
       } catch (error) {
+        button.style.setProperty('--progress', '0%');
+        buttonLabel.textContent = 'Tentar novamente';
         status.textContent = error?.message || String(error);
       } finally {
         button.disabled = false;
       }
     }
 
+    async function copyExport() {
+      if (!exportText) return;
+      copyButton.disabled = true;
+      try {
+        await navigator.clipboard.writeText(exportText);
+        copyLabel.textContent = 'Copiado ✓';
+        status.textContent = 'JSON copiado para a área de transferência.';
+      } catch {
+        output.focus();
+        output.select();
+        status.textContent = 'Não foi possível copiar automaticamente. O texto está selecionado; toque em “Copiar”.';
+      } finally {
+        setTimeout(() => {
+          copyButton.disabled = false;
+          copyLabel.textContent = 'Copiar JSON';
+        }, 1400);
+      }
+    }
+
     button.addEventListener('click', exportData);
+    copyButton.addEventListener('click', copyExport);
   </script>
 </body>
 </html>
