@@ -15,8 +15,9 @@
     button::before { content:""; position:absolute; z-index:-1; inset:0 auto 0 0; width:var(--progress,0%); background:rgba(0,0,0,.18); transition:width .25s ease; }
     button:disabled { opacity:.85; }
     button span { position:relative; z-index:1; }
-    #copy { display:none; background:#34c759; }
-    #copy.visible { display:block; }
+    #share, #copy { display:none; }
+    #share { background:#34c759; }
+    #share.visible, #copy.visible { display:block; }
     #status { min-height:24px; font-size:14px; }
     textarea { width:100%; box-sizing:border-box; min-height:320px; border:1px solid #d1d1d6; border-radius:14px; padding:14px; background:#fff; color:#111; font:12px ui-monospace,SFMono-Regular,Menlo,monospace; resize:vertical; }
   </style>
@@ -26,6 +27,7 @@
     <h1>Exportar viagem</h1>
     <p>Exportação segura e limitada dos dados acessíveis pela sua sessão. O limite evita que o navegador trave com tabelas muito grandes.</p>
     <button id="export" type="button"><span>Carregar dados</span></button>
+    <button id="share" type="button"><span>Compartilhar arquivo</span></button>
     <button id="copy" type="button"><span>Copiar JSON</span></button>
     <p id="status" role="status"></p>
     <textarea id="output" readonly placeholder="Os dados aparecerão aqui."></textarea>
@@ -40,8 +42,10 @@
     );
 
     const button = document.querySelector('#export');
+    const shareButton = document.querySelector('#share');
     const copyButton = document.querySelector('#copy');
     const buttonLabel = button.querySelector('span');
+    const shareLabel = shareButton.querySelector('span');
     const copyLabel = copyButton.querySelector('span');
     const status = document.querySelector('#status');
     const output = document.querySelector('#output');
@@ -68,6 +72,7 @@
     async function exportData() {
       if (button.disabled) return;
       button.disabled = true;
+      shareButton.classList.remove('visible');
       copyButton.classList.remove('visible');
       output.value = '';
       exportText = '';
@@ -121,16 +126,72 @@
         exportText = JSON.stringify(exportObject, null, 2);
         output.value = exportText;
         progress('Exportação concluída', 100);
+        shareButton.classList.add('visible');
         copyButton.classList.add('visible');
         status.textContent = failures.length
-          ? 'Concluído, com falhas em: ' + failures.map(item => item.table).join(', ') + '.'
-          : 'Concluído. Toque em “Copiar JSON” para copiar os dados.';
+          ? 'Concluído, com falhas em: ' + failures.map(item => item.table).join(', ') + '. Compartilhe o arquivo para preservar os demais dados.'
+          : 'Concluído. Toque em “Compartilhar arquivo” e escolha “Salvar em Arquivos”; depois anexe o JSON à conversa.';
       } catch (error) {
         button.style.setProperty('--progress', '0%');
         buttonLabel.textContent = 'Tentar novamente';
         status.textContent = error?.message || String(error);
       } finally {
         button.disabled = false;
+      }
+    }
+
+    function createExportFile() {
+      const date = new Date().toISOString().slice(0, 10);
+      return new File([exportText], `viaggio-export-${date}.json`, { type: 'application/json' });
+    }
+
+    function downloadFile(file) {
+      const url = URL.createObjectURL(file);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = file.name;
+      link.hidden = true;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    async function shareExport() {
+      if (!exportText) return;
+      shareButton.disabled = true;
+      const file = createExportFile();
+
+      try {
+        const canShareFile = navigator.share
+          && (!navigator.canShare || navigator.canShare({ files: [file] }));
+
+        if (canShareFile) {
+          await navigator.share({
+            title: 'Viaggio — exportação da viagem',
+            text: 'Dados exportados do Viaggio.',
+            files: [file]
+          });
+          shareLabel.textContent = 'Compartilhado ✓';
+          status.textContent = 'Arquivo compartilhado. Se você o salvou em Arquivos, anexe-o à conversa.';
+        } else {
+          downloadFile(file);
+          shareLabel.textContent = 'Arquivo baixado ✓';
+          status.textContent = 'Arquivo baixado. Procure-o em Downloads, no app Arquivos, e anexe-o à conversa.';
+        }
+      } catch (error) {
+        if (error?.name === 'AbortError') {
+          status.textContent = 'Compartilhamento cancelado.';
+        } else {
+          downloadFile(file);
+          shareLabel.textContent = 'Arquivo baixado ✓';
+          status.textContent = 'O compartilhamento não abriu, então o arquivo foi baixado. Procure-o em Downloads.';
+        }
+      } finally {
+        setTimeout(() => {
+          shareButton.disabled = false;
+          shareLabel.textContent = 'Compartilhar arquivo';
+        }, 1400);
       }
     }
 
@@ -154,6 +215,7 @@
     }
 
     button.addEventListener('click', exportData);
+    shareButton.addEventListener('click', shareExport);
     copyButton.addEventListener('click', copyExport);
   </script>
 </body>
