@@ -70,7 +70,7 @@
         let passengers = [], days = [], checklist = [], budget = [], members = [], activities = [], locations = [];
         if (tripIds.length) {
           passengers = await select('passengers', q => q.in('trip_id', tripIds));
-          days = await select('trip_days', q => q.in('trip_id', tripIds).order('date'), { required: true });
+          days = await select('trip_days', q => q.in('trip_id', tripIds).order('date'));
           checklist = await select('checklist_items', q => q.in('trip_id', tripIds));
           budget = await select('budget_items', q => q.in('trip_id', tripIds));
           members = await select('trip_members', q => q.in('trip_id', tripIds));
@@ -78,7 +78,7 @@
           const dayIds = days.map(item => item.id);
           if (dayIds.length) {
             activities = await select('activities', q => q.in('day_id', dayIds).order('starts_at'));
-            locations = await select('day_locations', q => q.in('day_id', dayIds).order('position'), { required: true });
+            locations = await select('day_locations', q => q.in('day_id', dayIds).order('position'));
           }
         }
 
