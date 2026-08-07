@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#159bf0">
+  <title>Viaggio — Exportar viagem</title>
+  <style>
+    :root { font-family: -apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif; color-scheme: light; }
+    body { margin:0; min-height:100vh; background:#f2f2f7; color:#111; }
+    main { max-width:720px; margin:0 auto; padding:calc(24px + env(safe-area-inset-top)) 20px calc(32px + env(safe-area-inset-bottom)); }
+    h1 { margin:0 0 8px; font-size:32px; letter-spacing:-.03em; }
+    p { color:#666; line-height:1.45; }
+    button { width:100%; border:0; border-radius:14px; padding:15px 18px; font:inherit; font-weight:700; background:#007aff; color:#fff; margin:12px 0; }
+    button:disabled { opacity:.5; }
+    #status { min-height:24px; font-size:14px; }
+    textarea { width:100%; box-sizing:border-box; min-height:320px; border:1px solid #d1d1d6; border-radius:14px; padding:14px; background:#fff; color:#111; font:12px ui-monospace,SFMono-Regular,Menlo,monospace; resize:vertical; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Exportar viagem</h1>
+    <p>Esta página usa a sessão já autenticada do Viaggio e exporta apenas os dados que sua conta pode ler no Supabase. Nenhuma senha ou token é exibido.</p>
+    <button id="export" type="button">Carregar e copiar dados</button>
+    <p id="status" role="status"></p>
+    <textarea id="output" readonly placeholder="Os dados aparecerão aqui."></textarea>
+  </main>
+
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+    const supabase = createClient(
+      'https://siabldasqinpfmxslwji.supabase.co',
+      'sb_publishable_UgbBIOq1TnInuPRrQpAFag_JLIzYuFf'
+    );
+
+    const button = document.querySelector('#export');
+    const status = document.querySelector('#status');
+    const output = document.querySelector('#output');
+
+    async function select(table, configure = query => query) {
+      const result = await configure(supabase.from(table).select('*'));
+      if (result.error) throw new Error(`${table}: ${result.error.message}`);
+      return result.data || [];
+    }
+
+    async function exportData() {
+      button.disabled = true;
+      status.textContent = 'Verificando sessão…';
+      output.value = '';
+
+      try {
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
+        if (!sessionData.session?.user) throw new Error('Nenhuma sessão do Viaggio foi encontrada neste navegador. Abra o app, faça login e volte a esta página.');
+
+        status.textContent = 'Carregando viagens…';
+        const trips = await select('trips', q => q.is('deleted_at', null).order('start_date'));
+        const tripIds = trips.map(item => item.id);
+
+        let passengers = [], days = [], checklist = [], budget = [], members = [], activities = [], locations = [];
+        if (tripIds.length) {
+          [passengers, days, checklist, budget, members] = await Promise.all([
+            select('passengers', q => q.in('trip_id', tripIds)),
+            select('trip_days', q => q.in('trip_id', tripIds).order('date')),
+            select('checklist_items', q => q.in('trip_id', tripIds)),
+            select('budget_items', q => q.in('trip_id', tripIds)),
+            select('trip_members', q => q.in('trip_id', tripIds))
+          ]);
+
+          const dayIds = days.map(item => item.id);
+          if (dayIds.length) {
+            [activities, locations] = await Promise.all([
+              select('activities', q => q.in('day_id', dayIds).order('starts_at')),
+              select('day_locations', q => q.in('day_id', dayIds).order('position'))
+            ]);
+          }
+        }
+
+        const exportObject = {
+          exported_at: new Date().toISOString(),
+          user: { id: sessionData.session.user.id, email: sessionData.session.user.email },
+          trips,
+          passengers,
+          trip_days: days,
+          activities,
+          day_locations: locations,
+          checklist_items: checklist,
+          budget_items: budget,
+          trip_members: members
+        };
+
+        const text = JSON.stringify(exportObject, null, 2);
+        output.value = text;
+        output.focus();
+        output.select();
+
+        try {
+          await navigator.clipboard.writeText(text);
+          status.textContent = `Pronto. ${trips.length} viagem(ns) exportada(s) e copiadas para a área de transferência.`;
+        } catch {
+          status.textContent = `Pronto. ${trips.length} viagem(ns) exportada(s). Se não tiver sido copiado automaticamente, toque no texto e use “Selecionar Tudo” → “Copiar”.`;
+        }
+      } catch (error) {
+        status.textContent = error.message || String(error);
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    button.addEventListener('click', exportData);
+  </script>
+</body>
+</html>
