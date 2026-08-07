@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#159bf0">
   <title>Viaggio — Exportar viagem</title>
   <style>
-    :root { font-family: -apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif; color-scheme: light; }
+    :root { font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif; color-scheme:light; }
     body { margin:0; min-height:100vh; background:#f2f2f7; color:#111; }
     main { max-width:720px; margin:0 auto; padding:calc(24px + env(safe-area-inset-top)) 20px calc(32px + env(safe-area-inset-bottom)); }
     h1 { margin:0 0 8px; font-size:32px; letter-spacing:-.03em; }
@@ -20,8 +20,8 @@
 <body>
   <main>
     <h1>Exportar viagem</h1>
-    <p>Esta página usa a sessão já autenticada do Viaggio e exporta apenas os dados que sua conta pode ler no Supabase. Nenhuma senha ou token é exibido.</p>
-    <button id="export" type="button">Carregar e copiar dados</button>
+    <p>Exportação segura e limitada dos dados acessíveis pela sua sessão. O limite evita que o navegador trave com tabelas muito grandes.</p>
+    <button id="export" type="button">Carregar dados</button>
     <p id="status" role="status"></p>
     <textarea id="output" readonly placeholder="Os dados aparecerão aqui."></textarea>
   </main>
@@ -37,79 +37,78 @@
     const button = document.querySelector('#export');
     const status = document.querySelector('#status');
     const output = document.querySelector('#output');
-
     const failures = [];
+    const LIMIT = 250;
 
-    async function select(table, configure = query => query, { required = false } = {}) {
+    async function select(table, configure = query => query) {
       try {
-        const result = await configure(supabase.from(table).select('*'));
+        const result = await configure(supabase.from(table).select('*')).limit(LIMIT);
         if (result.error) throw new Error(result.error.message);
         return result.data || [];
       } catch (error) {
-        const message = error?.message || String(error);
-        failures.push({ table, message, required });
-        if (required) throw new Error(`${table}: ${message}`);
+        failures.push({ table, message: error?.message || String(error) });
         return [];
       }
     }
 
     async function exportData() {
+      if (button.disabled) return;
       button.disabled = true;
-      status.textContent = 'Verificando sessão…';
       output.value = '';
+      failures.length = 0;
 
       try {
+        status.textContent = 'Verificando sessão…';
         const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
         if (sessionError) throw sessionError;
-        if (!sessionData.session?.user) throw new Error('Nenhuma sessão do Viaggio foi encontrada neste navegador. Abra o app, faça login e volte a esta página.');
+        if (!sessionData.session?.user) {
+          throw new Error('Nenhuma sessão encontrada. Abra o app, faça login e volte a esta página.');
+        }
 
         status.textContent = 'Carregando viagens…';
-        const trips = await select('trips', q => q.is('deleted_at', null).order('start_date'), { required: true });
+        const trips = await select('trips', q => q.is('deleted_at', null).order('start_date'));
         const tripIds = trips.map(item => item.id);
 
         let passengers = [], days = [], checklist = [], budget = [], members = [], activities = [], locations = [];
         if (tripIds.length) {
+          status.textContent = 'Carregando dias e locais…';
           passengers = await select('passengers', q => q.in('trip_id', tripIds));
           days = await select('trip_days', q => q.in('trip_id', tripIds).order('date'));
-          checklist = await select('checklist_items', q => q.in('trip_id', tripIds));
-          budget = await select('budget_items', q => q.in('trip_id', tripIds));
-          members = await select('trip_members', q => q.in('trip_id', tripIds));
 
           const dayIds = days.map(item => item.id);
           if (dayIds.length) {
             activities = await select('activities', q => q.in('day_id', dayIds).order('starts_at'));
             locations = await select('day_locations', q => q.in('day_id', dayIds).order('position'));
           }
+
+          status.textContent = 'Carregando dados complementares…';
+          checklist = await select('checklist_items', q => q.in('trip_id', tripIds));
+          budget = await select('budget_items', q => q.in('trip_id', tripIds));
+          members = await select('trip_members', q => q.in('trip_id', tripIds));
         }
 
         const exportObject = {
           exported_at: new Date().toISOString(),
           user: { id: sessionData.session.user.id, email: sessionData.session.user.email },
-          trips,
-          passengers,
-          trip_days: days,
-          activities,
-          day_locations: locations,
-          checklist_items: checklist,
-          budget_items: budget,
-          trip_members: members
+          trips, passengers, trip_days: days, activities, day_locations: locations,
+          checklist_items: checklist, budget_items: budget, trip_members: members,
+          _limits: { per_table: LIMIT, note: 'Each table is limited to 250 rows.' },
+          _failures: failures
         };
 
         const text = JSON.stringify(exportObject, null, 2);
         output.value = text;
-        output.focus();
-        output.select();
 
         try {
           await navigator.clipboard.writeText(text);
           status.textContent = failures.length
-            ? `Pronto. ${trips.length} viagem(ns) exportada(s), mas algumas tabelas não puderam ser carregadas: ${failures.map(item => item.table).join(", ")}.`
-            : `Pronto. ${trips.length} viagem(ns) exportada(s) e copiadas para a área de transferência.`;
+            ? 'Concluído, com falhas em: ' + failures.map(item => item.table).join(', ') + '.'
+            : 'Concluído e copiado para a área de transferência.';
         } catch {
-          status.textContent = `Pronto. ${trips.length} viagem(ns) exportada(s). Se não tiver sido copiado automaticamente, toque no texto e use “Selecionar Tudo” → “Copiar”.`;
+          status.textContent = 'Concluído. Toque no texto, escolha “Selecionar Tudo” e depois “Copiar”.';
         }
       } catch (error) {
-        status.textContent = error.message || String(error);
+        status.textContent = error?.message || String(error);
       } finally {
         button.disabled = false;
       }
