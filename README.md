@@ -56,7 +56,7 @@ A aplicação é local-first para o roteiro de viagem:
 - o Service Worker mantém o app shell e imagens já visualizadas disponíveis offline;
 - a Home informa se o conteúdo está sincronizado, salvo localmente com mudanças pendentes ou em modo offline.
 
-Criação/edição estrutural de viagens, perfil e exclusões continuam exigindo conexão para evitar conflitos de identidade e estrutura.
+Criação de viagens, mudança de duração/data inicial, perfil e exclusões estruturais continuam exigindo conexão. Reordenação dos dias e edição do roteiro são local-first e entram na fila de sincronização.
 
 ### Primeira cópia
 
