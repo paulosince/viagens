@@ -3635,6 +3635,7 @@ async function saveTrip() {
 
     if (state.editingTripId) {
       const tripId = state.editingTripId;
+      const previousTrip = state.trips.find(trip => String(trip.id) === String(tripId)) || null;
       const updated = await client.from('trips').update(payload).eq('id', tripId);
       if (updated.error) throw updated.error;
 
@@ -3643,6 +3644,26 @@ async function saveTrip() {
 
       const dayError = await syncTripDaysForCount(client, tripId, values.start_date, dayCount, orderedSchema);
       if (dayError) throw dayError;
+
+      await recordChange({
+        tripId,
+        entityType: 'trip',
+        entityId: tripId,
+        action: 'update',
+        summary: 'Configurações da viagem “' + (payload.name || previousTrip?.name || 'Viagem') + '” alteradas',
+        beforeState: previousTrip ? {
+          name: previousTrip.name,
+          destination: previousTrip.destination,
+          start_date: previousTrip.start_date,
+          day_count: tripDayCount(previousTrip)
+        } : null,
+        afterState: {
+          name: payload.name,
+          destination: payload.destination,
+          start_date: payload.start_date,
+          day_count: dayCount
+        }
+      });
 
       state.selectedYear = Number(String(values.start_date).slice(0, 4));
       state.tripDataCache.delete(String(tripId));
@@ -3695,6 +3716,21 @@ async function saveTrip() {
       await client.from('trips').delete().eq('id', trip.id);
       throw failure;
     }
+
+    await recordChange({
+      tripId: trip.id,
+      entityType: 'trip',
+      entityId: trip.id,
+      action: 'create',
+      summary: 'Viagem “' + trip.name + '” criada',
+      beforeState: null,
+      afterState: {
+        name: trip.name,
+        destination: trip.destination,
+        start_date: trip.start_date,
+        day_count: dayCount
+      }
+    });
 
     state.selectedYear = Number(String(values.start_date).slice(0, 4));
     await loadTrips();
