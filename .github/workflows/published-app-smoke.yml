@@ -21,14 +21,19 @@ jobs:
           url='https://paulosince.github.io/viagens/'
           for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
             html="$(curl --location --silent --show-error --max-time 20 "$url" || true)"
-            js="$(curl --location --silent --show-error --max-time 20 "$url/src/main.js?v=20260925-4" || true)"
-            css="$(curl --location --silent --show-error --max-time 20 "$url/style.css?v=20260925-3" || true)"
-            if grep -q 'src/main.js?v=20260925-4' <<<"$html" &&
+            js="$(curl --location --silent --show-error --max-time 20 "$url/src/main.js?v=20260925-5" || true)"
+            css="$(curl --location --silent --show-error --max-time 20 "$url/style.css?v=20260925-4" || true)"
+            if grep -q 'src/main.js?v=20260925-5' <<<"$html" &&
                grep -q 'id="sync_status"' <<<"$html" &&
                grep -q 'enrichDayPage' <<<"$js" &&
                grep -q 'loadLocalWorkspace' <<<"$js" &&
                grep -q 'refreshWorkspaceInBackground' <<<"$js" &&
                grep -q 'fitBounds' <<<"$js" &&
+               grep -q 'beginInlineTimeEdit' <<<"$js" &&
+               grep -q 'openInlinePlaceSearch' <<<"$js" &&
+               grep -q 'saveInlinePhoto' <<<"$js" &&
+               grep -q 'day-inline-camera' <<<"$css" &&
+               grep -q 'day-inline-title' <<<"$css" &&
                grep -q 'id="splash_status"' <<<"$html" &&
                grep -q 'day-map-numbered-marker' <<<"$css" &&
                grep -q '100dvh' <<<"$css"; then
