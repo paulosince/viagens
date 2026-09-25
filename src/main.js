@@ -67,7 +67,8 @@ const state = {
   enrichingDays: new Set(),
   agendaSaveStates: new Map(),
   agendaSaveTimers: new Map(),
-  agendaSaveQueues: new Map()
+  agendaSaveQueues: new Map(),
+  agendaSaveVersions: new Map()
 };
 
 const dom = {
@@ -880,7 +881,10 @@ function confirmPlaceSearch() {
 
   if (inlineContext) {
     saveInlinePlaceSelection(inlineContext, location)
-      .catch(error => console.warn('Não foi possível salvar o local', error));
+      .catch(error => {
+        setAgendaSaveState(inlineContext.activityId, 'error');
+        console.warn('Não foi possível salvar o local', error);
+      });
     return;
   }
 
@@ -1118,11 +1122,18 @@ async function persistInlineDayChange(day, activities, locations, dayPatch = {},
   const { activityId = null, rerender = true } = options;
   const patch = { status: day.status || 'planned', ...dayPatch };
   const updatedDay = { ...day, ...patch };
+  const saveVersion = activityId
+    ? (state.agendaSaveVersions.get(String(activityId)) || 0) + 1
+    : 0;
 
-  if (activityId) setAgendaSaveState(activityId, 'saving');
+  if (activityId) {
+    state.agendaSaveVersions.set(String(activityId), saveVersion);
+    setAgendaSaveState(activityId, 'saving');
+  }
 
   const save = async () => {
     try {
+      if (activityId) setAgendaSaveState(activityId, 'saving');
       await offlineStore.saveDayBundle(updatedDay, activities, locations);
       await offlineStore.enqueueMutation({
         type: 'save-day',
@@ -1138,7 +1149,9 @@ async function persistInlineDayChange(day, activities, locations, dayPatch = {},
       updateInlineDayState(updatedDay, activities, locations);
       await refreshSyncStatus();
 
-      if (activityId) setAgendaSaveState(activityId, 'saved');
+      if (activityId && state.agendaSaveVersions.get(String(activityId)) === saveVersion) {
+        setAgendaSaveState(activityId, 'saved');
+      }
 
       if (rerender && state.activeDayId === String(day.id)) {
         openDayPage(day.id, { pushHistory: false });
@@ -1148,7 +1161,9 @@ async function persistInlineDayChange(day, activities, locations, dayPatch = {},
 
       flushOutbox().catch(error => console.warn('Alteração inline aguardando sincronização', error));
     } catch (error) {
-      if (activityId) setAgendaSaveState(activityId, 'error');
+      if (activityId && state.agendaSaveVersions.get(String(activityId)) === saveVersion) {
+        setAgendaSaveState(activityId, 'error');
+      }
       throw error;
     }
   };
@@ -1450,6 +1465,7 @@ function renderDayPageAgenda(day, activities, locations) {
       try {
         await saveInlinePhoto(day, activity, location, selected);
       } catch (error) {
+        setAgendaSaveState(activity.id, 'error');
         console.warn(error);
         camera.dataset.loading = 'false';
       }
