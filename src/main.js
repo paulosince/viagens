@@ -1,7 +1,29 @@
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 import { offlineStore } from './offline-store.js';
 
-const supabase = createClient('https://siabldasqinpfmxslwji.supabase.co', 'sb_publishable_UgbBIOq1TnInuPRrQpAFag_JLIzYuFf');
+const SUPABASE_URL = 'https://siabldasqinpfmxslwji.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_UgbBIOq1TnInuPRrQpAFag_JLIzYuFf';
+let supabase = null;
+let supabaseLoad = null;
+
+async function ensureSupabase() {
+  if (supabase) return supabase;
+  if (supabaseLoad) return supabaseLoad;
+  supabaseLoad = import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm')
+    .then(({ createClient }) => {
+      supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+      return supabase;
+    })
+    .catch(error => {
+      supabaseLoad = null;
+      throw error;
+    });
+  return supabaseLoad;
+}
+
+async function trySupabase() {
+  try { return await ensureSupabase(); }
+  catch { return null; }
+}
 const profilePhoto = 'assets/cintia.png';
 const placeSearchCache = new Map();
 const TRIP_CACHE_FRESH_MS = 60_000;
@@ -412,7 +434,9 @@ async function loadPlacePhotos(result) {
   dom.placePhotoMessage.dataset.kind = '';
   const currentPlaceId = `${result.osm_type}/${result.osm_id}`;
   try {
-    const { data, error } = await supabase.functions.invoke('unsplash-photos', { body: { action: 'search', query: unsplashQuery(result) } });
+    const client = await trySupabase();
+    if (!client) throw new Error('Fotos online indisponíveis.');
+    const { data, error } = await client.functions.invoke('unsplash-photos', { body: { action: 'search', query: unsplashQuery(result) } });
     const selected = state.placeSearch?.results?.[state.placeSearch.selectedIndex];
     if (!selected || `${selected.osm_type}/${selected.osm_id}` !== currentPlaceId) return;
     if (error) throw error;
@@ -528,7 +552,7 @@ function confirmPlaceSearch() {
     location.photoAuthor = photo.author || '';
     location.photoAuthorUrl = photo.authorUrl || '';
     location.photoSourceUrl = photo.sourceUrl || '';
-    if (photo.downloadLocation) supabase.functions.invoke('unsplash-photos', { body: { action: 'track', downloadLocation: photo.downloadLocation } });
+    if (photo.downloadLocation) trySupabase().then(client => client?.functions.invoke('unsplash-photos', { body: { action: 'track', downloadLocation: photo.downloadLocation } })).catch(() => {});
   }
   closePlaceSearch();
   renderDayLocationsEditor();
@@ -820,33 +844,35 @@ function closeDayEditor() {
 
 async function syncMutation(mutation) {
   if (mutation.type !== 'save-day') return;
+  const client = await ensureSupabase();
 
-  const savedDay = await supabase.from('trip_days').update(mutation.dayPatch).eq('id', mutation.dayId);
+  const savedDay = await client.from('trip_days').update(mutation.dayPatch).eq('id', mutation.dayId);
   if (savedDay.error) throw savedDay.error;
 
   if (mutation.locations?.length) {
-    const savedLocations = await supabase.from('day_locations').upsert(mutation.locations);
+    const savedLocations = await client.from('day_locations').upsert(mutation.locations);
     if (savedLocations.error) throw savedLocations.error;
   }
 
   if (mutation.activities?.length) {
-    const savedActivities = await supabase.from('activities').upsert(mutation.activities);
+    const savedActivities = await client.from('activities').upsert(mutation.activities);
     if (savedActivities.error) throw savedActivities.error;
   }
 
   if (mutation.removedActivityIds?.length) {
-    const removed = await supabase.from('activities').delete().in('id', mutation.removedActivityIds).eq('day_id', mutation.dayId);
+    const removed = await client.from('activities').delete().in('id', mutation.removedActivityIds).eq('day_id', mutation.dayId);
     if (removed.error) throw removed.error;
   }
 
   if (mutation.removedLocationIds?.length) {
-    const removed = await supabase.from('day_locations').delete().in('id', mutation.removedLocationIds).eq('day_id', mutation.dayId);
+    const removed = await client.from('day_locations').delete().in('id', mutation.removedLocationIds).eq('day_id', mutation.dayId);
     if (removed.error) throw removed.error;
   }
 }
 
 async function flushOutbox() {
   if (!navigator.onLine || !state.user) return false;
+  if (!await trySupabase()) return false;
   const mutations = await offlineStore.listOutbox();
   for (const mutation of mutations) {
     try {
@@ -1031,14 +1057,15 @@ async function fetchTripData(tripId) {
       }
     }
     try {
-      const result = await supabase.from('trip_days').select('*').eq('trip_id', tripId).order('day_number');
+      const client = await ensureSupabase();
+      const result = await client.from('trip_days').select('*').eq('trip_id', tripId).order('day_number');
       if (result.error) throw result.error;
       const days = result.data || [];
       let activities = [], locations = [];
       if (days.length) {
         const [activityResult, locationResult] = await Promise.all([
-          supabase.from('activities').select('*').in('day_id', days.map(day => day.id)).order('position'),
-          supabase.from('day_locations').select('*').in('day_id', days.map(day => day.id)).order('position')
+          client.from('activities').select('*').in('day_id', days.map(day => day.id)).order('position'),
+          client.from('day_locations').select('*').in('day_id', days.map(day => day.id)).order('position')
         ]);
         if (activityResult.error || locationResult.error) throw activityResult.error || locationResult.error;
         activities = activityResult.data || [];
@@ -1197,9 +1224,14 @@ function setEditingMode(editing) {
 
 async function softDeleteSelectedTrips() {
   if (!state.selectedTripIds.size) return;
+  const client = await trySupabase();
+  if (!client) {
+    dom.deleteSelectedTrips.textContent = 'Exclusão requer conexão';
+    return;
+  }
   const ids = [...state.selectedTripIds];
   dom.deleteSelectedTrips.disabled = true;
-  const result = await supabase.from('trips').update({ deleted_at: new Date().toISOString() }).in('id', ids).eq('user_id', state.user.id);
+  const result = await client.from('trips').update({ deleted_at: new Date().toISOString() }).in('id', ids).eq('user_id', state.user.id);
   if (result.error) {
     dom.deleteSelectedTrips.textContent = result.error.message;
     dom.deleteSelectedTrips.disabled = false;
@@ -1272,11 +1304,13 @@ function applyPassengers(records = []) {
 
 async function cacheCompleteWorkspace() {
   if (!state.user?.id || !state.trips.length || !navigator.onLine) return;
+  const client = await trySupabase();
+  if (!client) return;
   const lastSnapshot = await offlineStore.getMeta(`complete_snapshot:${state.user.id}`);
   if (lastSnapshot && Date.now() - new Date(lastSnapshot).getTime() < 30 * 60 * 1000) return;
 
   const tripIds = state.trips.map(trip => trip.id);
-  const daysResult = await supabase.from('trip_days').select('*').in('trip_id', tripIds).order('day_number');
+  const daysResult = await client.from('trip_days').select('*').in('trip_id', tripIds).order('day_number');
   if (daysResult.error) throw daysResult.error;
   const allDays = daysResult.data || [];
 
@@ -1285,8 +1319,8 @@ async function cacheCompleteWorkspace() {
   if (allDays.length) {
     const dayIds = allDays.map(day => day.id);
     const [activityResult, locationResult] = await Promise.all([
-      supabase.from('activities').select('*').in('day_id', dayIds).order('position'),
-      supabase.from('day_locations').select('*').in('day_id', dayIds).order('position')
+      client.from('activities').select('*').in('day_id', dayIds).order('position'),
+      client.from('day_locations').select('*').in('day_id', dayIds).order('position')
     ]);
     if (activityResult.error || locationResult.error) throw activityResult.error || locationResult.error;
     allActivities = activityResult.data || [];
@@ -1316,12 +1350,13 @@ async function cacheCompleteWorkspace() {
 
 async function loadTrips({ allowLocalFallback = true } = {}) {
   try {
-    const result = await supabase.from('trips').select('*').is('deleted_at', null).order('start_date', { ascending: true });
+    const client = await ensureSupabase();
+    const result = await client.from('trips').select('*').is('deleted_at', null).order('start_date', { ascending: true });
     if (result.error) throw result.error;
     state.trips = result.data || [];
     let passengerRecords = [];
     if (state.trips.length) {
-      const passengers = await supabase.from('passengers').select('*').in('trip_id', state.trips.map(trip => trip.id)).order('created_at');
+      const passengers = await client.from('passengers').select('*').in('trip_id', state.trips.map(trip => trip.id)).order('created_at');
       if (passengers.error) throw passengers.error;
       passengerRecords = passengers.data || [];
     }
@@ -1340,12 +1375,13 @@ async function loadTrips({ allowLocalFallback = true } = {}) {
 
 async function loadProfile({ allowLocalFallback = true } = {}) {
   try {
-    const result = await supabase.from('passenger_profiles').select('*').eq('user_id', state.user.id).maybeSingle();
+    const client = await ensureSupabase();
+    const result = await client.from('passenger_profiles').select('*').eq('user_id', state.user.id).maybeSingle();
     if (result.error) throw result.error;
     state.profile = result.data || { user_id: state.user.id, name: state.user.user_metadata?.name || 'Cíntia', birth_date: null, avatar_path: null };
-    if (state.profile.is_deleted) { await supabase.auth.signOut(); throw new Error('Esta conta está desativada. Seus dados continuam preservados.'); }
+    if (state.profile.is_deleted) { await client.auth.signOut(); throw new Error('Esta conta está desativada. Seus dados continuam preservados.'); }
     if (state.profile.avatar_path) {
-      const signed = await supabase.storage.from('profile-photos').createSignedUrl(state.profile.avatar_path, 3600);
+      const signed = await client.storage.from('profile-photos').createSignedUrl(state.profile.avatar_path, 3600);
       if (!signed.error) state.profile.avatar_url = signed.data.signedUrl;
     }
     await offlineStore.saveProfile(state.profile);
@@ -1593,6 +1629,12 @@ async function prepareAvatar(file) {
 }
 
 async function saveProfile() {
+  const client = await trySupabase();
+  if (!client) {
+    dom.profileMessage.dataset.kind = 'error';
+    dom.profileMessage.textContent = 'Perfil requer conexão. O roteiro continua disponível offline.';
+    return;
+  }
   state.saving = true; setLoading(dom.saveProfile, true);
   dom.profileMessage.dataset.kind = 'info';
   dom.profileMessage.textContent = state.avatarFile ? 'Enviando foto…' : 'Salvando perfil…';
@@ -1601,13 +1643,13 @@ async function saveProfile() {
     if (state.avatarFile) {
       const extension = state.avatarFile.type === 'image/png' ? 'png' : state.avatarFile.type === 'image/webp' ? 'webp' : 'jpg';
       avatarPath = `${state.user.id}/avatar-${Date.now()}.${extension}`;
-      const upload = await supabase.storage.from('profile-photos').upload(avatarPath, state.avatarFile, { contentType: state.avatarFile.type || 'image/jpeg', upsert: false });
+      const upload = await client.storage.from('profile-photos').upload(avatarPath, state.avatarFile, { contentType: state.avatarFile.type || 'image/jpeg', upsert: false });
       if (upload.error) throw new Error(`Foto: ${upload.error.message}`);
       dom.profileMessage.textContent = 'Salvando perfil…';
     }
-    const saved = await supabase.from('passenger_profiles').upsert({ user_id: state.user.id, name: dom.profileNameInput.value.trim(), birth_date: dom.birthDateInput.value || null, avatar_path: avatarPath, updated_at: new Date().toISOString() }).select().single();
+    const saved = await client.from('passenger_profiles').upsert({ user_id: state.user.id, name: dom.profileNameInput.value.trim(), birth_date: dom.birthDateInput.value || null, avatar_path: avatarPath, updated_at: new Date().toISOString() }).select().single();
     if (saved.error) throw new Error(`Perfil: ${saved.error.message}`);
-    await supabase.from('passengers').update({ name: dom.profileNameInput.value.trim(), age: ageFromBirthDate(dom.birthDateInput.value) }).eq('user_id', state.user.id);
+    await client.from('passengers').update({ name: dom.profileNameInput.value.trim(), age: ageFromBirthDate(dom.birthDateInput.value) }).eq('user_id', state.user.id);
     state.profile = saved.data;
     state.avatarFile = null;
     if (state.avatarPreview) URL.revokeObjectURL(state.avatarPreview);
@@ -1632,6 +1674,11 @@ function createDays(tripId, startValue, endValue) {
 }
 
 async function saveTrip() {
+  const client = await trySupabase();
+  if (!client) {
+    dom.newTripMessage.textContent = 'Criar ou alterar a viagem requer conexão. O roteiro já salvo continua editável offline.';
+    return;
+  }
   const values = Object.fromEntries(new FormData(dom.newTripForm));
   if (values.end_date < values.start_date) { dom.newTripMessage.textContent = 'A data final deve ser igual ou posterior à inicial.'; return; }
   if (!state.imageData) { dom.newTripMessage.textContent = 'Escolha a imagem da viagem.'; return; }
@@ -1639,7 +1686,7 @@ async function saveTrip() {
   if (state.editingTripId) {
     const tripId = state.editingTripId;
     const payload = { name: values.name.trim(), destination: values.destination.trim(), start_date: values.start_date, end_date: values.end_date, arrival_method: values.arrival_method, location_label: values.location_label.trim() || null, cover_url: state.imageData, secondary_color: state.tripColor };
-    const updated = await supabase.from('trips').update(payload).eq('id', tripId);
+    const updated = await client.from('trips').update(payload).eq('id', tripId);
     let failure = updated.error;
     if (!failure) {
       const existingPassengers = state.passengers.get(tripId) || [];
@@ -1648,7 +1695,7 @@ async function saveTrip() {
       const retainedIds = new Set(editedPassengers.filter(passenger => existingIds.has(String(passenger.id))).map(passenger => String(passenger.id)));
       const removedIds = existingPassengers.filter(passenger => !retainedIds.has(String(passenger.id))).map(passenger => passenger.id);
       if (removedIds.length) {
-        const removed = await supabase.from('passengers').delete().in('id', removedIds).eq('trip_id', tripId).select('id');
+        const removed = await client.from('passengers').delete().in('id', removedIds).eq('trip_id', tripId).select('id');
         failure = removed.error;
         if (!failure && (removed.data || []).length !== removedIds.length) failure = new Error('Não foi possível remover todos os passageiros duplicados.');
       }
@@ -1656,25 +1703,25 @@ async function saveTrip() {
         if (failure) break;
         const payload = { user_id: passenger.session ? state.user.id : passenger.userId || null, name: passenger.name.trim(), birth_date: passenger.birthDate || null, photo_url: passenger.photoUrl || null, age: ageFromBirthDate(passenger.birthDate) };
         failure = existingIds.has(String(passenger.id))
-          ? (await supabase.from('passengers').update(payload).eq('id', passenger.id).eq('trip_id', tripId)).error
-          : (await supabase.from('passengers').insert({ ...payload, trip_id: tripId })).error;
+          ? (await client.from('passengers').update(payload).eq('id', passenger.id).eq('trip_id', tripId)).error
+          : (await client.from('passengers').insert({ ...payload, trip_id: tripId })).error;
       }
     }
     if (!failure) {
-      const existing = await supabase.from('trip_days').select('id,date').eq('trip_id', tripId);
+      const existing = await client.from('trip_days').select('id,date').eq('trip_id', tripId);
       failure = existing.error;
       if (!failure) {
         const wanted = createDays(tripId, values.start_date, values.end_date);
         const wantedDates = new Set(wanted.map(day => day.date));
         const obsoleteIds = (existing.data || []).filter(day => !wantedDates.has(day.date)).map(day => day.id);
-        if (obsoleteIds.length) failure = (await supabase.from('trip_days').delete().in('id', obsoleteIds)).error;
+        if (obsoleteIds.length) failure = (await client.from('trip_days').delete().in('id', obsoleteIds)).error;
         const existingByDate = new Map((existing.data || []).map(day => [day.date, day]));
         for (const day of wanted) {
           if (failure) break;
           const current = existingByDate.get(day.date);
           failure = current
-            ? (await supabase.from('trip_days').update({ day_number: day.day_number }).eq('id', current.id)).error
-            : (await supabase.from('trip_days').insert(day)).error;
+            ? (await client.from('trip_days').update({ day_number: day.day_number }).eq('id', current.id)).error
+            : (await client.from('trip_days').insert(day)).error;
         }
       }
     }
@@ -1690,10 +1737,10 @@ async function saveTrip() {
     state.saving = false; setLoading(dom.saveNewTrip, false);
     return;
   }
-  const created = await supabase.from('trips').insert({ user_id: state.user.id, name: values.name.trim(), destination: values.destination.trim(), start_date: values.start_date, end_date: values.end_date, arrival_method: values.arrival_method, location_label: values.location_label.trim() || null, cover_url: state.imageData, secondary_color: state.tripColor }).select().single();
+  const created = await client.from('trips').insert({ user_id: state.user.id, name: values.name.trim(), destination: values.destination.trim(), start_date: values.start_date, end_date: values.end_date, arrival_method: values.arrival_method, location_label: values.location_label.trim() || null, cover_url: state.imageData, secondary_color: state.tripColor }).select().single();
   if (created.error) { dom.newTripMessage.textContent = created.error.message; state.saving = false; setLoading(dom.saveNewTrip, false); return; }
   const trip = created.data;
-  const member = await supabase.from('trip_members').insert({ trip_id: trip.id, user_id: state.user.id, role: 'owner' });
+  const member = await client.from('trip_members').insert({ trip_id: trip.id, user_id: state.user.id, role: 'owner' });
   let failure = member.error;
   if (!failure) {
     const passengerPayload = state.newTripPassengers.map(passenger => ({
@@ -1705,19 +1752,19 @@ async function saveTrip() {
       age: ageFromBirthDate(passenger.birthDate)
     })).filter(passenger => passenger.name);
     if (passengerPayload.length) {
-      const passengers = await supabase.from('passengers').insert(passengerPayload);
+      const passengers = await client.from('passengers').insert(passengerPayload);
       failure = passengers.error;
     }
   }
   if (!failure) {
-    const days = await supabase.from('trip_days').insert(createDays(trip.id, values.start_date, values.end_date));
+    const days = await client.from('trip_days').insert(createDays(trip.id, values.start_date, values.end_date));
     failure = days.error;
   }
   if (failure) {
-    await supabase.from('trip_days').delete().eq('trip_id', trip.id);
-    await supabase.from('passengers').delete().eq('trip_id', trip.id);
-    await supabase.from('trip_members').delete().eq('trip_id', trip.id);
-    await supabase.from('trips').delete().eq('id', trip.id);
+    await client.from('trip_days').delete().eq('trip_id', trip.id);
+    await client.from('passengers').delete().eq('trip_id', trip.id);
+    await client.from('trip_members').delete().eq('trip_id', trip.id);
+    await client.from('trips').delete().eq('id', trip.id);
     dom.newTripMessage.textContent = failure.message;
   } else {
     state.selectedYear = Number(String(values.start_date).slice(0, 4));
@@ -1729,11 +1776,13 @@ async function saveTrip() {
 }
 
 async function deleteAccount() {
+  const client = await trySupabase();
+  if (!client) { dom.profileMessage.textContent = 'Excluir conta requer conexão.'; return; }
   if (!window.confirm('Desativar esta conta? A sessão será encerrada, mas nenhuma viagem, foto ou outro dado será apagado.')) return;
-  const result = await supabase.rpc('soft_delete_own_account');
+  const result = await client.rpc('soft_delete_own_account');
   if (result.error) { dom.profileMessage.textContent = result.error.message; return; }
   await offlineStore.clearSession().catch(console.warn);
-  await supabase.auth.signOut();
+  await client.auth.signOut();
 }
 
 dom.closeDayEdit.addEventListener('click', closeDayEditor);
@@ -1782,7 +1831,8 @@ document.addEventListener('click', event => { if (document.body.dataset.yearMenu
 dom.birthDateInput.addEventListener('input', syncAge);
 dom.logoutButton.addEventListener('click', async () => {
   await offlineStore.clearSession().catch(console.warn);
-  await supabase.auth.signOut().catch(console.warn);
+  const client = await trySupabase();
+  if (client) await client.auth.signOut().catch(console.warn);
   state.user = null;
   state.profile = null;
   state.trips = [];
@@ -1817,7 +1867,9 @@ dom.newTripForm.addEventListener('submit', event => { event.preventDefault(); sa
 dom.profileForm.addEventListener('submit', event => { event.preventDefault(); saveProfile(); });
 dom.authForm.addEventListener('submit', async event => {
   event.preventDefault(); dom.authMessage.textContent = '';
-  const result = await supabase.auth.signInWithPassword(Object.fromEntries(new FormData(dom.authForm)));
+  const client = await trySupabase();
+  if (!client) { dom.authMessage.textContent = 'Sem conexão. Abra o app normalmente se este aparelho já tiver uma cópia da viagem.'; return; }
+  const result = await client.auth.signInWithPassword(Object.fromEntries(new FormData(dom.authForm)));
   if (result.error) { dom.authMessage.textContent = result.error.message; return; }
   state.user = result.data.user;
   await offlineStore.cacheSession(state.user);
@@ -1833,8 +1885,13 @@ dom.authForm.addEventListener('submit', async event => {
 async function boot() {
   try {
     await offlineStore.open();
-    const { data } = await supabase.auth.getSession();
-    state.user = data.session?.user || await offlineStore.getCachedSession();
+    const client = await trySupabase();
+    let remoteUser = null;
+    if (client) {
+      const { data } = await client.auth.getSession();
+      remoteUser = data.session?.user || null;
+    }
+    state.user = remoteUser || await offlineStore.getCachedSession();
     if (!state.user) {
       setSessionView('anonymous');
       return;
@@ -1892,14 +1949,16 @@ window.addEventListener('online', () => {
   }).catch(console.warn);
 });
 
-supabase.auth.onAuthStateChange((_event, session) => {
-  if (session) {
-    offlineStore.cacheSession(session.user).catch(console.warn);
-    return;
-  }
-  if (!navigator.onLine && state.user) return;
-  state.user = null; state.profile = null; state.trips = []; state.passengers.clear(); state.tripDataCache.clear(); state.tripDataLoads.clear();
-  syncTripList(); closeSheets(); setSessionView('anonymous');
-});
+ensureSupabase()
+  .then(client => client.auth.onAuthStateChange((_event, session) => {
+    if (session) {
+      offlineStore.cacheSession(session.user).catch(console.warn);
+      return;
+    }
+    if (!navigator.onLine && state.user) return;
+    state.user = null; state.profile = null; state.trips = []; state.passengers.clear(); state.tripDataCache.clear(); state.tripDataLoads.clear();
+    syncTripList(); closeSheets(); setSessionView('anonymous');
+  }))
+  .catch(() => {});
 
 boot();
