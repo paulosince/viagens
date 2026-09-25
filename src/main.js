@@ -787,7 +787,7 @@ function renderPlaceSearchResults(results) {
       state.placeSearch.selectedPhotoIndex = -1;
       dom.confirmPlaceSearch.disabled = false;
       renderPlaceSearchResults(results);
-      loadPlacePhotos(result);
+      if (!state.placeSearch.inlineContext) loadPlacePhotos(result);
     });
     item.append(option);
     dom.placeSearchResults.append(item);
@@ -825,8 +825,8 @@ async function runPlaceSearch() {
   }
 }
 
-function openPlaceSearch(location) {
-  state.placeSearch = { location, results: [], selectedIndex: -1, photos: [], selectedPhotoIndex: -1 };
+function openPlaceSearch(location, options = {}) {
+  state.placeSearch = { location, results: [], selectedIndex: -1, photos: [], selectedPhotoIndex: -1, ...options };
   dom.placeSearchInput.value = location.name || '';
   dom.placeSearchMessage.textContent = '';
   dom.placeSearchMessage.dataset.kind = '';
@@ -844,26 +844,43 @@ function confirmPlaceSearch() {
   const search = state.placeSearch;
   const match = search?.results?.[search.selectedIndex];
   if (!match) return;
+
   const location = search.location;
   location.name = placeResultName(match);
   location.selectedName = location.name;
   location.provider = 'openstreetmap';
-  location.providerPlaceId = `${match.osm_type}/${match.osm_id}`;
+  location.providerPlaceId = String(match.osm_type) + '/' + String(match.osm_id);
   location.formattedAddress = match.display_name;
   location.latitude = Number(match.lat);
   location.longitude = Number(match.lon);
   location.category = match.category || match.class || '';
   location.placeType = match.type || '';
-  const photo = search.photos?.[search.selectedPhotoIndex];
-  if (photo) {
-    location.photoUrl = photo.imageUrl;
-    location.photoProvider = 'unsplash';
-    location.photoAuthor = photo.author || '';
-    location.photoAuthorUrl = photo.authorUrl || '';
-    location.photoSourceUrl = photo.sourceUrl || '';
-    if (photo.downloadLocation) trySupabase().then(client => client?.functions.invoke('unsplash-photos', { body: { action: 'track', downloadLocation: photo.downloadLocation } })).catch(() => {});
+
+  if (!search.inlineContext) {
+    const photo = search.photos?.[search.selectedPhotoIndex];
+    if (photo) {
+      location.photoUrl = photo.imageUrl;
+      location.photoProvider = 'unsplash';
+      location.photoAuthor = photo.author || '';
+      location.photoAuthorUrl = photo.authorUrl || '';
+      location.photoSourceUrl = photo.sourceUrl || '';
+      if (photo.downloadLocation) {
+        trySupabase()
+          .then(client => client?.functions.invoke('unsplash-photos', { body: { action: 'track', downloadLocation: photo.downloadLocation } }))
+          .catch(() => {});
+      }
+    }
   }
+
+  const inlineContext = search.inlineContext;
   closePlaceSearch();
+
+  if (inlineContext) {
+    saveInlinePlaceSelection(inlineContext, location)
+      .catch(error => console.warn('Não foi possível salvar o local', error));
+    return;
+  }
+
   renderDayLocationsEditor();
   syncDayActivityLocationSelects();
 }
