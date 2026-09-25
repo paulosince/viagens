@@ -5,6 +5,7 @@ const SUPABASE_KEY = 'sb_publishable_UgbBIOq1TnInuPRrQpAFag_JLIzYuFf';
 let supabase = null;
 let supabaseLoad = null;
 let leafletLoad = null;
+let orderedDaySchemaSupport = null;
 
 async function ensureSupabase() {
   if (supabase) return supabase;
@@ -93,6 +94,91 @@ const dom = {
 dom.tripPage.after(dom.scrim, dom.newTripSheet, dom.profileSheet);
 
 const displayDate = value => value ? new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(`${value}T12:00:00`)).replace('.', '') : '';
+
+function addDaysToDate(value, offset) {
+  if (!value) return '';
+  const [year, month, day] = String(value).split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + Number(offset || 0), 12, 0, 0));
+  return date.toISOString().slice(0, 10);
+}
+
+function inclusiveDayCount(startValue, endValue) {
+  if (!startValue || !endValue) return 1;
+  const start = new Date(String(startValue) + 'T12:00:00Z');
+  const end = new Date(String(endValue) + 'T12:00:00Z');
+  return Math.max(1, Math.round((end - start) / 86400000) + 1);
+}
+
+function tripDayCount(trip) {
+  const explicit = Number(trip?.day_count);
+  if (Number.isInteger(explicit) && explicit > 0) return explicit;
+  return inclusiveDayCount(trip?.start_date, trip?.end_date);
+}
+
+function tripEndDate(trip) {
+  return addDaysToDate(trip?.start_date, tripDayCount(trip) - 1);
+}
+
+function dayPosition(day) {
+  const explicit = Number(day?.position);
+  if (Number.isInteger(explicit) && explicit >= 0) return explicit;
+  const legacy = Number(day?.day_number);
+  return Number.isInteger(legacy) && legacy > 0 ? legacy - 1 : 0;
+}
+
+function dayNumber(day) {
+  return dayPosition(day) + 1;
+}
+
+function dayIsHidden(day) {
+  return day?.is_hidden === true || day?.status === 'hidden';
+}
+
+function dayDeletedAt(day) {
+  if (day?.deleted_at) return day.deleted_at;
+  const status = String(day?.status || '');
+  return status.startsWith('deleted:') ? status.slice(8) : null;
+}
+
+function activeTripForDay(day) {
+  return state.trips.find(trip => String(trip.id) === String(day?.trip_id || state.activeTripId)) || null;
+}
+
+function derivedDayDate(day, trip = activeTripForDay(day)) {
+  return trip?.start_date ? addDaysToDate(trip.start_date, dayPosition(day)) : '';
+}
+
+function normalizeTripRecord(trip) {
+  return { ...trip, day_count: tripDayCount(trip) };
+}
+
+function normalizeDayRecord(day) {
+  return {
+    ...day,
+    position: dayPosition(day),
+    is_hidden: dayIsHidden(day),
+    deleted_at: dayDeletedAt(day)
+  };
+}
+
+function normalizeActivityRecord(activity) {
+  if (activity?.start_time) return activity;
+  const time = activity?.starts_at ? String(activity.starts_at).slice(11, 19) : null;
+  return { ...activity, start_time: time };
+}
+
+async function supportsOrderedDaySchema(client = null) {
+  if (orderedDaySchemaSupport !== null) return orderedDaySchemaSupport;
+  const activeClient = client || await trySupabase();
+  if (!activeClient) return false;
+  try {
+    const probe = await activeClient.from('trips').select('day_count').limit(1);
+    orderedDaySchemaSupport = !probe.error;
+  } catch {
+    orderedDaySchemaSupport = false;
+  }
+  return orderedDaySchemaSupport;
+}
 const profileName = () => state.profile?.name || state.user?.user_metadata?.full_name || state.user?.user_metadata?.name || 'Cíntia';
 const profileImage = () => state.avatarPreview || state.profile?.avatar_url || state.user?.user_metadata?.avatar_url || profilePhoto;
 
@@ -106,7 +192,7 @@ function ageFromBirthDate(value) {
 
 function tripTiming(trip) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
-  const start = new Date(`${trip.start_date}T00:00:00`), end = new Date(`${trip.end_date}T23:59:59`);
+  const start = new Date(`${trip.start_date}T00:00:00`), end = new Date(`${tripEndDate(trip)}T23:59:59`);
   if (today > end) return 'viagem realizada';
   if (today >= start) return 'em andamento';
   const days = Math.ceil((start - today) / 86400000);
@@ -318,7 +404,7 @@ function syncPassengerList(container, passengers) {
 function dayTitle(day, activities = [], locations = []) {
   const firstLocation = locations[0];
   const firstPlace = activities.find(activity => activity.place_name) || activities[0];
-  return day.title || firstPlace?.title || firstPlace?.place_name || firstLocation?.name || `Dia ${day.day_number}`;
+  return day.title || firstPlace?.title || firstPlace?.place_name || firstLocation?.name || `Dia ${dayNumber(day)}`;
 }
 
 function dayPhoto(day, activities = [], locations = []) {
@@ -326,6 +412,7 @@ function dayPhoto(day, activities = [], locations = []) {
 }
 
 function activityTime(activity) {
+  if (activity?.start_time) return String(activity.start_time).slice(0, 5);
   if (!activity?.starts_at) return '';
   return new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }).format(new Date(activity.starts_at));
 }
@@ -1887,7 +1974,7 @@ function openDayEditor(day) {
   };
   const trip = state.trips.find(item => String(item.id) === String(state.activeTripId));
   const destination = trip?.destination?.trim() || trip?.name?.trim() || 'seu destino';
-  dom.dayEditTitle.textContent = `Dia ${day.day_number}`;
+  dom.dayEditTitle.textContent = `Dia ${dayNumber(day)}`;
   dom.dayEditDate.textContent = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' }).format(new Date(`${day.date}T12:00:00`));
   dom.dayTitleInput.placeholder = `Primeiro dia em ${destination}`;
   dom.dayTitleInput.value = state.dayEditor.title;
