@@ -195,7 +195,13 @@ async function replaceTripData(tripId, days, activities, locations) {
 async function loadTripData(tripId) {
   if (!tripId) return { days: [], activities: [], locations: [] };
   const days = await getAllByIndex('trip_days', 'trip_id', String(tripId));
-  days.sort((a, b) => (a.day_number || 0) - (b.day_number || 0));
+  const orderValue = day => {
+    const position = Number(day?.position);
+    if (Number.isInteger(position) && position >= 0) return position;
+    const legacy = Number(day?.day_number);
+    return Number.isInteger(legacy) && legacy > 0 ? legacy - 1 : 0;
+  };
+  days.sort((a, b) => orderValue(a) - orderValue(b));
 
   const activities = [];
   const locations = [];
