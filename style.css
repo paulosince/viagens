@@ -795,16 +795,19 @@ body[data-day-page="open"] .day-page {
 .day-view-agenda-item {
   position: relative;
   display: grid;
-  grid-template-columns: 64px 28px minmax(0, 1fr) 104px;
+  grid-template-columns: 64px minmax(0, 1fr) 104px;
   align-items: start;
-  gap: 9px;
+  gap: 10px;
   min-height: 112px;
   padding: 16px 12px;
   border-bottom: 1px solid #d7d7dc;
 }
-.day-view-agenda-item[data-has-photo="false"] { grid-template-columns: 64px 28px minmax(0, 1fr) auto; }
+.day-view-agenda-item[data-has-photo="false"] { grid-template-columns: 64px minmax(0, 1fr) 38px; }
 .day-view-agenda-item:last-child { border-bottom: 0; }
 .day-inline-time {
+  grid-column: 1;
+  grid-row: 1;
+  width: 58px;
   min-width: 58px;
   min-height: 34px;
   margin: -5px 0 0 -6px;
@@ -833,29 +836,46 @@ body[data-day-page="open"] .day-page {
 }
 .day-view-pin {
   position: relative;
-  width: 22px;
-  height: 22px;
-  margin-top: 1px;
+  grid-column: 1;
+  grid-row: 2;
+  width: 58px;
+  height: 34px;
+  margin: 7px 0 0 -6px;
   padding: 0;
-  border: 2px solid var(--ios-blue);
-  border-radius: 50% 50% 50% 0;
+  border: 0;
+  border-radius: 10px;
   color: var(--ios-blue);
-  background: transparent;
-  transform: rotate(-45deg);
+  background: rgba(0,122,255,.06);
   appearance: none;
   -webkit-appearance: none;
 }
 .day-inline-location:active {
-  background: rgba(0,122,255,.12);
+  background: rgba(0,122,255,.14);
+}
+.day-view-pin::before {
+  position: absolute;
+  top: 8px;
+  left: 21px;
+  width: 13px;
+  height: 13px;
+  border: 2px solid var(--ios-blue);
+  border-radius: 50% 50% 50% 0;
+  content: "";
+  transform: rotate(-45deg);
 }
 .day-view-pin::after {
   position: absolute;
-  inset: 5px;
-  content: "";
+  top: 13px;
+  left: 26px;
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
   background: var(--ios-blue);
+  content: "";
 }
 .day-view-agenda-copy {
+  grid-column: 2;
+  grid-row: 1 / span 3;
   min-width: 0;
 }
 .day-inline-title,
@@ -927,6 +947,8 @@ body[data-day-page="open"] .day-page {
 }
 .day-view-photo-shell {
   position: relative;
+  grid-column: 3;
+  grid-row: 1 / span 3;
   width: 104px;
   height: 92px;
 }
@@ -960,6 +982,8 @@ body[data-day-page="open"] .day-page {
 .day-inline-camera[data-loading="true"] { opacity: .5; pointer-events: none; }
 .day-inline-camera-empty {
   position: relative;
+  grid-column: 3;
+  grid-row: 1;
   right: auto;
   bottom: auto;
   align-self: start;
@@ -1087,15 +1111,36 @@ body[data-day-page="open"] .day-page {
   .day-page-hero { min-height: 360px; }
   .day-page-content { min-height: calc(100svh - 360px); }
   .day-view-agenda-item {
-    grid-template-columns: 54px 24px minmax(0, 1fr);
+    grid-template-columns: 54px minmax(0, 1fr);
     gap: 8px;
     padding: 15px 10px;
   }
-  .day-view-agenda-item[data-has-photo="false"] { grid-template-columns: 54px 24px minmax(0, 1fr) 38px; }
-  .day-inline-time { min-width: 50px; margin-left: -4px; padding-inline: 4px; font-size: 14px; }
+  .day-view-agenda-item[data-has-photo="false"] { grid-template-columns: 54px minmax(0, 1fr) 38px; }
+  .day-inline-time {
+    grid-column: 1;
+    grid-row: 1;
+    width: 50px;
+    min-width: 50px;
+    margin-left: -4px;
+    padding-inline: 4px;
+    font-size: 14px;
+  }
+  .day-inline-location {
+    grid-column: 1;
+    grid-row: 2;
+    width: 50px;
+    margin-left: -4px;
+  }
+  .day-view-pin::before { left: 17px; }
+  .day-view-pin::after { left: 22px; }
   .day-inline-time-input { width: 70px; margin-left: -4px; }
+  .day-view-agenda-copy {
+    grid-column: 2 / -1;
+    grid-row: 1 / span 2;
+  }
   .day-view-photo-shell {
-    grid-column: 3;
+    grid-column: 2 / -1;
+    grid-row: 3;
     width: 100%;
     height: auto;
     aspect-ratio: 16 / 9;
@@ -1107,7 +1152,7 @@ body[data-day-page="open"] .day-page {
     margin: 0;
   }
   .day-inline-camera { width: 38px; height: 38px; font-size: 18px; }
-  .day-inline-camera-empty { grid-column: 4; grid-row: 1; }
+  .day-inline-camera-empty { grid-column: 3; grid-row: 1; }
   .day-inline-title { font-size: 16px; }
   .day-inline-description { font-size: 13px; line-height: 1.45; }
   .day-view-map { height: 250px; }
