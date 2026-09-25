@@ -231,7 +231,7 @@ async function loadLocalWorkspace(user) {
     birth_date: null,
     avatar_path: null
   };
-  state.trips = workspace.trips || [];
+  state.trips = (workspace.trips || []).map(normalizeTripRecord);
   applyPassengers(workspace.passengers || []);
   syncProfileUI();
   syncYearList();
@@ -2192,11 +2192,18 @@ function groupByDay(records = []) {
 }
 
 function applyTripData(data) {
-  state.tripDays = data.days;
-  state.dayActivities = data.activitiesByDay;
-  state.dayLocations = data.locationsByDay;
+  const days = (data.days || []).map(normalizeDayRecord).sort((a, b) => dayPosition(a) - dayPosition(b));
+  const activitiesByDay = new Map();
+  for (const [dayId, activities] of (data.activitiesByDay || new Map())) {
+    activitiesByDay.set(String(dayId), (activities || []).map(normalizeActivityRecord));
+  }
+  const locationsByDay = data.locationsByDay || new Map();
+
+  state.tripDays = days;
+  state.dayActivities = activitiesByDay;
+  state.dayLocations = locationsByDay;
   state.activeTripDataVersion = data.version;
-  renderTripDays(data.days, data.activitiesByDay, data.locationsByDay);
+  renderTripDays(days, activitiesByDay, locationsByDay);
 }
 
 async function fetchTripData(tripId) {
@@ -2222,9 +2229,10 @@ async function fetchTripData(tripId) {
     try {
       const client = await trySupabase();
     if (!client) throw new Error('Backend indisponível.');
-      const result = await client.from('trip_days').select('*').eq('trip_id', tripId).order('day_number');
+      const orderedSchema = await supportsOrderedDaySchema(client);
+      const result = await client.from('trip_days').select('*').eq('trip_id', tripId).order(orderedSchema ? 'position' : 'day_number');
       if (result.error) throw result.error;
-      const days = result.data || [];
+      const days = (result.data || []).map(normalizeDayRecord);
       let activities = [], locations = [];
       if (days.length) {
         const [activityResult, locationResult] = await Promise.all([
@@ -2232,7 +2240,7 @@ async function fetchTripData(tripId) {
           client.from('day_locations').select('*').in('day_id', days.map(day => day.id)).order('position')
         ]);
         if (activityResult.error || locationResult.error) throw activityResult.error || locationResult.error;
-        activities = activityResult.data || [];
+        activities = (activityResult.data || []).map(normalizeActivityRecord);
         locations = locationResult.data || [];
       }
       await offlineStore.replaceTripData(key, days, activities, locations);
@@ -2474,9 +2482,10 @@ async function cacheCompleteWorkspace() {
   if (lastSnapshot && Date.now() - new Date(lastSnapshot).getTime() < 30 * 60 * 1000) return;
 
   const tripIds = state.trips.map(trip => trip.id);
-  const daysResult = await client.from('trip_days').select('*').in('trip_id', tripIds).order('day_number');
+  const orderedSchema = await supportsOrderedDaySchema(client);
+  const daysResult = await client.from('trip_days').select('*').in('trip_id', tripIds).order(orderedSchema ? 'position' : 'day_number');
   if (daysResult.error) throw daysResult.error;
-  const allDays = daysResult.data || [];
+  const allDays = (daysResult.data || []).map(normalizeDayRecord);
 
   let allActivities = [];
   let allLocations = [];
@@ -2487,7 +2496,7 @@ async function cacheCompleteWorkspace() {
       client.from('day_locations').select('*').in('day_id', dayIds).order('position')
     ]);
     if (activityResult.error || locationResult.error) throw activityResult.error || locationResult.error;
-    allActivities = activityResult.data || [];
+    allActivities = (activityResult.data || []).map(normalizeActivityRecord);
     allLocations = locationResult.data || [];
   }
 
@@ -2518,7 +2527,7 @@ async function loadTrips({ allowLocalFallback = true } = {}) {
     if (!client) throw new Error('Backend indisponível.');
     const result = await client.from('trips').select('*').is('deleted_at', null).order('start_date', { ascending: true });
     if (result.error) throw result.error;
-    state.trips = result.data || [];
+    state.trips = (result.data || []).map(normalizeTripRecord);
     let passengerRecords = [];
     if (state.trips.length) {
       const passengers = await client.from('passengers').select('*').in('trip_id', state.trips.map(trip => trip.id)).order('created_at');
@@ -2531,7 +2540,7 @@ async function loadTrips({ allowLocalFallback = true } = {}) {
     if (!allowLocalFallback || !state.user?.id) throw remoteError;
     const local = await offlineStore.loadWorkspace(state.user.id);
     if (!local.trips.length) throw remoteError;
-    state.trips = local.trips;
+    state.trips = local.trips.map(normalizeTripRecord);
     applyPassengers(local.passengers);
   }
   syncYearList();
