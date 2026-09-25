@@ -14,11 +14,18 @@
 
 * { box-sizing: border-box; }
 
-html { min-height: 100%; background: var(--page); }
+html {
+  width: 100%;
+  min-height: 100%;
+  min-height: 100dvh;
+  background: var(--page);
+}
 
 body {
+  width: 100%;
   min-width: 320px;
-  min-height: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
   margin: 0;
   color: var(--text);
   background: var(--page);
@@ -27,16 +34,21 @@ body {
 
 html:has(body[data-app-ready="false"]),
 body[data-app-ready="false"] {
+  min-height: 100dvh;
+  overflow: hidden;
   background: linear-gradient(180deg, #159bf0 0%, #65d8ef 58%, #b9eff8 100%);
 }
+
+#app { min-height: 100dvh; }
 
 .app-splash {
   position: fixed;
   z-index: 100;
-  top: calc(-1 * env(safe-area-inset-top));
-  right: calc(-1 * env(safe-area-inset-right));
-  bottom: calc(-1 * env(safe-area-inset-bottom));
-  left: calc(-1 * env(safe-area-inset-left));
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 100%;
   display: grid;
   overflow: hidden;
   place-items: center;
@@ -844,6 +856,62 @@ body[data-day-page="open"] .day-page {
   width: 100%;
   height: 100%;
   border: 0;
+}
+
+.day-view-map.leaflet-container {
+  display: block;
+  font-weight: 400;
+}
+.day-map-numbered-marker {
+  border: 0;
+  background: transparent;
+}
+.day-map-numbered-marker span {
+  position: relative;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 3px solid white;
+  border-radius: 50% 50% 50% 0;
+  color: white;
+  background: var(--ios-blue);
+  box-shadow: 0 4px 12px rgba(0,0,0,.28);
+  font-size: 12px;
+  font-weight: 900;
+  transform: rotate(-45deg);
+}
+.day-map-numbered-marker span::after {
+  content: attr(data-number);
+}
+.day-map-numbered-marker span {
+  line-height: 1;
+}
+.day-map-numbered-marker span {
+  text-align: center;
+}
+.day-map-numbered-marker span {
+  padding: 0;
+}
+.day-map-numbered-marker span {
+  writing-mode: horizontal-tb;
+}
+.day-map-numbered-marker span {
+  font-variant-numeric: tabular-nums;
+}
+.day-map-numbered-marker span {
+  text-orientation: mixed;
+}
+.day-map-numbered-marker span {
+  transform: rotate(-45deg);
+}
+.day-map-numbered-marker span {
+  color: transparent;
+}
+.day-map-numbered-marker span::before {
+  content: attr(data-label);
+  color: white;
+  transform: rotate(45deg);
 }
 .day-view-directions {
   display: grid;
