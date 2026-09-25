@@ -1887,9 +1887,8 @@ async function saveInlinePlaceSelection(context, draft) {
   activity.longitude = record.longitude;
   if (record.photo_url) activity.photo_url = record.photo_url;
 
-  const patch = day.main_place_name ? {} : { main_place_name: record.name };
   setAgendaSaveState(activity.id, 'saving');
-  await persistInlineDayChange(day, records.activities, records.locations, patch, { activityId: activity.id });
+  await persistInlineDayChange(day, records.activities, records.locations, {}, { activityId: activity.id });
 }
 
 async function saveInlinePhoto(day, activity, location, file) {
@@ -2200,7 +2199,7 @@ function openDayEditor(day) {
     day,
     title: day.title || '',
     notes: day.summary || '',
-    locations: locations.length ? locations.map(location => ({ id: location.id || crypto.randomUUID(), name: location.name || '', photoUrl: location.photo_url || '', provider: location.provider || '', providerPlaceId: location.provider_place_id || '', formattedAddress: location.formatted_address || '', latitude: numericCoordinate(location.latitude), longitude: numericCoordinate(location.longitude), category: location.category || '', placeType: location.place_type || '', photoProvider: location.photo_provider || '', photoAuthor: location.photo_author || '', photoAuthorUrl: location.photo_author_url || '', photoSourceUrl: location.photo_source_url || '' })) : [{ id: crypto.randomUUID(), name: day.main_place_name || '', photoUrl: day.photo_url || '', provider: '', providerPlaceId: '', formattedAddress: '', latitude: null, longitude: null, category: '', placeType: '' }],
+    locations: locations.length ? locations.map(location => ({ id: location.id || crypto.randomUUID(), name: location.name || '', photoUrl: location.photo_url || '', provider: location.provider || '', providerPlaceId: location.provider_place_id || '', formattedAddress: location.formatted_address || '', latitude: numericCoordinate(location.latitude), longitude: numericCoordinate(location.longitude), category: location.category || '', placeType: location.place_type || '', photoProvider: location.photo_provider || '', photoAuthor: location.photo_author || '', photoAuthorUrl: location.photo_author_url || '', photoSourceUrl: location.photo_source_url || '' })) : [{ id: crypto.randomUUID(), name: '', photoUrl: '', provider: '', providerPlaceId: '', formattedAddress: '', latitude: null, longitude: null, category: '', placeType: '' }],
     activities: activities.length ? activities.map(activity => ({ id: activity.id || crypto.randomUUID(), time: activityTime(activity) || '09:00', text: activity.title || '', locationId: activity.place_id || '' })) : [{ id: crypto.randomUUID(), time: '09:00', text: '', locationId: '' }]
   };
   const trip = state.trips.find(item => String(item.id) === String(state.activeTripId));
