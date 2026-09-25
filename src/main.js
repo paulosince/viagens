@@ -393,6 +393,7 @@ async function recordChange({
 }) {
   if (!state.user?.id || !summary) return null;
 
+  const snapshotId = tripId ? crypto.randomUUID() : null;
   const entry = {
     id: crypto.randomUUID(),
     user_id: state.user.id,
@@ -403,13 +404,15 @@ async function recordChange({
     summary,
     before_state: beforeState,
     after_state: afterState,
+    snapshot_id: snapshotId,
     created_at: new Date().toISOString()
   };
 
   await offlineStore.saveChangeLog(entry);
   await offlineStore.enqueueMutation({
-    type: 'change-log',
+    type: 'record-change',
     tripId: tripId || null,
+    snapshotId,
     entry
   });
 
@@ -2514,6 +2517,20 @@ function activityForRemote(activity, orderedSchema, day = null) {
 async function syncMutation(mutation) {
   const client = await trySupabase();
   if (!client) throw new Error('Backend indisponível.');
+
+  if (mutation.type === 'record-change') {
+    if (mutation.snapshotId && mutation.tripId) {
+      const snapshot = await client.rpc('capture_trip_snapshot', {
+        p_snapshot_id: mutation.snapshotId,
+        p_trip_id: mutation.tripId,
+        p_label: mutation.entry?.summary || null
+      });
+      if (snapshot.error) throw snapshot.error;
+    }
+    const saved = await client.from('change_log').upsert(mutation.entry);
+    if (saved.error) throw saved.error;
+    return;
+  }
 
   if (mutation.type === 'change-log') {
     const saved = await client.from('change_log').upsert(mutation.entry);
