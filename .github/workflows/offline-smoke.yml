@@ -8,12 +8,14 @@ on:
       - 'style.css'
       - 'sw.js'
       - 'src/**'
+      - 'supabase/migrations/**'
   pull_request:
     paths:
       - 'index.html'
       - 'style.css'
       - 'sw.js'
       - 'src/**'
+      - 'supabase/migrations/**'
   workflow_dispatch:
 
 jobs:
