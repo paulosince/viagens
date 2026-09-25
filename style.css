@@ -1873,6 +1873,53 @@ body[data-place-search="open"] .place-search-sheet { visibility: visible; transf
   font-size: 11px;
   font-weight: 600;
 }
+.change-log-message {
+  min-height: 18px;
+  margin-top: 8px !important;
+  color: var(--secondary);
+  font-size: 12px !important;
+  font-weight: 600;
+}
+.change-log-snapshot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 9px;
+}
+.change-log-snapshot-id,
+.change-log-restore {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 750;
+}
+.change-log-snapshot-id {
+  max-width: 170px;
+  overflow: hidden;
+  color: #6e6e73;
+  background: rgba(118,118,128,.1);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.change-log-restore {
+  color: var(--ios-blue);
+  background: rgba(0,122,255,.09);
+}
+.change-log-restore:active:not(:disabled),
+.change-log-snapshot-id:active {
+  transform: scale(.96);
+}
+.change-log-restore:disabled {
+  opacity: .4;
+}
+.change-log-marker[data-action="restore"],
+.change-log-marker[data-action="checkpoint"] {
+  background: #ff9f0a;
+}
 .change-log-empty {
   width: min(100%, 660px);
   margin: 28px auto;
