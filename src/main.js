@@ -127,13 +127,18 @@ function setActiveSheet(name = 'none') {
 
 async function refreshSyncStatus() {
   if (!dom.syncStatus || !state.user) return;
-  const pending = (await offlineStore.listOutbox().catch(() => [])).length;
+  const [pending, snapshotAt] = await Promise.all([
+    offlineStore.listOutbox().then(items => items.length).catch(() => 0),
+    offlineStore.getMeta(`complete_snapshot:${state.user.id}`).catch(() => null)
+  ]);
 
   if (!navigator.onLine) {
     dom.syncStatus.dataset.kind = 'offline';
-    dom.syncStatus.textContent = pending
-      ? `Salvo neste iPhone · ${pending} ${pending === 1 ? 'alteração pendente' : 'alterações pendentes'}`
-      : 'Modo offline · cópia local';
+    if (pending) {
+      dom.syncStatus.textContent = `Salvo neste iPhone · ${pending} ${pending === 1 ? 'alteração pendente' : 'alterações pendentes'}`;
+    } else {
+      dom.syncStatus.textContent = snapshotAt ? 'Modo offline · roteiro disponível' : 'Modo offline · cópia incompleta';
+    }
     return;
   }
 
@@ -143,8 +148,14 @@ async function refreshSyncStatus() {
     return;
   }
 
+  if (!snapshotAt) {
+    dom.syncStatus.dataset.kind = 'pending';
+    dom.syncStatus.textContent = 'Cópia offline ainda não concluída';
+    return;
+  }
+
   dom.syncStatus.dataset.kind = 'synced';
-  dom.syncStatus.textContent = 'Sincronizado';
+  dom.syncStatus.textContent = 'Sincronizado · disponível offline';
 }
 
 function setLoading(button, loading) {
