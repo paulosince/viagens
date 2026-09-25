@@ -68,7 +68,11 @@ const state = {
   agendaSaveStates: new Map(),
   agendaSaveTimers: new Map(),
   agendaSaveQueues: new Map(),
-  agendaSaveVersions: new Map()
+  agendaSaveVersions: new Map(),
+  daySaveStates: new Map(),
+  daySaveTimers: new Map(),
+  daySaveQueues: new Map(),
+  daySaveVersions: new Map()
 };
 
 const dom = {
@@ -77,7 +81,7 @@ const dom = {
   home: document.querySelector('#user_home'), profileButton: document.querySelector('#profile_button'), headerProfileImage: document.querySelector('#header_profile_image'), headerProfileFallback: document.querySelector('#header_profile_fallback'),
   editTripsButton: document.querySelector('#edit_trips_button'), newTripButton: document.querySelector('#new_trip_button'), emptyNewTripButton: document.querySelector('#empty_new_trip_button'), sessionEmail: document.querySelector('#session_email'), syncStatus: document.querySelector('#sync_status'), tripHeading: document.querySelector('#trip_heading'), yearButton: document.querySelector('#year_selector_button'), currentYear: document.querySelector('#current_year'), yearMenu: document.querySelector('#year_menu'), yearList: document.querySelector('#year_list'),
   tripList: document.querySelector('#trip_list'), homeEmpty: document.querySelector('#home_empty'), scrim: document.querySelector('#sheet_scrim'), tripEditFooter: document.querySelector('#trip_edit_footer'), deleteSelectedTrips: document.querySelector('#delete_selected_trips'), tripPage: document.querySelector('#trip_page'), closeTripPage: document.querySelector('#close_trip_page'), editTripButton: document.querySelector('#edit_trip_button'), tripPageHero: document.querySelector('#trip_page_hero'), tripPageTitle: document.querySelector('#trip_page_title'), tripPageDates: document.querySelector('#trip_page_dates'), tripPagePassengers: document.querySelector('#trip_page_passengers'), tripPagePassengerCount: document.querySelector('#trip_page_passenger_count'), tripDayList: document.querySelector('#trip_day_list'), tripDayMessage: document.querySelector('#trip_day_message'),
-  dayPage: document.querySelector('#day_page'), closeDayPage: document.querySelector('#close_day_page'), editDayButton: document.querySelector('#edit_day_button'), dayPageHero: document.querySelector('#day_page_hero'), dayPageBadge: document.querySelector('#day_page_badge'), dayPageTitle: document.querySelector('#day_page_title'), dayPageDate: document.querySelector('#day_page_date'), dayPageAgenda: document.querySelector('#day_page_agenda'), dayPageEmpty: document.querySelector('#day_page_empty'), dayPageMap: document.querySelector('#day_page_map'), dayPageDirections: document.querySelector('#day_page_directions'),
+  dayPage: document.querySelector('#day_page'), closeDayPage: document.querySelector('#close_day_page'), editDayButton: document.querySelector('#edit_day_button'), dayPageHero: document.querySelector('#day_page_hero'), dayPageBadge: document.querySelector('#day_page_badge'), dayPageTitle: document.querySelector('#day_page_title'), dayPageDate: document.querySelector('#day_page_date'), dayPageSaveStatus: document.querySelector('#day_page_save_status'), dayPagePhotoInput: document.querySelector('#day_page_photo_input'), dayPageCamera: document.querySelector('#day_page_camera'), dayPageAgenda: document.querySelector('#day_page_agenda'), dayPageEmpty: document.querySelector('#day_page_empty'), dayPageMap: document.querySelector('#day_page_map'), dayPageDirections: document.querySelector('#day_page_directions'),
   newTripSheet: document.querySelector('#home_new_trip'), newTripForm: document.querySelector('#new_trip_form'), newTripTitle: document.querySelector('#new-trip-title'), closeNewTrip: document.querySelector('#close_new_trip'), saveNewTrip: document.querySelector('#save_new_trip'), newTripMessage: document.querySelector('#new_trip_message'), coverInput: document.querySelector('#cover-image'), coverPreview: document.querySelector('#cover_preview_image'), tripColorValue: document.querySelector('#trip-color-value'), tripColorPalette: document.querySelector('#trip_color_palette'), tripColorCustom: document.querySelector('#trip-color-custom'), newTripPassengerList: document.querySelector('#new_trip_passenger_list'), addTripPassenger: document.querySelector('#add_trip_passenger'),
   dayEditSheet: document.querySelector('#day_edit_sheet'), daySheetScrim: document.querySelector('#day_sheet_scrim'), dayEditForm: document.querySelector('#day_edit_form'), closeDayEdit: document.querySelector('#close_day_edit'), saveDayEdit: document.querySelector('#save_day_edit'), dayEditTitle: document.querySelector('#day_edit_title'), dayEditDate: document.querySelector('#day_edit_date'), dayTitleInput: document.querySelector('#day-title-input'), dayLocationsEditor: document.querySelector('#day_locations_editor'), addDayLocation: document.querySelector('#add_day_location'), dayAgendaEditor: document.querySelector('#day_agenda_editor'), addDayActivity: document.querySelector('#add_day_activity'), dayNotesInput: document.querySelector('#day-notes-input'), dayEditMessage: document.querySelector('#day_edit_message'),
   placeSearchSheet: document.querySelector('#place_search_sheet'), placeSearchScrim: document.querySelector('#place_search_scrim'), placeSearchForm: document.querySelector('#place_search_form'), closePlaceSearch: document.querySelector('#close_place_search'), confirmPlaceSearch: document.querySelector('#confirm_place_search'), placeSearchInput: document.querySelector('#place_search_input'), runPlaceSearch: document.querySelector('#run_place_search'), placeSearchMessage: document.querySelector('#place_search_message'), placeSearchResults: document.querySelector('#place_search_results'), placePhotoSection: document.querySelector('#place_photo_section'), placePhotoMessage: document.querySelector('#place_photo_message'), placePhotoResults: document.querySelector('#place_photo_results'),
@@ -318,7 +322,7 @@ function dayTitle(day, activities = [], locations = []) {
 }
 
 function dayPhoto(day, activities = [], locations = []) {
-  return locations[0]?.photo_url || day.photo_url || activities.find(activity => activity.photo_url)?.photo_url || '';
+  return day.photo_url || locations[0]?.photo_url || activities.find(activity => activity.photo_url)?.photo_url || '';
 }
 
 function activityTime(activity) {
@@ -1040,6 +1044,7 @@ function openDayPage(dayId, { pushHistory = true } = {}) {
   dom.dayPageHero.style.backgroundImage = photo ? `url("${String(photo).replaceAll('"', '%22')}")` : '';
   dom.dayPageBadge.textContent = `dia ${day.day_number}`;
   dom.dayPageTitle.textContent = dayTitle(day, activities, locations);
+  dom.dayPageSaveStatus.dataset.state = state.daySaveStates.get(String(day.id)) || 'idle';
   dom.dayPageDate.textContent = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' }).format(new Date(`${day.date}T12:00:00`));
   renderDayPageAgenda(day, activities, locations);
   renderDayPageMap(locations, activities);
@@ -1049,6 +1054,179 @@ function openDayPage(dayId, { pushHistory = true } = {}) {
   document.body.dataset.dayPage = 'open';
 }
 
+
+
+function setDaySaveState(dayId, status) {
+  const key = String(dayId);
+  const currentTimer = state.daySaveTimers.get(key);
+  if (currentTimer) {
+    clearTimeout(currentTimer);
+    state.daySaveTimers.delete(key);
+  }
+
+  state.daySaveStates.set(key, status);
+  if (state.activeDayId === key && dom.dayPageSaveStatus) {
+    dom.dayPageSaveStatus.dataset.state = status;
+    dom.dayPageSaveStatus.setAttribute(
+      'aria-label',
+      status === 'saving' ? 'Salvando alteração'
+      : status === 'saved' ? 'Alteração salva'
+      : status === 'error' ? 'Não foi possível salvar'
+      : ''
+    );
+  }
+
+  if (status === 'saved') {
+    const timer = setTimeout(() => {
+      if (state.daySaveStates.get(key) !== 'saved') return;
+      state.daySaveStates.set(key, 'idle');
+      if (state.activeDayId === key && dom.dayPageSaveStatus) dom.dayPageSaveStatus.dataset.state = 'idle';
+      state.daySaveTimers.delete(key);
+    }, 1000);
+    state.daySaveTimers.set(key, timer);
+  }
+}
+
+function queueDaySave(dayId, task) {
+  const key = String(dayId);
+  const previous = state.daySaveQueues.get(key) || Promise.resolve();
+  const next = previous
+    .catch(() => {})
+    .then(task)
+    .finally(() => {
+      if (state.daySaveQueues.get(key) === next) state.daySaveQueues.delete(key);
+    });
+  state.daySaveQueues.set(key, next);
+  return next;
+}
+
+async function persistDayHeroChange(day, dayPatch, { rerender = true } = {}) {
+  const dayId = String(day.id);
+  const saveVersion = (state.daySaveVersions.get(dayId) || 0) + 1;
+  state.daySaveVersions.set(dayId, saveVersion);
+  setDaySaveState(dayId, 'saving');
+
+  const activities = (state.dayActivities.get(dayId) || []).map(activity => ({ ...activity }));
+  const locations = (state.dayLocations.get(dayId) || []).map(location => ({ ...location }));
+  const patch = { status: day.status || 'planned', ...dayPatch };
+  const updatedDay = { ...day, ...patch };
+
+  return queueDaySave(dayId, async () => {
+    try {
+      setDaySaveState(dayId, 'saving');
+      await offlineStore.saveDayBundle(updatedDay, activities, locations);
+      await offlineStore.enqueueMutation({
+        type: 'save-day',
+        tripId: String(day.trip_id || state.activeTripId),
+        dayId: day.id,
+        dayPatch: patch,
+        locations,
+        activities,
+        removedLocationIds: [],
+        removedActivityIds: []
+      });
+
+      updateInlineDayState(updatedDay, activities, locations);
+      await refreshSyncStatus();
+
+      if (state.daySaveVersions.get(dayId) === saveVersion) setDaySaveState(dayId, 'saved');
+
+      if (rerender && state.activeDayId === dayId) {
+        openDayPage(day.id, { pushHistory: false });
+      } else {
+        renderTripDays(state.tripDays, state.dayActivities, state.dayLocations);
+      }
+
+      flushOutbox().catch(error => console.warn('Alteração do dia aguardando sincronização', error));
+    } catch (error) {
+      if (state.daySaveVersions.get(dayId) === saveVersion) setDaySaveState(dayId, 'error');
+      throw error;
+    }
+  });
+}
+
+function beginInlineDayTitleEdit() {
+  const day = state.tripDays.find(item => String(item.id) === String(state.activeDayId));
+  if (!day) return;
+
+  const editor = document.createElement('input');
+  editor.type = 'text';
+  editor.className = 'day-inline-heading-input';
+  editor.value = day.title || dayTitle(
+    day,
+    state.dayActivities.get(String(day.id)) || [],
+    state.dayLocations.get(String(day.id)) || []
+  );
+
+  let debounceTimer = null;
+  let lastQueuedValue = day.title || '';
+  let closed = false;
+
+  const saveValue = async (value, { rerender = false } = {}) => {
+    if (closed && !rerender) return;
+    const normalized = value.trim();
+    if (normalized === lastQueuedValue && !rerender) return;
+    lastQueuedValue = normalized;
+    const currentDay = state.tripDays.find(item => String(item.id) === String(day.id)) || day;
+    await persistDayHeroChange(currentDay, { title: normalized || null }, { rerender });
+  };
+
+  const schedule = () => {
+    setDaySaveState(day.id, 'saving');
+    clearTimeout(debounceTimer);
+    const value = editor.value;
+    debounceTimer = setTimeout(() => {
+      saveValue(value).catch(error => console.warn('Autosave do nome do dia falhou', error));
+    }, 550);
+  };
+
+  const finish = async () => {
+    if (closed) return;
+    closed = true;
+    clearTimeout(debounceTimer);
+    try {
+      await saveValue(editor.value, { rerender: true });
+    } catch (error) {
+      console.warn('Autosave final do nome do dia falhou', error);
+      openDayPage(day.id, { pushHistory: false });
+    }
+  };
+
+  editor.addEventListener('input', schedule);
+  editor.addEventListener('blur', finish, { once: true });
+  editor.addEventListener('keydown', event => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      editor.blur();
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      clearTimeout(debounceTimer);
+      closed = true;
+      openDayPage(day.id, { pushHistory: false });
+    }
+  });
+
+  dom.dayPageTitle.replaceWith(editor);
+  dom.dayPageTitle = editor;
+  editor.focus({ preventScroll: true });
+  editor.setSelectionRange(editor.value.length, editor.value.length);
+}
+
+async function saveDayHeroPhoto(file) {
+  const day = state.tripDays.find(item => String(item.id) === String(state.activeDayId));
+  if (!day || !file) return;
+
+  setDaySaveState(day.id, 'saving');
+  try {
+    const photoUrl = await compressImage(file);
+    const currentDay = state.tripDays.find(item => String(item.id) === String(day.id)) || day;
+    await persistDayHeroChange(currentDay, { photo_url: photoUrl });
+  } catch (error) {
+    setDaySaveState(day.id, 'error');
+    throw error;
+  }
+}
 
 function agendaSaveIndicator(activityId) {
   return dom.dayPageAgenda.querySelector('[data-activity-id="' + CSS.escape(String(activityId)) + '"] .day-inline-save-status');
