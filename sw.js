@@ -8,7 +8,9 @@ const APP_SHELL = [
   './src/offline-store.js',
   './manifest.webmanifest',
   './assets/app-icon.svg',
-  './assets/cintia.png'
+  './assets/cintia.png',
+  './assets/paulo.jpeg',
+  './assets/splash-plane.png'
 ];
 
 self.addEventListener('install', event => {
@@ -34,7 +36,27 @@ self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
   const isSupabaseClient = url.href === SUPABASE_CLIENT;
-  if (url.origin !== self.location.origin && !isSupabaseClient) return;
+  const isImage = event.request.destination === 'image';
+
+  if (url.origin !== self.location.origin && !isSupabaseClient && !isImage) return;
+
+  if (isImage && url.origin !== self.location.origin) {
+    event.respondWith(
+      caches.match(event.request).then(cached => {
+        const refreshed = fetch(event.request)
+          .then(response => {
+            if (response.ok || response.type === 'opaque') {
+              caches.open(CACHE_NAME).then(cache => cache.put(event.request, response.clone()));
+            }
+            return response;
+          })
+          .catch(() => cached);
+        return cached || refreshed;
+      })
+    );
+    return;
+  }
+
   if (event.request.mode !== 'navigate') {
     event.respondWith(
       caches.match(event.request).then(cached => {
