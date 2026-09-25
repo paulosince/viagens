@@ -4,6 +4,7 @@ const SUPABASE_URL = 'https://siabldasqinpfmxslwji.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_UgbBIOq1TnInuPRrQpAFag_JLIzYuFf';
 let supabase = null;
 let supabaseLoad = null;
+let leafletLoad = null;
 
 async function ensureSupabase() {
   if (supabase) return supabase;
@@ -60,7 +61,10 @@ const state = {
   tripDataLoads: new Map(),
   activeTripDataVersion: 0,
   dayEditor: null,
-  placeSearch: null
+  placeSearch: null,
+  dayMap: null,
+  dayMapRenderToken: 0,
+  enrichingDays: new Set()
 };
 
 const dom = {
@@ -282,6 +286,75 @@ function numericCoordinate(value) {
   if (value === null || value === undefined || value === '') return null;
   const coordinate = Number(value);
   return Number.isFinite(coordinate) ? coordinate : null;
+}
+
+function primaryActivityPlace(activity) {
+  const explicit = String(activity?.place_name || '').trim();
+  if (explicit) return explicit;
+  const title = String(activity?.title || '').trim();
+  if (!title) return '';
+  return title
+    .split(/\s+(?:e|&|\+)\s+/i)[0]
+    .replace(/\s+[—–-]\s+.*$/, '')
+    .trim();
+}
+
+function activityLooksGeocodable(activity) {
+  const value = primaryActivityPlace(activity).toLocaleLowerCase('pt-BR');
+  if (!value || value.length < 3) return false;
+  return !/^(almo[cç]o|jantar|caf[eé]|lanche|check[- ]?in|check[- ]?out|deslocamento|transfer|voo|trem|metr[oô]|[oô]nibus|chegada|sa[ií]da)\b/.test(value);
+}
+
+async function loadLeaflet() {
+  if (window.L?.map) return window.L;
+  if (leafletLoad) return leafletLoad;
+
+  leafletLoad = new Promise((resolve, reject) => {
+    let stylesheet = document.querySelector('#leaflet_styles');
+    if (!stylesheet) {
+      stylesheet = document.createElement('link');
+      stylesheet.id = 'leaflet_styles';
+      stylesheet.rel = 'stylesheet';
+      stylesheet.href = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css';
+      document.head.append(stylesheet);
+    }
+
+    const existing = document.querySelector('#leaflet_script');
+    if (existing) {
+      existing.addEventListener('load', () => resolve(window.L), { once: true });
+      existing.addEventListener('error', () => reject(new Error('Mapa indisponível.')), { once: true });
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.id = 'leaflet_script';
+    script.src = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js';
+    script.onload = () => window.L?.map ? resolve(window.L) : reject(new Error('Mapa indisponível.'));
+    script.onerror = () => reject(new Error('Mapa indisponível.'));
+    document.head.append(script);
+  }).catch(error => {
+    leafletLoad = null;
+    throw error;
+  });
+
+  return leafletLoad;
+}
+
+async function firstUnsplashPhoto(query) {
+  if (!query || !navigator.onLine) return null;
+  const client = await trySupabase();
+  if (!client) return null;
+  try {
+    const { data, error } = await client.functions.invoke('unsplash-photos', { body: { action: 'search', query } });
+    if (error || data?.quotaExceeded) return null;
+    const photo = data?.photos?.[0] || null;
+    if (photo?.downloadLocation) {
+      client.functions.invoke('unsplash-photos', { body: { action: 'track', downloadLocation: photo.downloadLocation } }).catch(() => {});
+    }
+    return photo;
+  } catch {
+    return null;
+  }
 }
 
 function renderTripDays(days, activitiesByDay = new Map(), locationsByDay = new Map()) {
