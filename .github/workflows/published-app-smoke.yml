@@ -1,0 +1,33 @@
+name: Published app smoke test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'sw.js'
+      - 'src/**'
+      - '.github/workflows/published-app-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  published:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Wait for GitHub Pages and verify build
+        shell: bash
+        run: |
+          url='https://paulosince.github.io/viagens/'
+          for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
+            html="$(curl --location --silent --show-error --max-time 20 "$url" || true)"
+            if grep -q 'src/main.js?v=20260925-1' <<<"$html" &&
+               grep -q 'id="sync_status"' <<<"$html"; then
+              echo "Published app is current on attempt $attempt."
+              exit 0
+            fi
+            echo "Attempt $attempt: current build not visible yet."
+            sleep 5
+          done
+          echo "Expected offline-first build is not being served at $url"
+          exit 1
