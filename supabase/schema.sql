@@ -168,6 +168,24 @@ create table if not exists public.trip_members (
   primary key (trip_id, user_id)
 );
 
+create table if not exists public.state_snapshots (
+  id uuid primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  trip_id uuid not null references public.trips(id) on delete cascade,
+  label text,
+  state jsonb not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists state_snapshots_user_created_idx
+  on public.state_snapshots (user_id, created_at desc);
+create index if not exists state_snapshots_trip_created_idx
+  on public.state_snapshots (trip_id, created_at desc);
+
+alter table public.state_snapshots enable row level security;
+drop policy if exists "snapshots read own" on public.state_snapshots;
+create policy "snapshots read own" on public.state_snapshots for select using (user_id = auth.uid());
+
 create table if not exists public.change_log (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -178,6 +196,7 @@ create table if not exists public.change_log (
   summary text not null,
   before_state jsonb,
   after_state jsonb,
+  snapshot_id uuid references public.state_snapshots(id) on delete set null,
   created_at timestamptz not null default now()
 );
 
