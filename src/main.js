@@ -639,6 +639,95 @@ async function enrichDayPage(day, activities, locations) {
   }
 }
 
+
+async function persistDayOrder(orderIds) {
+  const trip = state.trips.find(item => String(item.id) === String(state.activeTripId));
+  if (!trip || !orderIds.length) return;
+
+  const positionById = new Map(orderIds.map((id, position) => [String(id), position]));
+  const updatedDays = state.tripDays.map(day => (
+    positionById.has(String(day.id))
+      ? { ...day, position: positionById.get(String(day.id)) }
+      : day
+  )).sort((a, b) => dayPosition(a) - dayPosition(b));
+
+  state.tripDays = updatedDays;
+
+  const allActivities = [...state.dayActivities.values()].flat();
+  const allLocations = [...state.dayLocations.values()].flat();
+  await offlineStore.replaceTripData(String(trip.id), updatedDays, allActivities, allLocations);
+  await offlineStore.enqueueMutation({
+    type: 'reorder-days',
+    tripId: String(trip.id),
+    order: orderIds.map((id, position) => ({ id, position }))
+  });
+
+  const data = {
+    days: updatedDays,
+    activitiesByDay: state.dayActivities,
+    locationsByDay: state.dayLocations,
+    loadedAt: Date.now(),
+    version: Date.now()
+  };
+  state.tripDataCache.set(String(trip.id), data);
+  applyTripData(data);
+  await refreshSyncStatus();
+
+  flushOutbox().catch(error => console.warn('Reordenação aguardando sincronização', error));
+}
+
+function startDayDrag(event, card) {
+  if (event.button !== undefined && event.button !== 0) return;
+  event.preventDefault();
+  const pointerId = event.pointerId;
+  const handle = event.currentTarget;
+  const list = dom.tripDayList;
+  card.dataset.dragging = 'true';
+  document.body.dataset.dayDragging = 'true';
+  handle.setPointerCapture?.(pointerId);
+
+  const move = moveEvent => {
+    const target = document.elementFromPoint(moveEvent.clientX, moveEvent.clientY)?.closest('.trip-day-card');
+    if (!target || target === card || target.parentElement !== list) return;
+    const rect = target.getBoundingClientRect();
+    const before = moveEvent.clientY < rect.top + rect.height / 2;
+    list.insertBefore(card, before ? target : target.nextSibling);
+  };
+
+  const finish = async () => {
+    handle.removeEventListener('pointermove', move);
+    handle.removeEventListener('pointerup', finish);
+    handle.removeEventListener('pointercancel', finish);
+    handle.releasePointerCapture?.(pointerId);
+    card.dataset.dragging = 'false';
+    document.body.dataset.dayDragging = 'false';
+
+    const orderIds = [...list.querySelectorAll('.trip-day-card[data-day-id]')]
+      .map(item => item.dataset.dayId)
+      .filter(Boolean);
+
+    try {
+      await persistDayOrder(orderIds);
+    } catch (error) {
+      console.warn('Não foi possível salvar a nova ordem', error);
+      renderTripDays(state.tripDays, state.dayActivities, state.dayLocations);
+    }
+  };
+
+  handle.addEventListener('pointermove', move);
+  handle.addEventListener('pointerup', finish, { once: true });
+  handle.addEventListener('pointercancel', finish, { once: true });
+}
+
+async function recoverHiddenDay(day) {
+  const records = cloneDayRecords(day);
+  const patch = {
+    is_hidden: false,
+    status: (day.status === 'hidden' || !day.status) ? 'planned' : day.status
+  };
+  await persistInlineDayChange(day, records.activities, records.locations, patch);
+}
+
 function renderTripDays(days, activitiesByDay = new Map(), locationsByDay = new Map()) {
   dom.tripDayList.replaceChildren();
   const periodLabels = { morning: 'manhã', afternoon: 'tarde', night: 'noite' };
@@ -2029,11 +2118,31 @@ function activityForRemote(activity, orderedSchema, day = null) {
 }
 
 async function syncMutation(mutation) {
-  if (mutation.type !== 'save-day') return;
   const client = await trySupabase();
   if (!client) throw new Error('Backend indisponível.');
 
   const orderedSchema = await supportsOrderedDaySchema(client);
+
+  if (mutation.type === 'reorder-days') {
+    const field = orderedSchema ? 'position' : 'day_number';
+    const order = mutation.order || [];
+    const temporaryBase = 100000;
+
+    for (const [index, item] of order.entries()) {
+      const temporaryValue = temporaryBase + index;
+      const moved = await client.from('trip_days').update({ [field]: temporaryValue }).eq('id', item.id).eq('trip_id', mutation.tripId);
+      if (moved.error) throw moved.error;
+    }
+
+    for (const item of order) {
+      const finalValue = orderedSchema ? item.position : item.position + 1;
+      const moved = await client.from('trip_days').update({ [field]: finalValue }).eq('id', item.id).eq('trip_id', mutation.tripId);
+      if (moved.error) throw moved.error;
+    }
+    return;
+  }
+
+  if (mutation.type !== 'save-day') return;
   const savedDay = await client
     .from('trip_days')
     .update(dayPatchForRemote(mutation.dayPatch || {}, orderedSchema))
