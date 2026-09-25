@@ -6,6 +6,7 @@ let supabase = null;
 let supabaseLoad = null;
 let leafletLoad = null;
 let orderedDaySchemaSupport = null;
+let outboxFlushPromise = null;
 
 async function ensureSupabase() {
   if (supabase) return supabase;
@@ -2572,27 +2573,39 @@ async function syncMutation(mutation) {
 }
 
 async function flushOutbox() {
-  if (!navigator.onLine || !state.user) {
-    await refreshSyncStatus();
-    return false;
-  }
-  if (!await trySupabase()) {
-    await refreshSyncStatus();
-    return false;
-  }
-  const mutations = await offlineStore.listOutbox();
-  for (const mutation of mutations) {
-    try {
-      await syncMutation(mutation);
-      await offlineStore.removeMutation(mutation.id);
-    } catch (error) {
-      console.warn('Sincronização pendente', error);
+  if (outboxFlushPromise) return outboxFlushPromise;
+
+  outboxFlushPromise = (async () => {
+    if (!navigator.onLine || !state.user) {
       await refreshSyncStatus();
       return false;
     }
+    if (!await trySupabase()) {
+      await refreshSyncStatus();
+      return false;
+    }
+
+    const mutations = await offlineStore.listOutbox();
+    for (const mutation of mutations) {
+      try {
+        await syncMutation(mutation);
+        await offlineStore.removeMutation(mutation.id);
+      } catch (error) {
+        console.warn('Sincronização pendente', error);
+        await refreshSyncStatus();
+        return false;
+      }
+    }
+
+    await refreshSyncStatus();
+    return true;
+  })();
+
+  try {
+    return await outboxFlushPromise;
+  } finally {
+    outboxFlushPromise = null;
   }
-  await refreshSyncStatus();
-  return true;
 }
 
 function applyLocalDaySave(day, activities, locations) {
