@@ -88,7 +88,7 @@ const dom = {
   newTripSheet: document.querySelector('#home_new_trip'), newTripForm: document.querySelector('#new_trip_form'), newTripTitle: document.querySelector('#new-trip-title'), closeNewTrip: document.querySelector('#close_new_trip'), saveNewTrip: document.querySelector('#save_new_trip'), newTripMessage: document.querySelector('#new_trip_message'), coverInput: document.querySelector('#cover-image'), coverPreview: document.querySelector('#cover_preview_image'), tripColorValue: document.querySelector('#trip-color-value'), tripColorPalette: document.querySelector('#trip_color_palette'), tripColorCustom: document.querySelector('#trip-color-custom'), newTripPassengerList: document.querySelector('#new_trip_passenger_list'), addTripPassenger: document.querySelector('#add_trip_passenger'),
   dayEditSheet: document.querySelector('#day_edit_sheet'), daySheetScrim: document.querySelector('#day_sheet_scrim'), dayEditForm: document.querySelector('#day_edit_form'), closeDayEdit: document.querySelector('#close_day_edit'), saveDayEdit: document.querySelector('#save_day_edit'), dayEditTitle: document.querySelector('#day_edit_title'), dayEditDate: document.querySelector('#day_edit_date'), dayTitleInput: document.querySelector('#day-title-input'), dayLocationsEditor: document.querySelector('#day_locations_editor'), addDayLocation: document.querySelector('#add_day_location'), dayAgendaEditor: document.querySelector('#day_agenda_editor'), addDayActivity: document.querySelector('#add_day_activity'), dayNotesInput: document.querySelector('#day-notes-input'), dayEditMessage: document.querySelector('#day_edit_message'),
   placeSearchSheet: document.querySelector('#place_search_sheet'), placeSearchScrim: document.querySelector('#place_search_scrim'), placeSearchForm: document.querySelector('#place_search_form'), closePlaceSearch: document.querySelector('#close_place_search'), confirmPlaceSearch: document.querySelector('#confirm_place_search'), placeSearchInput: document.querySelector('#place_search_input'), runPlaceSearch: document.querySelector('#run_place_search'), placeSearchMessage: document.querySelector('#place_search_message'), placeSearchResults: document.querySelector('#place_search_results'), placePhotoSection: document.querySelector('#place_photo_section'), placePhotoMessage: document.querySelector('#place_photo_message'), placePhotoResults: document.querySelector('#place_photo_results'),
-  profileSheet: document.querySelector('#profile-sheet'), profileForm: document.querySelector('#profile_form'), closeProfile: document.querySelector('#close_profile'), saveProfile: document.querySelector('#save_profile'), profileMessage: document.querySelector('#profile_message'), profileEditorImage: document.querySelector('#profile_editor_image'), profilePhotoInput: document.querySelector('#profile-photo'), profileDisplayName: document.querySelector('#profile_display_name'), profileEmail: document.querySelector('#profile_email'), profileNameInput: document.querySelector('#profile-name'), birthDateInput: document.querySelector('#birth-date'), profileAge: document.querySelector('#profile_age'), profileCreatedAt: document.querySelector('#profile_created_at'), changeLogButton: document.querySelector('#change_log_button'), changeLogSheet: document.querySelector('#change_log_sheet'), closeChangeLog: document.querySelector('#close_change_log'), changeLogList: document.querySelector('#change_log_list'), changeLogEmpty: document.querySelector('#change_log_empty'), logoutButton: document.querySelector('#logout_button'), deleteAccountButton: document.querySelector('#delete_account_button')
+  profileSheet: document.querySelector('#profile-sheet'), profileForm: document.querySelector('#profile_form'), closeProfile: document.querySelector('#close_profile'), saveProfile: document.querySelector('#save_profile'), profileMessage: document.querySelector('#profile_message'), profileEditorImage: document.querySelector('#profile_editor_image'), profilePhotoInput: document.querySelector('#profile-photo'), profileDisplayName: document.querySelector('#profile_display_name'), profileEmail: document.querySelector('#profile_email'), profileNameInput: document.querySelector('#profile-name'), birthDateInput: document.querySelector('#birth-date'), profileAge: document.querySelector('#profile_age'), profileCreatedAt: document.querySelector('#profile_created_at'), changeLogButton: document.querySelector('#change_log_button'), changeLogSheet: document.querySelector('#change_log_sheet'), closeChangeLog: document.querySelector('#close_change_log'), changeLogList: document.querySelector('#change_log_list'), changeLogEmpty: document.querySelector('#change_log_empty'), changeLogMessage: document.querySelector('#change_log_message'), logoutButton: document.querySelector('#logout_button'), deleteAccountButton: document.querySelector('#delete_account_button')
 };
 
 // As folhas são camadas globais. Fora da Home, não ficam presas ao contexto
@@ -340,11 +340,91 @@ function renderChangeLog(entries = state.changeLog) {
     meta.textContent = (entry.trip_id ? tripNameForLog(entry.trip_id) + ' · ' : '') + when;
 
     copy.append(summary, meta);
+
+    if (entry.snapshot_id) {
+      const snapshotRow = document.createElement('div');
+      snapshotRow.className = 'change-log-snapshot';
+
+      const snapshotId = document.createElement('button');
+      snapshotId.type = 'button';
+      snapshotId.className = 'change-log-snapshot-id';
+      snapshotId.textContent = 'Snapshot ' + String(entry.snapshot_id).slice(0, 8);
+      snapshotId.title = String(entry.snapshot_id);
+      snapshotId.setAttribute('aria-label', 'Copiar ID completo do snapshot ' + String(entry.snapshot_id));
+      snapshotId.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(String(entry.snapshot_id));
+          dom.changeLogMessage.textContent = 'ID do snapshot copiado.';
+        } catch {
+          dom.changeLogMessage.textContent = String(entry.snapshot_id);
+        }
+      });
+
+      const restore = document.createElement('button');
+      restore.type = 'button';
+      restore.className = 'change-log-restore';
+      restore.textContent = 'Restaurar';
+      restore.setAttribute('aria-label', 'Restaurar a viagem para este momento');
+      restore.addEventListener('click', () => restoreSnapshot(entry.snapshot_id, restore));
+
+      snapshotRow.append(snapshotId, restore);
+      copy.append(snapshotRow);
+    }
+
     item.append(marker, copy);
     dom.changeLogList.append(item);
   }
 
   dom.changeLogEmpty.hidden = records.length > 0;
+}
+
+async function restoreSnapshot(snapshotId, button = null) {
+  if (!snapshotId) return;
+
+  dom.changeLogMessage.textContent = '';
+
+  if (!navigator.onLine) {
+    dom.changeLogMessage.textContent = 'Restaurar um snapshot requer conexão.';
+    return;
+  }
+
+  if (!window.confirm('Restaurar toda a viagem para este momento? O estado atual será salvo antes como um snapshot de segurança.')) {
+    return;
+  }
+
+  if (button) button.disabled = true;
+  dom.changeLogMessage.textContent = 'Sincronizando alterações pendentes…';
+
+  try {
+    const synced = await flushOutbox();
+    if (!synced) throw new Error('Há alterações pendentes que ainda não puderam ser sincronizadas.');
+
+    const client = await trySupabase();
+    if (!client) throw new Error('Backend indisponível.');
+
+    dom.changeLogMessage.textContent = 'Restaurando snapshot…';
+    const restored = await client.rpc('restore_trip_snapshot', {
+      p_snapshot_id: snapshotId
+    });
+    if (restored.error) throw restored.error;
+
+    const tripId = restored.data?.trip_id || state.activeTripId;
+    if (tripId) state.tripDataCache.delete(String(tripId));
+
+    await loadTrips();
+
+    if (tripId && String(state.activeTripId || '') === String(tripId)) {
+      await openTrip(tripId, { pushHistory: false, forceRefresh: true });
+    }
+
+    dom.changeLogMessage.textContent = 'Viagem restaurada. O estado anterior também foi guardado para desfazer esta restauração.';
+    await refreshChangeLog();
+  } catch (error) {
+    console.warn('Falha ao restaurar snapshot', error);
+    dom.changeLogMessage.textContent = error.message || 'Não foi possível restaurar este snapshot.';
+  } finally {
+    if (button) button.disabled = false;
+  }
 }
 
 async function refreshChangeLog() {
