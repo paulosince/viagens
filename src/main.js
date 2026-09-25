@@ -676,47 +676,24 @@ async function persistDayOrder(orderIds) {
   flushOutbox().catch(error => console.warn('Reordenação aguardando sincronização', error));
 }
 
-function startDayDrag(event, card) {
-  if (event.button !== undefined && event.button !== 0) return;
-  event.preventDefault();
-  const pointerId = event.pointerId;
-  const handle = event.currentTarget;
-  const list = dom.tripDayList;
-  card.dataset.dragging = 'true';
-  document.body.dataset.dayDragging = 'true';
-  handle.setPointerCapture?.(pointerId);
+async function moveDayByOffset(dayId, offset) {
+  const trip = state.trips.find(item => String(item.id) === String(state.activeTripId));
+  if (!trip || !offset) return;
 
-  const move = moveEvent => {
-    const target = document.elementFromPoint(moveEvent.clientX, moveEvent.clientY)?.closest('.trip-day-card');
-    if (!target || target === card || target.parentElement !== list) return;
-    const rect = target.getBoundingClientRect();
-    const before = moveEvent.clientY < rect.top + rect.height / 2;
-    list.insertBefore(card, before ? target : target.nextSibling);
-  };
+  const dayCount = tripDayCount(trip);
+  const orderedVisible = state.tripDays
+    .map(normalizeDayRecord)
+    .filter(day => !dayDeletedAt(day) && dayPosition(day) < dayCount)
+    .sort((a, b) => dayPosition(a) - dayPosition(b));
 
-  const finish = async () => {
-    handle.removeEventListener('pointermove', move);
-    handle.removeEventListener('pointerup', finish);
-    handle.removeEventListener('pointercancel', finish);
-    if (handle.hasPointerCapture?.(pointerId)) handle.releasePointerCapture(pointerId);
-    card.dataset.dragging = 'false';
-    document.body.dataset.dayDragging = 'false';
+  const currentIndex = orderedVisible.findIndex(day => String(day.id) === String(dayId));
+  const targetIndex = currentIndex + offset;
+  if (currentIndex < 0 || targetIndex < 0 || targetIndex >= orderedVisible.length) return;
 
-    const orderIds = [...list.querySelectorAll('.trip-day-card[data-day-id]')]
-      .map(item => item.dataset.dayId)
-      .filter(Boolean);
+  const reordered = [...orderedVisible];
+  [reordered[currentIndex], reordered[targetIndex]] = [reordered[targetIndex], reordered[currentIndex]];
 
-    try {
-      await persistDayOrder(orderIds);
-    } catch (error) {
-      console.warn('Não foi possível salvar a nova ordem', error);
-      renderTripDays(state.tripDays, state.dayActivities, state.dayLocations);
-    }
-  };
-
-  handle.addEventListener('pointermove', move);
-  handle.addEventListener('pointerup', finish, { once: true });
-  handle.addEventListener('pointercancel', finish, { once: true });
+  await persistDayOrder(reordered.map(day => String(day.id)));
 }
 
 async function recoverHiddenDay(day) {
@@ -953,13 +930,49 @@ function renderTripDays(days, activitiesByDay = new Map(), locationsByDay = new 
 
       card.append(recovery);
     } else {
-      const dragHandle = document.createElement('button');
-      dragHandle.type = 'button';
-      dragHandle.className = 'trip-day-drag-handle';
-      dragHandle.setAttribute('aria-label', 'Reordenar dia ' + dayNumber(day));
-      dragHandle.innerHTML = '<span></span><span></span><span></span>';
-      dragHandle.addEventListener('pointerdown', event => startDayDrag(event, card));
-      card.append(dragHandle);
+      const currentIndex = visibleDays.findIndex(item => String(item.id) === String(day.id));
+      const orderControls = document.createElement('div');
+      orderControls.className = 'trip-day-order-controls';
+      orderControls.setAttribute('aria-label', 'Mover dia ' + dayNumber(day));
+
+      const moveUp = document.createElement('button');
+      moveUp.type = 'button';
+      moveUp.className = 'trip-day-order-button';
+      moveUp.textContent = '↑';
+      moveUp.setAttribute('aria-label', 'Subir dia ' + dayNumber(day) + ' uma posição');
+      moveUp.disabled = currentIndex <= 0;
+      moveUp.addEventListener('click', async event => {
+        event.stopPropagation();
+        moveUp.disabled = true;
+        moveDown.disabled = true;
+        try {
+          await moveDayByOffset(day.id, -1);
+        } catch (error) {
+          console.warn('Não foi possível subir o dia', error);
+          renderTripDays(state.tripDays, state.dayActivities, state.dayLocations);
+        }
+      });
+
+      const moveDown = document.createElement('button');
+      moveDown.type = 'button';
+      moveDown.className = 'trip-day-order-button';
+      moveDown.textContent = '↓';
+      moveDown.setAttribute('aria-label', 'Descer dia ' + dayNumber(day) + ' uma posição');
+      moveDown.disabled = currentIndex >= visibleDays.length - 1;
+      moveDown.addEventListener('click', async event => {
+        event.stopPropagation();
+        moveUp.disabled = true;
+        moveDown.disabled = true;
+        try {
+          await moveDayByOffset(day.id, 1);
+        } catch (error) {
+          console.warn('Não foi possível descer o dia', error);
+          renderTripDays(state.tripDays, state.dayActivities, state.dayLocations);
+        }
+      });
+
+      orderControls.append(moveUp, moveDown);
+      card.append(orderControls);
     }
 
     dom.tripDayList.append(card);
