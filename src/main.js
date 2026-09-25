@@ -64,7 +64,10 @@ const state = {
   placeSearch: null,
   dayMap: null,
   dayMapRenderToken: 0,
-  enrichingDays: new Set()
+  enrichingDays: new Set(),
+  agendaSaveStates: new Map(),
+  agendaSaveTimers: new Map(),
+  agendaSaveQueues: new Map()
 };
 
 const dom = {
@@ -1043,25 +1046,114 @@ function openDayPage(dayId, { pushHistory = true } = {}) {
 }
 
 
-async function persistInlineDayChange(day, activities, locations, dayPatch = {}) {
+function agendaSaveIndicator(activityId) {
+  return dom.dayPageAgenda.querySelector('[data-activity-id="' + CSS.escape(String(activityId)) + '"] .day-inline-save-status');
+}
+
+function setAgendaSaveState(activityId, status) {
+  const key = String(activityId);
+  const currentTimer = state.agendaSaveTimers.get(key);
+  if (currentTimer) {
+    clearTimeout(currentTimer);
+    state.agendaSaveTimers.delete(key);
+  }
+
+  state.agendaSaveStates.set(key, status);
+  const indicator = agendaSaveIndicator(key);
+  if (indicator) {
+    indicator.dataset.state = status;
+    indicator.setAttribute('aria-label',
+      status === 'saving' ? 'Salvando alteração'
+      : status === 'saved' ? 'Alteração salva'
+      : status === 'error' ? 'Não foi possível salvar'
+      : ''
+    );
+  }
+
+  if (status === 'saved') {
+    const timer = setTimeout(() => {
+      if (state.agendaSaveStates.get(key) !== 'saved') return;
+      state.agendaSaveStates.set(key, 'idle');
+      const liveIndicator = agendaSaveIndicator(key);
+      if (liveIndicator) liveIndicator.dataset.state = 'idle';
+      state.agendaSaveTimers.delete(key);
+    }, 1000);
+    state.agendaSaveTimers.set(key, timer);
+  }
+}
+
+function queueAgendaSave(activityId, task) {
+  const key = String(activityId);
+  const previous = state.agendaSaveQueues.get(key) || Promise.resolve();
+  const next = previous
+    .catch(() => {})
+    .then(task)
+    .finally(() => {
+      if (state.agendaSaveQueues.get(key) === next) state.agendaSaveQueues.delete(key);
+    });
+  state.agendaSaveQueues.set(key, next);
+  return next;
+}
+
+function updateInlineDayState(day, activities, locations) {
+  const dayId = String(day.id);
+  state.tripDays = state.tripDays.map(item => String(item.id) === dayId ? day : item);
+  state.dayActivities.set(dayId, activities);
+  state.dayLocations.set(dayId, locations);
+
+  if (state.activeTripId) {
+    const data = {
+      days: state.tripDays,
+      activitiesByDay: state.dayActivities,
+      locationsByDay: state.dayLocations,
+      loadedAt: Date.now(),
+      version: Date.now()
+    };
+    state.tripDataCache.set(String(state.activeTripId), data);
+    state.activeTripDataVersion = data.version;
+  }
+}
+
+async function persistInlineDayChange(day, activities, locations, dayPatch = {}, options = {}) {
+  const { activityId = null, rerender = true } = options;
   const patch = { status: day.status || 'planned', ...dayPatch };
   const updatedDay = { ...day, ...patch };
 
-  await offlineStore.saveDayBundle(updatedDay, activities, locations);
-  await offlineStore.enqueueMutation({
-    type: 'save-day',
-    tripId: String(day.trip_id || state.activeTripId),
-    dayId: day.id,
-    dayPatch: patch,
-    locations,
-    activities,
-    removedLocationIds: [],
-    removedActivityIds: []
-  });
+  if (activityId) setAgendaSaveState(activityId, 'saving');
 
-  await refreshSyncStatus();
-  applyLocalDaySave(updatedDay, activities, locations);
-  flushOutbox().catch(error => console.warn('Alteração inline aguardando sincronização', error));
+  const save = async () => {
+    try {
+      await offlineStore.saveDayBundle(updatedDay, activities, locations);
+      await offlineStore.enqueueMutation({
+        type: 'save-day',
+        tripId: String(day.trip_id || state.activeTripId),
+        dayId: day.id,
+        dayPatch: patch,
+        locations,
+        activities,
+        removedLocationIds: [],
+        removedActivityIds: []
+      });
+
+      updateInlineDayState(updatedDay, activities, locations);
+      await refreshSyncStatus();
+
+      if (activityId) setAgendaSaveState(activityId, 'saved');
+
+      if (rerender && state.activeDayId === String(day.id)) {
+        openDayPage(day.id, { pushHistory: false });
+      } else {
+        renderTripDays(state.tripDays, state.dayActivities, state.dayLocations);
+      }
+
+      flushOutbox().catch(error => console.warn('Alteração inline aguardando sincronização', error));
+    } catch (error) {
+      if (activityId) setAgendaSaveState(activityId, 'error');
+      throw error;
+    }
+  };
+
+  return activityId ? queueAgendaSave(activityId, save) : save();
 }
 
 function cloneDayRecords(day) {
@@ -1089,13 +1181,14 @@ function beginInlineTimeEdit(button, day, activity) {
       return;
     }
 
+    setAgendaSaveState(activity.id, 'saving');
     const records = cloneDayRecords(day);
     const target = records.activities.find(item => String(item.id) === String(activity.id));
     if (!target) return;
 
     target.starts_at = day.date + 'T' + value + ':00';
     target.period = periodFromTime(value);
-    await persistInlineDayChange(day, records.activities, records.locations);
+    await persistInlineDayChange(day, records.activities, records.locations, {}, { activityId: activity.id });
   };
 
   button.replaceWith(input);
@@ -1112,28 +1205,60 @@ function beginInlineTextEdit(button, day, activity, field, multiline = false) {
   editor.value = activity[field] || '';
   if (multiline) editor.rows = 3;
 
-  let committed = false;
-  const commit = async () => {
-    if (committed) return;
-    committed = true;
+  let debounceTimer = null;
+  let lastQueuedValue = editor.value;
+  let closed = false;
 
-    const value = editor.value.trim();
+  const saveValue = async (value, { rerender = false } = {}) => {
+    if (closed && !rerender) return;
+    if (value === lastQueuedValue && !rerender) return;
+    lastQueuedValue = value;
+
     const records = cloneDayRecords(day);
     const target = records.activities.find(item => String(item.id) === String(activity.id));
     if (!target) return;
 
-    target[field] = value || null;
-    await persistInlineDayChange(day, records.activities, records.locations);
+    target[field] = value.trim() || null;
+    updateInlineDayState(day, records.activities, records.locations);
+    await persistInlineDayChange(day, records.activities, records.locations, {}, {
+      activityId: activity.id,
+      rerender
+    });
   };
 
-  editor.addEventListener('blur', commit, { once: true });
+  const scheduleSave = () => {
+    const value = editor.value;
+    setAgendaSaveState(activity.id, 'saving');
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      saveValue(value).catch(error => console.warn('Autosave de texto falhou', error));
+    }, 550);
+  };
+
+  const finish = async () => {
+    if (closed) return;
+    closed = true;
+    clearTimeout(debounceTimer);
+    const value = editor.value;
+    try {
+      await saveValue(value, { rerender: true });
+    } catch (error) {
+      console.warn('Autosave final de texto falhou', error);
+      openDayPage(day.id, { pushHistory: false });
+    }
+  };
+
+  editor.addEventListener('input', scheduleSave);
+  editor.addEventListener('blur', finish, { once: true });
   editor.addEventListener('keydown', event => {
     if (!multiline && event.key === 'Enter') {
       event.preventDefault();
       editor.blur();
     }
     if (event.key === 'Escape') {
-      committed = true;
+      event.preventDefault();
+      clearTimeout(debounceTimer);
+      closed = true;
       openDayPage(day.id, { pushHistory: false });
     }
   });
@@ -1216,10 +1341,12 @@ async function saveInlinePlaceSelection(context, draft) {
   if (record.photo_url) activity.photo_url = record.photo_url;
 
   const patch = day.main_place_name ? {} : { main_place_name: record.name };
-  await persistInlineDayChange(day, records.activities, records.locations, patch);
+  setAgendaSaveState(activity.id, 'saving');
+  await persistInlineDayChange(day, records.activities, records.locations, patch, { activityId: activity.id });
 }
 
 async function saveInlinePhoto(day, activity, location, file) {
+  setAgendaSaveState(activity.id, 'saving');
   const photoUrl = await compressImage(file);
   const records = cloneDayRecords(day);
   const targetActivity = records.activities.find(item => String(item.id) === String(activity.id));
@@ -1242,7 +1369,7 @@ async function saveInlinePhoto(day, activity, location, file) {
   }
 
   const patch = day.photo_url ? {} : { photo_url: photoUrl };
-  await persistInlineDayChange(day, records.activities, records.locations, patch);
+  await persistInlineDayChange(day, records.activities, records.locations, patch, { activityId: activity.id });
 }
 
 function renderDayPageAgenda(day, activities, locations) {
@@ -1253,6 +1380,7 @@ function renderDayPageAgenda(day, activities, locations) {
     const location = activityLocation(activity, locations);
     const item = document.createElement('li');
     item.className = 'day-view-agenda-item';
+    item.dataset.activityId = String(activity.id);
 
     const time = document.createElement('button');
     time.type = 'button';
@@ -1266,6 +1394,12 @@ function renderDayPageAgenda(day, activities, locations) {
     pin.className = 'day-view-pin day-inline-location';
     pin.setAttribute('aria-label', location?.name ? 'Editar local: ' + location.name : 'Definir local');
     pin.addEventListener('click', () => openInlinePlaceSearch(day, activity, location));
+
+    const saveStatus = document.createElement('span');
+    saveStatus.className = 'day-inline-save-status';
+    saveStatus.dataset.state = state.agendaSaveStates.get(String(activity.id)) || 'idle';
+    saveStatus.setAttribute('role', 'status');
+    saveStatus.setAttribute('aria-live', 'polite');
 
     const copy = document.createElement('div');
     copy.className = 'day-view-agenda-copy';
@@ -1296,7 +1430,7 @@ function renderDayPageAgenda(day, activities, locations) {
 
     const photoUrl = location?.photo_url || activity.photo_url || '';
     item.dataset.hasPhoto = String(Boolean(photoUrl));
-    item.append(time, pin, copy);
+    item.append(time, pin, saveStatus, copy);
 
     const file = document.createElement('input');
     file.type = 'file';
