@@ -22,12 +22,12 @@ jobs:
           url='https://paulosince.github.io/viagens/'
           for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
             html="$(curl --location --silent --show-error --max-time 20 "$url" || true)"
-            js="$(curl --location --silent --show-error --max-time 20 "$url/src/main.js?v=20260925-16" || true)"
+            js="$(curl --location --silent --show-error --max-time 20 "$url/src/main.js?v=20260925-17" || true)"
             css="$(curl --location --silent --show-error --max-time 20 "$url/style.css?v=20260925-14" || true)"
             offline="$(curl --location --silent --show-error --max-time 20 "$url/src/offline-store.js?v=snapshot-order" || true)"
             consent="$(curl --location --silent --show-error --max-time 20 "$url/oauth/consent/" || true)"
             mcp_headers="$(curl --silent --show-error --max-time 20 -i 'https://siabldasqinpfmxslwji.supabase.co/functions/v1/viaggio-mcp' || true)"
-            if grep -q 'src/main.js?v=20260925-16' <<<"$html" &&
+            if grep -q 'src/main.js?v=20260925-17' <<<"$html" &&
                grep -q 'id="sync_status"' <<<"$html" &&
                grep -q 'enrichDayPage' <<<"$js" &&
                grep -q 'loadLocalWorkspace' <<<"$js" &&
@@ -71,6 +71,8 @@ jobs:
                grep -q 'sequence' <<<"$offline" &&
                grep -q 'id="chatgpt_sheet"' <<<"$html" &&
                grep -q 'id="home_chatgpt_button"' <<<"$html" &&
+               grep -q 'openChatgptApp' <<<"$js" &&
+               grep -q 'com.openai.chat://' <<<"$js" &&
                grep -q 'VIAGGIO_MCP_URL' <<<"$js" &&
                grep -q 'chatgpt-integration-card' <<<"$css" &&
                grep -q 'approveAuthorization' <<<"$consent" &&
