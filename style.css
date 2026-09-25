@@ -79,6 +79,28 @@ body[data-app-ready="true"] .app-splash {
 }
 .splash-content h1 { margin: 0; font-size: clamp(46px, 13vw, 72px); line-height: 1; letter-spacing: -.055em; }
 .splash-content p { max-width: 330px; margin: 13px auto 0; font-size: clamp(16px, 4.5vw, 20px); font-weight: 600; line-height: 1.3; }
+.splash-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 22px;
+  margin: 22px auto 0;
+  color: rgba(255,255,255,.96);
+  font-size: 13px;
+  font-weight: 650;
+  text-shadow: 0 2px 10px rgba(17,83,130,.22);
+}
+.splash-spinner {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+  border: 2px solid rgba(255,255,255,.36);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: splash-spin .8s linear infinite;
+}
+@keyframes splash-spin { to { transform: rotate(360deg); } }
 .splash-cloud {
   position: absolute;
   z-index: 1;
