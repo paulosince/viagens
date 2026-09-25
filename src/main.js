@@ -1,6 +1,36 @@
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+import { offlineStore } from './offline-store.js';
 
-const supabase = createClient('https://siabldasqinpfmxslwji.supabase.co', 'sb_publishable_UgbBIOq1TnInuPRrQpAFag_JLIzYuFf');
+const SUPABASE_URL = 'https://siabldasqinpfmxslwji.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_UgbBIOq1TnInuPRrQpAFag_JLIzYuFf';
+let supabase = null;
+let supabaseLoad = null;
+
+async function ensureSupabase() {
+  if (supabase) return supabase;
+  if (supabaseLoad) return supabaseLoad;
+  supabaseLoad = import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm')
+    .then(({ createClient }) => {
+      supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+      return supabase;
+    })
+    .catch(error => {
+      supabaseLoad = null;
+      throw error;
+    });
+  return supabaseLoad;
+}
+
+async function trySupabase(timeoutMs = 1800) {
+  if (!navigator.onLine) return null;
+  try {
+    return await Promise.race([
+      ensureSupabase(),
+      new Promise(resolve => setTimeout(() => resolve(null), timeoutMs))
+    ]);
+  } catch {
+    return null;
+  }
+}
 const profilePhoto = 'assets/cintia.png';
 const placeSearchCache = new Map();
 const TRIP_CACHE_FRESH_MS = 60_000;
@@ -36,7 +66,7 @@ const state = {
 const dom = {
   authView: document.querySelector('#auth_view'), authForm: document.querySelector('#auth_form'), authMessage: document.querySelector('#auth_message'),
   home: document.querySelector('#user_home'), profileButton: document.querySelector('#profile_button'), headerProfileImage: document.querySelector('#header_profile_image'), headerProfileFallback: document.querySelector('#header_profile_fallback'),
-  editTripsButton: document.querySelector('#edit_trips_button'), newTripButton: document.querySelector('#new_trip_button'), emptyNewTripButton: document.querySelector('#empty_new_trip_button'), sessionEmail: document.querySelector('#session_email'), tripHeading: document.querySelector('#trip_heading'), yearButton: document.querySelector('#year_selector_button'), currentYear: document.querySelector('#current_year'), yearMenu: document.querySelector('#year_menu'), yearList: document.querySelector('#year_list'),
+  editTripsButton: document.querySelector('#edit_trips_button'), newTripButton: document.querySelector('#new_trip_button'), emptyNewTripButton: document.querySelector('#empty_new_trip_button'), sessionEmail: document.querySelector('#session_email'), syncStatus: document.querySelector('#sync_status'), tripHeading: document.querySelector('#trip_heading'), yearButton: document.querySelector('#year_selector_button'), currentYear: document.querySelector('#current_year'), yearMenu: document.querySelector('#year_menu'), yearList: document.querySelector('#year_list'),
   tripList: document.querySelector('#trip_list'), homeEmpty: document.querySelector('#home_empty'), scrim: document.querySelector('#sheet_scrim'), tripEditFooter: document.querySelector('#trip_edit_footer'), deleteSelectedTrips: document.querySelector('#delete_selected_trips'), tripPage: document.querySelector('#trip_page'), closeTripPage: document.querySelector('#close_trip_page'), editTripButton: document.querySelector('#edit_trip_button'), tripPageHero: document.querySelector('#trip_page_hero'), tripPageTitle: document.querySelector('#trip_page_title'), tripPageDates: document.querySelector('#trip_page_dates'), tripPagePassengers: document.querySelector('#trip_page_passengers'), tripPagePassengerCount: document.querySelector('#trip_page_passenger_count'), tripDayList: document.querySelector('#trip_day_list'), tripDayMessage: document.querySelector('#trip_day_message'),
   dayPage: document.querySelector('#day_page'), closeDayPage: document.querySelector('#close_day_page'), editDayButton: document.querySelector('#edit_day_button'), dayPageHero: document.querySelector('#day_page_hero'), dayPageBadge: document.querySelector('#day_page_badge'), dayPageTitle: document.querySelector('#day_page_title'), dayPageDate: document.querySelector('#day_page_date'), dayPageAgenda: document.querySelector('#day_page_agenda'), dayPageEmpty: document.querySelector('#day_page_empty'), dayPageMap: document.querySelector('#day_page_map'), dayPageDirections: document.querySelector('#day_page_directions'),
   newTripSheet: document.querySelector('#home_new_trip'), newTripForm: document.querySelector('#new_trip_form'), newTripTitle: document.querySelector('#new-trip-title'), closeNewTrip: document.querySelector('#close_new_trip'), saveNewTrip: document.querySelector('#save_new_trip'), newTripMessage: document.querySelector('#new_trip_message'), coverInput: document.querySelector('#cover-image'), coverPreview: document.querySelector('#cover_preview_image'), tripColorValue: document.querySelector('#trip-color-value'), tripColorPalette: document.querySelector('#trip_color_palette'), tripColorCustom: document.querySelector('#trip-color-custom'), newTripPassengerList: document.querySelector('#new_trip_passenger_list'), addTripPassenger: document.querySelector('#add_trip_passenger'),
@@ -93,6 +123,28 @@ function setActiveSheet(name = 'none') {
   document.body.dataset.activeSheet = name;
   dom.newTripSheet.setAttribute('aria-hidden', String(name !== 'new-trip'));
   dom.profileSheet.setAttribute('aria-hidden', String(name !== 'profile'));
+}
+
+async function refreshSyncStatus() {
+  if (!dom.syncStatus || !state.user) return;
+  const pending = (await offlineStore.listOutbox().catch(() => [])).length;
+
+  if (!navigator.onLine) {
+    dom.syncStatus.dataset.kind = 'offline';
+    dom.syncStatus.textContent = pending
+      ? `Salvo neste iPhone · ${pending} ${pending === 1 ? 'alteração pendente' : 'alterações pendentes'}`
+      : 'Modo offline · cópia local';
+    return;
+  }
+
+  if (pending) {
+    dom.syncStatus.dataset.kind = 'pending';
+    dom.syncStatus.textContent = `Salvo neste iPhone · ${pending} ${pending === 1 ? 'alteração pendente' : 'alterações pendentes'}`;
+    return;
+  }
+
+  dom.syncStatus.dataset.kind = 'synced';
+  dom.syncStatus.textContent = 'Sincronizado';
 }
 
 function setLoading(button, loading) {
@@ -411,7 +463,9 @@ async function loadPlacePhotos(result) {
   dom.placePhotoMessage.dataset.kind = '';
   const currentPlaceId = `${result.osm_type}/${result.osm_id}`;
   try {
-    const { data, error } = await supabase.functions.invoke('unsplash-photos', { body: { action: 'search', query: unsplashQuery(result) } });
+    const client = await trySupabase();
+    if (!client) throw new Error('Fotos online indisponíveis.');
+    const { data, error } = await client.functions.invoke('unsplash-photos', { body: { action: 'search', query: unsplashQuery(result) } });
     const selected = state.placeSearch?.results?.[state.placeSearch.selectedIndex];
     if (!selected || `${selected.osm_type}/${selected.osm_id}` !== currentPlaceId) return;
     if (error) throw error;
@@ -527,7 +581,7 @@ function confirmPlaceSearch() {
     location.photoAuthor = photo.author || '';
     location.photoAuthorUrl = photo.authorUrl || '';
     location.photoSourceUrl = photo.sourceUrl || '';
-    if (photo.downloadLocation) supabase.functions.invoke('unsplash-photos', { body: { action: 'track', downloadLocation: photo.downloadLocation } });
+    if (photo.downloadLocation) trySupabase().then(client => client?.functions.invoke('unsplash-photos', { body: { action: 'track', downloadLocation: photo.downloadLocation } })).catch(() => {});
   }
   closePlaceSearch();
   renderDayLocationsEditor();
@@ -817,116 +871,188 @@ function closeDayEditor() {
   dom.dayEditSheet.setAttribute('aria-hidden', 'true');
 }
 
+async function syncMutation(mutation) {
+  if (mutation.type !== 'save-day') return;
+  const client = await trySupabase();
+  if (!client) throw new Error('Backend indisponível.');
+
+  const savedDay = await client.from('trip_days').update(mutation.dayPatch).eq('id', mutation.dayId);
+  if (savedDay.error) throw savedDay.error;
+
+  if (mutation.locations?.length) {
+    const savedLocations = await client.from('day_locations').upsert(mutation.locations);
+    if (savedLocations.error) throw savedLocations.error;
+  }
+
+  if (mutation.activities?.length) {
+    const savedActivities = await client.from('activities').upsert(mutation.activities);
+    if (savedActivities.error) throw savedActivities.error;
+  }
+
+  if (mutation.removedActivityIds?.length) {
+    const removed = await client.from('activities').delete().in('id', mutation.removedActivityIds).eq('day_id', mutation.dayId);
+    if (removed.error) throw removed.error;
+  }
+
+  if (mutation.removedLocationIds?.length) {
+    const removed = await client.from('day_locations').delete().in('id', mutation.removedLocationIds).eq('day_id', mutation.dayId);
+    if (removed.error) throw removed.error;
+  }
+}
+
+async function flushOutbox() {
+  if (!navigator.onLine || !state.user) {
+    await refreshSyncStatus();
+    return false;
+  }
+  if (!await trySupabase()) {
+    await refreshSyncStatus();
+    return false;
+  }
+  const mutations = await offlineStore.listOutbox();
+  for (const mutation of mutations) {
+    try {
+      await syncMutation(mutation);
+      await offlineStore.removeMutation(mutation.id);
+    } catch (error) {
+      console.warn('Sincronização pendente', error);
+      await refreshSyncStatus();
+      return false;
+    }
+  }
+  await refreshSyncStatus();
+  return true;
+}
+
+function applyLocalDaySave(day, activities, locations) {
+  const dayId = String(day.id);
+  state.tripDays = state.tripDays.map(item => String(item.id) === dayId ? day : item);
+  state.dayActivities.set(dayId, activities);
+  state.dayLocations.set(dayId, locations);
+
+  const data = {
+    days: state.tripDays,
+    activitiesByDay: state.dayActivities,
+    locationsByDay: state.dayLocations,
+    loadedAt: Date.now(),
+    version: Date.now()
+  };
+  if (state.activeTripId) state.tripDataCache.set(String(state.activeTripId), data);
+  applyTripData(data);
+
+  if (state.activeDayId === dayId) openDayPage(dayId, { pushHistory: false });
+}
+
 async function saveDayEditor() {
   if (!state.dayEditor) return;
   state.saving = true;
   setLoading(dom.saveDayEdit, true);
+
   const editor = state.dayEditor;
   const firstLocation = editor.locations.find(location => location.name.trim()) || null;
   const unresolvedLocation = editor.locations.find(location => location.name.trim() && (!Number.isFinite(location.latitude) || !Number.isFinite(location.longitude)));
+
   if (unresolvedLocation) {
     dom.dayEditMessage.textContent = `Busque e escolha “${unresolvedLocation.name.trim()}” na lista antes de salvar.`;
     state.saving = false;
     setLoading(dom.saveDayEdit, false);
     return;
   }
-  const savedDay = await supabase.from('trip_days').update({
+
+  const dayPatch = {
     title: editor.title.trim() || null,
     summary: editor.notes.trim() || null,
     main_place_name: firstLocation?.name.trim() || null,
     photo_url: firstLocation?.photoUrl || null,
     status: 'planned'
-  }).eq('id', editor.day.id);
-  if (savedDay.error) {
-    dom.dayEditMessage.textContent = savedDay.error.message;
+  };
+  const localDay = { ...editor.day, ...dayPatch };
+
+  const previousLocations = state.dayLocations.get(String(editor.day.id)) || [];
+  const previousActivities = state.dayActivities.get(String(editor.day.id)) || [];
+  const previousLocationById = new Map(previousLocations.map(item => [String(item.id), item]));
+  const previousActivityById = new Map(previousActivities.map(item => [String(item.id), item]));
+
+  const locations = editor.locations
+    .filter(location => location.name.trim())
+    .map((location, position) => ({
+      ...(previousLocationById.get(String(location.id)) || {}),
+      id: location.id,
+      day_id: editor.day.id,
+      position,
+      name: location.name.trim(),
+      provider: location.provider || null,
+      provider_place_id: location.providerPlaceId || null,
+      formatted_address: location.formattedAddress || null,
+      latitude: location.latitude,
+      longitude: location.longitude,
+      category: location.category || null,
+      place_type: location.placeType || null,
+      photo_provider: location.photoProvider || null,
+      photo_author: location.photoAuthor || null,
+      photo_author_url: location.photoAuthorUrl || null,
+      photo_source_url: location.photoSourceUrl || null,
+      photo_url: location.photoUrl || null
+    }));
+
+  const activities = editor.activities
+    .filter(activity => activity.text.trim())
+    .map((activity, position) => {
+      const location = editor.locations.find(item => item.id === activity.locationId);
+      return {
+        ...(previousActivityById.get(String(activity.id)) || {}),
+        id: activity.id,
+        day_id: editor.day.id,
+        period: periodFromTime(activity.time),
+        position,
+        title: activity.text.trim(),
+        starts_at: `${editor.day.date}T${activity.time || '09:00'}:00`,
+        place_id: activity.locationId || null,
+        place_name: location?.name.trim() || null,
+        address: location?.formattedAddress || null,
+        latitude: location?.latitude ?? null,
+        longitude: location?.longitude ?? null,
+        photo_url: location?.photoUrl || null
+      };
+    });
+
+  const retainedLocationIds = new Set(locations.map(location => String(location.id)));
+  const removedLocationIds = previousLocations
+    .filter(location => !retainedLocationIds.has(String(location.id)))
+    .map(location => location.id);
+
+  const retainedActivityIds = new Set(activities.map(activity => String(activity.id)));
+  const removedActivityIds = previousActivities
+    .filter(activity => !retainedActivityIds.has(String(activity.id)))
+    .map(activity => activity.id);
+
+  try {
+    await offlineStore.saveDayBundle(localDay, activities, locations);
+    await offlineStore.enqueueMutation({
+      type: 'save-day',
+      tripId: String(editor.day.trip_id || state.activeTripId),
+      dayId: editor.day.id,
+      dayPatch,
+      locations,
+      activities,
+      removedLocationIds,
+      removedActivityIds
+    });
+    await refreshSyncStatus();
+
+    applyLocalDaySave(localDay, activities, locations);
+
     state.saving = false;
     setLoading(dom.saveDayEdit, false);
-    return;
-  }
-  const locations = editor.locations.filter(location => location.name.trim()).map((location, position) => ({
-    id: location.id,
-    day_id: editor.day.id,
-    position,
-    name: location.name.trim(),
-    provider: location.provider || null,
-    provider_place_id: location.providerPlaceId || null,
-    formatted_address: location.formattedAddress || null,
-    latitude: location.latitude,
-    longitude: location.longitude,
-    category: location.category || null,
-    place_type: location.placeType || null,
-    photo_url: location.photoUrl || null
-  }));
-  const activities = editor.activities.filter(activity => activity.text.trim()).map((activity, position) => ({
-    id: activity.id,
-    day_id: editor.day.id,
-    period: periodFromTime(activity.time),
-    position,
-    title: activity.text.trim(),
-    starts_at: `${editor.day.date}T${activity.time || '09:00'}:00`,
-    place_id: activity.locationId || null,
-    place_name: editor.locations.find(location => location.id === activity.locationId)?.name.trim() || null,
-    address: editor.locations.find(location => location.id === activity.locationId)?.formattedAddress || null,
-    latitude: editor.locations.find(location => location.id === activity.locationId)?.latitude || null,
-    longitude: editor.locations.find(location => location.id === activity.locationId)?.longitude || null,
-    photo_url: editor.locations.find(location => location.id === activity.locationId)?.photoUrl || null
-  }));
+    closeDayEditor();
 
-  const savedLocationIds = new Set((state.dayLocations.get(String(editor.day.id)) || []).map(location => String(location.id)));
-  const retainedLocationIds = new Set(locations.filter(location => savedLocationIds.has(String(location.id))).map(location => String(location.id)));
-  const removedLocationIds = [...savedLocationIds].filter(id => !retainedLocationIds.has(id));
-  for (const location of locations) {
-    const payload = Object.fromEntries(Object.entries(location).filter(([key]) => !['id', 'day_id'].includes(key)));
-    const result = savedLocationIds.has(String(location.id))
-      ? await supabase.from('day_locations').update(payload).eq('id', location.id).eq('day_id', editor.day.id)
-      : await supabase.from('day_locations').insert(location);
-    if (result.error) {
-      dom.dayEditMessage.textContent = result.error.message;
-      state.saving = false;
-      setLoading(dom.saveDayEdit, false);
-      return;
-    }
-  }
-
-  const savedActivityIds = new Set((state.dayActivities.get(String(editor.day.id)) || []).map(activity => String(activity.id)));
-  const retainedActivityIds = new Set(activities.filter(activity => savedActivityIds.has(String(activity.id))).map(activity => String(activity.id)));
-  const removedActivityIds = [...savedActivityIds].filter(id => !retainedActivityIds.has(id));
-  for (const activity of activities) {
-    const payload = Object.fromEntries(Object.entries(activity).filter(([key]) => !['id', 'day_id'].includes(key)));
-    const result = savedActivityIds.has(String(activity.id))
-      ? await supabase.from('activities').update(payload).eq('id', activity.id).eq('day_id', editor.day.id)
-      : await supabase.from('activities').insert(activity);
-    if (result.error) {
-      dom.dayEditMessage.textContent = result.error.message;
-      state.saving = false;
-      setLoading(dom.saveDayEdit, false);
-      return;
-    }
-  }
-  if (removedActivityIds.length) {
-    const removed = await supabase.from('activities').delete().in('id', removedActivityIds).eq('day_id', editor.day.id);
-    if (removed.error) {
-      dom.dayEditMessage.textContent = removed.error.message;
-      state.saving = false;
-      setLoading(dom.saveDayEdit, false);
-      return;
-    }
-  }
-  if (removedLocationIds.length) {
-    const removed = await supabase.from('day_locations').delete().in('id', removedLocationIds).eq('day_id', editor.day.id);
-    if (removed.error) {
-      dom.dayEditMessage.textContent = removed.error.message;
-      state.saving = false;
-      setLoading(dom.saveDayEdit, false);
-      return;
-    }
-  }
-  state.saving = false;
-  setLoading(dom.saveDayEdit, false);
-  closeDayEditor();
-  if (state.activeTripId) {
-    state.tripDataCache.delete(String(state.activeTripId));
-    await openTrip(state.activeTripId, { pushHistory: false, forceRefresh: true });
+    flushOutbox().then(synced => {
+      if (synced && state.activeTripId) state.tripDataCache.get(String(state.activeTripId)).loadedAt = Date.now();
+    }).catch(error => console.warn('Falha ao processar fila local', error));
+  } catch (error) {
+    dom.dayEditMessage.textContent = error.message || 'Não foi possível salvar a alteração neste aparelho.';
+    state.saving = false;
+    setLoading(dom.saveDayEdit, false);
   }
 }
 
@@ -953,28 +1079,62 @@ async function fetchTripData(tripId) {
   const key = String(tripId);
   if (state.tripDataLoads.has(key)) return state.tripDataLoads.get(key);
   const load = (async () => {
-    const result = await supabase.from('trip_days').select('*').eq('trip_id', tripId).order('day_number');
-    if (result.error) throw result.error;
-    const days = result.data || [];
-    let activities = [], locations = [];
-    if (days.length) {
-      const [activityResult, locationResult] = await Promise.all([
-        supabase.from('activities').select('*').in('day_id', days.map(day => day.id)).order('position'),
-        supabase.from('day_locations').select('*').in('day_id', days.map(day => day.id)).order('position')
-      ]);
-      if (activityResult.error || locationResult.error) throw activityResult.error || locationResult.error;
-      activities = activityResult.data || [];
-      locations = locationResult.data || [];
+    const pendingLocalChanges = await offlineStore.hasPendingForTrip(key);
+    if (pendingLocalChanges) {
+      const local = await offlineStore.loadTripData(key);
+      if (local.days.length) {
+        const data = {
+          days: local.days,
+          activitiesByDay: groupByDay(local.activities),
+          locationsByDay: groupByDay(local.locations),
+          loadedAt: Date.now(),
+          version: Date.now(),
+          offline: true
+        };
+        state.tripDataCache.set(key, data);
+        return data;
+      }
     }
-    const data = {
-      days,
-      activitiesByDay: groupByDay(activities),
-      locationsByDay: groupByDay(locations),
-      loadedAt: Date.now(),
-      version: Date.now()
-    };
-    state.tripDataCache.set(key, data);
-    return data;
+    try {
+      const client = await trySupabase();
+    if (!client) throw new Error('Backend indisponível.');
+      const result = await client.from('trip_days').select('*').eq('trip_id', tripId).order('day_number');
+      if (result.error) throw result.error;
+      const days = result.data || [];
+      let activities = [], locations = [];
+      if (days.length) {
+        const [activityResult, locationResult] = await Promise.all([
+          client.from('activities').select('*').in('day_id', days.map(day => day.id)).order('position'),
+          client.from('day_locations').select('*').in('day_id', days.map(day => day.id)).order('position')
+        ]);
+        if (activityResult.error || locationResult.error) throw activityResult.error || locationResult.error;
+        activities = activityResult.data || [];
+        locations = locationResult.data || [];
+      }
+      await offlineStore.replaceTripData(key, days, activities, locations);
+      const data = {
+        days,
+        activitiesByDay: groupByDay(activities),
+        locationsByDay: groupByDay(locations),
+        loadedAt: Date.now(),
+        version: Date.now()
+      };
+      state.tripDataCache.set(key, data);
+      return data;
+    } catch (remoteError) {
+      const local = await offlineStore.loadTripData(key);
+      if (!local.days.length) throw remoteError;
+      const data = {
+        days: local.days,
+        activitiesByDay: groupByDay(local.activities),
+        locationsByDay: groupByDay(local.locations),
+        loadedAt: Date.now(),
+        version: Date.now(),
+        offline: true
+      };
+      state.tripDataCache.set(key, data);
+      return data;
+    }
   })().finally(() => state.tripDataLoads.delete(key));
   state.tripDataLoads.set(key, load);
   return load;
@@ -1104,9 +1264,14 @@ function setEditingMode(editing) {
 
 async function softDeleteSelectedTrips() {
   if (!state.selectedTripIds.size) return;
+  const client = await trySupabase();
+  if (!client) {
+    dom.deleteSelectedTrips.textContent = 'Exclusão requer conexão';
+    return;
+  }
   const ids = [...state.selectedTripIds];
   dom.deleteSelectedTrips.disabled = true;
-  const result = await supabase.from('trips').update({ deleted_at: new Date().toISOString() }).in('id', ids).eq('user_id', state.user.id);
+  const result = await client.from('trips').update({ deleted_at: new Date().toISOString() }).in('id', ids).eq('user_id', state.user.id);
   if (result.error) {
     dom.deleteSelectedTrips.textContent = result.error.message;
     dom.deleteSelectedTrips.disabled = false;
@@ -1168,31 +1333,104 @@ function syncYearList() {
   dom.currentYear.textContent = String(state.selectedYear);
 }
 
-async function loadTrips() {
-  const result = await supabase.from('trips').select('*').is('deleted_at', null).order('start_date', { ascending: true });
-  if (result.error) throw result.error;
-  state.trips = result.data || [];
+function applyPassengers(records = []) {
   state.passengers.clear();
-  if (state.trips.length) {
-    const passengers = await supabase.from('passengers').select('*').in('trip_id', state.trips.map(trip => trip.id)).order('created_at');
-    if (passengers.error) throw passengers.error;
-    for (const passenger of passengers.data || []) {
-      const list = state.passengers.get(passenger.trip_id) || [];
-      list.push(passenger); state.passengers.set(passenger.trip_id, list);
+  for (const passenger of records) {
+    const list = state.passengers.get(passenger.trip_id) || [];
+    list.push(passenger);
+    state.passengers.set(passenger.trip_id, list);
+  }
+}
+
+async function cacheCompleteWorkspace() {
+  if (!state.user?.id || !state.trips.length || !navigator.onLine) return;
+  const client = await trySupabase();
+  if (!client) return;
+  const lastSnapshot = await offlineStore.getMeta(`complete_snapshot:${state.user.id}`);
+  if (lastSnapshot && Date.now() - new Date(lastSnapshot).getTime() < 30 * 60 * 1000) return;
+
+  const tripIds = state.trips.map(trip => trip.id);
+  const daysResult = await client.from('trip_days').select('*').in('trip_id', tripIds).order('day_number');
+  if (daysResult.error) throw daysResult.error;
+  const allDays = daysResult.data || [];
+
+  let allActivities = [];
+  let allLocations = [];
+  if (allDays.length) {
+    const dayIds = allDays.map(day => day.id);
+    const [activityResult, locationResult] = await Promise.all([
+      client.from('activities').select('*').in('day_id', dayIds).order('position'),
+      client.from('day_locations').select('*').in('day_id', dayIds).order('position')
+    ]);
+    if (activityResult.error || locationResult.error) throw activityResult.error || locationResult.error;
+    allActivities = activityResult.data || [];
+    allLocations = locationResult.data || [];
+  }
+
+  const dayById = new Map(allDays.map(day => [String(day.id), day]));
+  for (const trip of state.trips) {
+    if (await offlineStore.hasPendingForTrip(trip.id)) continue;
+    const days = allDays.filter(day => String(day.trip_id) === String(trip.id));
+    const ids = new Set(days.map(day => String(day.id)));
+    const activities = allActivities.filter(activity => ids.has(String(activity.day_id)));
+    const locations = allLocations.filter(location => ids.has(String(location.day_id)));
+    await offlineStore.replaceTripData(String(trip.id), days, activities, locations);
+
+    state.tripDataCache.set(String(trip.id), {
+      days,
+      activitiesByDay: groupByDay(activities),
+      locationsByDay: groupByDay(locations),
+      loadedAt: Date.now(),
+      version: Date.now()
+    });
+  }
+
+  await offlineStore.setMeta(`complete_snapshot:${state.user.id}`, new Date().toISOString());
+}
+
+async function loadTrips({ allowLocalFallback = true } = {}) {
+  try {
+    const client = await trySupabase();
+    if (!client) throw new Error('Backend indisponível.');
+    const result = await client.from('trips').select('*').is('deleted_at', null).order('start_date', { ascending: true });
+    if (result.error) throw result.error;
+    state.trips = result.data || [];
+    let passengerRecords = [];
+    if (state.trips.length) {
+      const passengers = await client.from('passengers').select('*').in('trip_id', state.trips.map(trip => trip.id)).order('created_at');
+      if (passengers.error) throw passengers.error;
+      passengerRecords = passengers.data || [];
     }
+    applyPassengers(passengerRecords);
+    if (state.user?.id) await offlineStore.replaceWorkspace(state.user.id, state.trips, passengerRecords);
+  } catch (remoteError) {
+    if (!allowLocalFallback || !state.user?.id) throw remoteError;
+    const local = await offlineStore.loadWorkspace(state.user.id);
+    if (!local.trips.length) throw remoteError;
+    state.trips = local.trips;
+    applyPassengers(local.passengers);
   }
   syncYearList();
   syncTripList();
 }
 
-async function loadProfile() {
-  const result = await supabase.from('passenger_profiles').select('*').eq('user_id', state.user.id).maybeSingle();
-  if (result.error) state.profile = { user_id: state.user.id, name: state.user.user_metadata?.name || 'Cíntia', birth_date: null, avatar_path: null };
-  else state.profile = result.data || { user_id: state.user.id, name: state.user.user_metadata?.name || 'Cíntia', birth_date: null, avatar_path: null };
-  if (state.profile.is_deleted) { await supabase.auth.signOut(); throw new Error('Esta conta está desativada. Seus dados continuam preservados.'); }
-  if (state.profile.avatar_path) {
-    const signed = await supabase.storage.from('profile-photos').createSignedUrl(state.profile.avatar_path, 3600);
-    if (!signed.error) state.profile.avatar_url = signed.data.signedUrl;
+async function loadProfile({ allowLocalFallback = true } = {}) {
+  try {
+    const client = await trySupabase();
+    if (!client) throw new Error('Backend indisponível.');
+    const result = await client.from('passenger_profiles').select('*').eq('user_id', state.user.id).maybeSingle();
+    if (result.error) throw result.error;
+    state.profile = result.data || { user_id: state.user.id, name: state.user.user_metadata?.name || 'Cíntia', birth_date: null, avatar_path: null };
+    if (state.profile.is_deleted) { await client.auth.signOut(); throw new Error('Esta conta está desativada. Seus dados continuam preservados.'); }
+    if (state.profile.avatar_path) {
+      const signed = await client.storage.from('profile-photos').createSignedUrl(state.profile.avatar_path, 3600);
+      if (!signed.error) state.profile.avatar_url = signed.data.signedUrl;
+    }
+    await offlineStore.saveProfile(state.profile);
+  } catch (remoteError) {
+    if (!allowLocalFallback) throw remoteError;
+    state.profile = await offlineStore.getProfile(state.user.id);
+    if (!state.profile) state.profile = { user_id: state.user.id, name: state.user.user_metadata?.name || 'Cíntia', birth_date: null, avatar_path: null };
   }
   syncProfileUI();
 }
@@ -1433,6 +1671,12 @@ async function prepareAvatar(file) {
 }
 
 async function saveProfile() {
+  const client = await trySupabase();
+  if (!client) {
+    dom.profileMessage.dataset.kind = 'error';
+    dom.profileMessage.textContent = 'Perfil requer conexão. O roteiro continua disponível offline.';
+    return;
+  }
   state.saving = true; setLoading(dom.saveProfile, true);
   dom.profileMessage.dataset.kind = 'info';
   dom.profileMessage.textContent = state.avatarFile ? 'Enviando foto…' : 'Salvando perfil…';
@@ -1441,13 +1685,13 @@ async function saveProfile() {
     if (state.avatarFile) {
       const extension = state.avatarFile.type === 'image/png' ? 'png' : state.avatarFile.type === 'image/webp' ? 'webp' : 'jpg';
       avatarPath = `${state.user.id}/avatar-${Date.now()}.${extension}`;
-      const upload = await supabase.storage.from('profile-photos').upload(avatarPath, state.avatarFile, { contentType: state.avatarFile.type || 'image/jpeg', upsert: false });
+      const upload = await client.storage.from('profile-photos').upload(avatarPath, state.avatarFile, { contentType: state.avatarFile.type || 'image/jpeg', upsert: false });
       if (upload.error) throw new Error(`Foto: ${upload.error.message}`);
       dom.profileMessage.textContent = 'Salvando perfil…';
     }
-    const saved = await supabase.from('passenger_profiles').upsert({ user_id: state.user.id, name: dom.profileNameInput.value.trim(), birth_date: dom.birthDateInput.value || null, avatar_path: avatarPath, updated_at: new Date().toISOString() }).select().single();
+    const saved = await client.from('passenger_profiles').upsert({ user_id: state.user.id, name: dom.profileNameInput.value.trim(), birth_date: dom.birthDateInput.value || null, avatar_path: avatarPath, updated_at: new Date().toISOString() }).select().single();
     if (saved.error) throw new Error(`Perfil: ${saved.error.message}`);
-    await supabase.from('passengers').update({ name: dom.profileNameInput.value.trim(), age: ageFromBirthDate(dom.birthDateInput.value) }).eq('user_id', state.user.id);
+    await client.from('passengers').update({ name: dom.profileNameInput.value.trim(), age: ageFromBirthDate(dom.birthDateInput.value) }).eq('user_id', state.user.id);
     state.profile = saved.data;
     state.avatarFile = null;
     if (state.avatarPreview) URL.revokeObjectURL(state.avatarPreview);
@@ -1472,6 +1716,11 @@ function createDays(tripId, startValue, endValue) {
 }
 
 async function saveTrip() {
+  const client = await trySupabase();
+  if (!client) {
+    dom.newTripMessage.textContent = 'Criar ou alterar a viagem requer conexão. O roteiro já salvo continua editável offline.';
+    return;
+  }
   const values = Object.fromEntries(new FormData(dom.newTripForm));
   if (values.end_date < values.start_date) { dom.newTripMessage.textContent = 'A data final deve ser igual ou posterior à inicial.'; return; }
   if (!state.imageData) { dom.newTripMessage.textContent = 'Escolha a imagem da viagem.'; return; }
@@ -1479,7 +1728,7 @@ async function saveTrip() {
   if (state.editingTripId) {
     const tripId = state.editingTripId;
     const payload = { name: values.name.trim(), destination: values.destination.trim(), start_date: values.start_date, end_date: values.end_date, arrival_method: values.arrival_method, location_label: values.location_label.trim() || null, cover_url: state.imageData, secondary_color: state.tripColor };
-    const updated = await supabase.from('trips').update(payload).eq('id', tripId);
+    const updated = await client.from('trips').update(payload).eq('id', tripId);
     let failure = updated.error;
     if (!failure) {
       const existingPassengers = state.passengers.get(tripId) || [];
@@ -1488,7 +1737,7 @@ async function saveTrip() {
       const retainedIds = new Set(editedPassengers.filter(passenger => existingIds.has(String(passenger.id))).map(passenger => String(passenger.id)));
       const removedIds = existingPassengers.filter(passenger => !retainedIds.has(String(passenger.id))).map(passenger => passenger.id);
       if (removedIds.length) {
-        const removed = await supabase.from('passengers').delete().in('id', removedIds).eq('trip_id', tripId).select('id');
+        const removed = await client.from('passengers').delete().in('id', removedIds).eq('trip_id', tripId).select('id');
         failure = removed.error;
         if (!failure && (removed.data || []).length !== removedIds.length) failure = new Error('Não foi possível remover todos os passageiros duplicados.');
       }
@@ -1496,25 +1745,25 @@ async function saveTrip() {
         if (failure) break;
         const payload = { user_id: passenger.session ? state.user.id : passenger.userId || null, name: passenger.name.trim(), birth_date: passenger.birthDate || null, photo_url: passenger.photoUrl || null, age: ageFromBirthDate(passenger.birthDate) };
         failure = existingIds.has(String(passenger.id))
-          ? (await supabase.from('passengers').update(payload).eq('id', passenger.id).eq('trip_id', tripId)).error
-          : (await supabase.from('passengers').insert({ ...payload, trip_id: tripId })).error;
+          ? (await client.from('passengers').update(payload).eq('id', passenger.id).eq('trip_id', tripId)).error
+          : (await client.from('passengers').insert({ ...payload, trip_id: tripId })).error;
       }
     }
     if (!failure) {
-      const existing = await supabase.from('trip_days').select('id,date').eq('trip_id', tripId);
+      const existing = await client.from('trip_days').select('id,date').eq('trip_id', tripId);
       failure = existing.error;
       if (!failure) {
         const wanted = createDays(tripId, values.start_date, values.end_date);
         const wantedDates = new Set(wanted.map(day => day.date));
         const obsoleteIds = (existing.data || []).filter(day => !wantedDates.has(day.date)).map(day => day.id);
-        if (obsoleteIds.length) failure = (await supabase.from('trip_days').delete().in('id', obsoleteIds)).error;
+        if (obsoleteIds.length) failure = (await client.from('trip_days').delete().in('id', obsoleteIds)).error;
         const existingByDate = new Map((existing.data || []).map(day => [day.date, day]));
         for (const day of wanted) {
           if (failure) break;
           const current = existingByDate.get(day.date);
           failure = current
-            ? (await supabase.from('trip_days').update({ day_number: day.day_number }).eq('id', current.id)).error
-            : (await supabase.from('trip_days').insert(day)).error;
+            ? (await client.from('trip_days').update({ day_number: day.day_number }).eq('id', current.id)).error
+            : (await client.from('trip_days').insert(day)).error;
         }
       }
     }
@@ -1530,10 +1779,10 @@ async function saveTrip() {
     state.saving = false; setLoading(dom.saveNewTrip, false);
     return;
   }
-  const created = await supabase.from('trips').insert({ user_id: state.user.id, name: values.name.trim(), destination: values.destination.trim(), start_date: values.start_date, end_date: values.end_date, arrival_method: values.arrival_method, location_label: values.location_label.trim() || null, cover_url: state.imageData, secondary_color: state.tripColor }).select().single();
+  const created = await client.from('trips').insert({ user_id: state.user.id, name: values.name.trim(), destination: values.destination.trim(), start_date: values.start_date, end_date: values.end_date, arrival_method: values.arrival_method, location_label: values.location_label.trim() || null, cover_url: state.imageData, secondary_color: state.tripColor }).select().single();
   if (created.error) { dom.newTripMessage.textContent = created.error.message; state.saving = false; setLoading(dom.saveNewTrip, false); return; }
   const trip = created.data;
-  const member = await supabase.from('trip_members').insert({ trip_id: trip.id, user_id: state.user.id, role: 'owner' });
+  const member = await client.from('trip_members').insert({ trip_id: trip.id, user_id: state.user.id, role: 'owner' });
   let failure = member.error;
   if (!failure) {
     const passengerPayload = state.newTripPassengers.map(passenger => ({
@@ -1545,19 +1794,19 @@ async function saveTrip() {
       age: ageFromBirthDate(passenger.birthDate)
     })).filter(passenger => passenger.name);
     if (passengerPayload.length) {
-      const passengers = await supabase.from('passengers').insert(passengerPayload);
+      const passengers = await client.from('passengers').insert(passengerPayload);
       failure = passengers.error;
     }
   }
   if (!failure) {
-    const days = await supabase.from('trip_days').insert(createDays(trip.id, values.start_date, values.end_date));
+    const days = await client.from('trip_days').insert(createDays(trip.id, values.start_date, values.end_date));
     failure = days.error;
   }
   if (failure) {
-    await supabase.from('trip_days').delete().eq('trip_id', trip.id);
-    await supabase.from('passengers').delete().eq('trip_id', trip.id);
-    await supabase.from('trip_members').delete().eq('trip_id', trip.id);
-    await supabase.from('trips').delete().eq('id', trip.id);
+    await client.from('trip_days').delete().eq('trip_id', trip.id);
+    await client.from('passengers').delete().eq('trip_id', trip.id);
+    await client.from('trip_members').delete().eq('trip_id', trip.id);
+    await client.from('trips').delete().eq('id', trip.id);
     dom.newTripMessage.textContent = failure.message;
   } else {
     state.selectedYear = Number(String(values.start_date).slice(0, 4));
@@ -1569,10 +1818,13 @@ async function saveTrip() {
 }
 
 async function deleteAccount() {
+  const client = await trySupabase();
+  if (!client) { dom.profileMessage.textContent = 'Excluir conta requer conexão.'; return; }
   if (!window.confirm('Desativar esta conta? A sessão será encerrada, mas nenhuma viagem, foto ou outro dado será apagado.')) return;
-  const result = await supabase.rpc('soft_delete_own_account');
+  const result = await client.rpc('soft_delete_own_account');
   if (result.error) { dom.profileMessage.textContent = result.error.message; return; }
-  await supabase.auth.signOut();
+  await offlineStore.clearSession().catch(console.warn);
+  await client.auth.signOut();
 }
 
 dom.closeDayEdit.addEventListener('click', closeDayEditor);
@@ -1619,7 +1871,20 @@ dom.deleteSelectedTrips.addEventListener('click', softDeleteSelectedTrips);
 dom.yearButton.addEventListener('click', () => setYearMenu(document.body.dataset.yearMenu !== 'open'));
 document.addEventListener('click', event => { if (document.body.dataset.yearMenu === 'open' && !dom.tripHeading.contains(event.target)) setYearMenu(false); });
 dom.birthDateInput.addEventListener('input', syncAge);
-dom.logoutButton.addEventListener('click', () => supabase.auth.signOut());
+dom.logoutButton.addEventListener('click', async () => {
+  await offlineStore.clearSession().catch(console.warn);
+  const client = await trySupabase();
+  if (client) await client.auth.signOut().catch(console.warn);
+  state.user = null;
+  state.profile = null;
+  state.trips = [];
+  state.passengers.clear();
+  state.tripDataCache.clear();
+  state.tripDataLoads.clear();
+  syncTripList();
+  closeSheets();
+  setSessionView('anonymous');
+});
 dom.deleteAccountButton.addEventListener('click', deleteAccount);
 
 for (const option of dom.tripColorPalette.querySelectorAll('.trip-color-option')) option.addEventListener('click', () => selectTripColor(option.dataset.color));
@@ -1644,32 +1909,75 @@ dom.newTripForm.addEventListener('submit', event => { event.preventDefault(); sa
 dom.profileForm.addEventListener('submit', event => { event.preventDefault(); saveProfile(); });
 dom.authForm.addEventListener('submit', async event => {
   event.preventDefault(); dom.authMessage.textContent = '';
-  const result = await supabase.auth.signInWithPassword(Object.fromEntries(new FormData(dom.authForm)));
+  const client = await trySupabase();
+  if (!client) { dom.authMessage.textContent = 'Sem conexão. Abra o app normalmente se este aparelho já tiver uma cópia da viagem.'; return; }
+  const result = await client.auth.signInWithPassword(Object.fromEntries(new FormData(dom.authForm)));
   if (result.error) { dom.authMessage.textContent = result.error.message; return; }
   state.user = result.data.user;
-  try { await loadProfile(); await loadTrips(); setSessionView('authenticated'); }
+  await offlineStore.cacheSession(state.user);
+  try {
+    await loadProfile();
+    await loadTrips();
+    await cacheCompleteWorkspace().catch(error => console.warn('Snapshot offline incompleto', error));
+    setSessionView('authenticated');
+    await refreshSyncStatus();
+  }
   catch (error) { dom.authMessage.textContent = error.message; setSessionView('anonymous'); }
 });
 
 async function boot() {
   try {
-    const { data } = await supabase.auth.getSession();
-    state.user = data.session?.user || null;
+    await offlineStore.open();
+    navigator.storage?.persist?.().catch(() => {});
+    const client = await trySupabase();
+    let remoteUser = null;
+    if (client) {
+      const { data } = await client.auth.getSession();
+      remoteUser = data.session?.user || null;
+    }
+    state.user = remoteUser || await offlineStore.getCachedSession();
     if (!state.user) {
       setSessionView('anonymous');
       return;
     }
+
+    await offlineStore.cacheSession(state.user);
+    await flushOutbox().catch(error => console.warn('Fila local aguardando sincronização', error));
+
     try {
       await loadProfile();
       await loadTrips();
+      await cacheCompleteWorkspace().catch(error => console.warn('Snapshot offline incompleto', error));
       setSessionView('authenticated');
+      await refreshSyncStatus();
     } catch (error) {
-      dom.authMessage.textContent = error.message;
-      setSessionView('anonymous');
+      const localUser = await offlineStore.getCachedSession();
+      if (!localUser) throw error;
+      state.user = localUser;
+      await loadProfile({ allowLocalFallback: true });
+      await loadTrips({ allowLocalFallback: true });
+      setSessionView('authenticated');
+      await refreshSyncStatus();
+      dom.authMessage.textContent = 'Modo offline: usando a cópia salva neste aparelho.';
     }
   } catch (error) {
-    dom.authMessage.textContent = error.message || 'Não foi possível iniciar o aplicativo.';
-    setSessionView('anonymous');
+    const localUser = await offlineStore.getCachedSession().catch(() => null);
+    if (localUser) {
+      try {
+        state.user = localUser;
+        await loadProfile({ allowLocalFallback: true });
+        await loadTrips({ allowLocalFallback: true });
+        setSessionView('authenticated');
+        await refreshSyncStatus();
+        dom.authMessage.textContent = 'Modo offline: usando a cópia salva neste aparelho.';
+      } catch {
+        dom.authMessage.textContent = error.message || 'Não foi possível iniciar o aplicativo.';
+        setSessionView('anonymous');
+      }
+    } else {
+      dom.authMessage.textContent = error.message || 'Não foi possível iniciar o aplicativo.';
+      setSessionView('anonymous');
+    }
   } finally {
     const revealApp = () => requestAnimationFrame(() => requestAnimationFrame(() => {
       document.body.dataset.appReady = 'true';
@@ -1679,10 +1987,27 @@ async function boot() {
   }
 }
 
-supabase.auth.onAuthStateChange((_event, session) => {
-  if (session) return;
-  state.user = null; state.profile = null; state.trips = []; state.passengers.clear(); state.tripDataCache.clear(); state.tripDataLoads.clear();
-  syncTripList(); closeSheets(); setSessionView('anonymous');
+window.addEventListener('offline', () => { refreshSyncStatus().catch(console.warn); });
+window.addEventListener('online', () => {
+  refreshSyncStatus().catch(console.warn);
+  flushOutbox().then(synced => {
+    if (synced && state.activeTripId) {
+      state.tripDataCache.delete(String(state.activeTripId));
+      openTrip(state.activeTripId, { pushHistory: false, forceRefresh: true }).catch(console.warn);
+    }
+  }).catch(console.warn);
 });
+
+ensureSupabase()
+  .then(client => client.auth.onAuthStateChange((_event, session) => {
+    if (session) {
+      offlineStore.cacheSession(session.user).catch(console.warn);
+      return;
+    }
+    if (!navigator.onLine && state.user) return;
+    state.user = null; state.profile = null; state.trips = []; state.passengers.clear(); state.tripDataCache.clear(); state.tripDataLoads.clear();
+    syncTripList(); closeSheets(); setSessionView('anonymous');
+  }))
+  .catch(() => {});
 
 boot();
