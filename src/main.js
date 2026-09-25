@@ -1733,7 +1733,6 @@ function beginInlineTimeEdit(button, day, activity) {
     if (!target) return;
 
     target.start_time = value + ':00';
-    target.starts_at = derivedDayDate(day) + 'T' + value + ':00';
     target.period = periodFromTime(value);
     await persistInlineDayChange(day, records.activities, records.locations, {}, { activityId: activity.id });
   };
@@ -2414,7 +2413,6 @@ async function saveDayEditor() {
         position,
         title: activity.text.trim(),
         start_time: `${activity.time || '09:00'}:00`,
-        starts_at: `${derivedDayDate(editor.day)}T${activity.time || '09:00'}:00`,
         place_id: activity.locationId || null,
         place_name: location?.name.trim() || null,
         address: location?.formattedAddress || null,
