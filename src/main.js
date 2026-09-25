@@ -530,23 +530,14 @@ async function enrichDayPage(day, activities, locations) {
 
     if (!changed) return;
 
-    const firstLocation = updatedLocations.find(location => location.name);
-    const firstPhoto = updatedLocations.find(location => location.photo_url)?.photo_url || null;
-    const updatedDay = {
-      ...day,
-      main_place_name: day.main_place_name || firstLocation?.name || null,
-      photo_url: day.photo_url || firstPhoto
-    };
+    const updatedDay = { ...day };
 
     await offlineStore.saveDayBundle(updatedDay, updatedActivities, updatedLocations);
     await offlineStore.enqueueMutation({
       type: 'save-day',
       tripId: String(day.trip_id || state.activeTripId),
       dayId: day.id,
-      dayPatch: {
-        main_place_name: updatedDay.main_place_name,
-        photo_url: updatedDay.photo_url
-      },
+      dayPatch: { status: day.status || 'planned' },
       locations: updatedLocations,
       activities: updatedActivities,
       removedLocationIds: [],
@@ -1060,6 +1051,10 @@ function openDayPage(dayId, { pushHistory = true } = {}) {
   state.activeDayId = String(day.id);
   const renderKey = `${state.activeTripId}:${day.id}:${state.activeTripDataVersion}`;
   if (dom.dayPage.dataset.renderKey === renderKey) {
+    const activities = state.dayActivities.get(String(day.id)) || [];
+    const locations = state.dayLocations.get(String(day.id)) || [];
+    ensureDayTitleControl().textContent = dayTitle(day, activities, locations);
+    dom.dayPageSaveStatus.dataset.state = state.daySaveStates.get(String(day.id)) || 'idle';
     dom.dayPage.setAttribute('aria-hidden', 'false');
     document.body.dataset.dayPage = 'open';
     return;
@@ -1185,13 +1180,23 @@ function beginInlineDayTitleEdit() {
   );
 
   let debounceTimer = null;
-  let lastQueuedValue = day.title || '';
+  let lastQueuedValue = editor.value.trim();
   let closed = false;
 
   const saveValue = async (value, { rerender = false } = {}) => {
     if (closed && !rerender) return;
     const normalized = value.trim();
-    if (normalized === lastQueuedValue && !rerender) return;
+    if (normalized === lastQueuedValue) {
+      if (rerender) {
+        const currentDay = state.tripDays.find(item => String(item.id) === String(day.id)) || day;
+        ensureDayTitleControl().textContent = dayTitle(
+          currentDay,
+          state.dayActivities.get(String(day.id)) || [],
+          state.dayLocations.get(String(day.id)) || []
+        );
+      }
+      return;
+    }
     lastQueuedValue = normalized;
     const currentDay = state.tripDays.find(item => String(item.id) === String(day.id)) || day;
     await persistDayHeroChange(currentDay, { title: normalized || null }, { rerender });
@@ -1229,7 +1234,12 @@ function beginInlineDayTitleEdit() {
       event.preventDefault();
       clearTimeout(debounceTimer);
       closed = true;
-      openDayPage(day.id, { pushHistory: false });
+      const currentDay = state.tripDays.find(item => String(item.id) === String(day.id)) || day;
+      ensureDayTitleControl().textContent = dayTitle(
+        currentDay,
+        state.dayActivities.get(String(day.id)) || [],
+        state.dayLocations.get(String(day.id)) || []
+      );
     }
   });
 
