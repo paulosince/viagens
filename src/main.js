@@ -1025,49 +1025,304 @@ function openDayPage(dayId, { pushHistory = true } = {}) {
   document.body.dataset.dayPage = 'open';
 }
 
+
+async function persistInlineDayChange(day, activities, locations, dayPatch = {}) {
+  const patch = { status: day.status || 'planned', ...dayPatch };
+  const updatedDay = { ...day, ...patch };
+
+  await offlineStore.saveDayBundle(updatedDay, activities, locations);
+  await offlineStore.enqueueMutation({
+    type: 'save-day',
+    tripId: String(day.trip_id || state.activeTripId),
+    dayId: day.id,
+    dayPatch: patch,
+    locations,
+    activities,
+    removedLocationIds: [],
+    removedActivityIds: []
+  });
+
+  await refreshSyncStatus();
+  applyLocalDaySave(updatedDay, activities, locations);
+  flushOutbox().catch(error => console.warn('Alteração inline aguardando sincronização', error));
+}
+
+function cloneDayRecords(day) {
+  const dayId = String(day.id);
+  return {
+    activities: (state.dayActivities.get(dayId) || []).map(activity => ({ ...activity })),
+    locations: (state.dayLocations.get(dayId) || []).map(location => ({ ...location }))
+  };
+}
+
+function beginInlineTimeEdit(button, day, activity) {
+  const input = document.createElement('input');
+  input.type = 'time';
+  input.className = 'day-inline-time-input';
+  input.value = activityTime(activity) || '09:00';
+
+  let committed = false;
+  const commit = async () => {
+    if (committed) return;
+    committed = true;
+
+    const value = input.value;
+    if (!value) {
+      openDayPage(day.id, { pushHistory: false });
+      return;
+    }
+
+    const records = cloneDayRecords(day);
+    const target = records.activities.find(item => String(item.id) === String(activity.id));
+    if (!target) return;
+
+    target.starts_at = day.date + 'T' + value + ':00';
+    target.period = periodFromTime(value);
+    await persistInlineDayChange(day, records.activities, records.locations);
+  };
+
+  button.replaceWith(input);
+  input.addEventListener('change', commit, { once: true });
+  input.addEventListener('blur', commit, { once: true });
+  input.focus({ preventScroll: true });
+  if (input.showPicker) input.showPicker();
+}
+
+function beginInlineTextEdit(button, day, activity, field, multiline = false) {
+  const editor = document.createElement(multiline ? 'textarea' : 'input');
+  editor.className = multiline ? 'day-inline-textarea' : 'day-inline-text-input';
+  if (!multiline) editor.type = 'text';
+  editor.value = activity[field] || '';
+  if (multiline) editor.rows = 3;
+
+  let committed = false;
+  const commit = async () => {
+    if (committed) return;
+    committed = true;
+
+    const value = editor.value.trim();
+    const records = cloneDayRecords(day);
+    const target = records.activities.find(item => String(item.id) === String(activity.id));
+    if (!target) return;
+
+    target[field] = value || null;
+    await persistInlineDayChange(day, records.activities, records.locations);
+  };
+
+  editor.addEventListener('blur', commit, { once: true });
+  editor.addEventListener('keydown', event => {
+    if (!multiline && event.key === 'Enter') {
+      event.preventDefault();
+      editor.blur();
+    }
+    if (event.key === 'Escape') {
+      committed = true;
+      openDayPage(day.id, { pushHistory: false });
+    }
+  });
+
+  button.replaceWith(editor);
+  editor.focus({ preventScroll: true });
+  if (editor.setSelectionRange) editor.setSelectionRange(editor.value.length, editor.value.length);
+}
+
+function locationDraft(location, activity) {
+  return {
+    id: location?.id || crypto.randomUUID(),
+    name: location?.name || activity.place_name || primaryActivityPlace(activity) || '',
+    selectedName: location?.name || activity.place_name || '',
+    photoUrl: location?.photo_url || activity.photo_url || '',
+    provider: location?.provider || '',
+    providerPlaceId: location?.provider_place_id || '',
+    formattedAddress: location?.formatted_address || activity.address || '',
+    latitude: numericCoordinate(location?.latitude ?? activity.latitude),
+    longitude: numericCoordinate(location?.longitude ?? activity.longitude),
+    category: location?.category || '',
+    placeType: location?.place_type || '',
+    photoProvider: location?.photo_provider || '',
+    photoAuthor: location?.photo_author || '',
+    photoAuthorUrl: location?.photo_author_url || '',
+    photoSourceUrl: location?.photo_source_url || ''
+  };
+}
+
+function openInlinePlaceSearch(day, activity, location) {
+  openPlaceSearch(locationDraft(location, activity), {
+    inlineContext: {
+      dayId: String(day.id),
+      activityId: String(activity.id),
+      originalLocationId: location?.id ? String(location.id) : null
+    }
+  });
+}
+
+async function saveInlinePlaceSelection(context, draft) {
+  const day = state.tripDays.find(item => String(item.id) === String(context.dayId));
+  if (!day) return;
+
+  const records = cloneDayRecords(day);
+  const activity = records.activities.find(item => String(item.id) === String(context.activityId));
+  if (!activity) return;
+
+  let location = context.originalLocationId
+    ? records.locations.find(item => String(item.id) === String(context.originalLocationId))
+    : null;
+
+  const record = {
+    ...(location || {}),
+    id: location?.id || draft.id || crypto.randomUUID(),
+    day_id: day.id,
+    position: location?.position ?? records.locations.length,
+    name: draft.name.trim(),
+    provider: draft.provider || null,
+    provider_place_id: draft.providerPlaceId || null,
+    formatted_address: draft.formattedAddress || null,
+    latitude: draft.latitude,
+    longitude: draft.longitude,
+    category: draft.category || null,
+    place_type: draft.placeType || null,
+    photo_provider: draft.photoProvider || null,
+    photo_author: draft.photoAuthor || null,
+    photo_author_url: draft.photoAuthorUrl || null,
+    photo_source_url: draft.photoSourceUrl || null,
+    photo_url: draft.photoUrl || location?.photo_url || activity.photo_url || null
+  };
+
+  if (location) Object.assign(location, record);
+  else records.locations.push(record);
+
+  activity.place_id = record.id;
+  activity.place_name = record.name;
+  activity.address = record.formatted_address;
+  activity.latitude = record.latitude;
+  activity.longitude = record.longitude;
+  if (record.photo_url) activity.photo_url = record.photo_url;
+
+  const patch = day.main_place_name ? {} : { main_place_name: record.name };
+  await persistInlineDayChange(day, records.activities, records.locations, patch);
+}
+
+async function saveInlinePhoto(day, activity, location, file) {
+  const photoUrl = await compressImage(file);
+  const records = cloneDayRecords(day);
+  const targetActivity = records.activities.find(item => String(item.id) === String(activity.id));
+  if (!targetActivity) return;
+
+  targetActivity.photo_url = photoUrl;
+
+  if (location) {
+    const targetLocation = records.locations.find(item => String(item.id) === String(location.id));
+    if (targetLocation) {
+      targetLocation.photo_url = photoUrl;
+      targetLocation.photo_provider = null;
+      targetLocation.photo_author = null;
+      targetLocation.photo_author_url = null;
+      targetLocation.photo_source_url = null;
+      for (const linkedActivity of records.activities) {
+        if (String(linkedActivity.place_id || '') === String(targetLocation.id)) linkedActivity.photo_url = photoUrl;
+      }
+    }
+  }
+
+  const patch = day.photo_url ? {} : { photo_url: photoUrl };
+  await persistInlineDayChange(day, records.activities, records.locations, patch);
+}
+
 function renderDayPageAgenda(day, activities, locations) {
   dom.dayPageAgenda.replaceChildren();
   const ordered = [...activities].sort((a, b) => String(a.starts_at || '').localeCompare(String(b.starts_at || '')) || (a.position || 0) - (b.position || 0));
+
   for (const activity of ordered) {
     const location = activityLocation(activity, locations);
     const item = document.createElement('li');
     item.className = 'day-view-agenda-item';
-    const time = document.createElement('time');
+
+    const time = document.createElement('button');
+    time.type = 'button';
+    time.className = 'day-inline-time';
     time.textContent = activityTime(activity) || '—';
-    const pin = document.createElement('span');
-    pin.className = 'day-view-pin';
-    pin.setAttribute('aria-hidden', 'true');
+    time.setAttribute('aria-label', 'Editar horário de ' + (activity.title || 'atividade'));
+    time.addEventListener('click', () => beginInlineTimeEdit(time, day, activity));
+
+    const pin = document.createElement('button');
+    pin.type = 'button';
+    pin.className = 'day-view-pin day-inline-location';
+    pin.setAttribute('aria-label', location?.name ? 'Editar local: ' + location.name : 'Definir local');
+    pin.addEventListener('click', () => openInlinePlaceSearch(day, activity, location));
+
     const copy = document.createElement('div');
     copy.className = 'day-view-agenda-copy';
-    const title = document.createElement('strong');
+
+    const title = document.createElement('button');
+    title.type = 'button';
+    title.className = 'day-inline-title';
     title.textContent = activity.title || location?.name || activity.place_name || 'Atividade';
-    const place = document.createElement('span');
+    title.setAttribute('aria-label', 'Editar título');
+    title.addEventListener('click', () => beginInlineTextEdit(title, day, activity, 'title'));
+
+    const place = document.createElement('button');
+    place.type = 'button';
+    place.className = 'day-inline-place-name';
     place.textContent = location?.name || activity.place_name || 'Sem local definido';
+    place.addEventListener('click', () => openInlinePlaceSearch(day, activity, location));
+
     copy.append(title, place);
-    if (activity.description) {
-      const description = document.createElement('p');
-      description.className = 'day-view-agenda-description';
-      description.textContent = activity.description;
-      copy.append(description);
-    }
+
+    const description = document.createElement('button');
+    description.type = 'button';
+    description.className = 'day-inline-description';
+    description.textContent = activity.description || 'Adicionar observação';
+    description.dataset.empty = String(!activity.description);
+    description.setAttribute('aria-label', activity.description ? 'Editar observação' : 'Adicionar observação');
+    description.addEventListener('click', () => beginInlineTextEdit(description, day, activity, 'description', true));
+    copy.append(description);
+
     const photoUrl = location?.photo_url || activity.photo_url || '';
     item.dataset.hasPhoto = String(Boolean(photoUrl));
     item.append(time, pin, copy);
-    if (photoUrl) {
-      const photo = document.createElement(location?.photo_source_url ? 'a' : 'div');
-      photo.className = 'day-view-place-photo';
-      photo.style.backgroundImage = `url("${String(photoUrl).replaceAll('"', '%22')}")`;
-      if (location?.photo_source_url) {
-        photo.href = location.photo_source_url;
-        photo.target = '_blank';
-        photo.rel = 'noopener';
-        photo.setAttribute('aria-label', `Abrir fonte da foto de ${location.name || activity.title}`);
+
+    const file = document.createElement('input');
+    file.type = 'file';
+    file.accept = 'image/*';
+    file.className = 'day-inline-photo-input';
+    file.setAttribute('aria-label', 'Escolher foto de ' + (location?.name || activity.title || 'atividade'));
+
+    const camera = document.createElement('label');
+    camera.className = 'day-inline-camera';
+    camera.setAttribute('aria-label', 'Alterar foto');
+    camera.append(document.createTextNode('📷'), file);
+
+    file.addEventListener('change', async () => {
+      const selected = file.files?.[0];
+      if (!selected) return;
+      camera.dataset.loading = 'true';
+      try {
+        await saveInlinePhoto(day, activity, location, selected);
+      } catch (error) {
+        console.warn(error);
+        camera.dataset.loading = 'false';
       }
-      item.append(photo);
+    });
+
+    if (photoUrl) {
+      const photoShell = document.createElement('div');
+      photoShell.className = 'day-view-photo-shell';
+
+      const photo = document.createElement('div');
+      photo.className = 'day-view-place-photo';
+      photo.style.backgroundImage = 'url("' + String(photoUrl).replaceAll('"', '%22') + '")';
+
+      photoShell.append(photo, camera);
+      item.append(photoShell);
+    } else {
+      camera.classList.add('day-inline-camera-empty');
+      item.append(camera);
     }
+
     dom.dayPageAgenda.append(item);
   }
-  dom.dayPageEmpty.textContent = ordered.length ? '' : `Nenhum horário planejado para o dia ${day.day_number}.`;
+
+  dom.dayPageEmpty.textContent = ordered.length ? '' : 'Nenhum horário planejado para o dia ' + day.day_number + '.';
 }
 
 function dayMapPoints(locations, activities = []) {
