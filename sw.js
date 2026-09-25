@@ -1,4 +1,4 @@
-const CACHE_NAME = 'viaggio-home-v43-chatgpt-app';
+const CACHE_NAME = 'viaggio-home-v44-chatgpt-native';
 const SUPABASE_CLIENT = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const LEAFLET_CSS = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css';
 const LEAFLET_JS = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js';
@@ -7,7 +7,7 @@ const APP_SHELL = [
   './',
   './index.html',
   './style.css?v=20260925-14',
-  './src/main.js?v=20260925-17',
+  './src/main.js?v=20260925-18',
   './src/offline-store.js',
   './manifest.webmanifest',
   './assets/app-icon.svg',
