@@ -204,9 +204,15 @@
       <header id="day_page_hero" class="day-page-hero">
         <div class="trip-page-hero-copy day-page-hero-copy">
           <span id="day_page_badge" class="day-page-badge"></span>
-          <h1 id="day_page_title"></h1>
+          <div class="day-page-title-row">
+            <button id="day_page_title" class="day-inline-heading" type="button" aria-label="Editar nome do dia"></button>
+            <span id="day_page_save_status" class="day-hero-save-status" data-state="idle" role="status" aria-live="polite"></span>
+          </div>
           <p id="day_page_date"></p>
         </div>
+        <label id="day_page_camera" class="day-hero-camera" aria-label="Alterar imagem do dia">📷
+          <input id="day_page_photo_input" type="file" accept="image/*">
+        </label>
       </header>
       <div class="day-page-content">
         <section class="day-view-section">
