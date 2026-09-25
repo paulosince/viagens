@@ -73,7 +73,8 @@ const state = {
   daySaveStates: new Map(),
   daySaveTimers: new Map(),
   daySaveQueues: new Map(),
-  daySaveVersions: new Map()
+  daySaveVersions: new Map(),
+  changeLog: []
 };
 
 const dom = {
@@ -86,12 +87,12 @@ const dom = {
   newTripSheet: document.querySelector('#home_new_trip'), newTripForm: document.querySelector('#new_trip_form'), newTripTitle: document.querySelector('#new-trip-title'), closeNewTrip: document.querySelector('#close_new_trip'), saveNewTrip: document.querySelector('#save_new_trip'), newTripMessage: document.querySelector('#new_trip_message'), coverInput: document.querySelector('#cover-image'), coverPreview: document.querySelector('#cover_preview_image'), tripColorValue: document.querySelector('#trip-color-value'), tripColorPalette: document.querySelector('#trip_color_palette'), tripColorCustom: document.querySelector('#trip-color-custom'), newTripPassengerList: document.querySelector('#new_trip_passenger_list'), addTripPassenger: document.querySelector('#add_trip_passenger'),
   dayEditSheet: document.querySelector('#day_edit_sheet'), daySheetScrim: document.querySelector('#day_sheet_scrim'), dayEditForm: document.querySelector('#day_edit_form'), closeDayEdit: document.querySelector('#close_day_edit'), saveDayEdit: document.querySelector('#save_day_edit'), dayEditTitle: document.querySelector('#day_edit_title'), dayEditDate: document.querySelector('#day_edit_date'), dayTitleInput: document.querySelector('#day-title-input'), dayLocationsEditor: document.querySelector('#day_locations_editor'), addDayLocation: document.querySelector('#add_day_location'), dayAgendaEditor: document.querySelector('#day_agenda_editor'), addDayActivity: document.querySelector('#add_day_activity'), dayNotesInput: document.querySelector('#day-notes-input'), dayEditMessage: document.querySelector('#day_edit_message'),
   placeSearchSheet: document.querySelector('#place_search_sheet'), placeSearchScrim: document.querySelector('#place_search_scrim'), placeSearchForm: document.querySelector('#place_search_form'), closePlaceSearch: document.querySelector('#close_place_search'), confirmPlaceSearch: document.querySelector('#confirm_place_search'), placeSearchInput: document.querySelector('#place_search_input'), runPlaceSearch: document.querySelector('#run_place_search'), placeSearchMessage: document.querySelector('#place_search_message'), placeSearchResults: document.querySelector('#place_search_results'), placePhotoSection: document.querySelector('#place_photo_section'), placePhotoMessage: document.querySelector('#place_photo_message'), placePhotoResults: document.querySelector('#place_photo_results'),
-  profileSheet: document.querySelector('#profile-sheet'), profileForm: document.querySelector('#profile_form'), closeProfile: document.querySelector('#close_profile'), saveProfile: document.querySelector('#save_profile'), profileMessage: document.querySelector('#profile_message'), profileEditorImage: document.querySelector('#profile_editor_image'), profilePhotoInput: document.querySelector('#profile-photo'), profileDisplayName: document.querySelector('#profile_display_name'), profileEmail: document.querySelector('#profile_email'), profileNameInput: document.querySelector('#profile-name'), birthDateInput: document.querySelector('#birth-date'), profileAge: document.querySelector('#profile_age'), profileCreatedAt: document.querySelector('#profile_created_at'), logoutButton: document.querySelector('#logout_button'), deleteAccountButton: document.querySelector('#delete_account_button')
+  profileSheet: document.querySelector('#profile-sheet'), profileForm: document.querySelector('#profile_form'), closeProfile: document.querySelector('#close_profile'), saveProfile: document.querySelector('#save_profile'), profileMessage: document.querySelector('#profile_message'), profileEditorImage: document.querySelector('#profile_editor_image'), profilePhotoInput: document.querySelector('#profile-photo'), profileDisplayName: document.querySelector('#profile_display_name'), profileEmail: document.querySelector('#profile_email'), profileNameInput: document.querySelector('#profile-name'), birthDateInput: document.querySelector('#birth-date'), profileAge: document.querySelector('#profile_age'), profileCreatedAt: document.querySelector('#profile_created_at'), changeLogButton: document.querySelector('#change_log_button'), changeLogSheet: document.querySelector('#change_log_sheet'), closeChangeLog: document.querySelector('#close_change_log'), changeLogList: document.querySelector('#change_log_list'), changeLogEmpty: document.querySelector('#change_log_empty'), logoutButton: document.querySelector('#logout_button'), deleteAccountButton: document.querySelector('#delete_account_button')
 };
 
 // As folhas são camadas globais. Fora da Home, não ficam presas ao contexto
 // de empilhamento criado por transform/isolation daquele contêiner.
-dom.tripPage.after(dom.scrim, dom.newTripSheet, dom.profileSheet);
+dom.tripPage.after(dom.scrim, dom.newTripSheet, dom.profileSheet, dom.changeLogSheet);
 
 const displayDate = value => value ? new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(`${value}T12:00:00`)).replace('.', '') : '';
 
@@ -267,6 +268,7 @@ function setActiveSheet(name = 'none') {
   document.body.dataset.activeSheet = name;
   dom.newTripSheet.setAttribute('aria-hidden', String(name !== 'new-trip'));
   dom.profileSheet.setAttribute('aria-hidden', String(name !== 'profile'));
+  dom.changeLogSheet.setAttribute('aria-hidden', String(name !== 'change-log'));
 }
 
 async function refreshSyncStatus() {
@@ -300,6 +302,121 @@ async function refreshSyncStatus() {
 
   dom.syncStatus.dataset.kind = 'synced';
   dom.syncStatus.textContent = 'Sincronizado · disponível offline';
+}
+
+
+function tripNameForLog(tripId) {
+  return state.trips.find(trip => String(trip.id) === String(tripId))?.name || 'Viagem';
+}
+
+function renderChangeLog(entries = state.changeLog) {
+  dom.changeLogList.replaceChildren();
+  const records = [...entries]
+    .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
+    .slice(0, 150);
+
+  for (const entry of records) {
+    const item = document.createElement('li');
+    item.className = 'change-log-item';
+
+    const marker = document.createElement('span');
+    marker.className = 'change-log-marker';
+    marker.dataset.action = entry.action || 'update';
+
+    const copy = document.createElement('div');
+    copy.className = 'change-log-copy';
+
+    const summary = document.createElement('strong');
+    summary.textContent = entry.summary || 'Alteração registrada';
+
+    const meta = document.createElement('span');
+    const when = new Intl.DateTimeFormat('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(new Date(entry.created_at));
+    meta.textContent = (entry.trip_id ? tripNameForLog(entry.trip_id) + ' · ' : '') + when;
+
+    copy.append(summary, meta);
+    item.append(marker, copy);
+    dom.changeLogList.append(item);
+  }
+
+  dom.changeLogEmpty.hidden = records.length > 0;
+}
+
+async function refreshChangeLog() {
+  if (!state.user?.id) return;
+
+  const local = await offlineStore.listChangeLogs(state.user.id, 150).catch(() => []);
+  state.changeLog = local;
+  renderChangeLog(local);
+
+  const client = await trySupabase();
+  if (!client) return;
+
+  const remote = await client
+    .from('change_log')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(150);
+
+  if (remote.error) {
+    console.warn('Histórico remoto indisponível', remote.error);
+    return;
+  }
+
+  await offlineStore.saveChangeLogs(remote.data || []).catch(console.warn);
+  const merged = new Map();
+  for (const entry of [...local, ...(remote.data || [])]) merged.set(String(entry.id), entry);
+  state.changeLog = [...merged.values()]
+    .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
+    .slice(0, 150);
+  renderChangeLog(state.changeLog);
+}
+
+async function openChangeLog() {
+  setActiveSheet('change-log');
+  await refreshChangeLog();
+}
+
+async function recordChange({
+  tripId = null,
+  entityType = 'app',
+  entityId = null,
+  action = 'update',
+  summary,
+  beforeState = null,
+  afterState = null
+}) {
+  if (!state.user?.id || !summary) return null;
+
+  const entry = {
+    id: crypto.randomUUID(),
+    user_id: state.user.id,
+    trip_id: tripId || null,
+    entity_type: entityType,
+    entity_id: entityId ? String(entityId) : null,
+    action,
+    summary,
+    before_state: beforeState,
+    after_state: afterState,
+    created_at: new Date().toISOString()
+  };
+
+  await offlineStore.saveChangeLog(entry);
+  await offlineStore.enqueueMutation({
+    type: 'change-log',
+    tripId: tripId || null,
+    entry
+  });
+
+  state.changeLog = [entry, ...state.changeLog.filter(item => String(item.id) !== String(entry.id))].slice(0, 150);
+  if (document.body.dataset.activeSheet === 'change-log') renderChangeLog(state.changeLog);
+
+  flushOutbox().catch(error => console.warn('Histórico aguardando sincronização', error));
+  return entry;
 }
 
 function setLoading(button, loading) {
@@ -640,7 +757,28 @@ async function enrichDayPage(day, activities, locations) {
 }
 
 
-async function persistDayOrder(orderIds) {
+
+function revealMovedDay(dayId) {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      const card = dom.tripDayList.querySelector('[data-day-id="' + CSS.escape(String(dayId)) + '"]');
+      if (!card) return;
+
+      card.dataset.recentlyMoved = 'true';
+      card.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+        inline: 'nearest'
+      });
+
+      setTimeout(() => {
+        if (card.isConnected) card.dataset.recentlyMoved = 'false';
+      }, 1200);
+    });
+  });
+}
+
+async function persistDayOrder(orderIds, focusDayId = null) {
   const trip = state.trips.find(item => String(item.id) === String(state.activeTripId));
   if (!trip || !orderIds.length) return;
 
@@ -671,6 +809,7 @@ async function persistDayOrder(orderIds) {
   };
   state.tripDataCache.set(String(trip.id), data);
   applyTripData(data);
+  if (focusDayId) revealMovedDay(focusDayId);
   await refreshSyncStatus();
 
   flushOutbox().catch(error => console.warn('Reordenação aguardando sincronização', error));
@@ -693,7 +832,23 @@ async function moveDayByOffset(dayId, offset) {
   const reordered = [...orderedVisible];
   [reordered[currentIndex], reordered[targetIndex]] = [reordered[targetIndex], reordered[currentIndex]];
 
-  await persistDayOrder(reordered.map(day => String(day.id)));
+  const movedDay = orderedVisible[currentIndex];
+  const movedTitle = dayTitle(
+    movedDay,
+    state.dayActivities.get(String(movedDay.id)) || [],
+    state.dayLocations.get(String(movedDay.id)) || []
+  );
+
+  await persistDayOrder(reordered.map(day => String(day.id)), dayId);
+  await recordChange({
+    tripId: trip.id,
+    entityType: 'trip_day',
+    entityId: dayId,
+    action: 'reorder',
+    summary: 'Dia ' + (currentIndex + 1) + ' movido para o dia ' + (targetIndex + 1) + ': ' + movedTitle,
+    beforeState: { position: currentIndex },
+    afterState: { position: targetIndex }
+  });
 }
 
 async function recoverHiddenDay(day) {
@@ -2270,6 +2425,12 @@ function activityForRemote(activity, orderedSchema, day = null) {
 async function syncMutation(mutation) {
   const client = await trySupabase();
   if (!client) throw new Error('Backend indisponível.');
+
+  if (mutation.type === 'change-log') {
+    const saved = await client.from('change_log').upsert(mutation.entry);
+    if (saved.error) throw saved.error;
+    return;
+  }
 
   const orderedSchema = await supportsOrderedDaySchema(client);
 
