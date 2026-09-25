@@ -28,3 +28,26 @@ O próximo passo é transformar cada viagem em um conjunto de tabelas: roteiro p
 3. Publique a função autenticada: `supabase functions deploy unsplash-photos`.
 
 A chave fica somente na Edge Function. A interface oculta as sugestões quando a cota não está disponível e mantém o envio de foto do aparelho.
+
+
+## Disponibilidade offline
+
+A aplicação é local-first para o roteiro de viagem:
+
+- perfil, viagens, passageiros, dias, locais e agenda recebem uma cópia durável em IndexedDB;
+- a abertura do app e a consulta do roteiro usam essa cópia quando o Supabase ou a internet não estão disponíveis;
+- edições de dias são salvas primeiro no aparelho e entram em uma fila de sincronização;
+- quando a conexão retorna, a fila é enviada ao Supabase;
+- mudanças locais pendentes nunca são substituídas por uma leitura remota;
+- o Service Worker mantém o app shell e imagens já visualizadas disponíveis offline;
+- a Home informa se o conteúdo está sincronizado, salvo localmente com mudanças pendentes ou em modo offline.
+
+Criação/edição estrutural de viagens, perfil e exclusões continuam exigindo conexão para evitar conflitos de identidade e estrutura.
+
+### Primeira cópia
+
+Depois de publicar uma versão nova, abra o app uma vez com o Supabase acessível. O app cria um snapshot completo dos dias, agenda e locais de todas as viagens; a partir daí o roteiro pode ser consultado offline naquele aparelho.
+
+### Keepalive
+
+O workflow `.github/workflows/supabase-keepalive.yml` faz uma consulta diária ao projeto para reduzir a chance de pausa automática por inatividade. Ele é uma camada adicional de disponibilidade, não substitui a cópia local.
