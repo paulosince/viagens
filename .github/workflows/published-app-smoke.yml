@@ -21,9 +21,9 @@ jobs:
           url='https://paulosince.github.io/viagens/'
           for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
             html="$(curl --location --silent --show-error --max-time 20 "$url" || true)"
-            js="$(curl --location --silent --show-error --max-time 20 "$url/src/main.js?v=20260925-5" || true)"
-            css="$(curl --location --silent --show-error --max-time 20 "$url/style.css?v=20260925-5" || true)"
-            if grep -q 'src/main.js?v=20260925-5' <<<"$html" &&
+            js="$(curl --location --silent --show-error --max-time 20 "$url/src/main.js?v=20260925-6" || true)"
+            css="$(curl --location --silent --show-error --max-time 20 "$url/style.css?v=20260925-6" || true)"
+            if grep -q 'src/main.js?v=20260925-6' <<<"$html" &&
                grep -q 'id="sync_status"' <<<"$html" &&
                grep -q 'enrichDayPage' <<<"$js" &&
                grep -q 'loadLocalWorkspace' <<<"$js" &&
@@ -34,6 +34,9 @@ jobs:
                grep -q 'saveInlinePhoto' <<<"$js" &&
                grep -q 'day-inline-camera' <<<"$css" &&
                grep -q 'day-inline-title' <<<"$css" &&
+               grep -q 'agenda-save-pulse' <<<"$css" &&
+               grep -q 'agendaSaveVersions' <<<"$js" &&
+               grep -q 'setAgendaSaveState' <<<"$js" &&
                grep -q 'grid-row: 2' <<<"$css" &&
                grep -q 'width: 50px' <<<"$css" &&
                grep -q 'id="splash_status"' <<<"$html" &&
