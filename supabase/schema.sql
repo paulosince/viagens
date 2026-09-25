@@ -20,7 +20,6 @@ create table if not exists public.trips (
 );
 
 alter table public.trips add column if not exists destination text not null default '';
-alter table public.trip_days add column if not exists main_place_name text;
 alter table public.trip_days add column if not exists position integer;
 alter table public.trip_days add column if not exists is_hidden boolean not null default false;
 alter table public.trip_days add column if not exists deleted_at timestamptz;
@@ -63,7 +62,6 @@ create table if not exists public.trip_days (
   title text,
   summary text,
   photo_url text,
-  main_place_name text,
   status text not null default 'empty'
 );
 
