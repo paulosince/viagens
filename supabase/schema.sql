@@ -6,7 +6,8 @@ create table if not exists public.trips (
   name text not null,
   destination text not null default '',
   start_date date not null,
-  end_date date not null,
+  day_count integer not null default 1 check (day_count between 1 and 365),
+  end_date date,
   arrival_method text,
   location_label text,
   latitude numeric,
@@ -16,17 +17,21 @@ create table if not exists public.trips (
   primary_color text not null default '#14212b',
   secondary_color text not null default '#b89d63',
   deleted_at timestamptz,
-  created_at timestamptz not null default now(),
-  constraint trips_dates_valid check (end_date >= start_date)
+  created_at timestamptz not null default now()
 );
 
 alter table public.trips add column if not exists destination text not null default '';
 alter table public.trip_days add column if not exists main_place_name text;
+alter table public.trip_days add column if not exists position integer;
+alter table public.trip_days add column if not exists is_hidden boolean not null default false;
+alter table public.trip_days add column if not exists deleted_at timestamptz;
 alter table public.activities add column if not exists shopping_items text;
 alter table public.activities add column if not exists meal text;
 alter table public.activities add column if not exists transport text;
 alter table public.activities add column if not exists notes text;
+alter table public.activities add column if not exists start_time time without time zone;
 alter table public.trips add column if not exists start_date date;
+alter table public.trips add column if not exists day_count integer not null default 1;
 alter table public.trips add column if not exists end_date date;
 alter table public.trips add column if not exists arrival_method text;
 alter table public.trips add column if not exists location_label text;
@@ -54,16 +59,21 @@ alter table public.passengers add column if not exists birth_date date;
 create table if not exists public.trip_days (
   id uuid primary key default gen_random_uuid(),
   trip_id uuid not null references public.trips(id) on delete cascade,
-  day_number integer not null,
-  date date not null,
+  position integer not null default 0,
+  is_hidden boolean not null default false,
+  deleted_at timestamptz,
+  day_number integer,
+  date date,
   title text,
   summary text,
   photo_url text,
   main_place_name text,
-  status text not null default 'empty',
-  unique(trip_id, day_number),
-  unique(trip_id, date)
+  status text not null default 'empty'
 );
+
+create unique index if not exists trip_days_trip_position_active_unique
+  on public.trip_days (trip_id, position)
+  where deleted_at is null;
 
 create table if not exists public.day_locations (
   id uuid primary key default gen_random_uuid(),
@@ -113,6 +123,7 @@ create table if not exists public.activities (
   position integer not null default 0,
   title text not null,
   description text,
+  start_time time without time zone,
   starts_at timestamptz,
   place_name text,
   address text,
