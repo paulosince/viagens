@@ -197,6 +197,14 @@ button { -webkit-tap-highlight-color: transparent; }
 }
 
 .header-buttons { display: flex; align-items: center; gap: 10px; }
+.chatgpt-header-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  padding-inline: 13px;
+  white-space: nowrap;
+}
 
 .profile-button,
 .circle-button {
