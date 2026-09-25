@@ -858,6 +858,15 @@ async function recoverHiddenDay(day) {
     status: (day.status === 'hidden' || !day.status) ? 'planned' : day.status
   };
   await persistInlineDayChange(day, records.activities, records.locations, patch);
+  await recordChange({
+    tripId: day.trip_id || state.activeTripId,
+    entityType: 'trip_day',
+    entityId: day.id,
+    action: 'restore',
+    summary: 'Dia ' + dayNumber(day) + ' recuperado',
+    beforeState: { is_hidden: true },
+    afterState: { is_hidden: false }
+  });
 }
 
 async function softDeleteHiddenDay(day) {
@@ -915,6 +924,15 @@ async function softDeleteHiddenDay(day) {
   state.tripDataCache.set(String(trip.id), data);
   applyTripData(data);
   await refreshSyncStatus();
+  await recordChange({
+    tripId: trip.id,
+    entityType: 'trip_day',
+    entityId: day.id,
+    action: 'delete',
+    summary: 'Dia ' + (position + 1) + ' movido para Apagados recentemente',
+    beforeState: { deleted_at: null, position },
+    afterState: { deleted_at: deletedAt, position }
+  });
 }
 
 function renderTripDays(days, activitiesByDay = new Map(), locationsByDay = new Map()) {
@@ -1663,6 +1681,7 @@ function beginInlineDayTitleEdit() {
     state.dayActivities.get(String(day.id)) || [],
     state.dayLocations.get(String(day.id)) || []
   );
+  const originalTitle = editor.value.trim();
 
   let debounceTimer = null;
   let lastQueuedValue = editor.value.trim();
@@ -1702,6 +1721,18 @@ function beginInlineDayTitleEdit() {
     clearTimeout(debounceTimer);
     try {
       await saveValue(editor.value, { rerender: true });
+      const finalTitle = editor.value.trim();
+      if (finalTitle !== originalTitle) {
+        await recordChange({
+          tripId: day.trip_id || state.activeTripId,
+          entityType: 'trip_day',
+          entityId: day.id,
+          action: 'update',
+          summary: 'Dia ' + dayNumber(day) + ' renomeado de “' + originalTitle + '” para “' + finalTitle + '”',
+          beforeState: { title: originalTitle },
+          afterState: { title: finalTitle }
+        });
+      }
     } catch (error) {
       console.warn('Autosave final do nome do dia falhou', error);
       openDayPage(day.id, { pushHistory: false });
@@ -1743,6 +1774,15 @@ async function saveDayHeroPhoto(file) {
     const photoUrl = await compressImage(file);
     const currentDay = state.tripDays.find(item => String(item.id) === String(day.id)) || day;
     await persistDayHeroChange(currentDay, { photo_url: photoUrl });
+    await recordChange({
+      tripId: day.trip_id || state.activeTripId,
+      entityType: 'trip_day',
+      entityId: day.id,
+      action: 'update',
+      summary: 'Imagem do dia ' + dayNumber(day) + ' alterada',
+      beforeState: { photo: Boolean(day.photo_url) },
+      afterState: { photo: true }
+    });
   } catch (error) {
     setDaySaveState(day.id, 'error');
     throw error;
@@ -1895,6 +1935,7 @@ function beginInlineTimeEdit(button, day, activity) {
       return;
     }
 
+    const previousTime = activityTime(activity) || '—';
     setAgendaSaveState(activity.id, 'saving');
     const records = cloneDayRecords(day);
     const target = records.activities.find(item => String(item.id) === String(activity.id));
@@ -1903,6 +1944,17 @@ function beginInlineTimeEdit(button, day, activity) {
     target.start_time = value + ':00';
     target.period = periodFromTime(value);
     await persistInlineDayChange(day, records.activities, records.locations, {}, { activityId: activity.id });
+    if (previousTime !== value) {
+      await recordChange({
+        tripId: day.trip_id || state.activeTripId,
+        entityType: 'activity',
+        entityId: activity.id,
+        action: 'update',
+        summary: 'Horário de “' + (activity.title || 'atividade') + '” alterado de ' + previousTime + ' para ' + value,
+        beforeState: { start_time: previousTime },
+        afterState: { start_time: value }
+      });
+    }
   };
 
   button.replaceWith(input);
@@ -1918,6 +1970,7 @@ function beginInlineTextEdit(button, day, activity, field, multiline = false) {
   if (!multiline) editor.type = 'text';
   editor.value = activity[field] || '';
   if (multiline) editor.rows = 3;
+  const originalValue = editor.value.trim();
 
   let debounceTimer = null;
   let lastQueuedValue = editor.value;
@@ -1956,6 +2009,20 @@ function beginInlineTextEdit(button, day, activity, field, multiline = false) {
     const value = editor.value;
     try {
       await saveValue(value, { rerender: true });
+      const finalValue = value.trim();
+      if (finalValue !== originalValue) {
+        await recordChange({
+          tripId: day.trip_id || state.activeTripId,
+          entityType: 'activity',
+          entityId: activity.id,
+          action: 'update',
+          summary: field === 'title'
+            ? 'Atividade renomeada de “' + (originalValue || 'sem título') + '” para “' + (finalValue || 'sem título') + '”'
+            : 'Observação de “' + (activity.title || 'atividade') + '” alterada',
+          beforeState: { [field]: originalValue || null },
+          afterState: { [field]: finalValue || null }
+        });
+      }
     } catch (error) {
       console.warn('Autosave final de texto falhou', error);
       openDayPage(day.id, { pushHistory: false });
@@ -2023,6 +2090,7 @@ async function saveInlinePlaceSelection(context, draft) {
   let location = context.originalLocationId
     ? records.locations.find(item => String(item.id) === String(context.originalLocationId))
     : null;
+  const previousPlace = location?.name || activity.place_name || 'Sem local';
 
   const record = {
     ...(location || {}),
@@ -2056,6 +2124,17 @@ async function saveInlinePlaceSelection(context, draft) {
 
   setAgendaSaveState(activity.id, 'saving');
   await persistInlineDayChange(day, records.activities, records.locations, {}, { activityId: activity.id });
+  if (previousPlace !== record.name) {
+    await recordChange({
+      tripId: day.trip_id || state.activeTripId,
+      entityType: 'activity',
+      entityId: activity.id,
+      action: 'update',
+      summary: 'Local de “' + (activity.title || 'atividade') + '” alterado de “' + previousPlace + '” para “' + record.name + '”',
+      beforeState: { place_name: previousPlace === 'Sem local' ? null : previousPlace },
+      afterState: { place_name: record.name }
+    });
+  }
 }
 
 async function saveInlinePhoto(day, activity, location, file) {
@@ -2083,6 +2162,15 @@ async function saveInlinePhoto(day, activity, location, file) {
 
   const patch = day.photo_url ? {} : { photo_url: photoUrl };
   await persistInlineDayChange(day, records.activities, records.locations, patch, { activityId: activity.id });
+  await recordChange({
+    tripId: day.trip_id || state.activeTripId,
+    entityType: 'activity',
+    entityId: activity.id,
+    action: 'update',
+    summary: 'Foto de “' + (activity.title || location?.name || 'atividade') + '” alterada',
+    beforeState: { photo: Boolean(activity.photo_url || location?.photo_url) },
+    afterState: { photo: true }
+  });
 }
 
 function renderDayPageAgenda(day, activities, locations) {
@@ -2621,6 +2709,23 @@ async function saveDayEditor() {
     await refreshSyncStatus();
 
     applyLocalDaySave(localDay, activities, locations);
+    await recordChange({
+      tripId: editor.day.trip_id || state.activeTripId,
+      entityType: 'trip_day',
+      entityId: editor.day.id,
+      action: 'update',
+      summary: 'Dia ' + dayNumber(editor.day) + ' alterado no editor completo',
+      beforeState: {
+        title: editor.day.title || null,
+        activities: previousActivities.length,
+        locations: previousLocations.length
+      },
+      afterState: {
+        title: localDay.title || null,
+        activities: activities.length,
+        locations: locations.length
+      }
+    });
 
     state.saving = false;
     setLoading(dom.saveDayEdit, false);
@@ -2859,12 +2964,25 @@ async function softDeleteSelectedTrips() {
     return;
   }
   const ids = [...state.selectedTripIds];
+  const deletedTrips = state.trips.filter(trip => ids.includes(String(trip.id)) || ids.includes(trip.id));
+  const deletedAt = new Date().toISOString();
   dom.deleteSelectedTrips.disabled = true;
-  const result = await client.from('trips').update({ deleted_at: new Date().toISOString() }).in('id', ids).eq('user_id', state.user.id);
+  const result = await client.from('trips').update({ deleted_at: deletedAt }).in('id', ids).eq('user_id', state.user.id);
   if (result.error) {
     dom.deleteSelectedTrips.textContent = result.error.message;
     dom.deleteSelectedTrips.disabled = false;
     return;
+  }
+  for (const trip of deletedTrips) {
+    await recordChange({
+      tripId: trip.id,
+      entityType: 'trip',
+      entityId: trip.id,
+      action: 'delete',
+      summary: 'Viagem “' + trip.name + '” movida para excluídas',
+      beforeState: { deleted_at: null },
+      afterState: { deleted_at: deletedAt }
+    });
   }
   setEditingMode(false);
   await loadTrips();
