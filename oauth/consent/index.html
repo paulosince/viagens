@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#14212b">
+  <title>Autorizar ChatGPT · Viaggio</title>
+  <style>
+    :root{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif;color:#0b1628;background:#f2f2f7}
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100dvh;display:grid;place-items:center;padding:max(24px,env(safe-area-inset-top)) 18px max(24px,env(safe-area-inset-bottom));background:linear-gradient(180deg,#eaf3fb,#f2f2f7 42%)}
+    main{width:min(100%,520px)}
+    .brand{display:flex;align-items:center;gap:12px;margin:0 0 18px;padding:0 6px}
+    .mark{display:grid;width:44px;height:44px;place-items:center;border-radius:14px;color:#fff;background:#14212b;font-size:23px}
+    .brand strong{font-size:22px}.brand span{display:block;margin-top:2px;color:#6e6e73;font-size:13px}
+    .card{padding:24px;border:1px solid rgba(60,60,67,.12);border-radius:28px;background:rgba(255,255,255,.86);box-shadow:0 18px 50px rgba(30,42,60,.12);backdrop-filter:blur(24px)}
+    h1{margin:0;font-size:28px;line-height:1.05;letter-spacing:-.035em}
+    p{color:#55565b;line-height:1.5}
+    .client{margin:18px 0;padding:16px;border-radius:18px;background:#f7f7fa}
+    .client strong,.client span{display:block}.client span{margin-top:4px;color:#77777d;font-size:12px}
+    .scopes{display:grid;gap:8px;margin:16px 0 22px;padding:0;list-style:none}
+    .scopes li{display:flex;gap:9px;align-items:center;color:#3c3c43;font-size:14px}
+    .scopes li::before{content:"✓";display:grid;width:21px;height:21px;place-items:center;border-radius:50%;color:#fff;background:#34c759;font-size:12px;font-weight:800}
+    .actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    button{min-height:48px;border:0;border-radius:15px;font:inherit;font-weight:750}
+    .primary{color:#fff;background:#007aff}.secondary{color:#0b1628;background:#e9e9ee}
+    .message{min-height:18px;margin:12px 0 0;color:#6e6e73;font-size:12px;text-align:center}
+    .login{display:grid;gap:10px;margin-top:18px}
+    input{min-height:48px;padding:0 14px;border:1px solid rgba(60,60,67,.18);border-radius:14px;background:#fff;font:inherit}
+    [hidden]{display:none!important}
+  </style>
+</head>
+<body>
+<main>
+  <div class="brand"><div class="mark">✈︎</div><div><strong>Viaggio</strong><span>Conexão segura com ChatGPT</span></div></div>
+  <section class="card">
+    <div id="loading">
+      <h1>Preparando autorização…</h1>
+      <p>Verificando sua conta e o aplicativo que pediu acesso.</p>
+    </div>
+
+    <form id="login" class="login" hidden>
+      <h1>Entre no Viaggio</h1>
+      <p>Use a mesma conta do aplicativo para continuar a autorização.</p>
+      <input name="email" type="email" autocomplete="email" placeholder="E-mail" required>
+      <input name="password" type="password" autocomplete="current-password" placeholder="Senha" required>
+      <button class="primary" type="submit">Entrar e continuar</button>
+    </form>
+
+    <div id="consent" hidden>
+      <h1>Permitir acesso ao Viaggio?</h1>
+      <p>Você está autorizando um assistente de IA a ler e, quando você pedir, alterar suas viagens.</p>
+      <div class="client"><strong id="client_name">Aplicativo</strong><span id="client_uri"></span></div>
+      <ul id="scope_list" class="scopes"></ul>
+      <div class="actions">
+        <button id="deny" class="secondary" type="button">Cancelar</button>
+        <button id="approve" class="primary" type="button">Autorizar</button>
+      </div>
+    </div>
+
+    <p id="message" class="message" role="status"></p>
+  </section>
+</main>
+<script type="module">
+  import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+  const SUPABASE_URL = 'https://siabldasqinpfmxslwji.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_UgbBIOq1TnInuPRrQpAFag_JLIzYuFf';
+  const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  const authorizationId = new URLSearchParams(location.search).get('authorization_id');
+  const loading = document.querySelector('#loading');
+  const login = document.querySelector('#login');
+  const consent = document.querySelector('#consent');
+  const message = document.querySelector('#message');
+  const clientName = document.querySelector('#client_name');
+  const clientUri = document.querySelector('#client_uri');
+  const scopeList = document.querySelector('#scope_list');
+  const approve = document.querySelector('#approve');
+  const deny = document.querySelector('#deny');
+
+  if (!authorizationId) {
+    loading.querySelector('h1').textContent = 'Autorização inválida';
+    loading.querySelector('p').textContent = 'O pedido não contém um authorization_id.';
+    throw new Error('Missing authorization_id');
+  }
+
+  const scopeLabel = scope => ({
+    openid: 'Identificar sua conta',
+    email: 'Ler o e-mail da conta',
+    profile: 'Ler informações básicas do perfil'
+  })[scope] || scope;
+
+  async function showDetails() {
+    message.textContent = '';
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData.session) {
+      loading.hidden = true;
+      consent.hidden = true;
+      login.hidden = false;
+      return;
+    }
+
+    const { data, error } = await supabase.auth.oauth.getAuthorizationDetails(authorizationId);
+    if (error || !data) throw error || new Error('Pedido de autorização inválido.');
+
+    if (!('authorization_id' in data)) {
+      location.replace(data.redirect_url);
+      return;
+    }
+
+    clientName.textContent = data.client?.name || 'ChatGPT';
+    clientUri.textContent = data.redirect_uri || '';
+    scopeList.replaceChildren();
+    const scopes = String(data.scope || '').split(/\s+/).filter(Boolean);
+    for (const scope of scopes) {
+      const item = document.createElement('li');
+      item.textContent = scopeLabel(scope);
+      scopeList.append(item);
+    }
+    if (!scopes.length) {
+      for (const label of ['Ler suas viagens', 'Criar e editar roteiros quando você pedir']) {
+        const item = document.createElement('li');
+        item.textContent = label;
+        scopeList.append(item);
+      }
+    }
+
+    loading.hidden = true;
+    login.hidden = true;
+    consent.hidden = false;
+  }
+
+  login.addEventListener('submit', async event => {
+    event.preventDefault();
+    message.textContent = 'Entrando…';
+    const credentials = Object.fromEntries(new FormData(login));
+    const { error } = await supabase.auth.signInWithPassword(credentials);
+    if (error) {
+      message.textContent = error.message;
+      return;
+    }
+    await showDetails().catch(error => { message.textContent = error.message; });
+  });
+
+  async function decide(kind) {
+    approve.disabled = true;
+    deny.disabled = true;
+    message.textContent = kind === 'approve' ? 'Autorizando…' : 'Cancelando…';
+
+    const fn = kind === 'approve'
+      ? supabase.auth.oauth.approveAuthorization.bind(supabase.auth.oauth)
+      : supabase.auth.oauth.denyAuthorization.bind(supabase.auth.oauth);
+
+    const { data, error } = await fn(authorizationId);
+    if (error) {
+      message.textContent = error.message;
+      approve.disabled = false;
+      deny.disabled = false;
+      return;
+    }
+    location.replace(data.redirect_url);
+  }
+
+  approve.addEventListener('click', () => decide('approve'));
+  deny.addEventListener('click', () => decide('deny'));
+
+  showDetails().catch(error => {
+    loading.hidden = false;
+    login.hidden = true;
+    consent.hidden = true;
+    loading.querySelector('h1').textContent = 'Não foi possível autorizar';
+    loading.querySelector('p').textContent = error.message || 'Tente novamente.';
+  });
+</script>
+</body>
+</html>
