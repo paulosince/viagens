@@ -866,8 +866,7 @@ body[data-day-page="open"] .day-page {
   border: 0;
   background: transparent;
 }
-.day-map-numbered-marker span {
-  position: relative;
+.day-map-numbered-marker > span {
   display: grid;
   width: 30px;
   height: 30px;
@@ -881,36 +880,9 @@ body[data-day-page="open"] .day-page {
   font-weight: 900;
   transform: rotate(-45deg);
 }
-.day-map-numbered-marker span::after {
-  content: attr(data-number);
-}
-.day-map-numbered-marker span {
+.day-map-numbered-marker b {
+  font: inherit;
   line-height: 1;
-}
-.day-map-numbered-marker span {
-  text-align: center;
-}
-.day-map-numbered-marker span {
-  padding: 0;
-}
-.day-map-numbered-marker span {
-  writing-mode: horizontal-tb;
-}
-.day-map-numbered-marker span {
-  font-variant-numeric: tabular-nums;
-}
-.day-map-numbered-marker span {
-  text-orientation: mixed;
-}
-.day-map-numbered-marker span {
-  transform: rotate(-45deg);
-}
-.day-map-numbered-marker span {
-  color: transparent;
-}
-.day-map-numbered-marker span::before {
-  content: attr(data-label);
-  color: white;
   transform: rotate(45deg);
 }
 .day-view-directions {
