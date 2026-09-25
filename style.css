@@ -769,43 +769,40 @@ body[data-trip-page="open"] .trip-page {
   font-weight: 800;
 }
 .trip-day-remove:disabled { opacity: .45; }
-.trip-day-drag-handle {
+.trip-day-order-controls {
   position: absolute;
   z-index: 5;
   right: 13px;
   bottom: 13px;
+  display: flex;
+  gap: 6px;
+}
+.trip-day-order-button {
   display: grid;
   width: 40px;
   height: 40px;
-  place-content: center;
-  gap: 3px;
-  padding: 0;
+  place-items: center;
+  padding: 0 0 2px;
   border: 1px solid rgba(118,118,128,.14);
   border-radius: 50%;
-  background: rgba(242,242,247,.86);
+  color: #6e6e73;
+  background: rgba(242,242,247,.9);
   box-shadow: 0 3px 12px rgba(0,0,0,.08);
+  font: inherit;
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  touch-action: none;
-  cursor: grab;
+  appearance: none;
+  -webkit-appearance: none;
 }
-.trip-day-drag-handle span {
-  display: block;
-  width: 16px;
-  height: 2px;
-  border-radius: 999px;
-  background: #8e8e93;
+.trip-day-order-button:active:not(:disabled) {
+  transform: scale(.92);
+  background: rgba(229,229,234,.96);
 }
-.trip-day-drag-handle:active { cursor: grabbing; }
-.trip-day-card[data-dragging="true"] {
-  z-index: 20;
-  opacity: .78;
-  transform: scale(.985);
-  box-shadow: 0 22px 46px rgba(0,0,0,.25);
-}
-body[data-day-dragging="true"] {
-  user-select: none;
-  -webkit-user-select: none;
+.trip-day-order-button:disabled {
+  opacity: .28;
 }
 
 @media (min-width: 720px) {
