@@ -85,3 +85,64 @@ comment on column public.trip_days.deleted_at is
 
 comment on column public.activities.start_time is
   'Clock time within the owning day. No calendar date is stored here.';
+
+
+-- Permanently purge soft-deleted days and their day-owned dependent records
+-- after the 30-day recovery window.
+create extension if not exists pg_cron;
+
+create or replace function public.purge_expired_trip_days()
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  purged_count integer := 0;
+begin
+  delete from public.checklist_items
+  where activity_id in (
+    select a.id
+    from public.activities a
+    join public.trip_days d on d.id = a.day_id
+    where d.deleted_at < now() - interval '30 days'
+  );
+
+  delete from public.budget_items
+  where activity_id in (
+    select a.id
+    from public.activities a
+    join public.trip_days d on d.id = a.day_id
+    where d.deleted_at < now() - interval '30 days'
+  );
+
+  delete from public.trip_days
+  where deleted_at < now() - interval '30 days';
+
+  get diagnostics purged_count = row_count;
+  return purged_count;
+end;
+$$;
+
+revoke all on function public.purge_expired_trip_days() from public, anon, authenticated;
+
+do $$
+declare
+  existing_job bigint;
+begin
+  select jobid into existing_job
+  from cron.job
+  where jobname = 'purge_deleted_trip_days_30d'
+  limit 1;
+
+  if existing_job is not null then
+    perform cron.unschedule(existing_job);
+  end if;
+end;
+$$;
+
+select cron.schedule(
+  'purge_deleted_trip_days_30d',
+  '23 4 * * *',
+  $cron$select public.purge_expired_trip_days();$cron$
+);
