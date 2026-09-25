@@ -1,9 +1,11 @@
-const CACHE_NAME = 'viaggio-home-v24';
+const CACHE_NAME = 'viaggio-home-v25-offline-first';
 const APP_SHELL = [
   './',
   './index.html',
   './style.css?v=20260720-33',
-  './src/main.js?v=20260720-34',
+  './src/main.js?v=20260925-1',
+  './src/offline-store.js',
+  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm',
   './manifest.webmanifest',
   './assets/app-icon.svg',
   './assets/cintia.png'
@@ -28,7 +30,8 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
-  if (url.origin !== self.location.origin) return;
+  const isSupabaseClient = url.href === 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+  if (url.origin !== self.location.origin && !isSupabaseClient) return;
   if (event.request.mode !== 'navigate') {
     event.respondWith(
       caches.match(event.request).then(cached => {
