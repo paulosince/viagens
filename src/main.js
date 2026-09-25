@@ -479,46 +479,46 @@ async function copyMcpUrl() {
   }
 }
 
-function openChatgptApp(webUrl = 'https://chatgpt.com/') {
+function openChatgptApp() {
   const isiOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
   if (!isiOS) {
-    window.location.href = webUrl;
+    window.open('https://chatgpt.com/', '_blank', 'noopener');
     return;
   }
 
-  let appUrl = 'com.openai.chat://';
-  try {
-    const parsed = new URL(webUrl);
-    if (parsed.hostname.endsWith('chatgpt.com')) {
-      appUrl = 'com.openai.chat://' + parsed.hostname + parsed.pathname + parsed.search + parsed.hash;
-    }
-  } catch {}
-
-  let fallbackTimer = null;
-  const stopFallback = () => {
-    if (document.visibilityState !== 'hidden') return;
-    if (fallbackTimer) clearTimeout(fallbackTimer);
-    document.removeEventListener('visibilitychange', stopFallback);
+  let didLeave = false;
+  const markLeave = () => {
+    if (document.visibilityState === 'hidden') didLeave = true;
   };
 
-  document.addEventListener('visibilitychange', stopFallback);
-  fallbackTimer = setTimeout(() => {
-    document.removeEventListener('visibilitychange', stopFallback);
-    if (document.visibilityState === 'visible') window.location.href = webUrl;
-  }, 1200);
+  document.addEventListener('visibilitychange', markLeave, { once: true });
 
-  window.location.href = appUrl;
+  // The iOS ChatGPT app registers the chatgpt:// scheme. Keep this navigation
+  // inside the original user gesture; installed PWAs are more restrictive than Safari.
+  const link = document.createElement('a');
+  link.href = 'chatgpt://';
+  link.style.display = 'none';
+  document.body.append(link);
+  link.click();
+  link.remove();
+
+  setTimeout(() => {
+    if (!didLeave && document.visibilityState === 'visible') {
+      dom.chatgptMessage.textContent = 'Não consegui abrir o app automaticamente. Abra o ChatGPT no iPhone e conclua a conexão em Configurações → Plugins.';
+    }
+  }, 1500);
 }
 
 function connectChatgpt() {
-  const target = CHATGPT_PLUGIN_URL || 'https://chatgpt.com/';
-
-  if (!CHATGPT_PLUGIN_URL) {
-    navigator.clipboard.writeText(VIAGGIO_MCP_URL).catch(() => {});
-    dom.chatgptMessage.textContent = 'Servidor copiado. Abrindo o ChatGPT; enquanto o Viaggio não está publicado no diretório, adicione esta integração em Plugins no modo de desenvolvedor.';
+  if (CHATGPT_PLUGIN_URL) {
+    window.location.href = CHATGPT_PLUGIN_URL;
+    return;
   }
 
-  openChatgptApp(target);
+  navigator.clipboard.writeText(VIAGGIO_MCP_URL).catch(() => {});
+  dom.chatgptMessage.textContent = 'Endereço MCP copiado. Abrindo o app ChatGPT. Como o Viaggio ainda não está publicado no diretório, a primeira conexão precisa ser adicionada uma vez em Configurações → Plugins no modo de desenvolvedor.';
+  openChatgptApp();
 }
 
 async function openChangeLog() {
