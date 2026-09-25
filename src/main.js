@@ -318,7 +318,7 @@ function syncPassengerList(container, passengers) {
 function dayTitle(day, activities = [], locations = []) {
   const firstLocation = locations[0];
   const firstPlace = activities.find(activity => activity.place_name) || activities[0];
-  return day.title || firstLocation?.name || day.main_place_name || firstPlace?.place_name || firstPlace?.title || `Dia ${day.day_number}`;
+  return day.title || firstPlace?.title || firstPlace?.place_name || firstLocation?.name || `Dia ${day.day_number}`;
 }
 
 function dayPhoto(day, activities = [], locations = []) {
@@ -1027,6 +1027,32 @@ function addDayAgendaActivity() {
   renderDayAgendaEditor(true);
 }
 
+function ensureDayTitleControl() {
+  if (dom.dayPageTitle?.matches?.('button.day-inline-heading') && dom.dayPageTitle.isConnected) {
+    if (dom.dayPageTitle.dataset.bound !== 'true') {
+      dom.dayPageTitle.dataset.bound = 'true';
+      dom.dayPageTitle.addEventListener('click', beginInlineDayTitleEdit);
+    }
+    return dom.dayPageTitle;
+  }
+
+  const control = document.createElement('button');
+  control.id = 'day_page_title';
+  control.type = 'button';
+  control.className = 'day-inline-heading';
+  control.setAttribute('aria-label', 'Editar nome do dia');
+  control.dataset.bound = 'true';
+  control.addEventListener('click', beginInlineDayTitleEdit);
+
+  if (dom.dayPageTitle?.isConnected) {
+    dom.dayPageTitle.replaceWith(control);
+  } else {
+    document.querySelector('.day-page-title-row')?.prepend(control);
+  }
+  dom.dayPageTitle = control;
+  return control;
+}
+
 function openDayPage(dayId, { pushHistory = true } = {}) {
   const day = state.tripDays.find(item => String(item.id) === String(dayId));
   if (!day) return;
@@ -1043,7 +1069,7 @@ function openDayPage(dayId, { pushHistory = true } = {}) {
   const photo = dayPhoto(day, activities, locations);
   dom.dayPageHero.style.backgroundImage = photo ? `url("${String(photo).replaceAll('"', '%22')}")` : '';
   dom.dayPageBadge.textContent = `dia ${day.day_number}`;
-  dom.dayPageTitle.textContent = dayTitle(day, activities, locations);
+  ensureDayTitleControl().textContent = dayTitle(day, activities, locations);
   dom.dayPageSaveStatus.dataset.state = state.daySaveStates.get(String(day.id)) || 'idle';
   dom.dayPageDate.textContent = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' }).format(new Date(`${day.date}T12:00:00`));
   renderDayPageAgenda(day, activities, locations);
@@ -1949,7 +1975,6 @@ async function saveDayEditor() {
   setLoading(dom.saveDayEdit, true);
 
   const editor = state.dayEditor;
-  const firstLocation = editor.locations.find(location => location.name.trim()) || null;
   const unresolvedLocation = editor.locations.find(location => location.name.trim() && (!Number.isFinite(location.latitude) || !Number.isFinite(location.longitude)));
 
   if (unresolvedLocation) {
@@ -1962,8 +1987,6 @@ async function saveDayEditor() {
   const dayPatch = {
     title: editor.title.trim() || null,
     summary: editor.notes.trim() || null,
-    main_place_name: firstLocation?.name.trim() || null,
-    photo_url: firstLocation?.photoUrl || null,
     status: 'planned'
   };
   const localDay = { ...editor.day, ...dayPatch };
@@ -2847,6 +2870,20 @@ dom.dayEditForm.addEventListener('submit', event => { event.preventDefault(); sa
 dom.closeTripPage.addEventListener('click', navigateBackFromTrip);
 dom.editTripButton.addEventListener('click', openTripEditor);
 dom.closeDayPage.addEventListener('click', navigateBackFromDay);
+ensureDayTitleControl();
+dom.dayPagePhotoInput.addEventListener('change', async () => {
+  const file = dom.dayPagePhotoInput.files?.[0];
+  if (!file) return;
+  dom.dayPageCamera.dataset.loading = 'true';
+  try {
+    await saveDayHeroPhoto(file);
+  } catch (error) {
+    console.warn('Não foi possível salvar a imagem do dia', error);
+  } finally {
+    dom.dayPageCamera.dataset.loading = 'false';
+    dom.dayPagePhotoInput.value = '';
+  }
+});
 dom.editDayButton.addEventListener('click', () => {
   const day = state.tripDays.find(item => String(item.id) === String(state.activeDayId));
   if (day) openDayEditor(day);
