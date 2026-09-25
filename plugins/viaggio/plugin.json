@@ -1,0 +1,20 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "viaggio",
+  "version": "1.0.0",
+  "description": "Planeje, leia e altere suas viagens do Viaggio diretamente pelo ChatGPT, com histórico e snapshots restauráveis.",
+  "author": {
+    "name": "Viaggio",
+    "url": "https://paulosince.github.io/viagens/"
+  },
+  "homepage": "https://paulosince.github.io/viagens/",
+  "repository": "https://github.com/paulosince/viagens",
+  "keywords": [
+    "travel",
+    "trip planning",
+    "itinerary",
+    "viaggio",
+    "agenda",
+    "budget"
+  ]
+}
