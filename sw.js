@@ -1,4 +1,4 @@
-const CACHE_NAME = 'viaggio-home-v30-inline-controls';
+const CACHE_NAME = 'viaggio-home-v31-autosave';
 const SUPABASE_CLIENT = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const LEAFLET_CSS = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css';
 const LEAFLET_JS = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js';
@@ -6,8 +6,8 @@ const EXTERNAL_ASSETS = [SUPABASE_CLIENT, LEAFLET_CSS, LEAFLET_JS];
 const APP_SHELL = [
   './',
   './index.html',
-  './style.css?v=20260925-5',
-  './src/main.js?v=20260925-5',
+  './style.css?v=20260925-6',
+  './src/main.js?v=20260925-6',
   './src/offline-store.js',
   './manifest.webmanifest',
   './assets/app-icon.svg',
