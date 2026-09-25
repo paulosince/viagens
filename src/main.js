@@ -664,9 +664,10 @@ function renderTripDays(days, activitiesByDay = new Map(), locationsByDay = new 
     label.textContent = 'dia';
     const number = document.createElement('strong');
     number.className = 'trip-day-number';
-    number.textContent = String(day.day_number);
+    number.textContent = String(dayNumber(day));
     badge.append(label, number);
-    const timingData = dayTiming(day.date);
+    const derivedDate = derivedDayDate(day);
+    const timingData = dayTiming(derivedDate);
     const timing = document.createElement('span');
     timing.className = 'trip-day-timing';
     timing.textContent = timingData.label;
@@ -689,7 +690,7 @@ function renderTripDays(days, activitiesByDay = new Map(), locationsByDay = new 
     title.textContent = titleText;
     const date = document.createElement('span');
     date.className = 'trip-day-date';
-    date.textContent = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' }).format(new Date(`${day.date}T12:00:00`));
+    date.textContent = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' }).format(new Date(`${derivedDate}T12:00:00`));
     body.append(title, date);
 
     const agenda = document.createElement('div');
@@ -726,7 +727,7 @@ function renderTripDays(days, activitiesByDay = new Map(), locationsByDay = new 
     button.addEventListener('pointerup', releasePress);
     button.addEventListener('pointercancel', releasePress);
     const empty = !day.title && !day.summary && !day.main_place_name && !day.photo_url && activities.length === 0 && locations.length === 0;
-    button.setAttribute('aria-label', empty ? `Preencher dia ${day.day_number}` : `Abrir dia ${day.day_number}`);
+    button.setAttribute('aria-label', empty ? `Preencher dia ${dayNumber(day)}` : `Abrir dia ${dayNumber(day)}`);
     button.addEventListener('click', () => {
       button.blur();
       if (empty) openDayEditor(day);
@@ -1150,10 +1151,11 @@ function openDayPage(dayId, { pushHistory = true } = {}) {
   const locations = state.dayLocations.get(String(day.id)) || [];
   const photo = dayPhoto(day, activities, locations);
   dom.dayPageHero.style.backgroundImage = photo ? `url("${String(photo).replaceAll('"', '%22')}")` : '';
-  dom.dayPageBadge.textContent = `dia ${day.day_number}`;
+  dom.dayPageBadge.textContent = `dia ${dayNumber(day)}`;
   ensureDayTitleControl().textContent = dayTitle(day, activities, locations);
   dom.dayPageSaveStatus.dataset.state = state.daySaveStates.get(String(day.id)) || 'idle';
-  dom.dayPageDate.textContent = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' }).format(new Date(`${day.date}T12:00:00`));
+  const derivedDate = derivedDayDate(day);
+  dom.dayPageDate.textContent = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' }).format(new Date(`${derivedDate}T12:00:00`));
   renderDayPageAgenda(day, activities, locations);
   renderDayPageMap(locations, activities);
   enrichDayPage(day, activities, locations).catch(error => console.warn('Não foi possível enriquecer o dia', error));
@@ -1502,7 +1504,8 @@ function beginInlineTimeEdit(button, day, activity) {
     const target = records.activities.find(item => String(item.id) === String(activity.id));
     if (!target) return;
 
-    target.starts_at = day.date + 'T' + value + ':00';
+    target.start_time = value + ':00';
+    target.starts_at = derivedDayDate(day) + 'T' + value + ':00';
     target.period = periodFromTime(value);
     await persistInlineDayChange(day, records.activities, records.locations, {}, { activityId: activity.id });
   };
@@ -1690,7 +1693,7 @@ async function saveInlinePhoto(day, activity, location, file) {
 
 function renderDayPageAgenda(day, activities, locations) {
   dom.dayPageAgenda.replaceChildren();
-  const ordered = [...activities].sort((a, b) => String(a.starts_at || '').localeCompare(String(b.starts_at || '')) || (a.position || 0) - (b.position || 0));
+  const ordered = [...activities].sort((a, b) => String(activityTime(a)).localeCompare(String(activityTime(b))) || (a.position || 0) - (b.position || 0));
 
   for (const activity of ordered) {
     const location = activityLocation(activity, locations);
@@ -1790,7 +1793,7 @@ function renderDayPageAgenda(day, activities, locations) {
     dom.dayPageAgenda.append(item);
   }
 
-  dom.dayPageEmpty.textContent = ordered.length ? '' : 'Nenhum horário planejado para o dia ' + day.day_number + '.';
+  dom.dayPageEmpty.textContent = ordered.length ? '' : 'Nenhum horário planejado para o dia ' + dayNumber(day) + '.';
 }
 
 function dayMapPoints(locations, activities = []) {
@@ -1975,7 +1978,7 @@ function openDayEditor(day) {
   const trip = state.trips.find(item => String(item.id) === String(state.activeTripId));
   const destination = trip?.destination?.trim() || trip?.name?.trim() || 'seu destino';
   dom.dayEditTitle.textContent = `Dia ${dayNumber(day)}`;
-  dom.dayEditDate.textContent = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' }).format(new Date(`${day.date}T12:00:00`));
+  dom.dayEditDate.textContent = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' }).format(new Date(`${derivedDayDate(day)}T12:00:00`));
   dom.dayTitleInput.placeholder = `Primeiro dia em ${destination}`;
   dom.dayTitleInput.value = state.dayEditor.title;
   dom.dayNotesInput.value = state.dayEditor.notes;
@@ -2126,7 +2129,8 @@ async function saveDayEditor() {
         period: periodFromTime(activity.time),
         position,
         title: activity.text.trim(),
-        starts_at: `${editor.day.date}T${activity.time || '09:00'}:00`,
+        start_time: `${activity.time || '09:00'}:00`,
+        starts_at: `${derivedDayDate(editor.day)}T${activity.time || '09:00'}:00`,
         place_id: activity.locationId || null,
         place_name: location?.name.trim() || null,
         address: location?.formattedAddress || null,
@@ -2271,7 +2275,7 @@ async function openTrip(tripId, { pushHistory = true, forceRefresh = false } = {
   dom.tripPage.style.setProperty('--trip-page-color', accent);
   dom.tripPageHero.style.backgroundImage = trip.cover_url ? `url("${trip.cover_url.replaceAll('"', '%22')}")` : '';
   dom.tripPageTitle.textContent = trip.name;
-  dom.tripPageDates.textContent = `${displayDate(trip.start_date)} — ${displayDate(trip.end_date)}`;
+  dom.tripPageDates.textContent = `${displayDate(trip.start_date)} — ${displayDate(tripEndDate(trip))}`;
   dom.tripPagePassengers._count = dom.tripPagePassengerCount;
   syncPassengerList(dom.tripPagePassengers, state.passengers.get(trip.id) || []);
   dom.tripPage.setAttribute('aria-hidden', 'false');
@@ -2352,7 +2356,7 @@ function updateTripNode(item, trip) {
   refs.owner.textContent = owned ? 'criada por você' : 'viagem compartilhada';
   refs.timing.textContent = tripTiming(trip);
   refs.title.textContent = trip.name;
-  refs.dates.textContent = `${displayDate(trip.start_date)} — ${displayDate(trip.end_date)}`;
+  refs.dates.textContent = `${displayDate(trip.start_date)} — ${displayDate(tripEndDate(trip))}`;
   refs.selection.dataset.selected = String(state.selectedTripIds.has(String(trip.id)));
   syncPassengerList(refs.stack, state.passengers.get(trip.id) || []);
 }
@@ -2719,7 +2723,7 @@ function openTripEditor() {
   dom.newTripForm.elements.name.value = trip.name || '';
   dom.newTripForm.elements.destination.value = trip.destination || '';
   dom.newTripForm.elements.start_date.value = trip.start_date || '';
-  dom.newTripForm.elements.end_date.value = trip.end_date || '';
+  dom.newTripForm.elements.day_count.value = String(tripDayCount(trip));
   dom.newTripForm.elements.arrival_method.value = trip.arrival_method || 'avião';
   dom.newTripForm.elements.location_label.value = trip.location_label || '';
   selectTripColor(trip.secondary_color || '#4775d1');
