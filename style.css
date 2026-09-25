@@ -648,6 +648,14 @@ body[data-trip-page="open"] .trip-page {
   -webkit-user-select: none;
   -webkit-touch-callout: none;
 }
+.trip-day-card[data-recently-moved="true"] {
+  animation: moved-day-highlight 1.15s ease both;
+}
+@keyframes moved-day-highlight {
+  0%, 100% { box-shadow: 0 16px 34px color-mix(in srgb, var(--trip-page-color) 58%, rgba(0,0,0,.2)); }
+  35% { box-shadow: 0 0 0 5px rgba(255,255,255,.78), 0 20px 42px color-mix(in srgb, var(--trip-page-color) 76%, rgba(0,0,0,.28)); }
+}
+
 .trip-day-card[data-pressed="true"],
 .trip-day-card:active,
 .trip-day-card:has(.trip-day-card-button:active) {
@@ -1752,6 +1760,7 @@ body[data-place-search="open"] .place-search-sheet { visibility: visible; transf
 }
 
 .profile-sheet { z-index: 22; }
+.change-log-sheet { z-index: 23; }
 .profile-photo-section { display: flex; width: min(100%, 660px); margin: 12px auto 28px; flex-direction: column; align-items: center; }
 .profile-photo-section > strong { margin-top: 11px; font-size: 21px; }
 .profile-photo-section > span { margin-top: 3px; color: var(--secondary); font-size: 13px; }
@@ -1779,8 +1788,98 @@ body[data-place-search="open"] .place-search-sheet { visibility: visible; transf
 .static-row output { padding-right: 16px; text-align: right; }
 .account-actions { margin-top: 12px; }
 .account-row { width: 100%; min-height: 56px; padding: 0 16px; border: 0; color: var(--ios-blue); background: transparent; text-align: center; }
+.account-row + .account-row { border-top: 1px solid var(--line); }
+.account-row-detail {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+}
+.account-row-detail span:last-child {
+  color: #8e8e93;
+  font-size: 28px;
+  font-weight: 300;
+  line-height: 1;
+}
 .account-row.destructive { color: var(--ios-red); }
 .danger-section { margin-top: 34px; }
+
+.sheet-header-spacer {
+  display: block;
+  width: 48px;
+  height: 48px;
+}
+.change-log-back {
+  padding: 0 3px 3px 0;
+  font-size: 39px;
+}
+.change-log-intro {
+  width: min(100%, 660px);
+  margin: 4px auto 16px;
+  padding: 0 14px;
+}
+.change-log-intro p {
+  margin: 0;
+  color: var(--secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.change-log-list {
+  width: min(100%, 660px);
+  margin: 0 auto;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 22px;
+  background: var(--surface);
+  list-style: none;
+}
+.change-log-item {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  min-height: 64px;
+  margin-left: 16px;
+  padding: 13px 16px 13px 0;
+  border-bottom: 1px solid var(--line);
+}
+.change-log-item:last-child { border-bottom: 0; }
+.change-log-marker {
+  width: 9px;
+  height: 9px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: var(--ios-blue);
+}
+.change-log-marker[data-action="delete"] { background: var(--ios-red); }
+.change-log-marker[data-action="reorder"] { background: #af52de; }
+.change-log-marker[data-action="create"] { background: #34c759; }
+.change-log-copy {
+  min-width: 0;
+}
+.change-log-copy strong,
+.change-log-copy span {
+  display: block;
+}
+.change-log-copy strong {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.32;
+}
+.change-log-copy span {
+  margin-top: 4px;
+  color: var(--secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+.change-log-empty {
+  width: min(100%, 660px);
+  margin: 28px auto;
+  color: var(--secondary);
+  text-align: center;
+}
+.change-log-empty[hidden] { display: none; }
 
 .new-trip-sheet {
   position: fixed;
@@ -1805,7 +1904,8 @@ body[data-trip-page="open"] #home_new_trip { z-index: 81; }
 body:not([data-active-sheet="none"]) { overflow: hidden; }
 body:not([data-active-sheet="none"]) .scrim { opacity: 1; pointer-events: auto; backdrop-filter: blur(4px); }
 body[data-active-sheet="new-trip"] #home_new_trip,
-body[data-active-sheet="profile"] #profile-sheet { transform: translateY(0); visibility: visible; transition-delay: 0s; }
+body[data-active-sheet="profile"] #profile-sheet,
+body[data-active-sheet="change-log"] #change_log_sheet { transform: translateY(0); visibility: visible; transition-delay: 0s; }
 
 .sheet-header {
   position: sticky;
