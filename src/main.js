@@ -357,6 +357,144 @@ async function firstUnsplashPhoto(query) {
   }
 }
 
+async function enrichDayPage(day, activities, locations) {
+  const dayId = String(day.id);
+  if (!navigator.onLine || state.enrichingDays.has(dayId)) return;
+
+  const candidates = activities.filter(activity => {
+    const location = activityLocation(activity, locations);
+    return (!location || !location.photo_url) && activityLooksGeocodable(activity);
+  });
+  if (!candidates.length) return;
+
+  state.enrichingDays.add(dayId);
+  try {
+    const updatedActivities = activities.map(activity => ({ ...activity }));
+    const updatedLocations = locations.map(location => ({ ...location }));
+    let changed = false;
+
+    for (const sourceActivity of candidates) {
+      const activity = updatedActivities.find(item => String(item.id) === String(sourceActivity.id));
+      if (!activity) continue;
+
+      let location = activityLocation(activity, updatedLocations);
+      let searchResult = null;
+
+      if (!location) {
+        const lat = numericCoordinate(activity.latitude);
+        const lon = numericCoordinate(activity.longitude);
+
+        if (Number.isFinite(lat) && Number.isFinite(lon)) {
+          location = {
+            id: crypto.randomUUID(),
+            day_id: day.id,
+            position: updatedLocations.length,
+            name: activity.place_name || primaryActivityPlace(activity),
+            provider: null,
+            provider_place_id: null,
+            formatted_address: activity.address || null,
+            latitude: lat,
+            longitude: lon,
+            category: null,
+            place_type: null,
+            photo_provider: null,
+            photo_author: null,
+            photo_author_url: null,
+            photo_source_url: null,
+            photo_url: activity.photo_url || null
+          };
+          updatedLocations.push(location);
+          changed = true;
+        } else {
+          const query = primaryActivityPlace(activity);
+          try {
+            const results = await searchOpenStreetMap(query);
+            searchResult = results[0] || null;
+          } catch {
+            searchResult = null;
+          }
+          if (!searchResult) continue;
+
+          location = {
+            id: crypto.randomUUID(),
+            day_id: day.id,
+            position: updatedLocations.length,
+            name: placeResultName(searchResult),
+            provider: 'openstreetmap',
+            provider_place_id: String(searchResult.osm_type) + '/' + String(searchResult.osm_id),
+            formatted_address: searchResult.display_name || null,
+            latitude: Number(searchResult.lat),
+            longitude: Number(searchResult.lon),
+            category: searchResult.category || searchResult.class || null,
+            place_type: searchResult.type || null,
+            photo_provider: null,
+            photo_author: null,
+            photo_author_url: null,
+            photo_source_url: null,
+            photo_url: activity.photo_url || null
+          };
+          updatedLocations.push(location);
+          changed = true;
+        }
+
+        activity.place_id = location.id;
+        activity.place_name = location.name;
+        activity.address = location.formatted_address;
+        activity.latitude = location.latitude;
+        activity.longitude = location.longitude;
+      }
+
+      if (!location.photo_url) {
+        const query = searchResult ? unsplashQuery(searchResult) : (location.name || primaryActivityPlace(activity));
+        const photo = await firstUnsplashPhoto(query);
+        if (photo?.imageUrl) {
+          location.photo_url = photo.imageUrl;
+          location.photo_provider = 'unsplash';
+          location.photo_author = photo.author || null;
+          location.photo_author_url = photo.authorUrl || null;
+          location.photo_source_url = photo.sourceUrl || null;
+          activity.photo_url = photo.imageUrl;
+          changed = true;
+        }
+      } else if (!activity.photo_url) {
+        activity.photo_url = location.photo_url;
+        changed = true;
+      }
+    }
+
+    if (!changed) return;
+
+    const firstLocation = updatedLocations.find(location => location.name);
+    const firstPhoto = updatedLocations.find(location => location.photo_url)?.photo_url || null;
+    const updatedDay = {
+      ...day,
+      main_place_name: day.main_place_name || firstLocation?.name || null,
+      photo_url: day.photo_url || firstPhoto
+    };
+
+    await offlineStore.saveDayBundle(updatedDay, updatedActivities, updatedLocations);
+    await offlineStore.enqueueMutation({
+      type: 'save-day',
+      tripId: String(day.trip_id || state.activeTripId),
+      dayId: day.id,
+      dayPatch: {
+        main_place_name: updatedDay.main_place_name,
+        photo_url: updatedDay.photo_url
+      },
+      locations: updatedLocations,
+      activities: updatedActivities,
+      removedLocationIds: [],
+      removedActivityIds: []
+    });
+    await refreshSyncStatus();
+
+    applyLocalDaySave(updatedDay, updatedActivities, updatedLocations);
+    flushOutbox().catch(error => console.warn('Enriquecimento aguardando sincronização', error));
+  } finally {
+    state.enrichingDays.delete(dayId);
+  }
+}
+
 function renderTripDays(days, activitiesByDay = new Map(), locationsByDay = new Map()) {
   dom.tripDayList.replaceChildren();
   const periodLabels = { morning: 'manhã', afternoon: 'tarde', night: 'noite' };
