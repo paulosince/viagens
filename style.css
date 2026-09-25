@@ -722,10 +722,10 @@ body[data-trip-page="open"] .trip-page {
 .trip-day-message:empty { display: none; }
 
 .trip-day-card[data-restorable="true"] {
-  opacity: .5;
   box-shadow: 0 10px 24px color-mix(in srgb, var(--trip-page-color) 34%, rgba(0,0,0,.16));
 }
 .trip-day-card[data-restorable="true"] .trip-day-card-button {
+  opacity: .5;
   cursor: default;
 }
 .trip-day-card[data-restorable="true"]:active,
