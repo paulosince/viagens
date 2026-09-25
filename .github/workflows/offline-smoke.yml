@@ -1,9 +1,17 @@
 name: Offline smoke test
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'style.css'
+      - 'sw.js'
+      - 'src/**'
   pull_request:
     paths:
       - 'index.html'
+      - 'style.css'
       - 'sw.js'
       - 'src/**'
   workflow_dispatch:
