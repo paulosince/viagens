@@ -44,6 +44,14 @@ O roteiro usa um modelo posicional:
 
 A migração correspondente está em `supabase/migrations/20260925_ordered_trip_days.sql`. O frontend mantém compatibilidade temporária com o schema antigo durante a transição.
 
+## Histórico e snapshots
+
+Cada alteração relevante de uma viagem entra no histórico e recebe um snapshot completo do estado da viagem após a mudança. O snapshot inclui configurações da viagem, passageiros, dias, ordem, locais, atividades, checklist e orçamento.
+
+O histórico mostra o ID do snapshot e permite restaurar a viagem inteira para aquele momento. Antes de qualquer restauração, o backend cria automaticamente um snapshot de segurança do estado atual, permitindo desfazer a própria restauração.
+
+Snapshots são criados pelo backend depois que as mutações anteriores da fila local foram sincronizadas. Um ponto de segurança inicial é criado na primeira abertura online de cada viagem.
+
 ## Disponibilidade offline
 
 A aplicação é local-first para o roteiro de viagem:
