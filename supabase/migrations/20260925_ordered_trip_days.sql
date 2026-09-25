@@ -1,5 +1,6 @@
 -- Ordered trip days: dates are derived from trips.start_date + trip_days.position.
--- Legacy columns are kept nullable for backward compatibility during rollout.
+-- The frontend supports the legacy schema during rollout; this migration removes
+-- the redundant stored date columns once applied.
 
 alter table public.trips
   add column if not exists day_count integer;
