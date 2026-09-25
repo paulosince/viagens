@@ -22,9 +22,9 @@ jobs:
           url='https://paulosince.github.io/viagens/'
           for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
             html="$(curl --location --silent --show-error --max-time 20 "$url" || true)"
-            js="$(curl --location --silent --show-error --max-time 20 "$url/src/main.js?v=20260925-12" || true)"
-            css="$(curl --location --silent --show-error --max-time 20 "$url/style.css?v=20260925-10" || true)"
-            if grep -q 'src/main.js?v=20260925-12' <<<"$html" &&
+            js="$(curl --location --silent --show-error --max-time 20 "$url/src/main.js?v=20260925-13" || true)"
+            css="$(curl --location --silent --show-error --max-time 20 "$url/style.css?v=20260925-11" || true)"
+            if grep -q 'src/main.js?v=20260925-13' <<<"$html" &&
                grep -q 'id="sync_status"' <<<"$html" &&
                grep -q 'enrichDayPage' <<<"$js" &&
                grep -q 'loadLocalWorkspace' <<<"$js" &&
@@ -53,6 +53,12 @@ jobs:
                grep -q 'compareTripsForHome' <<<"$js" &&
                grep -q 'Viagens realizadas' <<<"$js" &&
                grep -q 'trip-section-title' <<<"$css" &&
+               grep -q 'revealMovedDay' <<<"$js" &&
+               grep -q "scrollIntoView" <<<"$js" &&
+               grep -q 'recordChange' <<<"$js" &&
+               grep -q 'refreshChangeLog' <<<"$js" &&
+               grep -q 'id="change_log_sheet"' <<<"$html" &&
+               grep -q 'change-log-list' <<<"$css" &&
                grep -q 'trip-day-recovery' <<<"$css" &&
                grep -q 'name="day_count"' <<<"$html" &&
                ! grep -q 'name="end_date"' <<<"$html" &&
