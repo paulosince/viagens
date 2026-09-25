@@ -1,11 +1,11 @@
 const CACHE_NAME = 'viaggio-home-v25-offline-first';
+const SUPABASE_CLIENT = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const APP_SHELL = [
   './',
   './index.html',
   './style.css?v=20260720-33',
   './src/main.js?v=20260925-1',
   './src/offline-store.js',
-  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm',
   './manifest.webmanifest',
   './assets/app-icon.svg',
   './assets/cintia.png'
@@ -14,7 +14,10 @@ const APP_SHELL = [
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(APP_SHELL))
+      .then(cache => Promise.all([
+        cache.addAll(APP_SHELL),
+        cache.add(SUPABASE_CLIENT).catch(() => undefined)
+      ]))
       .then(() => self.skipWaiting())
   );
 });
@@ -30,7 +33,7 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
-  const isSupabaseClient = url.href === 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+  const isSupabaseClient = url.href === SUPABASE_CLIENT;
   if (url.origin !== self.location.origin && !isSupabaseClient) return;
   if (event.request.mode !== 'navigate') {
     event.respondWith(
