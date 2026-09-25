@@ -42,3 +42,5 @@ jobs:
           test -f assets/cintia.png
           test -f supabase/migrations/20260925_ordered_trip_days.sql
           test -f supabase/migrations/20260925_change_log.sql
+          test -f supabase/migrations/20260925_state_snapshots.sql
+          test -f supabase/migrations/20260925_snapshot_baseline.sql
