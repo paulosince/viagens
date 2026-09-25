@@ -171,10 +171,26 @@
           </div><p class="form-note">A idade é calculada automaticamente pela data de nascimento.</p></section>
           <section class="form-section"><h3>Conta</h3>
             <div class="form-group"><div class="form-row static-row"><span>Perfil criado em</span><output id="profile_created_at"></output></div></div>
-            <div class="form-group account-actions"><button id="logout_button" class="account-row" type="button">Sair</button></div>
+            <div class="form-group account-actions">
+              <button id="change_log_button" class="account-row account-row-detail" type="button"><span>Histórico de alterações</span><span aria-hidden="true">›</span></button>
+              <button id="logout_button" class="account-row" type="button">Sair</button>
+            </div>
           </section>
           <section class="form-section danger-section"><div class="form-group"><button id="delete_account_button" class="account-row destructive" type="button">Excluir conta</button></div><p class="form-note">A conta será desativada, sem apagar viagens, fotos ou qualquer outro dado.</p></section>
         </form>
+      </section>
+
+      <section id="change_log_sheet" class="new-trip-sheet change-log-sheet" aria-hidden="true" aria-labelledby="change-log-title">
+        <header class="sheet-header">
+          <button id="close_change_log" class="sheet-control change-log-back" type="button" aria-label="Voltar ao perfil">‹</button>
+          <h2 id="change-log-title">Alterações</h2>
+          <span class="sheet-header-spacer" aria-hidden="true"></span>
+        </header>
+        <section class="change-log-intro">
+          <p>Últimas mudanças feitas neste perfil. O histórico também é salvo neste aparelho e sincronizado quando houver conexão.</p>
+        </section>
+        <ol id="change_log_list" class="change-log-list"></ol>
+        <p id="change_log_empty" class="change-log-empty">Nenhuma alteração registrada ainda.</p>
       </section>
     </section>
 
