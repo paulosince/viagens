@@ -3652,6 +3652,8 @@ dom.newTripButton.addEventListener('click', openNewTrip);
 dom.emptyNewTripButton.addEventListener('click', openNewTrip);
 dom.closeNewTrip.addEventListener('click', closeSheets);
 dom.closeProfile.addEventListener('click', closeSheets);
+dom.changeLogButton.addEventListener('click', openChangeLog);
+dom.closeChangeLog.addEventListener('click', () => setActiveSheet('profile'));
 dom.scrim.addEventListener('click', closeSheets);
 dom.editTripsButton.addEventListener('click', () => setEditingMode(!state.editing));
 dom.deleteSelectedTrips.addEventListener('click', softDeleteSelectedTrips);
