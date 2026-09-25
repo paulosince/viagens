@@ -2,6 +2,8 @@ import { offlineStore } from './offline-store.js';
 
 const SUPABASE_URL = 'https://siabldasqinpfmxslwji.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_UgbBIOq1TnInuPRrQpAFag_JLIzYuFf';
+const VIAGGIO_MCP_URL = 'https://siabldasqinpfmxslwji.supabase.co/functions/v1/viaggio-mcp';
+const CHATGPT_PLUGIN_URL = '';
 let supabase = null;
 let supabaseLoad = null;
 let leafletLoad = null;
@@ -89,12 +91,12 @@ const dom = {
   newTripSheet: document.querySelector('#home_new_trip'), newTripForm: document.querySelector('#new_trip_form'), newTripTitle: document.querySelector('#new-trip-title'), closeNewTrip: document.querySelector('#close_new_trip'), saveNewTrip: document.querySelector('#save_new_trip'), newTripMessage: document.querySelector('#new_trip_message'), coverInput: document.querySelector('#cover-image'), coverPreview: document.querySelector('#cover_preview_image'), tripColorValue: document.querySelector('#trip-color-value'), tripColorPalette: document.querySelector('#trip_color_palette'), tripColorCustom: document.querySelector('#trip-color-custom'), newTripPassengerList: document.querySelector('#new_trip_passenger_list'), addTripPassenger: document.querySelector('#add_trip_passenger'),
   dayEditSheet: document.querySelector('#day_edit_sheet'), daySheetScrim: document.querySelector('#day_sheet_scrim'), dayEditForm: document.querySelector('#day_edit_form'), closeDayEdit: document.querySelector('#close_day_edit'), saveDayEdit: document.querySelector('#save_day_edit'), dayEditTitle: document.querySelector('#day_edit_title'), dayEditDate: document.querySelector('#day_edit_date'), dayTitleInput: document.querySelector('#day-title-input'), dayLocationsEditor: document.querySelector('#day_locations_editor'), addDayLocation: document.querySelector('#add_day_location'), dayAgendaEditor: document.querySelector('#day_agenda_editor'), addDayActivity: document.querySelector('#add_day_activity'), dayNotesInput: document.querySelector('#day-notes-input'), dayEditMessage: document.querySelector('#day_edit_message'),
   placeSearchSheet: document.querySelector('#place_search_sheet'), placeSearchScrim: document.querySelector('#place_search_scrim'), placeSearchForm: document.querySelector('#place_search_form'), closePlaceSearch: document.querySelector('#close_place_search'), confirmPlaceSearch: document.querySelector('#confirm_place_search'), placeSearchInput: document.querySelector('#place_search_input'), runPlaceSearch: document.querySelector('#run_place_search'), placeSearchMessage: document.querySelector('#place_search_message'), placeSearchResults: document.querySelector('#place_search_results'), placePhotoSection: document.querySelector('#place_photo_section'), placePhotoMessage: document.querySelector('#place_photo_message'), placePhotoResults: document.querySelector('#place_photo_results'),
-  profileSheet: document.querySelector('#profile-sheet'), profileForm: document.querySelector('#profile_form'), closeProfile: document.querySelector('#close_profile'), saveProfile: document.querySelector('#save_profile'), profileMessage: document.querySelector('#profile_message'), profileEditorImage: document.querySelector('#profile_editor_image'), profilePhotoInput: document.querySelector('#profile-photo'), profileDisplayName: document.querySelector('#profile_display_name'), profileEmail: document.querySelector('#profile_email'), profileNameInput: document.querySelector('#profile-name'), birthDateInput: document.querySelector('#birth-date'), profileAge: document.querySelector('#profile_age'), profileCreatedAt: document.querySelector('#profile_created_at'), changeLogButton: document.querySelector('#change_log_button'), changeLogSheet: document.querySelector('#change_log_sheet'), closeChangeLog: document.querySelector('#close_change_log'), changeLogList: document.querySelector('#change_log_list'), changeLogEmpty: document.querySelector('#change_log_empty'), changeLogMessage: document.querySelector('#change_log_message'), logoutButton: document.querySelector('#logout_button'), deleteAccountButton: document.querySelector('#delete_account_button')
+  profileSheet: document.querySelector('#profile-sheet'), profileForm: document.querySelector('#profile_form'), closeProfile: document.querySelector('#close_profile'), saveProfile: document.querySelector('#save_profile'), profileMessage: document.querySelector('#profile_message'), profileEditorImage: document.querySelector('#profile_editor_image'), profilePhotoInput: document.querySelector('#profile-photo'), profileDisplayName: document.querySelector('#profile_display_name'), profileEmail: document.querySelector('#profile_email'), profileNameInput: document.querySelector('#profile-name'), birthDateInput: document.querySelector('#birth-date'), profileAge: document.querySelector('#profile_age'), profileCreatedAt: document.querySelector('#profile_created_at'), chatgptButton: document.querySelector('#chatgpt_button'), chatgptSheet: document.querySelector('#chatgpt_sheet'), closeChatgpt: document.querySelector('#close_chatgpt'), connectChatgpt: document.querySelector('#connect_chatgpt'), copyMcpUrl: document.querySelector('#copy_mcp_url'), chatgptMessage: document.querySelector('#chatgpt_message'), chatgptMcpUrl: document.querySelector('#chatgpt_mcp_url'), changeLogButton: document.querySelector('#change_log_button'), changeLogSheet: document.querySelector('#change_log_sheet'), closeChangeLog: document.querySelector('#close_change_log'), changeLogList: document.querySelector('#change_log_list'), changeLogEmpty: document.querySelector('#change_log_empty'), changeLogMessage: document.querySelector('#change_log_message'), logoutButton: document.querySelector('#logout_button'), deleteAccountButton: document.querySelector('#delete_account_button')
 };
 
 // As folhas são camadas globais. Fora da Home, não ficam presas ao contexto
 // de empilhamento criado por transform/isolation daquele contêiner.
-dom.tripPage.after(dom.scrim, dom.newTripSheet, dom.profileSheet, dom.changeLogSheet);
+dom.tripPage.after(dom.scrim, dom.newTripSheet, dom.profileSheet, dom.chatgptSheet, dom.changeLogSheet);
 
 const displayDate = value => value ? new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(`${value}T12:00:00`)).replace('.', '') : '';
 
@@ -270,6 +272,7 @@ function setActiveSheet(name = 'none') {
   document.body.dataset.activeSheet = name;
   dom.newTripSheet.setAttribute('aria-hidden', String(name !== 'new-trip'));
   dom.profileSheet.setAttribute('aria-hidden', String(name !== 'profile'));
+  dom.chatgptSheet.setAttribute('aria-hidden', String(name !== 'chatgpt'));
   dom.changeLogSheet.setAttribute('aria-hidden', String(name !== 'change-log'));
 }
 
@@ -338,7 +341,8 @@ function renderChangeLog(entries = state.changeLog) {
       hour: '2-digit',
       minute: '2-digit'
     }).format(new Date(entry.created_at));
-    meta.textContent = (entry.trip_id ? tripNameForLog(entry.trip_id) + ' · ' : '') + when;
+    const sourceLabel = entry.source === 'chatgpt' ? ' · via ChatGPT' : entry.source === 'api' ? ' · via API' : '';
+    meta.textContent = (entry.trip_id ? tripNameForLog(entry.trip_id) + ' · ' : '') + when + sourceLabel;
 
     copy.append(summary, meta);
 
@@ -456,6 +460,34 @@ async function refreshChangeLog() {
     .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
     .slice(0, 150);
   renderChangeLog(state.changeLog);
+}
+
+function openChatgptIntegration() {
+  dom.chatgptMcpUrl.textContent = VIAGGIO_MCP_URL;
+  dom.chatgptMessage.textContent = CHATGPT_PLUGIN_URL
+    ? 'A integração pública está disponível para instalação.'
+    : 'O servidor do Viaggio já está pronto. A publicação no diretório do ChatGPT ainda precisa ser concluída.';
+  setActiveSheet('chatgpt');
+}
+
+async function copyMcpUrl() {
+  try {
+    await navigator.clipboard.writeText(VIAGGIO_MCP_URL);
+    dom.chatgptMessage.textContent = 'Endereço da integração copiado.';
+  } catch {
+    dom.chatgptMessage.textContent = VIAGGIO_MCP_URL;
+  }
+}
+
+async function connectChatgpt() {
+  if (CHATGPT_PLUGIN_URL) {
+    window.open(CHATGPT_PLUGIN_URL, '_blank', 'noopener');
+    return;
+  }
+
+  await copyMcpUrl();
+  dom.chatgptMessage.textContent = 'Servidor copiado. Enquanto o Viaggio não está publicado no diretório, abra o ChatGPT em modo de desenvolvedor, vá a Plugins, toque em + e cole este endereço.';
+  window.open('https://chatgpt.com/', '_blank', 'noopener');
 }
 
 async function openChangeLog() {
@@ -3937,6 +3969,10 @@ dom.newTripButton.addEventListener('click', openNewTrip);
 dom.emptyNewTripButton.addEventListener('click', openNewTrip);
 dom.closeNewTrip.addEventListener('click', closeSheets);
 dom.closeProfile.addEventListener('click', closeSheets);
+dom.chatgptButton.addEventListener('click', openChatgptIntegration);
+dom.closeChatgpt.addEventListener('click', () => setActiveSheet('profile'));
+dom.connectChatgpt.addEventListener('click', connectChatgpt);
+dom.copyMcpUrl.addEventListener('click', copyMcpUrl);
 dom.changeLogButton.addEventListener('click', openChangeLog);
 dom.closeChangeLog.addEventListener('click', () => setActiveSheet('profile'));
 dom.scrim.addEventListener('click', closeSheets);
