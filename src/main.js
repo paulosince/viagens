@@ -479,15 +479,46 @@ async function copyMcpUrl() {
   }
 }
 
-async function connectChatgpt() {
-  if (CHATGPT_PLUGIN_URL) {
-    window.open(CHATGPT_PLUGIN_URL, '_blank', 'noopener');
+function openChatgptApp(webUrl = 'https://chatgpt.com/') {
+  const isiOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if (!isiOS) {
+    window.location.href = webUrl;
     return;
   }
 
-  await copyMcpUrl();
-  dom.chatgptMessage.textContent = 'Servidor copiado. Enquanto o Viaggio não está publicado no diretório, abra o ChatGPT em modo de desenvolvedor, vá a Plugins, toque em + e cole este endereço.';
-  window.open('https://chatgpt.com/', '_blank', 'noopener');
+  let appUrl = 'com.openai.chat://';
+  try {
+    const parsed = new URL(webUrl);
+    if (parsed.hostname.endsWith('chatgpt.com')) {
+      appUrl = 'com.openai.chat://' + parsed.hostname + parsed.pathname + parsed.search + parsed.hash;
+    }
+  } catch {}
+
+  let fallbackTimer = null;
+  const stopFallback = () => {
+    if (document.visibilityState !== 'hidden') return;
+    if (fallbackTimer) clearTimeout(fallbackTimer);
+    document.removeEventListener('visibilitychange', stopFallback);
+  };
+
+  document.addEventListener('visibilitychange', stopFallback);
+  fallbackTimer = setTimeout(() => {
+    document.removeEventListener('visibilitychange', stopFallback);
+    if (document.visibilityState === 'visible') window.location.href = webUrl;
+  }, 1200);
+
+  window.location.href = appUrl;
+}
+
+function connectChatgpt() {
+  const target = CHATGPT_PLUGIN_URL || 'https://chatgpt.com/';
+
+  if (!CHATGPT_PLUGIN_URL) {
+    navigator.clipboard.writeText(VIAGGIO_MCP_URL).catch(() => {});
+    dom.chatgptMessage.textContent = 'Servidor copiado. Abrindo o ChatGPT; enquanto o Viaggio não está publicado no diretório, adicione esta integração em Plugins no modo de desenvolvedor.';
+  }
+
+  openChatgptApp(target);
 }
 
 async function openChangeLog() {
