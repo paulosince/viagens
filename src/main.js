@@ -2666,6 +2666,7 @@ function updateTripNode(item, trip) {
 
 function syncTripSelectionUI() {
   for (const item of dom.tripList.children) {
+    if (!item.dataset.tripId) continue;
     const selected = state.selectedTripIds.has(String(item.dataset.tripId));
     if (item._refs?.selection) item._refs.selection.dataset.selected = String(selected);
     item._refs?.button?.setAttribute('aria-pressed', String(selected));
@@ -2709,15 +2710,79 @@ async function softDeleteSelectedTrips() {
   dom.deleteSelectedTrips.textContent = 'Excluir selecionadas';
 }
 
+
+function tripDateRange(trip) {
+  const start = trip?.start_date ? new Date(String(trip.start_date) + 'T00:00:00') : null;
+  const endValue = tripEndDate(trip);
+  const end = endValue ? new Date(String(endValue) + 'T23:59:59') : null;
+  return { start, end };
+}
+
+function tripListGroup(trip, now = new Date()) {
+  const { start, end } = tripDateRange(trip);
+  if (end && end < now) return 'past';
+  if (start && start > now) return 'upcoming';
+  return 'current';
+}
+
+function compareTripsForHome(a, b, now = new Date()) {
+  const groupRank = { current: 0, upcoming: 1, past: 2 };
+  const groupA = tripListGroup(a, now);
+  const groupB = tripListGroup(b, now);
+
+  if (groupRank[groupA] !== groupRank[groupB]) {
+    return groupRank[groupA] - groupRank[groupB];
+  }
+
+  if (groupA === 'past') {
+    return String(tripEndDate(b)).localeCompare(String(tripEndDate(a)));
+  }
+
+  return String(a.start_date || '').localeCompare(String(b.start_date || ''));
+}
+
+function createTripSectionTitle(text) {
+  const item = document.createElement('li');
+  item.className = 'trip-section-title';
+  item.setAttribute('aria-hidden', 'true');
+
+  const heading = document.createElement('h2');
+  heading.textContent = text;
+  item.append(heading);
+
+  return item;
+}
+
 function syncTripList() {
-  const visibleTrips = state.trips.filter(trip => Number(String(trip.start_date).slice(0, 4)) === state.selectedYear);
-  const wanted = new Set(visibleTrips.map(trip => String(trip.id)));
-  for (const item of [...dom.tripList.children]) if (!wanted.has(item.dataset.tripId)) item.remove();
+  const now = new Date();
+  const visibleTrips = state.trips
+    .filter(trip => Number(String(trip.start_date).slice(0, 4)) === state.selectedYear)
+    .sort((a, b) => compareTripsForHome(a, b, now));
+
+  const existingCards = new Map(
+    [...dom.tripList.children]
+      .filter(item => item.dataset.tripId)
+      .map(item => [String(item.dataset.tripId), item])
+  );
+
+  dom.tripList.replaceChildren();
+
+  let pastSectionAdded = false;
   for (const trip of visibleTrips) {
-    let item = [...dom.tripList.children].find(node => node.dataset.tripId === String(trip.id));
-    if (!item) item = createTripNode(trip); else updateTripNode(item, trip);
+    const group = tripListGroup(trip, now);
+
+    if (group === 'past' && !pastSectionAdded) {
+      dom.tripList.append(createTripSectionTitle('Viagens realizadas'));
+      pastSectionAdded = true;
+    }
+
+    let item = existingCards.get(String(trip.id));
+    if (!item) item = createTripNode(trip);
+    else updateTripNode(item, trip);
+
     dom.tripList.append(item);
   }
+
   syncTripSelectionUI();
   const empty = visibleTrips.length === 0;
   dom.homeEmpty.setAttribute('aria-hidden', String(!empty));
