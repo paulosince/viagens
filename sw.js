@@ -1,10 +1,13 @@
-const CACHE_NAME = 'viaggio-home-v26-offline-first';
+const CACHE_NAME = 'viaggio-home-v27-day-view';
 const SUPABASE_CLIENT = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+const LEAFLET_CSS = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css';
+const LEAFLET_JS = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js';
+const EXTERNAL_ASSETS = [SUPABASE_CLIENT, LEAFLET_CSS, LEAFLET_JS];
 const APP_SHELL = [
   './',
   './index.html',
-  './style.css?v=20260925-1',
-  './src/main.js?v=20260925-2',
+  './style.css?v=20260925-2',
+  './src/main.js?v=20260925-3',
   './src/offline-store.js',
   './manifest.webmanifest',
   './assets/app-icon.svg',
@@ -18,7 +21,7 @@ self.addEventListener('install', event => {
     caches.open(CACHE_NAME)
       .then(cache => Promise.all([
         cache.addAll(APP_SHELL),
-        cache.add(SUPABASE_CLIENT).catch(() => undefined)
+        ...EXTERNAL_ASSETS.map(url => cache.add(url).catch(() => undefined))
       ]))
       .then(() => self.skipWaiting())
   );
@@ -35,10 +38,10 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
-  const isSupabaseClient = url.href === SUPABASE_CLIENT;
+  const isExternalAsset = EXTERNAL_ASSETS.includes(url.href);
   const isImage = event.request.destination === 'image';
 
-  if (url.origin !== self.location.origin && !isSupabaseClient && !isImage) return;
+  if (url.origin !== self.location.origin && !isExternalAsset && !isImage) return;
 
   if (isImage && url.origin !== self.location.origin) {
     event.respondWith(
