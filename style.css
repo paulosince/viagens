@@ -340,6 +340,27 @@ body[data-editing="true"] .home {
 .trip-list > li { background: transparent; }
 .trip-list::marker, .trip-list > li::marker { color: transparent; font-size: 0; }
 
+.trip-section-title {
+  margin: 18px 2px -2px;
+  padding-top: 8px;
+}
+.trip-section-title h2 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 750;
+  letter-spacing: -.02em;
+}
+.trip-section-title h2::after {
+  height: 1px;
+  flex: 1;
+  background: rgba(60,60,67,.18);
+  content: "";
+}
+
 .trip-card {
   position: relative;
   min-height: 330px;
