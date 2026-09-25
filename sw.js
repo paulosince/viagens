@@ -1,4 +1,4 @@
-const CACHE_NAME = 'viaggio-home-v34-ordered-days';
+const CACHE_NAME = 'viaggio-home-v35-date-free-days';
 const SUPABASE_CLIENT = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const LEAFLET_CSS = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css';
 const LEAFLET_JS = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js';
@@ -7,7 +7,7 @@ const APP_SHELL = [
   './',
   './index.html',
   './style.css?v=20260925-8',
-  './src/main.js?v=20260925-9',
+  './src/main.js?v=20260925-10',
   './src/offline-store.js',
   './manifest.webmanifest',
   './assets/app-icon.svg',
