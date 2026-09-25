@@ -64,7 +64,9 @@ self.addEventListener('fetch', event => {
     event.respondWith(
       caches.match(event.request).then(cached => {
         const refreshed = fetch(event.request).then(response => {
-          if (response.ok) caches.open(CACHE_NAME).then(cache => cache.put(event.request, response.clone()));
+          if (response.ok || response.type === 'opaque') {
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, response.clone()));
+          }
           return response;
         }).catch(() => cached);
         return cached || refreshed;
