@@ -169,6 +169,14 @@
             <div class="form-row"><label for="birth-date">Nascimento</label><input id="birth-date" name="birth_date" type="date"></div>
             <div class="form-row static-row"><span>Idade</span><output id="profile_age">—</output></div>
           </div><p class="form-note">A idade é calculada automaticamente pela data de nascimento.</p></section>
+          <section class="form-section"><h3>Integrações</h3>
+            <div class="form-group account-actions">
+              <button id="chatgpt_button" class="account-row account-row-detail integration-row" type="button">
+                <span><strong>ChatGPT</strong><small>Crie e altere viagens conversando</small></span>
+                <span aria-hidden="true">›</span>
+              </button>
+            </div>
+          </section>
           <section class="form-section"><h3>Conta</h3>
             <div class="form-group"><div class="form-row static-row"><span>Perfil criado em</span><output id="profile_created_at"></output></div></div>
             <div class="form-group account-actions">
@@ -178,6 +186,28 @@
           </section>
           <section class="form-section danger-section"><div class="form-group"><button id="delete_account_button" class="account-row destructive" type="button">Excluir conta</button></div><p class="form-note">A conta será desativada, sem apagar viagens, fotos ou qualquer outro dado.</p></section>
         </form>
+      </section>
+
+      <section id="chatgpt_sheet" class="new-trip-sheet chatgpt-sheet" aria-hidden="true" aria-labelledby="chatgpt-title">
+        <header class="sheet-header">
+          <button id="close_chatgpt" class="sheet-control change-log-back" type="button" aria-label="Voltar ao perfil">‹</button>
+          <h2 id="chatgpt-title">ChatGPT</h2>
+          <span class="sheet-header-spacer" aria-hidden="true"></span>
+        </header>
+        <section class="chatgpt-integration-card">
+          <div class="chatgpt-integration-mark" aria-hidden="true">✦</div>
+          <h3>Dirija o Viaggio conversando</h3>
+          <p>Depois de conectar sua conta, o ChatGPT pode criar viagens, organizar dias, editar agenda, passageiros, checklist e orçamento, além de restaurar snapshots quando você pedir.</p>
+          <ul>
+            <li>Você autoriza sua conta do Viaggio via OAuth.</li>
+            <li>Toda mudança feita pelo ChatGPT aparece no Histórico.</li>
+            <li>Cada mudança gera um snapshot restaurável.</li>
+          </ul>
+          <button id="connect_chatgpt" class="chatgpt-connect-button" type="button">Conectar ao ChatGPT</button>
+          <button id="copy_mcp_url" class="chatgpt-copy-button" type="button">Copiar endereço da integração</button>
+          <p id="chatgpt_message" class="chatgpt-message" role="status"></p>
+          <code id="chatgpt_mcp_url" class="chatgpt-endpoint">https://siabldasqinpfmxslwji.supabase.co/functions/v1/viaggio-mcp</code>
+        </section>
       </section>
 
       <section id="change_log_sheet" class="new-trip-sheet change-log-sheet" aria-hidden="true" aria-labelledby="change-log-title">
