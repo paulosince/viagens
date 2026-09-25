@@ -698,7 +698,7 @@ function startDayDrag(event, card) {
     handle.removeEventListener('pointermove', move);
     handle.removeEventListener('pointerup', finish);
     handle.removeEventListener('pointercancel', finish);
-    handle.releasePointerCapture?.(pointerId);
+    if (handle.hasPointerCapture?.(pointerId)) handle.releasePointerCapture(pointerId);
     card.dataset.dragging = 'false';
     document.body.dataset.dayDragging = 'false';
 
@@ -726,6 +726,63 @@ async function recoverHiddenDay(day) {
     status: (day.status === 'hidden' || !day.status) ? 'planned' : day.status
   };
   await persistInlineDayChange(day, records.activities, records.locations, patch);
+}
+
+async function softDeleteHiddenDay(day) {
+  const client = await trySupabase();
+  if (!client || !await supportsOrderedDaySchema(client)) {
+    throw new Error('A lixeira de dias ficará disponível após a migração do banco.');
+  }
+
+  const trip = activeTripForDay(day);
+  const position = dayPosition(day);
+  const deletedAt = new Date().toISOString();
+
+  const deleted = await client
+    .from('trip_days')
+    .update({ deleted_at: deletedAt, is_hidden: true })
+    .eq('id', day.id)
+    .select()
+    .single();
+  if (deleted.error) throw deleted.error;
+
+  const replacement = await client
+    .from('trip_days')
+    .insert({
+      trip_id: day.trip_id,
+      position,
+      is_hidden: false,
+      status: 'empty'
+    })
+    .select()
+    .single();
+  if (replacement.error) {
+    await client.from('trip_days').update({ deleted_at: null }).eq('id', day.id);
+    throw replacement.error;
+  }
+
+  const deletedDay = normalizeDayRecord(deleted.data);
+  const replacementDay = normalizeDayRecord(replacement.data);
+  const updatedDays = state.tripDays
+    .map(item => String(item.id) === String(day.id) ? deletedDay : item)
+    .concat(replacementDay)
+    .sort((a, b) => dayPosition(a) - dayPosition(b));
+
+  state.tripDays = updatedDays;
+  const allActivities = [...state.dayActivities.values()].flat();
+  const allLocations = [...state.dayLocations.values()].flat();
+  await offlineStore.replaceTripData(String(trip.id), updatedDays, allActivities, allLocations);
+
+  const data = {
+    days: updatedDays,
+    activitiesByDay: state.dayActivities,
+    locationsByDay: state.dayLocations,
+    loadedAt: Date.now(),
+    version: Date.now()
+  };
+  state.tripDataCache.set(String(trip.id), data);
+  applyTripData(data);
+  await refreshSyncStatus();
 }
 
 function renderTripDays(days, activitiesByDay = new Map(), locationsByDay = new Map()) {
@@ -877,6 +934,23 @@ function renderTripDays(days, activitiesByDay = new Map(), locationsByDay = new 
         });
       });
       recovery.append(message, recover);
+
+      if (orderedDaySchemaSupport === true) {
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'trip-day-remove';
+        remove.textContent = 'Excluir';
+        remove.addEventListener('click', () => {
+          if (!window.confirm('Mover este dia para Apagados recentemente por 30 dias?')) return;
+          remove.disabled = true;
+          softDeleteHiddenDay(day).catch(error => {
+            console.warn('Não foi possível excluir o dia', error);
+            remove.disabled = false;
+          });
+        });
+        recovery.append(remove);
+      }
+
       card.append(recovery);
     } else {
       const dragHandle = document.createElement('button');
