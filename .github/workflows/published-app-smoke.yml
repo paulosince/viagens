@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'index.html'
+      - 'style.css'
       - 'sw.js'
       - 'src/**'
       - '.github/workflows/published-app-smoke.yml'
