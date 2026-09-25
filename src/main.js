@@ -1270,6 +1270,50 @@ function applyPassengers(records = []) {
   }
 }
 
+async function cacheCompleteWorkspace() {
+  if (!state.user?.id || !state.trips.length || !navigator.onLine) return;
+  const lastSnapshot = await offlineStore.getMeta(`complete_snapshot:${state.user.id}`);
+  if (lastSnapshot && Date.now() - new Date(lastSnapshot).getTime() < 30 * 60 * 1000) return;
+
+  const tripIds = state.trips.map(trip => trip.id);
+  const daysResult = await supabase.from('trip_days').select('*').in('trip_id', tripIds).order('day_number');
+  if (daysResult.error) throw daysResult.error;
+  const allDays = daysResult.data || [];
+
+  let allActivities = [];
+  let allLocations = [];
+  if (allDays.length) {
+    const dayIds = allDays.map(day => day.id);
+    const [activityResult, locationResult] = await Promise.all([
+      supabase.from('activities').select('*').in('day_id', dayIds).order('position'),
+      supabase.from('day_locations').select('*').in('day_id', dayIds).order('position')
+    ]);
+    if (activityResult.error || locationResult.error) throw activityResult.error || locationResult.error;
+    allActivities = activityResult.data || [];
+    allLocations = locationResult.data || [];
+  }
+
+  const dayById = new Map(allDays.map(day => [String(day.id), day]));
+  for (const trip of state.trips) {
+    if (await offlineStore.hasPendingForTrip(trip.id)) continue;
+    const days = allDays.filter(day => String(day.trip_id) === String(trip.id));
+    const ids = new Set(days.map(day => String(day.id)));
+    const activities = allActivities.filter(activity => ids.has(String(activity.day_id)));
+    const locations = allLocations.filter(location => ids.has(String(location.day_id)));
+    await offlineStore.replaceTripData(String(trip.id), days, activities, locations);
+
+    state.tripDataCache.set(String(trip.id), {
+      days,
+      activitiesByDay: groupByDay(activities),
+      locationsByDay: groupByDay(locations),
+      loadedAt: Date.now(),
+      version: Date.now()
+    });
+  }
+
+  await offlineStore.setMeta(`complete_snapshot:${state.user.id}`, new Date().toISOString());
+}
+
 async function loadTrips({ allowLocalFallback = true } = {}) {
   try {
     const result = await supabase.from('trips').select('*').is('deleted_at', null).order('start_date', { ascending: true });
@@ -1688,6 +1732,7 @@ async function deleteAccount() {
   if (!window.confirm('Desativar esta conta? A sessão será encerrada, mas nenhuma viagem, foto ou outro dado será apagado.')) return;
   const result = await supabase.rpc('soft_delete_own_account');
   if (result.error) { dom.profileMessage.textContent = result.error.message; return; }
+  await offlineStore.clearSession().catch(console.warn);
   await supabase.auth.signOut();
 }
 
@@ -1735,7 +1780,19 @@ dom.deleteSelectedTrips.addEventListener('click', softDeleteSelectedTrips);
 dom.yearButton.addEventListener('click', () => setYearMenu(document.body.dataset.yearMenu !== 'open'));
 document.addEventListener('click', event => { if (document.body.dataset.yearMenu === 'open' && !dom.tripHeading.contains(event.target)) setYearMenu(false); });
 dom.birthDateInput.addEventListener('input', syncAge);
-dom.logoutButton.addEventListener('click', () => supabase.auth.signOut());
+dom.logoutButton.addEventListener('click', async () => {
+  await offlineStore.clearSession().catch(console.warn);
+  await supabase.auth.signOut().catch(console.warn);
+  state.user = null;
+  state.profile = null;
+  state.trips = [];
+  state.passengers.clear();
+  state.tripDataCache.clear();
+  state.tripDataLoads.clear();
+  syncTripList();
+  closeSheets();
+  setSessionView('anonymous');
+});
 dom.deleteAccountButton.addEventListener('click', deleteAccount);
 
 for (const option of dom.tripColorPalette.querySelectorAll('.trip-color-option')) option.addEventListener('click', () => selectTripColor(option.dataset.color));
@@ -1764,7 +1821,12 @@ dom.authForm.addEventListener('submit', async event => {
   if (result.error) { dom.authMessage.textContent = result.error.message; return; }
   state.user = result.data.user;
   await offlineStore.cacheSession(state.user);
-  try { await loadProfile(); await loadTrips(); setSessionView('authenticated'); }
+  try {
+    await loadProfile();
+    await loadTrips();
+    await cacheCompleteWorkspace().catch(error => console.warn('Snapshot offline incompleto', error));
+    setSessionView('authenticated');
+  }
   catch (error) { dom.authMessage.textContent = error.message; setSessionView('anonymous'); }
 });
 
@@ -1784,6 +1846,7 @@ async function boot() {
     try {
       await loadProfile();
       await loadTrips();
+      await cacheCompleteWorkspace().catch(error => console.warn('Snapshot offline incompleto', error));
       setSessionView('authenticated');
     } catch (error) {
       const localUser = await offlineStore.getCachedSession();
@@ -1830,7 +1893,11 @@ window.addEventListener('online', () => {
 });
 
 supabase.auth.onAuthStateChange((_event, session) => {
-  if (session) return;
+  if (session) {
+    offlineStore.cacheSession(session.user).catch(console.warn);
+    return;
+  }
+  if (!navigator.onLine && state.user) return;
   state.user = null; state.profile = null; state.trips = []; state.passengers.clear(); state.tripDataCache.clear(); state.tripDataLoads.clear();
   syncTripList(); closeSheets(); setSessionView('anonymous');
 });
