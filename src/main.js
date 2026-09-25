@@ -1997,12 +1997,47 @@ function closeDayEditor() {
   dom.dayEditSheet.setAttribute('aria-hidden', 'true');
 }
 
+function dayPatchForRemote(dayPatch, orderedSchema) {
+  if (orderedSchema) return { ...dayPatch };
+
+  const patch = { ...dayPatch };
+  if ('is_hidden' in patch) {
+    patch.status = patch.is_hidden ? 'hidden' : (patch.status === 'hidden' ? 'planned' : patch.status);
+    delete patch.is_hidden;
+  }
+  if ('deleted_at' in patch) {
+    patch.status = patch.deleted_at ? 'deleted:' + patch.deleted_at : (patch.status?.startsWith?.('deleted:') ? 'planned' : patch.status);
+    delete patch.deleted_at;
+  }
+  delete patch.position;
+  return patch;
+}
+
+function activityForRemote(activity, orderedSchema, day = null) {
+  const record = { ...activity };
+  if (orderedSchema) {
+    delete record.starts_at;
+    if (!record.start_time && activityTime(activity)) record.start_time = activityTime(activity) + ':00';
+    return record;
+  }
+
+  delete record.start_time;
+  const time = activityTime(activity) || '09:00';
+  const date = day ? derivedDayDate(day) : '';
+  if (date) record.starts_at = date + 'T' + time + ':00';
+  return record;
+}
+
 async function syncMutation(mutation) {
   if (mutation.type !== 'save-day') return;
   const client = await trySupabase();
   if (!client) throw new Error('Backend indisponível.');
 
-  const savedDay = await client.from('trip_days').update(mutation.dayPatch).eq('id', mutation.dayId);
+  const orderedSchema = await supportsOrderedDaySchema(client);
+  const savedDay = await client
+    .from('trip_days')
+    .update(dayPatchForRemote(mutation.dayPatch || {}, orderedSchema))
+    .eq('id', mutation.dayId);
   if (savedDay.error) throw savedDay.error;
 
   if (mutation.locations?.length) {
@@ -2011,7 +2046,9 @@ async function syncMutation(mutation) {
   }
 
   if (mutation.activities?.length) {
-    const savedActivities = await client.from('activities').upsert(mutation.activities);
+    const day = state.tripDays.find(item => String(item.id) === String(mutation.dayId)) || null;
+    const remoteActivities = mutation.activities.map(activity => activityForRemote(activity, orderedSchema, day));
+    const savedActivities = await client.from('activities').upsert(remoteActivities);
     if (savedActivities.error) throw savedActivities.error;
   }
 
