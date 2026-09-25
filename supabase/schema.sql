@@ -7,7 +7,6 @@ create table if not exists public.trips (
   destination text not null default '',
   start_date date not null,
   day_count integer not null default 1 check (day_count between 1 and 365),
-  end_date date,
   arrival_method text,
   location_label text,
   latitude numeric,
@@ -32,7 +31,6 @@ alter table public.activities add column if not exists notes text;
 alter table public.activities add column if not exists start_time time without time zone;
 alter table public.trips add column if not exists start_date date;
 alter table public.trips add column if not exists day_count integer not null default 1;
-alter table public.trips add column if not exists end_date date;
 alter table public.trips add column if not exists arrival_method text;
 alter table public.trips add column if not exists location_label text;
 alter table public.trips add column if not exists latitude numeric;
@@ -62,8 +60,6 @@ create table if not exists public.trip_days (
   position integer not null default 0,
   is_hidden boolean not null default false,
   deleted_at timestamptz,
-  day_number integer,
-  date date,
   title text,
   summary text,
   photo_url text,
@@ -124,7 +120,6 @@ create table if not exists public.activities (
   title text not null,
   description text,
   start_time time without time zone,
-  starts_at timestamptz,
   place_name text,
   address text,
   latitude numeric,
