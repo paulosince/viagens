@@ -12,15 +12,17 @@
   <link rel="icon" href="assets/app-icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon-180.PNG">
   <style id="splash-critical">
-    html, body { min-height: 100%; margin: 0; background: linear-gradient(180deg, #159bf0 0%, #65d8ef 58%, #b9eff8 100%); }
-    body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", sans-serif; }
+    html { width: 100%; min-height: 100%; min-height: 100dvh; margin: 0; background: #b9eff8; }
+    body { width: 100%; min-height: 100vh; min-height: 100dvh; margin: 0; background: linear-gradient(180deg, #159bf0 0%, #65d8ef 58%, #b9eff8 100%); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", sans-serif; }
+    body[data-app-ready="false"] { overflow: hidden; }
     .app-splash {
       position: fixed;
       z-index: 100;
-      top: calc(-1 * env(safe-area-inset-top));
-      right: calc(-1 * env(safe-area-inset-right));
-      bottom: calc(-1 * env(safe-area-inset-bottom));
-      left: calc(-1 * env(safe-area-inset-left));
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh;
+      min-height: 100%;
       display: grid;
       overflow: hidden;
       place-items: center;
@@ -40,9 +42,9 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20260925-1" as="style">
-  <link rel="stylesheet" href="style.css?v=20260925-1" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20260925-1"></noscript>
+  <link rel="preload" href="style.css?v=20260925-2" as="style">
+  <link rel="stylesheet" href="style.css?v=20260925-2" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20260925-2"></noscript>
 </head>
 <body data-session="loading" data-active-sheet="none" data-editing="false" data-year-menu="closed" data-trip-page="closed" data-day-page="closed" data-app-ready="false">
   <div id="app_splash" class="app-splash" aria-label="Carregando Viaggio">
@@ -270,7 +272,7 @@
       <button id="delete_selected_trips" type="button" disabled>Excluir selecionadas</button>
     </footer>
   </main>
-  <script type="module" src="src/main.js?v=20260925-2"></script>
-  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260925-2');</script>
+  <script type="module" src="src/main.js?v=20260925-3"></script>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260925-3');</script>
 </body>
 </html>
