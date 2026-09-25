@@ -873,6 +873,46 @@ body[data-day-page="open"] .day-page {
   background: var(--ios-blue);
   content: "";
 }
+
+.day-inline-save-status {
+  grid-column: 1;
+  grid-row: 3;
+  justify-self: center;
+  width: 11px;
+  height: 11px;
+  margin: 10px 6px 0 0;
+  border-radius: 50%;
+  opacity: 0;
+  transform: scale(.55);
+  pointer-events: none;
+  transition: opacity .18s ease, transform .18s ease, background-color .18s ease;
+}
+.day-inline-save-status[data-state="saving"] {
+  opacity: 1;
+  background: #f4b942;
+  animation: agenda-save-pulse .72s ease-in-out infinite alternate;
+}
+.day-inline-save-status[data-state="saved"] {
+  opacity: 1;
+  background: #34c759;
+  transform: scale(1);
+  animation: none;
+}
+.day-inline-save-status[data-state="error"] {
+  opacity: 1;
+  background: #ff3b30;
+  transform: scale(1);
+  animation: none;
+}
+.day-inline-save-status[data-state="idle"] {
+  opacity: 0;
+  transform: scale(.55);
+  animation: none;
+}
+@keyframes agenda-save-pulse {
+  from { transform: scale(.72); }
+  to { transform: scale(1.18); }
+}
 .day-view-agenda-copy {
   grid-column: 2;
   grid-row: 1 / span 3;
@@ -1130,6 +1170,11 @@ body[data-day-page="open"] .day-page {
     grid-row: 2;
     width: 50px;
     margin-left: -4px;
+  }
+  .day-inline-save-status {
+    grid-column: 1;
+    grid-row: 3;
+    margin: 9px 4px 0 0;
   }
   .day-view-pin::before { left: 17px; }
   .day-view-pin::after { left: 22px; }
