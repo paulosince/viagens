@@ -960,7 +960,8 @@ function openDayPage(dayId, { pushHistory = true } = {}) {
   dom.dayPageTitle.textContent = dayTitle(day, activities, locations);
   dom.dayPageDate.textContent = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' }).format(new Date(`${day.date}T12:00:00`));
   renderDayPageAgenda(day, activities, locations);
-  renderDayPageMap(locations);
+  renderDayPageMap(locations, activities);
+  enrichDayPage(day, activities, locations).catch(error => console.warn('Não foi possível enriquecer o dia', error));
   dom.dayPage.dataset.renderKey = renderKey;
   dom.dayPage.setAttribute('aria-hidden', 'false');
   document.body.dataset.dayPage = 'open';
@@ -1011,23 +1012,86 @@ function renderDayPageAgenda(day, activities, locations) {
   dom.dayPageEmpty.textContent = ordered.length ? '' : `Nenhum horário planejado para o dia ${day.day_number}.`;
 }
 
-function renderDayPageMap(locations) {
-  const points = locations
-    .map(location => ({ ...location, latitude: numericCoordinate(location.latitude), longitude: numericCoordinate(location.longitude) }))
-    .filter(location => Number.isFinite(location.latitude) && Number.isFinite(location.longitude));
-  dom.dayPageMap.replaceChildren();
-  dom.dayPageDirections.replaceChildren();
-  if (!points.length) {
-    dom.dayPageMap.textContent = 'Adicione locais ao dia para ver o mapa.';
-    return;
+function dayMapPoints(locations, activities = []) {
+  const points = [];
+  const keys = new Set();
+
+  const addPoint = point => {
+    const latitude = numericCoordinate(point.latitude);
+    const longitude = numericCoordinate(point.longitude);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+    const key = latitude.toFixed(6) + ':' + longitude.toFixed(6);
+    if (keys.has(key)) return;
+    keys.add(key);
+    points.push({ ...point, latitude, longitude });
+  };
+
+  locations.forEach(addPoint);
+  activities.forEach(activity => {
+    if (activity.place_id && locations.some(location => String(location.id) === String(activity.place_id))) return;
+    addPoint({
+      name: activity.place_name || activity.title || 'Local',
+      latitude: activity.latitude,
+      longitude: activity.longitude
+    });
+  });
+
+  return points;
+}
+
+function renderOsmMapFallback(points, token) {
+  if (token !== state.dayMapRenderToken || !points.length) return;
+  const latitudes = points.map(point => point.latitude);
+  const longitudes = points.map(point => point.longitude);
+  let south = Math.min(...latitudes);
+  let north = Math.max(...latitudes);
+  let west = Math.min(...longitudes);
+  let east = Math.max(...longitudes);
+
+  const minLatSpan = 0.012;
+  const minLonSpan = 0.016;
+  if (north - south < minLatSpan) {
+    const center = (north + south) / 2;
+    south = center - minLatSpan / 2;
+    north = center + minLatSpan / 2;
   }
+  if (east - west < minLonSpan) {
+    const center = (east + west) / 2;
+    west = center - minLonSpan / 2;
+    east = center + minLonSpan / 2;
+  }
+
+  const latPad = (north - south) * 0.18;
+  const lonPad = (east - west) * 0.18;
   const first = points[0];
+  const bbox = [west - lonPad, south - latPad, east + lonPad, north + latPad].join(',');
+
   const iframe = document.createElement('iframe');
   iframe.title = 'Mapa do dia';
   iframe.loading = 'lazy';
   iframe.referrerPolicy = 'no-referrer-when-downgrade';
-  iframe.src = `https://www.openstreetmap.org/export/embed.html?marker=${first.latitude}%2C${first.longitude}&zoom=13&layers=M`;
-  dom.dayPageMap.append(iframe);
+  iframe.src = 'https://www.openstreetmap.org/export/embed.html?bbox=' + encodeURIComponent(bbox)
+    + '&layer=mapnik&marker=' + first.latitude + '%2C' + first.longitude;
+  dom.dayPageMap.replaceChildren(iframe);
+}
+
+function renderDayPageMap(locations, activities = []) {
+  const points = dayMapPoints(locations, activities);
+  const token = ++state.dayMapRenderToken;
+
+  if (state.dayMap) {
+    state.dayMap.remove();
+    state.dayMap = null;
+  }
+
+  dom.dayPageMap.replaceChildren();
+  dom.dayPageDirections.replaceChildren();
+
+  if (!points.length) {
+    dom.dayPageMap.textContent = 'Adicione locais ao dia para ver o mapa.';
+    return;
+  }
+
   const pinList = document.createElement('ol');
   pinList.className = 'day-view-map-pins';
   points.forEach((point, index) => {
@@ -1035,23 +1099,79 @@ function renderDayPageMap(locations) {
     const marker = document.createElement('span');
     marker.textContent = String(index + 1);
     const name = document.createElement('strong');
-    name.textContent = point.name || `Local ${index + 1}`;
+    name.textContent = point.name || ('Local ' + String(index + 1));
     item.append(marker, name);
     pinList.append(item);
   });
+
   const routeLink = document.createElement('a');
   routeLink.className = 'day-view-route-link';
   routeLink.target = '_blank';
   routeLink.rel = 'noopener';
-  routeLink.href = points.length > 1
-    ? `https://www.openstreetmap.org/directions?engine=fossgis_osrm_foot&route=${points.map(point => `${point.latitude}%2C${point.longitude}`).join('%3B')}`
-    : `https://www.openstreetmap.org/?mlat=${first.latitude}&mlon=${first.longitude}#map=16/${first.latitude}/${first.longitude}`;
-  routeLink.textContent = points.length > 1 ? 'Abrir direções do dia' : 'Abrir local no mapa';
+  if (points.length > 1) {
+    routeLink.href = 'https://www.openstreetmap.org/directions?engine=fossgis_osrm_foot&route='
+      + points.map(point => point.latitude + '%2C' + point.longitude).join('%3B');
+    routeLink.textContent = 'Abrir direções do dia';
+  } else {
+    routeLink.href = 'https://www.openstreetmap.org/?mlat=' + points[0].latitude
+      + '&mlon=' + points[0].longitude
+      + '#map=16/' + points[0].latitude + '/' + points[0].longitude;
+    routeLink.textContent = 'Abrir local no mapa';
+  }
   dom.dayPageDirections.append(pinList, routeLink);
+
+  dom.dayPageMap.textContent = 'Carregando mapa…';
+
+  loadLeaflet().then(L => {
+    if (token !== state.dayMapRenderToken || document.body.dataset.dayPage !== 'open') return;
+    dom.dayPageMap.replaceChildren();
+
+    const map = L.map(dom.dayPageMap, {
+      zoomControl: true,
+      attributionControl: true,
+      preferCanvas: true
+    });
+    state.dayMap = map;
+
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      minZoom: 2,
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    const bounds = [];
+    points.forEach((point, index) => {
+      const latLng = [point.latitude, point.longitude];
+      bounds.push(latLng);
+      const icon = L.divIcon({
+        className: 'day-map-numbered-marker',
+        html: '<span>' + String(index + 1) + '</span>',
+        iconSize: [30, 36],
+        iconAnchor: [15, 36],
+        popupAnchor: [0, -34]
+      });
+      L.marker(latLng, { icon })
+        .addTo(map)
+        .bindPopup(point.name || ('Local ' + String(index + 1)));
+    });
+
+    if (bounds.length === 1) {
+      map.setView(bounds[0], 16);
+    } else {
+      map.fitBounds(bounds, { padding: [30, 30], maxZoom: 15 });
+    }
+
+    requestAnimationFrame(() => map.invalidateSize());
+  }).catch(() => renderOsmMapFallback(points, token));
 }
 
 function closeDayPage() {
   state.activeDayId = null;
+  state.dayMapRenderToken += 1;
+  if (state.dayMap) {
+    state.dayMap.remove();
+    state.dayMap = null;
+  }
   document.body.dataset.dayPage = 'closed';
   dom.dayPage.setAttribute('aria-hidden', 'true');
 }
