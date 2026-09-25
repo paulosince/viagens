@@ -2,6 +2,7 @@ const DB_NAME = 'viaggio-local';
 const DB_VERSION = 2;
 
 let dbPromise;
+let lastQueueSequence = 0;
 
 function openDb() {
   if (dbPromise) return dbPromise;
@@ -246,9 +247,15 @@ async function saveDayBundle(day, activities, locations) {
 async function enqueueMutation(mutation) {
   const db = await openDb();
   const tx = db.transaction('outbox', 'readwrite');
+  const createdAt = mutation.created_at || new Date().toISOString();
+  const timeBase = Date.parse(createdAt) * 1000;
+  const sequence = mutation.sequence || Math.max(timeBase, lastQueueSequence + 1);
+  lastQueueSequence = Math.max(lastQueueSequence, sequence);
+
   const record = {
     id: mutation.id || crypto.randomUUID(),
-    created_at: mutation.created_at || new Date().toISOString(),
+    created_at: createdAt,
+    sequence,
     ...mutation
   };
   tx.objectStore('outbox').put(record);
@@ -260,7 +267,12 @@ async function listOutbox() {
   const db = await openDb();
   const tx = db.transaction('outbox', 'readonly');
   const records = await requestResult(tx.objectStore('outbox').getAll());
-  return records.sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+  return records.sort((a, b) => {
+    const aSequence = Number(a.sequence) || Date.parse(a.created_at || 0) * 1000;
+    const bSequence = Number(b.sequence) || Date.parse(b.created_at || 0) * 1000;
+    if (aSequence !== bSequence) return aSequence - bSequence;
+    return String(a.created_at || '').localeCompare(String(b.created_at || '')) || String(a.id).localeCompare(String(b.id));
+  });
 }
 
 async function removeMutation(id) {
