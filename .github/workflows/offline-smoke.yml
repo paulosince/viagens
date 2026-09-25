@@ -1,0 +1,32 @@
+name: Offline smoke test
+
+on:
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'sw.js'
+      - 'src/**'
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Parse JavaScript
+        run: |
+          node --check src/main.js
+          node --check src/offline-store.js
+          node --check sw.js
+      - name: Verify offline app shell
+        run: |
+          test -f index.html
+          test -f style.css
+          test -f src/main.js
+          test -f src/offline-store.js
+          test -f manifest.webmanifest
+          test -f assets/app-icon.svg
+          test -f assets/cintia.png
