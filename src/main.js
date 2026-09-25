@@ -2879,10 +2879,131 @@ async function saveProfile() {
   finally { state.saving = false; setLoading(dom.saveProfile, false); }
 }
 
-function createDays(tripId, startValue, endValue) {
-  const days = [], end = new Date(`${endValue}T12:00:00`);
-  for (let date = new Date(`${startValue}T12:00:00`), number = 1; date <= end; date.setDate(date.getDate() + 1), number += 1) days.push({ trip_id: tripId, day_number: number, date: date.toISOString().slice(0, 10), status: 'empty' });
-  return days;
+function createDays(tripId, dayCount, startValue, orderedSchema) {
+  return Array.from({ length: dayCount }, (_, position) => (
+    orderedSchema
+      ? {
+          trip_id: tripId,
+          position,
+          is_hidden: false,
+          status: 'empty'
+        }
+      : {
+          trip_id: tripId,
+          day_number: position + 1,
+          date: addDaysToDate(startValue, position),
+          status: 'empty'
+        }
+  ));
+}
+
+function tripPayloadFromForm(values, orderedSchema, includeOwner = false) {
+  const dayCount = Math.max(1, Math.min(365, Number(values.day_count) || 1));
+  const payload = {
+    name: values.name.trim(),
+    destination: values.destination.trim(),
+    start_date: values.start_date,
+    arrival_method: values.arrival_method,
+    location_label: values.location_label.trim() || null,
+    cover_url: state.imageData,
+    secondary_color: state.tripColor
+  };
+
+  if (includeOwner) payload.user_id = state.user.id;
+
+  if (orderedSchema) {
+    payload.day_count = dayCount;
+  } else {
+    payload.end_date = addDaysToDate(values.start_date, dayCount - 1);
+  }
+
+  return { payload, dayCount };
+}
+
+async function syncTripDaysForCount(client, tripId, startValue, dayCount, orderedSchema) {
+  const result = await client
+    .from('trip_days')
+    .select('*')
+    .eq('trip_id', tripId)
+    .order(orderedSchema ? 'position' : 'day_number');
+  if (result.error) return result.error;
+
+  const existing = (result.data || []).map(normalizeDayRecord);
+  const liveDays = existing.filter(day => !dayDeletedAt(day));
+
+  for (const day of liveDays) {
+    if (dayPosition(day) < dayCount || dayIsHidden(day)) continue;
+    const hidden = orderedSchema
+      ? await client.from('trip_days').update({ is_hidden: true }).eq('id', day.id)
+      : await client.from('trip_days').update({ status: 'hidden' }).eq('id', day.id);
+    if (hidden.error) return hidden.error;
+  }
+
+  const occupied = new Set(
+    liveDays
+      .filter(day => dayPosition(day) < dayCount)
+      .map(day => dayPosition(day))
+  );
+
+  const missing = [];
+  for (let position = 0; position < dayCount; position += 1) {
+    if (!occupied.has(position)) missing.push(position);
+  }
+
+  if (missing.length) {
+    const rows = missing.map(position => (
+      orderedSchema
+        ? { trip_id: tripId, position, is_hidden: false, status: 'empty' }
+        : { trip_id: tripId, day_number: position + 1, date: addDaysToDate(startValue, position), status: 'empty' }
+    ));
+    const inserted = await client.from('trip_days').insert(rows);
+    if (inserted.error) return inserted.error;
+  }
+
+  return null;
+}
+
+async function saveTripPassengers(client, tripId) {
+  const existingPassengers = state.passengers.get(tripId) || [];
+  const existingIds = new Set(existingPassengers.map(passenger => String(passenger.id)));
+  const editedPassengers = uniqueTripPassengers(state.newTripPassengers);
+  const retainedIds = new Set(
+    editedPassengers
+      .filter(passenger => existingIds.has(String(passenger.id)))
+      .map(passenger => String(passenger.id))
+  );
+  const removedIds = existingPassengers
+    .filter(passenger => !retainedIds.has(String(passenger.id)))
+    .map(passenger => passenger.id);
+
+  if (removedIds.length) {
+    const removed = await client
+      .from('passengers')
+      .delete()
+      .in('id', removedIds)
+      .eq('trip_id', tripId)
+      .select('id');
+    if (removed.error) return removed.error;
+    if ((removed.data || []).length !== removedIds.length) return new Error('Não foi possível remover todos os passageiros duplicados.');
+  }
+
+  for (const passenger of editedPassengers) {
+    const passengerPayload = {
+      user_id: passenger.session ? state.user.id : passenger.userId || null,
+      name: passenger.name.trim(),
+      birth_date: passenger.birthDate || null,
+      photo_url: passenger.photoUrl || null,
+      age: ageFromBirthDate(passenger.birthDate)
+    };
+
+    const result = existingIds.has(String(passenger.id))
+      ? await client.from('passengers').update(passengerPayload).eq('id', passenger.id).eq('trip_id', tripId)
+      : await client.from('passengers').insert({ ...passengerPayload, trip_id: tripId });
+
+    if (result.error) return result.error;
+  }
+
+  return null;
 }
 
 async function saveTrip() {
@@ -2891,100 +3012,98 @@ async function saveTrip() {
     dom.newTripMessage.textContent = 'Criar ou alterar a viagem requer conexão. O roteiro já salvo continua editável offline.';
     return;
   }
+
   const values = Object.fromEntries(new FormData(dom.newTripForm));
-  if (values.end_date < values.start_date) { dom.newTripMessage.textContent = 'A data final deve ser igual ou posterior à inicial.'; return; }
-  if (!state.imageData) { dom.newTripMessage.textContent = 'Escolha a imagem da viagem.'; return; }
-  state.saving = true; setLoading(dom.saveNewTrip, true);
-  if (state.editingTripId) {
-    const tripId = state.editingTripId;
-    const payload = { name: values.name.trim(), destination: values.destination.trim(), start_date: values.start_date, end_date: values.end_date, arrival_method: values.arrival_method, location_label: values.location_label.trim() || null, cover_url: state.imageData, secondary_color: state.tripColor };
-    const updated = await client.from('trips').update(payload).eq('id', tripId);
-    let failure = updated.error;
-    if (!failure) {
-      const existingPassengers = state.passengers.get(tripId) || [];
-      const existingIds = new Set(existingPassengers.map(passenger => String(passenger.id)));
-      const editedPassengers = uniqueTripPassengers(state.newTripPassengers);
-      const retainedIds = new Set(editedPassengers.filter(passenger => existingIds.has(String(passenger.id))).map(passenger => String(passenger.id)));
-      const removedIds = existingPassengers.filter(passenger => !retainedIds.has(String(passenger.id))).map(passenger => passenger.id);
-      if (removedIds.length) {
-        const removed = await client.from('passengers').delete().in('id', removedIds).eq('trip_id', tripId).select('id');
-        failure = removed.error;
-        if (!failure && (removed.data || []).length !== removedIds.length) failure = new Error('Não foi possível remover todos os passageiros duplicados.');
-      }
-      for (const passenger of editedPassengers) {
-        if (failure) break;
-        const payload = { user_id: passenger.session ? state.user.id : passenger.userId || null, name: passenger.name.trim(), birth_date: passenger.birthDate || null, photo_url: passenger.photoUrl || null, age: ageFromBirthDate(passenger.birthDate) };
-        failure = existingIds.has(String(passenger.id))
-          ? (await client.from('passengers').update(payload).eq('id', passenger.id).eq('trip_id', tripId)).error
-          : (await client.from('passengers').insert({ ...payload, trip_id: tripId })).error;
-      }
-    }
-    if (!failure) {
-      const existing = await client.from('trip_days').select('id,date').eq('trip_id', tripId);
-      failure = existing.error;
-      if (!failure) {
-        const wanted = createDays(tripId, values.start_date, values.end_date);
-        const wantedDates = new Set(wanted.map(day => day.date));
-        const obsoleteIds = (existing.data || []).filter(day => !wantedDates.has(day.date)).map(day => day.id);
-        if (obsoleteIds.length) failure = (await client.from('trip_days').delete().in('id', obsoleteIds)).error;
-        const existingByDate = new Map((existing.data || []).map(day => [day.date, day]));
-        for (const day of wanted) {
-          if (failure) break;
-          const current = existingByDate.get(day.date);
-          failure = current
-            ? (await client.from('trip_days').update({ day_number: day.day_number }).eq('id', current.id)).error
-            : (await client.from('trip_days').insert(day)).error;
-        }
-      }
-    }
-    if (failure) dom.newTripMessage.textContent = failure.message;
-    else {
+  const dayCount = Number(values.day_count);
+  if (!Number.isInteger(dayCount) || dayCount < 1 || dayCount > 365) {
+    dom.newTripMessage.textContent = 'Informe uma quantidade de dias entre 1 e 365.';
+    return;
+  }
+  if (!state.imageData) {
+    dom.newTripMessage.textContent = 'Escolha a imagem da viagem.';
+    return;
+  }
+
+  state.saving = true;
+  setLoading(dom.saveNewTrip, true);
+
+  try {
+    const orderedSchema = await supportsOrderedDaySchema(client);
+    const { payload } = tripPayloadFromForm(values, orderedSchema, !state.editingTripId);
+
+    if (state.editingTripId) {
+      const tripId = state.editingTripId;
+      const updated = await client.from('trips').update(payload).eq('id', tripId);
+      if (updated.error) throw updated.error;
+
+      const passengerError = await saveTripPassengers(client, tripId);
+      if (passengerError) throw passengerError;
+
+      const dayError = await syncTripDaysForCount(client, tripId, values.start_date, dayCount, orderedSchema);
+      if (dayError) throw dayError;
+
       state.selectedYear = Number(String(values.start_date).slice(0, 4));
       state.tripDataCache.delete(String(tripId));
       await loadTrips();
+
       state.saving = false;
       closeSheets();
-      await openTrip(tripId, { pushHistory: false });
+      await openTrip(tripId, { pushHistory: false, forceRefresh: true });
+      return;
     }
-    state.saving = false; setLoading(dom.saveNewTrip, false);
-    return;
-  }
-  const created = await client.from('trips').insert({ user_id: state.user.id, name: values.name.trim(), destination: values.destination.trim(), start_date: values.start_date, end_date: values.end_date, arrival_method: values.arrival_method, location_label: values.location_label.trim() || null, cover_url: state.imageData, secondary_color: state.tripColor }).select().single();
-  if (created.error) { dom.newTripMessage.textContent = created.error.message; state.saving = false; setLoading(dom.saveNewTrip, false); return; }
-  const trip = created.data;
-  const member = await client.from('trip_members').insert({ trip_id: trip.id, user_id: state.user.id, role: 'owner' });
-  let failure = member.error;
-  if (!failure) {
-    const passengerPayload = state.newTripPassengers.map(passenger => ({
+
+    const created = await client.from('trips').insert(payload).select().single();
+    if (created.error) throw created.error;
+
+    const trip = created.data;
+    let failure = null;
+
+    const member = await client.from('trip_members').insert({
       trip_id: trip.id,
-      user_id: passenger.session ? state.user.id : null,
-      name: passenger.name.trim(),
-      birth_date: passenger.birthDate || null,
-      photo_url: passenger.photoUrl || null,
-      age: ageFromBirthDate(passenger.birthDate)
-    })).filter(passenger => passenger.name);
-    if (passengerPayload.length) {
-      const passengers = await client.from('passengers').insert(passengerPayload);
-      failure = passengers.error;
+      user_id: state.user.id,
+      role: 'owner'
+    });
+    failure = member.error;
+
+    if (!failure) {
+      const passengerPayload = state.newTripPassengers.map(passenger => ({
+        trip_id: trip.id,
+        user_id: passenger.session ? state.user.id : null,
+        name: passenger.name.trim(),
+        birth_date: passenger.birthDate || null,
+        photo_url: passenger.photoUrl || null,
+        age: ageFromBirthDate(passenger.birthDate)
+      })).filter(passenger => passenger.name);
+
+      if (passengerPayload.length) {
+        const passengers = await client.from('passengers').insert(passengerPayload);
+        failure = passengers.error;
+      }
     }
-  }
-  if (!failure) {
-    const days = await client.from('trip_days').insert(createDays(trip.id, values.start_date, values.end_date));
-    failure = days.error;
-  }
-  if (failure) {
-    await client.from('trip_days').delete().eq('trip_id', trip.id);
-    await client.from('passengers').delete().eq('trip_id', trip.id);
-    await client.from('trip_members').delete().eq('trip_id', trip.id);
-    await client.from('trips').delete().eq('id', trip.id);
-    dom.newTripMessage.textContent = failure.message;
-  } else {
+
+    if (!failure) {
+      const days = await client.from('trip_days').insert(createDays(trip.id, dayCount, values.start_date, orderedSchema));
+      failure = days.error;
+    }
+
+    if (failure) {
+      await client.from('trip_days').delete().eq('trip_id', trip.id);
+      await client.from('passengers').delete().eq('trip_id', trip.id);
+      await client.from('trip_members').delete().eq('trip_id', trip.id);
+      await client.from('trips').delete().eq('id', trip.id);
+      throw failure;
+    }
+
     state.selectedYear = Number(String(values.start_date).slice(0, 4));
     await loadTrips();
     state.saving = false;
     closeSheets();
+  } catch (error) {
+    dom.newTripMessage.textContent = error.message || 'Não foi possível salvar a viagem.';
+  } finally {
+    state.saving = false;
+    setLoading(dom.saveNewTrip, false);
   }
-  state.saving = false; setLoading(dom.saveNewTrip, false);
 }
 
 async function deleteAccount() {
