@@ -197,6 +197,8 @@ create table if not exists public.change_log (
   before_state jsonb,
   after_state jsonb,
   snapshot_id uuid references public.state_snapshots(id) on delete set null,
+  source text not null default 'viaggio',
+  client_id text,
   created_at timestamptz not null default now()
 );
 
