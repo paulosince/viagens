@@ -1,5 +1,5 @@
 const DB_NAME = 'viaggio-local';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbPromise;
 
@@ -36,6 +36,12 @@ function openDb() {
       }
       if (!db.objectStoreNames.contains('outbox')) {
         const store = db.createObjectStore('outbox', { keyPath: 'id' });
+        store.createIndex('created_at', 'created_at', { unique: false });
+      }
+      if (!db.objectStoreNames.contains('change_log')) {
+        const store = db.createObjectStore('change_log', { keyPath: 'id' });
+        store.createIndex('user_id', 'user_id', { unique: false });
+        store.createIndex('trip_id', 'trip_id', { unique: false });
         store.createIndex('created_at', 'created_at', { unique: false });
       }
     };
@@ -266,7 +272,32 @@ async function removeMutation(id) {
 
 async function hasPendingForTrip(tripId) {
   const id = String(tripId);
-  return (await listOutbox()).some(item => String(item.tripId || '') === id);
+  return (await listOutbox()).some(item => item.type !== 'change-log' && String(item.tripId || '') === id);
+}
+
+async function saveChangeLog(entry) {
+  if (!entry?.id || !entry?.user_id) return;
+  const db = await openDb();
+  const tx = db.transaction('change_log', 'readwrite');
+  tx.objectStore('change_log').put(entry);
+  await transactionDone(tx);
+}
+
+async function saveChangeLogs(entries = []) {
+  if (!entries.length) return;
+  const db = await openDb();
+  const tx = db.transaction('change_log', 'readwrite');
+  const store = tx.objectStore('change_log');
+  for (const entry of entries) if (entry?.id && entry?.user_id) store.put(entry);
+  await transactionDone(tx);
+}
+
+async function listChangeLogs(userId, limit = 100) {
+  if (!userId) return [];
+  const records = await getAllByIndex('change_log', 'user_id', String(userId));
+  return records
+    .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
+    .slice(0, Math.max(1, Number(limit) || 100));
 }
 
 async function hasWorkspace(userId) {
@@ -290,6 +321,9 @@ export const offlineStore = {
   removeMutation,
   hasPendingForTrip,
   hasWorkspace,
+  saveChangeLog,
+  saveChangeLogs,
+  listChangeLogs,
   getMeta,
   setMeta
 };
