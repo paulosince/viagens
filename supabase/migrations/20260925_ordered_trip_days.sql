@@ -13,8 +13,7 @@ where day_count is null;
 
 alter table public.trips
   alter column day_count set default 1,
-  alter column day_count set not null,
-  alter column end_date drop not null;
+  alter column day_count set not null;
 
 alter table public.trips
   drop constraint if exists trips_dates_valid;
@@ -41,9 +40,7 @@ where status = 'hidden';
 
 alter table public.trip_days
   alter column position set default 0,
-  alter column position set not null,
-  alter column day_number drop not null,
-  alter column date drop not null;
+  alter column position set not null;
 
 alter table public.trip_days
   drop constraint if exists trip_days_trip_id_day_number_key,
@@ -62,10 +59,16 @@ set start_time = starts_at::time
 where start_time is null
   and starts_at is not null;
 
--- starts_at is legacy-only after this migration. The active model stores only
--- the clock time; the calendar date is inherited from the owning day position.
+-- The active model no longer stores redundant calendar dates.
 alter table public.activities
-  alter column starts_at drop not null;
+  drop column if exists starts_at;
+
+alter table public.trip_days
+  drop column if exists day_number,
+  drop column if exists date;
+
+alter table public.trips
+  drop column if exists end_date;
 
 comment on column public.trips.day_count is
   'Number of positions in the trip. End date is derived from start_date + day_count - 1.';
