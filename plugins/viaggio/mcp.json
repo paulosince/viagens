@@ -1,0 +1,9 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "viaggio": {
+      "type": "streamable-http",
+      "url": "https://siabldasqinpfmxslwji.supabase.co/functions/v1/viaggio-mcp"
+    }
+  }
+}
