@@ -209,6 +209,60 @@ async function loadTripData(tripId) {
   return { days, activities, locations };
 }
 
+async function saveDayBundle(day, activities, locations) {
+  if (!day?.id) return;
+  const dayId = String(day.id);
+  const oldActivityKeys = await getAllKeysByIndex('activities', 'day_id', dayId);
+  const oldLocationKeys = await getAllKeysByIndex('day_locations', 'day_id', dayId);
+
+  const db = await openDb();
+  const tx = db.transaction(['trip_days', 'activities', 'day_locations'], 'readwrite');
+  const dayStore = tx.objectStore('trip_days');
+  const activityStore = tx.objectStore('activities');
+  const locationStore = tx.objectStore('day_locations');
+
+  dayStore.put(day);
+  for (const key of oldActivityKeys) activityStore.delete(key);
+  for (const key of oldLocationKeys) locationStore.delete(key);
+  for (const activity of activities || []) activityStore.put(activity);
+  for (const location of locations || []) locationStore.put(location);
+
+  await transactionDone(tx);
+  await setMeta(`trip:${day.trip_id}:updated_at`, new Date().toISOString());
+}
+
+async function enqueueMutation(mutation) {
+  const db = await openDb();
+  const tx = db.transaction('outbox', 'readwrite');
+  const record = {
+    id: mutation.id || crypto.randomUUID(),
+    created_at: mutation.created_at || new Date().toISOString(),
+    ...mutation
+  };
+  tx.objectStore('outbox').put(record);
+  await transactionDone(tx);
+  return record;
+}
+
+async function listOutbox() {
+  const db = await openDb();
+  const tx = db.transaction('outbox', 'readonly');
+  const records = await requestResult(tx.objectStore('outbox').getAll());
+  return records.sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+}
+
+async function removeMutation(id) {
+  const db = await openDb();
+  const tx = db.transaction('outbox', 'readwrite');
+  tx.objectStore('outbox').delete(id);
+  await transactionDone(tx);
+}
+
+async function hasPendingForTrip(tripId) {
+  const id = String(tripId);
+  return (await listOutbox()).some(item => String(item.tripId || '') === id);
+}
+
 async function hasWorkspace(userId) {
   return (await loadWorkspace(userId)).trips.length > 0;
 }
@@ -224,6 +278,11 @@ export const offlineStore = {
   loadWorkspace,
   replaceTripData,
   loadTripData,
+  saveDayBundle,
+  enqueueMutation,
+  listOutbox,
+  removeMutation,
+  hasPendingForTrip,
   hasWorkspace,
   getMeta,
   setMeta
