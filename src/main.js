@@ -1,4 +1,5 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+import { offlineStore } from './offline-store.js';
 
 const supabase = createClient('https://siabldasqinpfmxslwji.supabase.co', 'sb_publishable_UgbBIOq1TnInuPRrQpAFag_JLIzYuFf');
 const profilePhoto = 'assets/cintia.png';
@@ -953,28 +954,44 @@ async function fetchTripData(tripId) {
   const key = String(tripId);
   if (state.tripDataLoads.has(key)) return state.tripDataLoads.get(key);
   const load = (async () => {
-    const result = await supabase.from('trip_days').select('*').eq('trip_id', tripId).order('day_number');
-    if (result.error) throw result.error;
-    const days = result.data || [];
-    let activities = [], locations = [];
-    if (days.length) {
-      const [activityResult, locationResult] = await Promise.all([
-        supabase.from('activities').select('*').in('day_id', days.map(day => day.id)).order('position'),
-        supabase.from('day_locations').select('*').in('day_id', days.map(day => day.id)).order('position')
-      ]);
-      if (activityResult.error || locationResult.error) throw activityResult.error || locationResult.error;
-      activities = activityResult.data || [];
-      locations = locationResult.data || [];
+    try {
+      const result = await supabase.from('trip_days').select('*').eq('trip_id', tripId).order('day_number');
+      if (result.error) throw result.error;
+      const days = result.data || [];
+      let activities = [], locations = [];
+      if (days.length) {
+        const [activityResult, locationResult] = await Promise.all([
+          supabase.from('activities').select('*').in('day_id', days.map(day => day.id)).order('position'),
+          supabase.from('day_locations').select('*').in('day_id', days.map(day => day.id)).order('position')
+        ]);
+        if (activityResult.error || locationResult.error) throw activityResult.error || locationResult.error;
+        activities = activityResult.data || [];
+        locations = locationResult.data || [];
+      }
+      await offlineStore.replaceTripData(key, days, activities, locations);
+      const data = {
+        days,
+        activitiesByDay: groupByDay(activities),
+        locationsByDay: groupByDay(locations),
+        loadedAt: Date.now(),
+        version: Date.now()
+      };
+      state.tripDataCache.set(key, data);
+      return data;
+    } catch (remoteError) {
+      const local = await offlineStore.loadTripData(key);
+      if (!local.days.length) throw remoteError;
+      const data = {
+        days: local.days,
+        activitiesByDay: groupByDay(local.activities),
+        locationsByDay: groupByDay(local.locations),
+        loadedAt: Date.now(),
+        version: Date.now(),
+        offline: true
+      };
+      state.tripDataCache.set(key, data);
+      return data;
     }
-    const data = {
-      days,
-      activitiesByDay: groupByDay(activities),
-      locationsByDay: groupByDay(locations),
-      loadedAt: Date.now(),
-      version: Date.now()
-    };
-    state.tripDataCache.set(key, data);
-    return data;
   })().finally(() => state.tripDataLoads.delete(key));
   state.tripDataLoads.set(key, load);
   return load;
@@ -1168,31 +1185,54 @@ function syncYearList() {
   dom.currentYear.textContent = String(state.selectedYear);
 }
 
-async function loadTrips() {
-  const result = await supabase.from('trips').select('*').is('deleted_at', null).order('start_date', { ascending: true });
-  if (result.error) throw result.error;
-  state.trips = result.data || [];
+function applyPassengers(records = []) {
   state.passengers.clear();
-  if (state.trips.length) {
-    const passengers = await supabase.from('passengers').select('*').in('trip_id', state.trips.map(trip => trip.id)).order('created_at');
-    if (passengers.error) throw passengers.error;
-    for (const passenger of passengers.data || []) {
-      const list = state.passengers.get(passenger.trip_id) || [];
-      list.push(passenger); state.passengers.set(passenger.trip_id, list);
+  for (const passenger of records) {
+    const list = state.passengers.get(passenger.trip_id) || [];
+    list.push(passenger);
+    state.passengers.set(passenger.trip_id, list);
+  }
+}
+
+async function loadTrips({ allowLocalFallback = true } = {}) {
+  try {
+    const result = await supabase.from('trips').select('*').is('deleted_at', null).order('start_date', { ascending: true });
+    if (result.error) throw result.error;
+    state.trips = result.data || [];
+    let passengerRecords = [];
+    if (state.trips.length) {
+      const passengers = await supabase.from('passengers').select('*').in('trip_id', state.trips.map(trip => trip.id)).order('created_at');
+      if (passengers.error) throw passengers.error;
+      passengerRecords = passengers.data || [];
     }
+    applyPassengers(passengerRecords);
+    if (state.user?.id) await offlineStore.replaceWorkspace(state.user.id, state.trips, passengerRecords);
+  } catch (remoteError) {
+    if (!allowLocalFallback || !state.user?.id) throw remoteError;
+    const local = await offlineStore.loadWorkspace(state.user.id);
+    if (!local.trips.length) throw remoteError;
+    state.trips = local.trips;
+    applyPassengers(local.passengers);
   }
   syncYearList();
   syncTripList();
 }
 
-async function loadProfile() {
-  const result = await supabase.from('passenger_profiles').select('*').eq('user_id', state.user.id).maybeSingle();
-  if (result.error) state.profile = { user_id: state.user.id, name: state.user.user_metadata?.name || 'Cíntia', birth_date: null, avatar_path: null };
-  else state.profile = result.data || { user_id: state.user.id, name: state.user.user_metadata?.name || 'Cíntia', birth_date: null, avatar_path: null };
-  if (state.profile.is_deleted) { await supabase.auth.signOut(); throw new Error('Esta conta está desativada. Seus dados continuam preservados.'); }
-  if (state.profile.avatar_path) {
-    const signed = await supabase.storage.from('profile-photos').createSignedUrl(state.profile.avatar_path, 3600);
-    if (!signed.error) state.profile.avatar_url = signed.data.signedUrl;
+async function loadProfile({ allowLocalFallback = true } = {}) {
+  try {
+    const result = await supabase.from('passenger_profiles').select('*').eq('user_id', state.user.id).maybeSingle();
+    if (result.error) throw result.error;
+    state.profile = result.data || { user_id: state.user.id, name: state.user.user_metadata?.name || 'Cíntia', birth_date: null, avatar_path: null };
+    if (state.profile.is_deleted) { await supabase.auth.signOut(); throw new Error('Esta conta está desativada. Seus dados continuam preservados.'); }
+    if (state.profile.avatar_path) {
+      const signed = await supabase.storage.from('profile-photos').createSignedUrl(state.profile.avatar_path, 3600);
+      if (!signed.error) state.profile.avatar_url = signed.data.signedUrl;
+    }
+    await offlineStore.saveProfile(state.profile);
+  } catch (remoteError) {
+    if (!allowLocalFallback) throw remoteError;
+    state.profile = await offlineStore.getProfile(state.user.id);
+    if (!state.profile) state.profile = { user_id: state.user.id, name: state.user.user_metadata?.name || 'Cíntia', birth_date: null, avatar_path: null };
   }
   syncProfileUI();
 }
@@ -1647,29 +1687,53 @@ dom.authForm.addEventListener('submit', async event => {
   const result = await supabase.auth.signInWithPassword(Object.fromEntries(new FormData(dom.authForm)));
   if (result.error) { dom.authMessage.textContent = result.error.message; return; }
   state.user = result.data.user;
+  await offlineStore.cacheSession(state.user);
   try { await loadProfile(); await loadTrips(); setSessionView('authenticated'); }
   catch (error) { dom.authMessage.textContent = error.message; setSessionView('anonymous'); }
 });
 
 async function boot() {
   try {
+    await offlineStore.open();
     const { data } = await supabase.auth.getSession();
-    state.user = data.session?.user || null;
+    state.user = data.session?.user || await offlineStore.getCachedSession();
     if (!state.user) {
       setSessionView('anonymous');
       return;
     }
+
+    await offlineStore.cacheSession(state.user);
+
     try {
       await loadProfile();
       await loadTrips();
       setSessionView('authenticated');
     } catch (error) {
-      dom.authMessage.textContent = error.message;
-      setSessionView('anonymous');
+      const localUser = await offlineStore.getCachedSession();
+      if (!localUser) throw error;
+      state.user = localUser;
+      await loadProfile({ allowLocalFallback: true });
+      await loadTrips({ allowLocalFallback: true });
+      setSessionView('authenticated');
+      dom.authMessage.textContent = 'Modo offline: usando a cópia salva neste aparelho.';
     }
   } catch (error) {
-    dom.authMessage.textContent = error.message || 'Não foi possível iniciar o aplicativo.';
-    setSessionView('anonymous');
+    const localUser = await offlineStore.getCachedSession().catch(() => null);
+    if (localUser) {
+      try {
+        state.user = localUser;
+        await loadProfile({ allowLocalFallback: true });
+        await loadTrips({ allowLocalFallback: true });
+        setSessionView('authenticated');
+        dom.authMessage.textContent = 'Modo offline: usando a cópia salva neste aparelho.';
+      } catch {
+        dom.authMessage.textContent = error.message || 'Não foi possível iniciar o aplicativo.';
+        setSessionView('anonymous');
+      }
+    } else {
+      dom.authMessage.textContent = error.message || 'Não foi possível iniciar o aplicativo.';
+      setSessionView('anonymous');
+    }
   } finally {
     const revealApp = () => requestAnimationFrame(() => requestAnimationFrame(() => {
       document.body.dataset.appReady = 'true';
