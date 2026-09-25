@@ -20,9 +20,16 @@ async function ensureSupabase() {
   return supabaseLoad;
 }
 
-async function trySupabase() {
-  try { return await ensureSupabase(); }
-  catch { return null; }
+async function trySupabase(timeoutMs = 1800) {
+  if (!navigator.onLine) return null;
+  try {
+    return await Promise.race([
+      ensureSupabase(),
+      new Promise(resolve => setTimeout(() => resolve(null), timeoutMs))
+    ]);
+  } catch {
+    return null;
+  }
 }
 const profilePhoto = 'assets/cintia.png';
 const placeSearchCache = new Map();
@@ -866,7 +873,8 @@ function closeDayEditor() {
 
 async function syncMutation(mutation) {
   if (mutation.type !== 'save-day') return;
-  const client = await ensureSupabase();
+  const client = await trySupabase();
+  if (!client) throw new Error('Backend indisponível.');
 
   const savedDay = await client.from('trip_days').update(mutation.dayPatch).eq('id', mutation.dayId);
   if (savedDay.error) throw savedDay.error;
@@ -1088,7 +1096,8 @@ async function fetchTripData(tripId) {
       }
     }
     try {
-      const client = await ensureSupabase();
+      const client = await trySupabase();
+    if (!client) throw new Error('Backend indisponível.');
       const result = await client.from('trip_days').select('*').eq('trip_id', tripId).order('day_number');
       if (result.error) throw result.error;
       const days = result.data || [];
@@ -1381,7 +1390,8 @@ async function cacheCompleteWorkspace() {
 
 async function loadTrips({ allowLocalFallback = true } = {}) {
   try {
-    const client = await ensureSupabase();
+    const client = await trySupabase();
+    if (!client) throw new Error('Backend indisponível.');
     const result = await client.from('trips').select('*').is('deleted_at', null).order('start_date', { ascending: true });
     if (result.error) throw result.error;
     state.trips = result.data || [];
@@ -1406,7 +1416,8 @@ async function loadTrips({ allowLocalFallback = true } = {}) {
 
 async function loadProfile({ allowLocalFallback = true } = {}) {
   try {
-    const client = await ensureSupabase();
+    const client = await trySupabase();
+    if (!client) throw new Error('Backend indisponível.');
     const result = await client.from('passenger_profiles').select('*').eq('user_id', state.user.id).maybeSingle();
     if (result.error) throw result.error;
     state.profile = result.data || { user_id: state.user.id, name: state.user.user_metadata?.name || 'Cíntia', birth_date: null, avatar_path: null };
@@ -1917,6 +1928,7 @@ dom.authForm.addEventListener('submit', async event => {
 async function boot() {
   try {
     await offlineStore.open();
+    navigator.storage?.persist?.().catch(() => {});
     const client = await trySupabase();
     let remoteUser = null;
     if (client) {
@@ -1945,6 +1957,7 @@ async function boot() {
       await loadProfile({ allowLocalFallback: true });
       await loadTrips({ allowLocalFallback: true });
       setSessionView('authenticated');
+      await refreshSyncStatus();
       dom.authMessage.textContent = 'Modo offline: usando a cópia salva neste aparelho.';
     }
   } catch (error) {
