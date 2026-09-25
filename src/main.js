@@ -730,21 +730,31 @@ async function recoverHiddenDay(day) {
 
 function renderTripDays(days, activitiesByDay = new Map(), locationsByDay = new Map()) {
   dom.tripDayList.replaceChildren();
+  const trip = state.trips.find(item => String(item.id) === String(state.activeTripId));
+  const dayCount = tripDayCount(trip);
   const periodLabels = { morning: 'manhã', afternoon: 'tarde', night: 'noite' };
-  for (const day of days) {
+  const visibleDays = [...days]
+    .map(normalizeDayRecord)
+    .filter(day => !dayDeletedAt(day) && dayPosition(day) < dayCount)
+    .sort((a, b) => dayPosition(a) - dayPosition(b));
+
+  for (const day of visibleDays) {
     const activities = activitiesByDay.get(String(day.id)) || [];
     const locations = locationsByDay.get(String(day.id)) || [];
     const firstLocation = locations[0];
     const photo = dayPhoto(day, activities, locations);
     const titleText = dayTitle(day, activities, locations);
+    const hidden = dayIsHidden(day);
 
     const card = document.createElement('li');
     card.className = 'trip-day-card';
+    card.dataset.dayId = String(day.id);
     card.dataset.pressed = 'false';
+    card.dataset.restorable = String(hidden);
 
     const image = document.createElement('div');
     image.className = 'trip-day-image';
-    if (photo) image.style.backgroundImage = `url("${String(photo).replaceAll('"', '%22')}")`;
+    if (photo) image.style.backgroundImage = 'url("' + String(photo).replaceAll('"', '%22') + '")';
 
     const badge = document.createElement('div');
     badge.className = 'trip-day-badge';
@@ -755,20 +765,23 @@ function renderTripDays(days, activitiesByDay = new Map(), locationsByDay = new 
     number.className = 'trip-day-number';
     number.textContent = String(dayNumber(day));
     badge.append(label, number);
-    const derivedDate = derivedDayDate(day);
+
+    const derivedDate = derivedDayDate(day, trip);
     const timingData = dayTiming(derivedDate);
     const timing = document.createElement('span');
     timing.className = 'trip-day-timing';
     timing.textContent = timingData.label;
     timing.dataset.today = String(timingData.today);
     image.append(badge, timing);
-    if (firstLocation?.photo_provider === 'unsplash' && firstLocation.photo_author) {
+
+    if (!day.photo_url && firstLocation?.photo_provider === 'unsplash' && firstLocation.photo_author) {
       const credit = document.createElement('a');
       credit.className = 'trip-day-photo-credit';
-      credit.href = `${firstLocation.photo_author_url || 'https://unsplash.com'}${(firstLocation.photo_author_url || '').includes('?') ? '&' : '?'}utm_source=viaggio&utm_medium=referral`;
+      const authorUrl = firstLocation.photo_author_url || 'https://unsplash.com';
+      credit.href = authorUrl + (authorUrl.includes('?') ? '&' : '?') + 'utm_source=viaggio&utm_medium=referral';
       credit.target = '_blank';
       credit.rel = 'noopener';
-      credit.textContent = `Foto: ${firstLocation.photo_author} · Unsplash`;
+      credit.textContent = 'Foto: ' + firstLocation.photo_author + ' · Unsplash';
       credit.addEventListener('click', event => event.stopPropagation());
       image.append(credit);
     }
@@ -779,7 +792,11 @@ function renderTripDays(days, activitiesByDay = new Map(), locationsByDay = new 
     title.textContent = titleText;
     const date = document.createElement('span');
     date.className = 'trip-day-date';
-    date.textContent = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' }).format(new Date(`${derivedDate}T12:00:00`));
+    date.textContent = new Intl.DateTimeFormat('pt-BR', {
+      weekday: 'long',
+      day: '2-digit',
+      month: 'long'
+    }).format(new Date(derivedDate + 'T12:00:00'));
     body.append(title, date);
 
     const agenda = document.createElement('div');
@@ -792,11 +809,13 @@ function renderTripDays(days, activitiesByDay = new Map(), locationsByDay = new 
       const heading = document.createElement('h3');
       heading.textContent = periodLabels[period];
       const list = document.createElement('ol');
+
       for (const activity of periodActivities) {
         const item = document.createElement('li');
-        if (activity.starts_at) {
+        const timeText = activityTime(activity);
+        if (timeText) {
           const time = document.createElement('time');
-          time.textContent = activityTime(activity);
+          time.textContent = timeText;
           item.append(time);
         }
         const text = document.createElement('span');
@@ -804,29 +823,75 @@ function renderTripDays(days, activitiesByDay = new Map(), locationsByDay = new 
         item.append(text);
         list.append(item);
       }
+
       group.append(heading, list);
       agenda.append(group);
     }
     if (agenda.childElementCount) body.append(agenda);
+
     const button = document.createElement('button');
     button.className = 'trip-day-card-button';
     button.type = 'button';
-    const releasePress = () => { card.dataset.pressed = 'false'; };
-    button.addEventListener('pointerdown', () => { card.dataset.pressed = 'true'; });
-    button.addEventListener('pointerup', releasePress);
-    button.addEventListener('pointercancel', releasePress);
-    const empty = !day.title && !day.summary && !day.main_place_name && !day.photo_url && activities.length === 0 && locations.length === 0;
-    button.setAttribute('aria-label', empty ? `Preencher dia ${dayNumber(day)}` : `Abrir dia ${dayNumber(day)}`);
-    button.addEventListener('click', () => {
-      button.blur();
-      if (empty) openDayEditor(day);
-      else openDayPage(day.id);
-    });
+
+    const empty = !day.title && !day.summary && !day.photo_url && activities.length === 0 && locations.length === 0;
+    button.setAttribute(
+      'aria-label',
+      hidden
+        ? 'Dia ' + dayNumber(day) + ' oculto, disponível para recuperação'
+        : empty
+          ? 'Preencher dia ' + dayNumber(day)
+          : 'Abrir dia ' + dayNumber(day)
+    );
+
+    if (!hidden) {
+      const releasePress = () => { card.dataset.pressed = 'false'; };
+      button.addEventListener('pointerdown', () => { card.dataset.pressed = 'true'; });
+      button.addEventListener('pointerup', releasePress);
+      button.addEventListener('pointercancel', releasePress);
+      button.addEventListener('click', () => {
+        button.blur();
+        if (empty) openDayEditor(day);
+        else openDayPage(day.id);
+      });
+    } else {
+      button.disabled = true;
+    }
+
     button.append(image, body);
     card.append(button);
+
+    if (hidden) {
+      const recovery = document.createElement('div');
+      recovery.className = 'trip-day-recovery';
+      const message = document.createElement('span');
+      message.textContent = 'Este dia existia antes da redução da viagem.';
+      const recover = document.createElement('button');
+      recover.type = 'button';
+      recover.className = 'trip-day-recover';
+      recover.textContent = 'Recuperar';
+      recover.addEventListener('click', () => {
+        recover.disabled = true;
+        recoverHiddenDay(day).catch(error => {
+          console.warn('Não foi possível recuperar o dia', error);
+          recover.disabled = false;
+        });
+      });
+      recovery.append(message, recover);
+      card.append(recovery);
+    } else {
+      const dragHandle = document.createElement('button');
+      dragHandle.type = 'button';
+      dragHandle.className = 'trip-day-drag-handle';
+      dragHandle.setAttribute('aria-label', 'Reordenar dia ' + dayNumber(day));
+      dragHandle.innerHTML = '<span></span><span></span><span></span>';
+      dragHandle.addEventListener('pointerdown', event => startDayDrag(event, card));
+      card.append(dragHandle);
+    }
+
     dom.tripDayList.append(card);
   }
-  dom.tripDayMessage.textContent = days.length ? '' : 'Nenhum dia encontrado para esta viagem.';
+
+  dom.tripDayMessage.textContent = visibleDays.length ? '' : 'Nenhum dia encontrado para esta viagem.';
 }
 
 function periodFromTime(time) {
