@@ -75,7 +75,8 @@ const state = {
   daySaveTimers: new Map(),
   daySaveQueues: new Map(),
   daySaveVersions: new Map(),
-  changeLog: []
+  changeLog: [],
+  baselineSnapshotsEnsured: new Set()
 };
 
 const dom = {
@@ -2943,6 +2944,25 @@ async function fetchTripData(tripId) {
   return load;
 }
 
+async function ensureTripBaselineSnapshot(tripId) {
+  const key = String(tripId);
+  if (!key || state.baselineSnapshotsEnsured.has(key) || !navigator.onLine) return null;
+
+  const synced = await flushOutbox();
+  if (!synced) return null;
+
+  const client = await trySupabase();
+  if (!client) return null;
+
+  const result = await client.rpc('ensure_trip_baseline_snapshot', {
+    p_trip_id: tripId
+  });
+  if (result.error) throw result.error;
+
+  state.baselineSnapshotsEnsured.add(key);
+  return result.data || null;
+}
+
 async function openTrip(tripId, { pushHistory = true, forceRefresh = false } = {}) {
   const trip = state.trips.find(item => String(item.id) === String(tripId));
   if (!trip) return;
@@ -2950,6 +2970,7 @@ async function openTrip(tripId, { pushHistory = true, forceRefresh = false } = {
     window.history.pushState({ view: 'trip', tripId: String(trip.id) }, '', `#trip-${trip.id}`);
   }
   state.activeTripId = String(trip.id);
+  ensureTripBaselineSnapshot(trip.id).catch(error => console.warn('Ponto de segurança inicial indisponível', error));
   const accent = /^#[0-9a-f]{6}$/i.test(trip.secondary_color || '') ? trip.secondary_color : '#4775d1';
   dom.tripPage.style.setProperty('--trip-page-color', accent);
   dom.tripPageHero.style.backgroundImage = trip.cover_url ? `url("${trip.cover_url.replaceAll('"', '%22')}")` : '';
