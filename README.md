@@ -40,7 +40,7 @@ O roteiro usa um modelo posicional:
 - atividades armazenam `start_time`, sem repetir a data do dia;
 - reduzir a quantidade de dias marca os excedentes como ocultos, preservando agenda, locais e fotos;
 - ao aumentar novamente a duração, os dias ocultos voltam como recuperáveis;
-- a ordem dos dias pode ser alterada por drag and drop e é salva localmente antes da sincronização.
+- a ordem dos dias pode ser alterada pelos botões de subir/descer uma posição e é salva localmente antes da sincronização.
 
 A migração correspondente está em `supabase/migrations/20260925_ordered_trip_days.sql`. O frontend mantém compatibilidade temporária com o schema antigo durante a transição.
 
