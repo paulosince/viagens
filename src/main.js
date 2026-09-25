@@ -1157,7 +1157,7 @@ function renderDayPageMap(locations, activities = []) {
       bounds.push(latLng);
       const icon = L.divIcon({
         className: 'day-map-numbered-marker',
-        html: '<span>' + String(index + 1) + '</span>',
+        html: '<span><b>' + String(index + 1) + '</b></span>',
         iconSize: [30, 36],
         iconAnchor: [15, 36],
         popupAnchor: [0, -34]
