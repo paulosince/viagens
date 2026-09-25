@@ -68,6 +68,7 @@ const state = {
 };
 
 const dom = {
+  splashStatus: document.querySelector('#splash_status'),
   authView: document.querySelector('#auth_view'), authForm: document.querySelector('#auth_form'), authMessage: document.querySelector('#auth_message'),
   home: document.querySelector('#user_home'), profileButton: document.querySelector('#profile_button'), headerProfileImage: document.querySelector('#header_profile_image'), headerProfileFallback: document.querySelector('#header_profile_fallback'),
   editTripsButton: document.querySelector('#edit_trips_button'), newTripButton: document.querySelector('#new_trip_button'), emptyNewTripButton: document.querySelector('#empty_new_trip_button'), sessionEmail: document.querySelector('#session_email'), syncStatus: document.querySelector('#sync_status'), tripHeading: document.querySelector('#trip_heading'), yearButton: document.querySelector('#year_selector_button'), currentYear: document.querySelector('#current_year'), yearMenu: document.querySelector('#year_menu'), yearList: document.querySelector('#year_list'),
@@ -115,6 +116,51 @@ function dayTiming(value) {
   if (difference > 1) return { label: `em ${difference} dias`, today: false };
   if (difference === -1) return { label: 'há 1 dia', today: false };
   return { label: `há ${Math.abs(difference)} dias`, today: false };
+}
+
+function setSplashStatus(message) {
+  if (dom.splashStatus) dom.splashStatus.textContent = message;
+}
+
+async function loadLocalWorkspace(user) {
+  if (!user?.id) return false;
+
+  setSplashStatus('Abrindo suas viagens salvas…');
+  const [profile, workspace] = await Promise.all([
+    offlineStore.getProfile(user.id),
+    offlineStore.loadWorkspace(user.id)
+  ]);
+
+  state.profile = profile || {
+    user_id: user.id,
+    name: user.user_metadata?.name || user.user_metadata?.full_name || 'Cíntia',
+    birth_date: null,
+    avatar_path: null
+  };
+  state.trips = workspace.trips || [];
+  applyPassengers(workspace.passengers || []);
+  syncProfileUI();
+  syncYearList();
+  syncTripList();
+
+  return state.trips.length > 0;
+}
+
+async function refreshWorkspaceInBackground() {
+  if (!state.user) return;
+
+  setTimeout(async () => {
+    try {
+      await flushOutbox().catch(error => console.warn('Fila local aguardando sincronização', error));
+      await loadProfile();
+      await loadTrips();
+      await cacheCompleteWorkspace().catch(error => console.warn('Snapshot offline incompleto', error));
+      await refreshSyncStatus();
+    } catch (error) {
+      console.warn('Atualização em segundo plano indisponível', error);
+      await refreshSyncStatus().catch(() => {});
+    }
+  }, 0);
 }
 
 function setSessionView(session) {
@@ -2281,46 +2327,61 @@ dom.authForm.addEventListener('submit', async event => {
 
 async function boot() {
   try {
+    setSplashStatus('Preparando armazenamento local…');
     await offlineStore.open();
     navigator.storage?.persist?.().catch(() => {});
-    const client = await trySupabase();
+
+    const cachedUser = await offlineStore.getCachedSession();
+    if (cachedUser) {
+      state.user = cachedUser;
+      const hasLocalWorkspace = await loadLocalWorkspace(cachedUser);
+
+      if (hasLocalWorkspace) {
+        setSessionView('authenticated');
+        await refreshSyncStatus();
+        setSplashStatus('Pronto');
+        refreshWorkspaceInBackground();
+        return;
+      }
+    }
+
+    setSplashStatus('Conectando à sua conta…');
+    const client = await trySupabase(2200);
     let remoteUser = null;
+
     if (client) {
       const { data } = await client.auth.getSession();
       remoteUser = data.session?.user || null;
     }
-    state.user = remoteUser || await offlineStore.getCachedSession();
+
+    state.user = remoteUser || cachedUser || null;
     if (!state.user) {
       setSessionView('anonymous');
+      setSplashStatus('Pronto');
       return;
     }
 
     await offlineStore.cacheSession(state.user);
-    await flushOutbox().catch(error => console.warn('Fila local aguardando sincronização', error));
 
-    try {
-      await loadProfile();
-      await loadTrips();
-      await cacheCompleteWorkspace().catch(error => console.warn('Snapshot offline incompleto', error));
-      setSessionView('authenticated');
-      await refreshSyncStatus();
-    } catch (error) {
-      const localUser = await offlineStore.getCachedSession();
-      if (!localUser) throw error;
-      state.user = localUser;
-      await loadProfile({ allowLocalFallback: true });
-      await loadTrips({ allowLocalFallback: true });
-      setSessionView('authenticated');
-      await refreshSyncStatus();
-      dom.authMessage.textContent = 'Modo offline: usando a cópia salva neste aparelho.';
-    }
+    setSplashStatus('Carregando seu perfil…');
+    await loadProfile({ allowLocalFallback: true });
+
+    setSplashStatus('Carregando suas viagens…');
+    await loadTrips({ allowLocalFallback: true });
+
+    setSessionView('authenticated');
+    await refreshSyncStatus();
+    setSplashStatus('Pronto');
+
+    refreshWorkspaceInBackground();
   } catch (error) {
     const localUser = await offlineStore.getCachedSession().catch(() => null);
+
     if (localUser) {
       try {
         state.user = localUser;
-        await loadProfile({ allowLocalFallback: true });
-        await loadTrips({ allowLocalFallback: true });
+        setSplashStatus('Abrindo a cópia salva neste iPhone…');
+        await loadLocalWorkspace(localUser);
         setSessionView('authenticated');
         await refreshSyncStatus();
         dom.authMessage.textContent = 'Modo offline: usando a cópia salva neste aparelho.';
