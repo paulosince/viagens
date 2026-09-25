@@ -30,6 +30,20 @@ O próximo passo é transformar cada viagem em um conjunto de tabelas: roteiro p
 A chave fica somente na Edge Function. A interface oculta as sugestões quando a cota não está disponível e mantém o envio de foto do aparelho.
 
 
+## Dias ordenados
+
+O roteiro usa um modelo posicional:
+
+- a viagem tem `start_date` e `day_count`;
+- cada dia tem uma `position` zero-based;
+- a data exibida é derivada de `start_date + position`;
+- atividades armazenam `start_time`, sem repetir a data do dia;
+- reduzir a quantidade de dias marca os excedentes como ocultos, preservando agenda, locais e fotos;
+- ao aumentar novamente a duração, os dias ocultos voltam como recuperáveis;
+- a ordem dos dias pode ser alterada por drag and drop e é salva localmente antes da sincronização.
+
+A migração correspondente está em `supabase/migrations/20260925_ordered_trip_days.sql`. O frontend mantém compatibilidade temporária com o schema antigo durante a transição.
+
 ## Disponibilidade offline
 
 A aplicação é local-first para o roteiro de viagem:
