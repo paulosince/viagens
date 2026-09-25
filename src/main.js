@@ -372,6 +372,11 @@ async function enrichDayPage(day, activities, locations) {
     const updatedActivities = activities.map(activity => ({ ...activity }));
     const updatedLocations = locations.map(location => ({ ...location }));
     let changed = false;
+    let dayContext = '';
+    const contextualLocation = updatedLocations.find(location => location.formatted_address);
+    if (contextualLocation?.formatted_address) {
+      dayContext = String(contextualLocation.formatted_address).split(',').slice(-3).join(',').trim();
+    }
 
     for (const sourceActivity of candidates) {
       const activity = updatedActivities.find(item => String(item.id) === String(sourceActivity.id));
@@ -406,14 +411,21 @@ async function enrichDayPage(day, activities, locations) {
           updatedLocations.push(location);
           changed = true;
         } else {
-          const query = primaryActivityPlace(activity);
+          const primaryQuery = primaryActivityPlace(activity);
+          const contextualQuery = dayContext ? primaryQuery + ', ' + dayContext : primaryQuery;
           try {
-            const results = await searchOpenStreetMap(query);
+            let results = await searchOpenStreetMap(contextualQuery);
+            if (!results.length && contextualQuery !== primaryQuery) results = await searchOpenStreetMap(primaryQuery);
             searchResult = results[0] || null;
           } catch {
             searchResult = null;
           }
           if (!searchResult) continue;
+
+          const address = searchResult.address || {};
+          const city = address.city || address.town || address.village || address.municipality || '';
+          const country = address.country || '';
+          if (city || country) dayContext = [city, country].filter(Boolean).join(', ');
 
           location = {
             id: crypto.randomUUID(),
