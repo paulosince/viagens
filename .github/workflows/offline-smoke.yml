@@ -38,3 +38,4 @@ jobs:
           test -f manifest.webmanifest
           test -f assets/app-icon.svg
           test -f assets/cintia.png
+          test -f supabase/migrations/20260925_ordered_trip_days.sql
