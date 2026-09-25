@@ -35,6 +35,10 @@ update public.trip_days
 set position = greatest(coalesce(day_number, 1) - 1, 0)
 where position is null;
 
+update public.trip_days
+set is_hidden = true
+where status = 'hidden';
+
 alter table public.trip_days
   alter column position set default 0,
   alter column position set not null,
