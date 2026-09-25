@@ -24,6 +24,7 @@ jobs:
             html="$(curl --location --silent --show-error --max-time 20 "$url" || true)"
             js="$(curl --location --silent --show-error --max-time 20 "$url/src/main.js?v=20260925-14" || true)"
             css="$(curl --location --silent --show-error --max-time 20 "$url/style.css?v=20260925-12" || true)"
+            offline="$(curl --location --silent --show-error --max-time 20 "$url/src/offline-store.js?v=snapshot-order" || true)"
             if grep -q 'src/main.js?v=20260925-14' <<<"$html" &&
                grep -q 'id="sync_status"' <<<"$html" &&
                grep -q 'enrichDayPage' <<<"$js" &&
@@ -64,6 +65,8 @@ jobs:
                grep -q 'ensureTripBaselineSnapshot' <<<"$js" &&
                grep -q 'change-log-restore' <<<"$css" &&
                grep -q 'change-log-snapshot-id' <<<"$css" &&
+               grep -q 'lastQueueSequence' <<<"$offline" &&
+               grep -q 'sequence' <<<"$offline" &&
                grep -q 'trip-day-recovery' <<<"$css" &&
                grep -q 'name="day_count"' <<<"$html" &&
                ! grep -q 'name="end_date"' <<<"$html" &&
