@@ -59,7 +59,7 @@ const state = {
 const dom = {
   authView: document.querySelector('#auth_view'), authForm: document.querySelector('#auth_form'), authMessage: document.querySelector('#auth_message'),
   home: document.querySelector('#user_home'), profileButton: document.querySelector('#profile_button'), headerProfileImage: document.querySelector('#header_profile_image'), headerProfileFallback: document.querySelector('#header_profile_fallback'),
-  editTripsButton: document.querySelector('#edit_trips_button'), newTripButton: document.querySelector('#new_trip_button'), emptyNewTripButton: document.querySelector('#empty_new_trip_button'), sessionEmail: document.querySelector('#session_email'), tripHeading: document.querySelector('#trip_heading'), yearButton: document.querySelector('#year_selector_button'), currentYear: document.querySelector('#current_year'), yearMenu: document.querySelector('#year_menu'), yearList: document.querySelector('#year_list'),
+  editTripsButton: document.querySelector('#edit_trips_button'), newTripButton: document.querySelector('#new_trip_button'), emptyNewTripButton: document.querySelector('#empty_new_trip_button'), sessionEmail: document.querySelector('#session_email'), syncStatus: document.querySelector('#sync_status'), tripHeading: document.querySelector('#trip_heading'), yearButton: document.querySelector('#year_selector_button'), currentYear: document.querySelector('#current_year'), yearMenu: document.querySelector('#year_menu'), yearList: document.querySelector('#year_list'),
   tripList: document.querySelector('#trip_list'), homeEmpty: document.querySelector('#home_empty'), scrim: document.querySelector('#sheet_scrim'), tripEditFooter: document.querySelector('#trip_edit_footer'), deleteSelectedTrips: document.querySelector('#delete_selected_trips'), tripPage: document.querySelector('#trip_page'), closeTripPage: document.querySelector('#close_trip_page'), editTripButton: document.querySelector('#edit_trip_button'), tripPageHero: document.querySelector('#trip_page_hero'), tripPageTitle: document.querySelector('#trip_page_title'), tripPageDates: document.querySelector('#trip_page_dates'), tripPagePassengers: document.querySelector('#trip_page_passengers'), tripPagePassengerCount: document.querySelector('#trip_page_passenger_count'), tripDayList: document.querySelector('#trip_day_list'), tripDayMessage: document.querySelector('#trip_day_message'),
   dayPage: document.querySelector('#day_page'), closeDayPage: document.querySelector('#close_day_page'), editDayButton: document.querySelector('#edit_day_button'), dayPageHero: document.querySelector('#day_page_hero'), dayPageBadge: document.querySelector('#day_page_badge'), dayPageTitle: document.querySelector('#day_page_title'), dayPageDate: document.querySelector('#day_page_date'), dayPageAgenda: document.querySelector('#day_page_agenda'), dayPageEmpty: document.querySelector('#day_page_empty'), dayPageMap: document.querySelector('#day_page_map'), dayPageDirections: document.querySelector('#day_page_directions'),
   newTripSheet: document.querySelector('#home_new_trip'), newTripForm: document.querySelector('#new_trip_form'), newTripTitle: document.querySelector('#new-trip-title'), closeNewTrip: document.querySelector('#close_new_trip'), saveNewTrip: document.querySelector('#save_new_trip'), newTripMessage: document.querySelector('#new_trip_message'), coverInput: document.querySelector('#cover-image'), coverPreview: document.querySelector('#cover_preview_image'), tripColorValue: document.querySelector('#trip-color-value'), tripColorPalette: document.querySelector('#trip_color_palette'), tripColorCustom: document.querySelector('#trip-color-custom'), newTripPassengerList: document.querySelector('#new_trip_passenger_list'), addTripPassenger: document.querySelector('#add_trip_passenger'),
@@ -116,6 +116,28 @@ function setActiveSheet(name = 'none') {
   document.body.dataset.activeSheet = name;
   dom.newTripSheet.setAttribute('aria-hidden', String(name !== 'new-trip'));
   dom.profileSheet.setAttribute('aria-hidden', String(name !== 'profile'));
+}
+
+async function refreshSyncStatus() {
+  if (!dom.syncStatus || !state.user) return;
+  const pending = (await offlineStore.listOutbox().catch(() => [])).length;
+
+  if (!navigator.onLine) {
+    dom.syncStatus.dataset.kind = 'offline';
+    dom.syncStatus.textContent = pending
+      ? `Salvo neste iPhone · ${pending} ${pending === 1 ? 'alteração pendente' : 'alterações pendentes'}`
+      : 'Modo offline · cópia local';
+    return;
+  }
+
+  if (pending) {
+    dom.syncStatus.dataset.kind = 'pending';
+    dom.syncStatus.textContent = `Salvo neste iPhone · ${pending} ${pending === 1 ? 'alteração pendente' : 'alterações pendentes'}`;
+    return;
+  }
+
+  dom.syncStatus.dataset.kind = 'synced';
+  dom.syncStatus.textContent = 'Sincronizado';
 }
 
 function setLoading(button, loading) {
@@ -871,8 +893,14 @@ async function syncMutation(mutation) {
 }
 
 async function flushOutbox() {
-  if (!navigator.onLine || !state.user) return false;
-  if (!await trySupabase()) return false;
+  if (!navigator.onLine || !state.user) {
+    await refreshSyncStatus();
+    return false;
+  }
+  if (!await trySupabase()) {
+    await refreshSyncStatus();
+    return false;
+  }
   const mutations = await offlineStore.listOutbox();
   for (const mutation of mutations) {
     try {
@@ -880,9 +908,11 @@ async function flushOutbox() {
       await offlineStore.removeMutation(mutation.id);
     } catch (error) {
       console.warn('Sincronização pendente', error);
+      await refreshSyncStatus();
       return false;
     }
   }
+  await refreshSyncStatus();
   return true;
 }
 
@@ -1000,6 +1030,7 @@ async function saveDayEditor() {
       removedLocationIds,
       removedActivityIds
     });
+    await refreshSyncStatus();
 
     applyLocalDaySave(localDay, activities, locations);
 
@@ -1878,6 +1909,7 @@ dom.authForm.addEventListener('submit', async event => {
     await loadTrips();
     await cacheCompleteWorkspace().catch(error => console.warn('Snapshot offline incompleto', error));
     setSessionView('authenticated');
+    await refreshSyncStatus();
   }
   catch (error) { dom.authMessage.textContent = error.message; setSessionView('anonymous'); }
 });
@@ -1905,6 +1937,7 @@ async function boot() {
       await loadTrips();
       await cacheCompleteWorkspace().catch(error => console.warn('Snapshot offline incompleto', error));
       setSessionView('authenticated');
+      await refreshSyncStatus();
     } catch (error) {
       const localUser = await offlineStore.getCachedSession();
       if (!localUser) throw error;
@@ -1922,6 +1955,7 @@ async function boot() {
         await loadProfile({ allowLocalFallback: true });
         await loadTrips({ allowLocalFallback: true });
         setSessionView('authenticated');
+        await refreshSyncStatus();
         dom.authMessage.textContent = 'Modo offline: usando a cópia salva neste aparelho.';
       } catch {
         dom.authMessage.textContent = error.message || 'Não foi possível iniciar o aplicativo.';
@@ -1940,7 +1974,9 @@ async function boot() {
   }
 }
 
+window.addEventListener('offline', () => { refreshSyncStatus().catch(console.warn); });
 window.addEventListener('online', () => {
+  refreshSyncStatus().catch(console.warn);
   flushOutbox().then(synced => {
     if (synced && state.activeTripId) {
       state.tripDataCache.delete(String(state.activeTripId));
