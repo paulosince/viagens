@@ -1,0 +1,23 @@
+name: Supabase keepalive
+
+on:
+  schedule:
+    - cron: '23 10 * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Query database
+        shell: bash
+        run: |
+          status="$(curl --silent --show-error --max-time 30 \
+            --output /tmp/supabase-response \
+            --write-out '%{http_code}' \
+            --header 'apikey: sb_publishable_UgbBIOq1TnInuPRrQpAFag_JLIzYuFf' \
+            --header 'Accept: application/json' \
+            'https://siabldasqinpfmxslwji.supabase.co/rest/v1/trips?select=id&limit=1')"
+          echo "Supabase HTTP status: $status"
+          test "$status" = "200"
