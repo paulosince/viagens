@@ -45,9 +45,9 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20260925-14" as="style">
-  <link rel="stylesheet" href="style.css?v=20260925-14" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20260925-14"></noscript>
+  <link rel="preload" href="style.css?v=20260925-15" as="style">
+  <link rel="stylesheet" href="style.css?v=20260925-15" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20260925-15"></noscript>
 </head>
 <body data-session="loading" data-active-sheet="none" data-editing="false" data-year-menu="closed" data-trip-page="closed" data-day-page="closed" data-app-ready="false">
   <div id="app_splash" class="app-splash" aria-label="Carregando Viaggio">
@@ -247,7 +247,6 @@
     <section id="day_page" class="day-page" aria-hidden="true">
       <nav class="trip-page-nav day-page-nav" aria-label="Navegação do dia">
         <button id="close_day_page" class="trip-page-control trip-page-back" type="button" aria-label="Voltar">‹</button>
-        <button id="edit_day_button" class="trip-page-control trip-page-edit" type="button" aria-label="Editar dia"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4.2L19 9.2 14.8 5 4 15.8V20Zm12-16.2L20.2 8 22 6.2a1.4 1.4 0 0 0 0-2L19.8 2a1.4 1.4 0 0 0-2 0L16 3.8Z"/></svg></button>
       </nav>
       <header id="day_page_hero" class="day-page-hero">
         <div class="trip-page-hero-copy day-page-hero-copy">
@@ -258,7 +257,11 @@
           </div>
           <p id="day_page_date"></p>
         </div>
-        <label id="day_page_camera" class="day-hero-camera" aria-label="Alterar imagem do dia">📷
+        <label id="day_page_camera" class="day-hero-camera" aria-label="Alterar imagem do dia">
+          <svg class="day-photo-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 8.5A2.5 2.5 0 0 1 6.5 6H9l1.4-2h3.2L15 6h2.5A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5v-8Z"/>
+            <circle cx="12" cy="12.5" r="3.2"/>
+          </svg>
           <input id="day_page_photo_input" type="file" accept="image/*">
         </label>
       </header>
@@ -333,7 +336,7 @@
       <button id="delete_selected_trips" type="button" disabled>Excluir selecionadas</button>
     </footer>
   </main>
-  <script type="module" src="src/main.js?v=20260925-18"></script>
-  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260925-20');</script>
+  <script type="module" src="src/main.js?v=20260925-19"></script>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260925-21');</script>
 </body>
 </html>
