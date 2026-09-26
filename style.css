@@ -961,7 +961,7 @@ body[data-day-page="open"] .day-page {
 }
 .day-page-badge {
   display: inline-flex;
-  margin: 0 0 12px 74px;
+  margin: 0 0 12px;
   padding: 8px 12px;
   border: 1px solid rgba(255,255,255,.58);
   border-radius: 999px;
@@ -972,6 +972,10 @@ body[data-day-page="open"] .day-page {
   text-transform: lowercase;
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
+}
+
+.day-page-hero-copy {
+  right: 110px;
 }
 
 .day-page-title-row {
