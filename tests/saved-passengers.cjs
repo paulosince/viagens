@@ -52,7 +52,7 @@ assert.equal(state.newTripPassengers.length, 1);
 assert.equal(state.newTripPassengers[0].photoUrl, 'family-photo');
 assert.equal(state.newTripPassengers[0].birthDate, '2012-04-05');
 state.newTripPassengers[0].name = 'Manuela Silva';
-assert.equal(context.matchesSavedPassenger(state.newTripPassengers[0], state.passengers.get('trip-1')[1]), true);
+assert.equal(context.matchesSavedPassenger(state.newTripPassengers[0], state.savedPassengers[1]), true);
 assert.equal(dom.savedTripPassengerList.children[1].attributes['aria-pressed'], 'true');
 dom.savedTripPassengerList.children[1].listeners.click();
 assert.equal(state.newTripPassengers.length, 0);
