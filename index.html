@@ -47,9 +47,9 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20260926-30" as="style">
-  <link rel="stylesheet" href="style.css?v=20260926-30" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20260926-30"></noscript>
+  <link rel="preload" href="style.css?v=20260926-31" as="style">
+  <link rel="stylesheet" href="style.css?v=20260926-31" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20260926-31"></noscript>
   <script>
     function showViaggioStartupError(detail) {
       if (!document.body || document.body.dataset.session !== 'loading') return;
@@ -105,6 +105,11 @@
           <p class="auth-switch">Ainda não tem conta? <button id="show_signup" type="button">Criar conta</button></p>
         </form>
         <form id="signup_form" class="auth-form" aria-hidden="true" inert>
+          <label class="signup-photo-picker" for="signup_photo">
+            <span class="signup-photo-preview"><img id="signup_photo_preview" alt="" hidden><span id="signup_photo_placeholder" aria-hidden="true">＋</span></span>
+            <span>Adicionar foto <small>Opcional · será salva ao entrar neste aparelho</small></span>
+          </label>
+          <input id="signup_photo" class="visually-hidden" name="photo" type="file" accept="image/*">
           <label class="visually-hidden" for="signup_name">Seu nome</label>
           <input id="signup_name" name="name" type="text" autocomplete="name" placeholder="Seu nome" maxlength="120" required>
           <label class="visually-hidden" for="signup_email">E-mail</label>
@@ -415,7 +420,7 @@
       <button id="delete_selected_trips" type="button" disabled>Excluir selecionadas</button>
     </footer>
   </main>
-  <script type="module" src="src/main.js?v=20260926-27"></script>
-  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260926-30');</script>
+  <script type="module" src="src/main.js?v=20260926-31"></script>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260926-31');</script>
 </body>
 </html>

@@ -2595,10 +2595,16 @@ body[data-active-sheet="change-log"] #change_log_sheet { transform: translateY(0
 .auth-brand img { display: block; width: 84px; height: 53px; object-fit: contain; animation: auth-plane-float 3.8s ease-in-out infinite alternate; }
 @keyframes auth-plane-float { to { transform: translateY(-5px) rotate(-2deg); } }
 .auth-intro { margin: 13px 0 24px; color: #3c5266; font-size: 16px; line-height: 1.4; }
+.signup-photo-picker { display: flex; align-items: center; gap: 13px; margin: -4px 0 17px; color: #006ed6; font-size: 15px; font-weight: 700; cursor: pointer; }
+.signup-photo-picker small { display: block; margin-top: 3px; color: #597082; font-size: 12px; font-weight: 400; line-height: 1.25; }
+.signup-photo-preview { display: grid; flex: 0 0 58px; width: 58px; height: 58px; place-items: center; overflow: hidden; border: 1px dashed #7caed1; border-radius: 50%; background: #e2f4fa; color: #007aff; font-size: 30px; font-weight: 400; }
+.signup-photo-preview img { width: 100%; height: 100%; object-fit: cover; }
+.signup-photo-preview img[hidden] { display: none; }
+.signup-photo-picker:has(+ input:focus-visible) .signup-photo-preview { outline: 3px solid rgba(0,122,255,.4); outline-offset: 3px; }
 .auth-form { max-height: 580px; opacity: 1; visibility: visible; transform: translateY(0); transition: max-height .38s ease, opacity .26s ease, transform .38s ease, visibility 0s; overflow: hidden; }
 .auth-form[aria-hidden="true"] { max-height: 0; opacity: 0; visibility: hidden; pointer-events: none; transform: translateY(12px); transition: max-height .38s ease, opacity .2s ease, transform .38s ease, visibility 0s linear .38s; }
-.auth-form input { display: block; width: 100%; height: 52px; margin: 0 0 11px; padding: 0 15px; border: 1px solid rgba(18,76,112,.18); border-radius: 14px; outline: 0; color: var(--text); background: rgba(255,255,255,.9); font-size: 16px; }
-.auth-form input:focus { border-color: #168ce2; box-shadow: 0 0 0 3px rgba(0,122,255,.13); }
+.auth-form input:not([type="file"]) { display: block; width: 100%; height: 52px; margin: 0 0 11px; padding: 0 15px; border: 1px solid rgba(18,76,112,.18); border-radius: 14px; outline: 0; color: var(--text); background: rgba(255,255,255,.9); font-size: 16px; }
+.auth-form input:not([type="file"]):focus { border-color: #168ce2; box-shadow: 0 0 0 3px rgba(0,122,255,.13); }
 .auth-form .auth-submit { width: 100%; min-height: 53px; margin-top: 4px; border: 0; border-radius: 14px; color: white; background: #087df4; font: inherit; font-weight: 700; }
 .auth-submit:disabled { opacity: .6; }
 .auth-message { margin: 12px 0 0; color: #b7312e; font-size: 13px; line-height: 1.4; }

@@ -93,7 +93,7 @@ const state = {
 
 const dom = {
   splashStatus: document.querySelector('#splash_status'),
-  authView: document.querySelector('#auth_view'), authForm: document.querySelector('#auth_form'), authMessage: document.querySelector('#auth_message'), authIntro: document.querySelector('#auth_intro'), authCard: document.querySelector('.auth-card'), signupForm: document.querySelector('#signup_form'), signupMessage: document.querySelector('#signup_message'), showSignup: document.querySelector('#show_signup'), showLogin: document.querySelector('#show_login'),
+  authView: document.querySelector('#auth_view'), authForm: document.querySelector('#auth_form'), authMessage: document.querySelector('#auth_message'), authIntro: document.querySelector('#auth_intro'), authCard: document.querySelector('.auth-card'), signupForm: document.querySelector('#signup_form'), signupMessage: document.querySelector('#signup_message'), signupPhotoInput: document.querySelector('#signup_photo'), signupPhotoPreview: document.querySelector('#signup_photo_preview'), signupPhotoPlaceholder: document.querySelector('#signup_photo_placeholder'), showSignup: document.querySelector('#show_signup'), showLogin: document.querySelector('#show_login'),
   home: document.querySelector('#user_home'), profileButton: document.querySelector('#profile_button'), headerProfileImage: document.querySelector('#header_profile_image'), headerProfileFallback: document.querySelector('#header_profile_fallback'), homeChatgptButton: document.querySelector('#home_chatgpt_button'),
   editTripsButton: document.querySelector('#edit_trips_button'), newTripButton: document.querySelector('#new_trip_button'), emptyNewTripButton: document.querySelector('#empty_new_trip_button'), sessionEmail: document.querySelector('#session_email'), syncStatus: document.querySelector('#sync_status'), tripHeading: document.querySelector('#trip_heading'), yearButton: document.querySelector('#year_selector_button'), currentYear: document.querySelector('#current_year'), yearMenu: document.querySelector('#year_menu'), yearList: document.querySelector('#year_list'),
   tripList: document.querySelector('#trip_list'), homeEmpty: document.querySelector('#home_empty'), scrim: document.querySelector('#sheet_scrim'), tripEditFooter: document.querySelector('#trip_edit_footer'), deleteSelectedTrips: document.querySelector('#delete_selected_trips'), tripPage: document.querySelector('#trip_page'), closeTripPage: document.querySelector('#close_trip_page'), editTripButton: document.querySelector('#edit_trip_button'), tripPageHero: document.querySelector('#trip_page_hero'), tripPageTitle: document.querySelector('#trip_page_title'), tripPageDates: document.querySelector('#trip_page_dates'), tripPagePassengers: document.querySelector('#trip_page_passengers'), tripPagePassengerCount: document.querySelector('#trip_page_passenger_count'), tripDayList: document.querySelector('#trip_day_list'), tripDayMessage: document.querySelector('#trip_day_message'),
@@ -263,6 +263,7 @@ async function refreshWorkspaceInBackground() {
     try {
       await flushOutbox().catch(error => console.warn('Fila local aguardando sincronização', error));
       await loadProfile();
+      await applyPendingSignupAvatar().catch(error => console.warn('Foto de cadastro aguardando envio', error));
       await loadTrips();
       await cacheCompleteWorkspace().catch(error => console.warn('Snapshot offline incompleto', error));
       await refreshSyncStatus();
@@ -4881,6 +4882,87 @@ dom.profilePhotoInput.addEventListener('change', async () => {
 dom.newTripForm.addEventListener('submit', event => { event.preventDefault(); saveTrip(); });
 dom.profileForm.addEventListener('submit', event => { event.preventDefault(); saveProfile(); });
 
+let signupAvatar = null;
+let signupAvatarPreview = '';
+let signupAvatarPreparing = null;
+let signupAvatarSelection = 0;
+
+function clearSignupAvatar() {
+  if (signupAvatarPreview) URL.revokeObjectURL(signupAvatarPreview);
+  signupAvatar = null;
+  signupAvatarPreview = '';
+  dom.signupPhotoPreview.hidden = true;
+  dom.signupPhotoPreview.removeAttribute('src');
+  dom.signupPhotoPlaceholder.hidden = false;
+}
+
+dom.signupPhotoInput.addEventListener('change', async () => {
+  const file = dom.signupPhotoInput.files?.[0];
+  if (!file) return;
+  const button = dom.signupForm.querySelector('.auth-submit');
+  button.disabled = true;
+  dom.signupMessage.textContent = '';
+  const selection = ++signupAvatarSelection;
+  const preparation = prepareAvatar(file);
+  signupAvatarPreparing = preparation;
+  try {
+    const prepared = await preparation;
+    if (selection !== signupAvatarSelection) { URL.revokeObjectURL(prepared.preview); return; }
+    clearSignupAvatar();
+    signupAvatar = prepared.blob;
+    signupAvatarPreview = prepared.preview;
+    dom.signupPhotoPreview.src = prepared.preview;
+    dom.signupPhotoPreview.hidden = false;
+    dom.signupPhotoPlaceholder.hidden = true;
+  } catch {
+    if (selection === signupAvatarSelection) {
+      dom.signupPhotoInput.value = '';
+      dom.signupMessage.textContent = 'Não foi possível preparar essa foto. Escolha outra imagem.';
+    }
+  } finally {
+    if (signupAvatarPreparing === preparation) {
+      signupAvatarPreparing = null;
+      button.disabled = false;
+    }
+  }
+});
+
+let pendingSignupAvatarTask = null;
+async function applyPendingSignupAvatar() {
+  if (!state.user?.email) return;
+  if (pendingSignupAvatarTask) return pendingSignupAvatarTask;
+  pendingSignupAvatarTask = (async () => {
+    const user = state.user;
+    const key = `signup_avatar:${user.email.trim().toLowerCase()}`;
+    const avatar = await offlineStore.getMeta(key);
+    if (!avatar) return;
+    if (state.profile?.avatar_path) { await offlineStore.deleteMeta(key); return; }
+    const client = await trySupabase();
+    if (!client) return;
+    const { data, error: authError } = await client.auth.getUser();
+    if (authError || data.user?.id !== user.id) return;
+    const avatarPath = `${user.id}/avatar-${Date.now()}.jpg`;
+    const upload = await client.storage.from('profile-photos').upload(avatarPath, avatar, { contentType: 'image/jpeg', upsert: false });
+    if (upload.error) throw upload.error;
+    const saved = await client.from('passenger_profiles').upsert({
+      user_id: user.id,
+      name: state.profile?.name || user.user_metadata?.name || user.email.split('@')[0],
+      birth_date: state.profile?.birth_date || null,
+      avatar_path: avatarPath,
+      updated_at: new Date().toISOString()
+    }).select().single();
+    if (saved.error) throw saved.error;
+    if (state.user?.id !== user.id) return;
+    state.profile = saved.data;
+    const signed = await client.storage.from('profile-photos').createSignedUrl(avatarPath, 3600);
+    if (!signed.error) state.profile.avatar_url = signed.data.signedUrl;
+    await offlineStore.saveProfile(state.profile);
+    await offlineStore.deleteMeta(key);
+    syncProfileUI();
+  })().finally(() => { pendingSignupAvatarTask = null; });
+  return pendingSignupAvatarTask;
+}
+
 function setAuthMode(mode) {
   const signup = mode === 'signup';
   dom.authCard.dataset.mode = signup ? 'signup' : 'login';
@@ -4899,6 +4981,7 @@ async function enterWithUser(user) {
   await loadProfile();
   await loadTrips();
   setSessionView('authenticated');
+  applyPendingSignupAvatar().catch(error => console.warn('Foto de cadastro aguardando envio', error));
   refreshSyncStatus().catch(console.warn);
   cacheCompleteWorkspace().catch(error => console.warn('Snapshot offline incompleto', error));
 }
@@ -4933,7 +5016,9 @@ dom.signupForm.addEventListener('submit', async event => {
 
   const button = dom.signupForm.querySelector('.auth-submit');
   button.disabled = true;
+  let accountCreated = false;
   try {
+    if (signupAvatarPreparing) await signupAvatarPreparing;
     const client = await trySupabase();
     if (!client) throw new Error('A criação de conta precisa de conexão com a internet.');
     const { data, error } = await client.auth.signUp({
@@ -4945,17 +5030,29 @@ dom.signupForm.addEventListener('submit', async event => {
       }
     });
     if (error) throw error;
+    accountCreated = true;
+    let avatarSaved = false;
+    if (signupAvatar) {
+      try {
+        await offlineStore.setMeta(`signup_avatar:${email.toLowerCase()}`, signupAvatar);
+        avatarSaved = true;
+      } catch (storageError) { console.warn('Não foi possível guardar a foto de cadastro', storageError); }
+    }
     if (data.session && data.user) {
+      dom.signupForm.reset();
+      clearSignupAvatar();
       await enterWithUser(data.user);
       return;
     }
+    const photoUnavailable = !!signupAvatar && !avatarSaved;
     dom.authForm.querySelector('[name="email"]').value = email;
     dom.signupForm.reset();
+    clearSignupAvatar();
     setAuthMode('login');
     dom.authMessage.dataset.kind = 'success';
-    dom.authMessage.textContent = 'Conta criada. Confirme seu e-mail pelo link que enviamos e depois entre aqui.';
+    dom.authMessage.textContent = `Conta criada. Confirme seu e-mail pelo link que enviamos e depois entre aqui.${avatarSaved ? ' Sua foto será adicionada quando você entrar neste aparelho.' : photoUnavailable ? ' Não foi possível guardar sua foto; adicione-a no perfil depois de entrar.' : ''}`;
   } catch (error) {
-    dom.signupMessage.textContent = error.message || 'Não foi possível criar a conta.';
+    dom.signupMessage.textContent = accountCreated ? 'Conta criada, mas não foi possível abrir o perfil. Tente entrar novamente.' : error.message || 'Não foi possível criar a conta.';
   } finally { button.disabled = false; }
 });
 

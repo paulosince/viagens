@@ -98,6 +98,13 @@ async function getMeta(key) {
   return (await get('meta', key))?.value ?? null;
 }
 
+async function deleteMeta(key) {
+  const db = await openDb();
+  const tx = db.transaction('meta', 'readwrite');
+  tx.objectStore('meta').delete(key);
+  await transactionDone(tx);
+}
+
 async function cacheSession(user) {
   if (!user?.id) return;
   await setMeta('session_user', {
@@ -337,5 +344,6 @@ export const offlineStore = {
   saveChangeLogs,
   listChangeLogs,
   getMeta,
-  setMeta
+  setMeta,
+  deleteMeta
 };
