@@ -274,6 +274,10 @@ async function refreshWorkspaceInBackground() {
 }
 
 function setSessionView(session) {
+  if (window.__viaggioBootGuard) {
+    clearTimeout(window.__viaggioBootGuard);
+    window.__viaggioBootGuard = null;
+  }
   document.body.dataset.session = session;
   dom.authView.setAttribute('aria-hidden', String(session !== 'anonymous'));
   dom.home.setAttribute('aria-hidden', String(session !== 'authenticated'));
