@@ -20,7 +20,10 @@ class Element {
 
 const state = {
   user: { id: 'user-1' }, profile: { birth_date: '1980-01-01' },
-  savedPassengers: [{ id: 'saved-1', owner_id: 'user-1', name: 'Gabriel', birth_date: '2010-02-03', photo_url: 'saved-photo' }],
+  savedPassengers: [
+    { id: 'saved-1', owner_id: 'user-1', name: 'Gabriel', birth_date: '2010-02-03', photo_url: 'saved-photo' },
+    { id: 'saved-2', owner_id: 'user-1', name: 'Manuela', birth_date: '2012-04-05', photo_url: null }
+  ],
   passengers: new Map([['trip-1', [
     { id: 'old-1', name: 'Gabriel', birth_date: '2010-02-03', photo_url: 'older-photo' },
     { id: 'old-2', name: 'Manuela', birth_date: '2012-04-05', photo_url: 'family-photo' },
@@ -59,28 +62,7 @@ const duplicate = context.uniqueTripPassengers([
   { name: ' gabriel ', birthDate: '2010-02-03', photoUrl: 'second' }
 ]);
 assert.equal(duplicate.length, 1);
+assert.equal(context.availableSavedPassengers()[1].photo_url, 'family-photo');
+assert.doesNotMatch(source, /Salvar para outras viagens/);
 
-const saveStart = source.indexOf('async function saveReusablePassengers(');
-const saveEnd = source.indexOf('\n}\n', saveStart);
-vm.runInContext(source.slice(saveStart, saveEnd + 2), context);
-const writes = [];
-const client = { from(table) {
-  assert.equal(table, 'saved_passengers');
-  return {
-    insert(payload) {
-      writes.push(payload);
-      return { select: () => ({ single: async () => ({ data: { ...payload, id: 'new-saved' }, error: null }) }) };
-    }
-  };
-} };
-state.newTripPassengers = [
-  { name: 'Manuela', birthDate: '2012-04-05', photoUrl: 'family-photo', session: false, saveForLater: true },
-  { name: 'Convidado', birthDate: '', photoUrl: '', session: false, saveForLater: false },
-  { name: 'Cintia', session: true }
-];
-context.saveReusablePassengers(client).then(() => {
-  assert.equal(writes.length, 1);
-  assert.equal(writes[0].name, 'Manuela');
-  assert.equal(writes[0].photo_url, 'family-photo');
-  console.log('PASS: saved family members retain photos; manual guests can opt out');
-}).catch(error => { console.error(error); process.exitCode = 1; });
+console.log('PASS: only profile-saved passengers are reusable; historical photos can enrich them');

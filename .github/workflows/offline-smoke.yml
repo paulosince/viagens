@@ -39,6 +39,8 @@ jobs:
           node tests/day-map-order.cjs
           node tests/inline-agenda.cjs
           node tests/day-attachments.cjs
+          node tests/saved-passengers.cjs
+          node tests/trip-sections.cjs
       - name: Verify offline app shell
         run: |
           test -f index.html

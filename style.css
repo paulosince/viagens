@@ -437,7 +437,7 @@ body[data-editing="true"] .home {
   display: grid;
   gap: 18px;
   margin: 0;
-  padding: 4px 18px 30px;
+  padding: 4px 18px 58px;
   list-style: none;
 }
 
@@ -2389,6 +2389,7 @@ body[data-active-sheet="change-log"] #change_log_sheet { transform: translateY(0
   width: 100%;
   min-width: 0;
   height: 55px;
+  box-sizing: border-box;
   padding: 0 16px 0 0;
   border: 0;
   outline: 0;
@@ -2432,6 +2433,16 @@ body[data-active-sheet="change-log"] #change_log_sheet { transform: translateY(0
 .trip-color-custom span { display: block; width: 100%; height: 100%; border-radius: inherit; background: conic-gradient(#f44, #fc0, #3c6, #18f, #a4e, #f44); }
 
 .new-trip-passenger-list { padding-left: 16px; }
+.profile-saved-passenger-list { padding-left: 16px; }
+.profile-saved-passenger-list:empty { display: none; }
+.profile-saved-passenger-row { min-height: 98px; }
+.profile-saved-passenger-row .new-trip-passenger-field input[type="date"] {
+  box-sizing: border-box;
+  padding-right: 8px;
+}
+.profile-add-saved-passenger { transition: background-color .2s ease; }
+.profile-add-saved-passenger:active { background: rgba(0,122,255,.08); }
+
 .saved-trip-passengers { padding: 13px 16px 5px; border-bottom: 1px solid var(--line); }
 .saved-trip-passengers[hidden] { display: none; }
 .saved-trip-heading { margin: 0 0 10px; color: var(--secondary); font-size: 13px; font-weight: 650; }

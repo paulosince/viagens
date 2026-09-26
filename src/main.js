@@ -52,6 +52,7 @@ const state = {
   trips: [],
   passengers: new Map(),
   savedPassengers: [],
+  profileSavedPassengers: [],
   selectedTripIds: new Set(),
   collapsedTripSections: new Set(),
   imageData: '',
@@ -101,7 +102,7 @@ const dom = {
   newTripSheet: document.querySelector('#home_new_trip'), newTripForm: document.querySelector('#new_trip_form'), newTripTitle: document.querySelector('#new-trip-title'), closeNewTrip: document.querySelector('#close_new_trip'), saveNewTrip: document.querySelector('#save_new_trip'), newTripMessage: document.querySelector('#new_trip_message'), coverInput: document.querySelector('#cover-image'), coverPreview: document.querySelector('#cover_preview_image'), tripColorValue: document.querySelector('#trip-color-value'), tripColorPalette: document.querySelector('#trip_color_palette'), tripColorCustom: document.querySelector('#trip-color-custom'), savedTripPassengers: document.querySelector('#saved_trip_passengers'), savedTripPassengerList: document.querySelector('#saved_trip_passenger_list'), newTripPassengerList: document.querySelector('#new_trip_passenger_list'), addTripPassenger: document.querySelector('#add_trip_passenger'),
   dayEditSheet: document.querySelector('#day_edit_sheet'), daySheetScrim: document.querySelector('#day_sheet_scrim'), dayEditForm: document.querySelector('#day_edit_form'), closeDayEdit: document.querySelector('#close_day_edit'), saveDayEdit: document.querySelector('#save_day_edit'), dayEditTitle: document.querySelector('#day_edit_title'), dayEditDate: document.querySelector('#day_edit_date'), dayTitleInput: document.querySelector('#day-title-input'), dayLocationsEditor: document.querySelector('#day_locations_editor'), addDayLocation: document.querySelector('#add_day_location'), dayAgendaEditor: document.querySelector('#day_agenda_editor'), addDayActivity: document.querySelector('#add_day_activity'), dayNotesInput: document.querySelector('#day-notes-input'), dayEditMessage: document.querySelector('#day_edit_message'),
   placeSearchSheet: document.querySelector('#place_search_sheet'), placeSearchScrim: document.querySelector('#place_search_scrim'), placeSearchForm: document.querySelector('#place_search_form'), closePlaceSearch: document.querySelector('#close_place_search'), confirmPlaceSearch: document.querySelector('#confirm_place_search'), placeSearchInput: document.querySelector('#place_search_input'), runPlaceSearch: document.querySelector('#run_place_search'), placeSearchMessage: document.querySelector('#place_search_message'), placeSearchResults: document.querySelector('#place_search_results'), placePhotoSection: document.querySelector('#place_photo_section'), placePhotoMessage: document.querySelector('#place_photo_message'), placePhotoResults: document.querySelector('#place_photo_results'),
-  profileSheet: document.querySelector('#profile-sheet'), profileForm: document.querySelector('#profile_form'), closeProfile: document.querySelector('#close_profile'), saveProfile: document.querySelector('#save_profile'), profileMessage: document.querySelector('#profile_message'), profileEditorImage: document.querySelector('#profile_editor_image'), profilePhotoInput: document.querySelector('#profile-photo'), profileDisplayName: document.querySelector('#profile_display_name'), profileEmail: document.querySelector('#profile_email'), profileNameInput: document.querySelector('#profile-name'), birthDateInput: document.querySelector('#birth-date'), profileAge: document.querySelector('#profile_age'), profileCreatedAt: document.querySelector('#profile_created_at'), chatgptButton: document.querySelector('#chatgpt_button'), chatgptSheet: document.querySelector('#chatgpt_sheet'), closeChatgpt: document.querySelector('#close_chatgpt'), connectChatgpt: document.querySelector('#connect_chatgpt'), copyMcpUrl: document.querySelector('#copy_mcp_url'), chatgptMessage: document.querySelector('#chatgpt_message'), chatgptMcpUrl: document.querySelector('#chatgpt_mcp_url'), changeLogButton: document.querySelector('#change_log_button'), changeLogSheet: document.querySelector('#change_log_sheet'), closeChangeLog: document.querySelector('#close_change_log'), changeLogList: document.querySelector('#change_log_list'), changeLogEmpty: document.querySelector('#change_log_empty'), changeLogMessage: document.querySelector('#change_log_message'), logoutButton: document.querySelector('#logout_button'), deleteAccountButton: document.querySelector('#delete_account_button')
+  profileSheet: document.querySelector('#profile-sheet'), profileForm: document.querySelector('#profile_form'), closeProfile: document.querySelector('#close_profile'), saveProfile: document.querySelector('#save_profile'), profileMessage: document.querySelector('#profile_message'), profileEditorImage: document.querySelector('#profile_editor_image'), profilePhotoInput: document.querySelector('#profile-photo'), profileDisplayName: document.querySelector('#profile_display_name'), profileEmail: document.querySelector('#profile_email'), profileNameInput: document.querySelector('#profile-name'), birthDateInput: document.querySelector('#birth-date'), profileAge: document.querySelector('#profile_age'), profileCreatedAt: document.querySelector('#profile_created_at'), profileSavedPassengerList: document.querySelector('#profile_saved_passenger_list'), addProfileSavedPassenger: document.querySelector('#add_profile_saved_passenger'), chatgptButton: document.querySelector('#chatgpt_button'), chatgptSheet: document.querySelector('#chatgpt_sheet'), closeChatgpt: document.querySelector('#close_chatgpt'), connectChatgpt: document.querySelector('#connect_chatgpt'), copyMcpUrl: document.querySelector('#copy_mcp_url'), chatgptMessage: document.querySelector('#chatgpt_message'), chatgptMcpUrl: document.querySelector('#chatgpt_mcp_url'), changeLogButton: document.querySelector('#change_log_button'), changeLogSheet: document.querySelector('#change_log_sheet'), closeChangeLog: document.querySelector('#close_change_log'), changeLogList: document.querySelector('#change_log_list'), changeLogEmpty: document.querySelector('#change_log_empty'), changeLogMessage: document.querySelector('#change_log_message'), logoutButton: document.querySelector('#logout_button'), deleteAccountButton: document.querySelector('#delete_account_button')
 };
 
 // As folhas são camadas globais. Fora da Home, não ficam presas ao contexto
@@ -642,9 +643,181 @@ function syncAge() {
   dom.profileAge.textContent = age === null ? '—' : `${age} anos`;
 }
 
+function profileSavedPassengerDraft(person = {}) {
+  const persistedId = person.persistedId || person.id || null;
+  return {
+    localId: person.localId || persistedId || crypto.randomUUID(),
+    persistedId,
+    name: person.name || '',
+    birthDate: person.birth_date || person.birthDate || '',
+    photoUrl: person.photo_url || person.photoUrl || ''
+  };
+}
+
+function resetProfileSavedPassengers() {
+  state.profileSavedPassengers = state.savedPassengers.map(profileSavedPassengerDraft);
+}
+
+function createProfileSavedPassengerRow(passenger) {
+  const row = document.createElement('div');
+  row.className = 'new-trip-passenger-row profile-saved-passenger-row';
+  row.dataset.localId = passenger.localId;
+
+  const avatar = document.createElement('label');
+  avatar.className = 'new-trip-passenger-avatar';
+  avatar.setAttribute('aria-label', 'Escolher foto de ' + (passenger.name || 'passageiro'));
+  const image = document.createElement('img');
+  image.alt = '';
+  const initial = document.createElement('span');
+  initial.textContent = passenger.name.trim()[0]?.toUpperCase() || '＋';
+  const photoInput = document.createElement('input');
+  photoInput.type = 'file';
+  photoInput.accept = 'image/*';
+
+  if (passenger.photoUrl) {
+    image.src = passenger.photoUrl;
+    image.hidden = false;
+    initial.hidden = true;
+  } else {
+    image.hidden = true;
+  }
+
+  photoInput.addEventListener('change', async () => {
+    const file = photoInput.files?.[0];
+    if (!file) return;
+    try {
+      passenger.photoUrl = await compressPassengerPhoto(file);
+      image.src = passenger.photoUrl;
+      image.hidden = false;
+      initial.hidden = true;
+    } catch {
+      dom.profileMessage.dataset.kind = 'error';
+      dom.profileMessage.textContent = 'Não foi possível preparar a foto do passageiro.';
+    }
+  });
+  avatar.append(image, initial, photoInput);
+
+  const fields = document.createElement('div');
+  fields.className = 'new-trip-passenger-fields';
+
+  const nameField = document.createElement('label');
+  nameField.className = 'new-trip-passenger-field';
+  const nameLabel = document.createElement('span');
+  nameLabel.textContent = 'Nome';
+  const nameInput = document.createElement('input');
+  nameInput.type = 'text';
+  nameInput.autocomplete = 'off';
+  nameInput.placeholder = 'Nome do passageiro';
+  nameInput.value = passenger.name;
+  nameInput.addEventListener('input', () => {
+    passenger.name = nameInput.value;
+    initial.textContent = passenger.name.trim()[0]?.toUpperCase() || '＋';
+    avatar.setAttribute('aria-label', 'Escolher foto de ' + (passenger.name || 'passageiro'));
+  });
+  nameField.append(nameLabel, nameInput);
+
+  const birthField = document.createElement('label');
+  birthField.className = 'new-trip-passenger-field';
+  const birthLabel = document.createElement('span');
+  birthLabel.textContent = 'Nascimento';
+  const birthInput = document.createElement('input');
+  birthInput.type = 'date';
+  birthInput.value = passenger.birthDate;
+  birthInput.addEventListener('input', () => { passenger.birthDate = birthInput.value; });
+  birthField.append(birthLabel, birthInput);
+
+  fields.append(nameField, birthField);
+
+  const remove = document.createElement('button');
+  remove.className = 'new-trip-passenger-remove';
+  remove.type = 'button';
+  remove.textContent = '×';
+  remove.setAttribute('aria-label', 'Remover ' + (passenger.name || 'passageiro') + ' dos passageiros salvos');
+  remove.addEventListener('click', () => {
+    state.profileSavedPassengers = state.profileSavedPassengers.filter(item => item.localId !== passenger.localId);
+    renderProfileSavedPassengers();
+  });
+
+  row.append(avatar, fields, remove);
+  return row;
+}
+
+function renderProfileSavedPassengers(focusLast = false) {
+  dom.profileSavedPassengerList.replaceChildren();
+  for (const passenger of state.profileSavedPassengers) {
+    dom.profileSavedPassengerList.append(createProfileSavedPassengerRow(passenger));
+  }
+  if (focusLast) {
+    dom.profileSavedPassengerList.lastElementChild?.querySelector('input[type="text"]')?.focus({ preventScroll: true });
+  }
+}
+
+function addProfileSavedPassenger() {
+  state.profileSavedPassengers.push(profileSavedPassengerDraft());
+  renderProfileSavedPassengers(true);
+}
+
+async function saveProfileSavedPassengers(client) {
+  const drafts = state.profileSavedPassengers.filter(passenger =>
+    passenger.name.trim() || passenger.birthDate || passenger.photoUrl
+  );
+
+  if (drafts.some(passenger => !passenger.name.trim())) {
+    throw new Error('Dê um nome a cada passageiro salvo ou remova a linha vazia.');
+  }
+
+  const seen = new Set();
+  for (const passenger of drafts) {
+    const key = savedPassengerKey(passenger);
+    if (seen.has(key)) throw new Error('Há passageiros salvos duplicados com o mesmo nome e nascimento.');
+    seen.add(key);
+  }
+
+  const retainedIds = new Set(
+    drafts.map(passenger => passenger.persistedId).filter(Boolean).map(String)
+  );
+  const removedIds = state.savedPassengers
+    .filter(passenger => !retainedIds.has(String(passenger.id)))
+    .map(passenger => passenger.id);
+
+  if (removedIds.length) {
+    const removed = await client
+      .from('saved_passengers')
+      .delete()
+      .in('id', removedIds)
+      .eq('owner_id', state.user.id)
+      .select('id');
+    if (removed.error) throw new Error('Passageiros salvos: ' + removed.error.message);
+  }
+
+  const savedPassengers = [];
+  for (const passenger of drafts) {
+    const payload = {
+      owner_id: state.user.id,
+      name: passenger.name.trim(),
+      birth_date: passenger.birthDate || null,
+      photo_url: passenger.photoUrl || null,
+      updated_at: new Date().toISOString()
+    };
+    const result = passenger.persistedId
+      ? await client.from('saved_passengers').update(payload).eq('id', passenger.persistedId).eq('owner_id', state.user.id).select().single()
+      : await client.from('saved_passengers').insert(payload).select().single();
+
+    if (result.error) throw new Error('Passageiros salvos: ' + result.error.message);
+    passenger.persistedId = result.data.id;
+    passenger.localId = result.data.id;
+    savedPassengers.push(result.data);
+  }
+
+  state.savedPassengers = savedPassengers.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+  resetProfileSavedPassengers();
+}
+
 function passengerImage(passenger) {
   const name = passenger.name || '';
   if (/c[ií]ntia/i.test(name)) return { src: profileImage(), position: '50% 46%' };
+  const saved = state.savedPassengers.find(person => savedPassengerKey(person) === savedPassengerKey(passenger));
+  if (saved?.photo_url) return { src: saved.photo_url, position: '50% 50%' };
   if (/paulo/i.test(name)) return { src: 'assets/paulo.jpeg', position: '50% 50%' };
   return { src: passenger.photo_url || '', position: '50% 50%' };
 }
@@ -3811,15 +3984,14 @@ function savedPassengerKey(passenger) {
 }
 
 function availableSavedPassengers() {
-  const entries = new Map();
-  for (const passenger of state.savedPassengers) entries.set(savedPassengerKey(passenger), passenger);
-  // Older trips already contain family photos, even before they enter the saved list.
+  const entries = new Map(state.savedPassengers.map(person => [savedPassengerKey(person), person]));
+  // Reuse a better historical photo only for people that are explicitly saved.
   for (const group of state.passengers.values()) for (const passenger of group) {
-    if (!passenger.name?.trim() || String(passenger.user_id || '') === String(state.user?.id)) continue;
     const key = savedPassengerKey(passenger);
     const existing = entries.get(key);
-    if (!existing) entries.set(key, passenger);
-    else if (!existing.photo_url && passenger.photo_url) entries.set(key, { ...existing, photo_url: passenger.photo_url });
+    if (existing && !existing.photo_url && passenger.photo_url) {
+      entries.set(key, { ...existing, photo_url: passenger.photo_url });
+    }
   }
   return [...entries.values()].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 }
@@ -3988,17 +4160,6 @@ function createTripPassengerRow(passenger) {
   birthField.append(birthInput);
   fields.append(nameField, birthField);
 
-  if (!passenger.session) {
-    const saveLabel = document.createElement('label');
-    saveLabel.className = 'new-trip-passenger-save';
-    const saveInput = document.createElement('input');
-    saveInput.type = 'checkbox';
-    saveInput.checked = passenger.saveForLater !== false;
-    saveInput.addEventListener('change', () => { passenger.saveForLater = saveInput.checked; });
-    saveLabel.append(saveInput, document.createTextNode(' Salvar para outras viagens'));
-    fields.append(saveLabel);
-  }
-
   const control = document.createElement(passenger.session ? 'span' : 'button');
   if (passenger.session) {
     control.className = 'new-trip-passenger-session-mark';
@@ -4021,7 +4182,11 @@ function createTripPassengerRow(passenger) {
 
 function renderTripPassengers(focusLast = false) {
   dom.newTripPassengerList.replaceChildren();
-  for (const passenger of state.newTripPassengers) createTripPassengerRow(passenger);
+  const saved = availableSavedPassengers();
+  for (const passenger of state.newTripPassengers) {
+    const isSaved = !passenger.session && saved.some(person => matchesSavedPassenger(passenger, person));
+    if (!passenger.session && !isSaved) createTripPassengerRow(passenger);
+  }
   renderSavedTripPassengers();
   if (focusLast) dom.newTripPassengerList.lastElementChild?.querySelector('input[type="text"]')?.focus({ preventScroll: true });
 }
@@ -4083,8 +4248,7 @@ function addTripPassenger() {
     userId: null,
     name: '',
     birthDate: '',
-    photoUrl: '',
-    saveForLater: true
+    photoUrl: ''
   });
   renderTripPassengers(true);
 }
@@ -4177,6 +4341,8 @@ function openProfile() {
   dom.profileMessage.textContent = '';
   dom.profileMessage.dataset.kind = 'info';
   syncProfileUI();
+  resetProfileSavedPassengers();
+  renderProfileSavedPassengers();
   setActiveSheet('profile');
 }
 
@@ -4237,6 +4403,8 @@ async function saveProfile() {
     const saved = await client.from('passenger_profiles').upsert({ user_id: state.user.id, name: dom.profileNameInput.value.trim(), birth_date: dom.birthDateInput.value || null, avatar_path: avatarPath, updated_at: new Date().toISOString() }).select().single();
     if (saved.error) throw new Error(`Perfil: ${saved.error.message}`);
     await client.from('passengers').update({ name: dom.profileNameInput.value.trim(), age: ageFromBirthDate(dom.birthDateInput.value) }).eq('user_id', state.user.id);
+    dom.profileMessage.textContent = 'Salvando passageiros…';
+    await saveProfileSavedPassengers(client);
     state.profile = saved.data;
     state.avatarFile = null;
     if (state.avatarPreview) URL.revokeObjectURL(state.avatarPreview);
@@ -4381,29 +4549,6 @@ async function saveTripPassengers(client, tripId) {
   return null;
 }
 
-async function saveReusablePassengers(client) {
-  for (const passenger of uniqueTripPassengers(state.newTripPassengers)) {
-    if (passenger.session || passenger.saveForLater === false) continue;
-    const payload = {
-      owner_id: state.user.id,
-      name: passenger.name.trim(),
-      birth_date: passenger.birthDate || null,
-      photo_url: passenger.photoUrl || null,
-      updated_at: new Date().toISOString()
-    };
-    const existing = state.savedPassengers.find(person => person.id === passenger.savedPassengerId)
-      || state.savedPassengers.find(person => savedPassengerKey(person) === savedPassengerKey(passenger));
-    if (existing && !passenger.photoEdited) payload.photo_url = existing.photo_url || passenger.photoUrl || null;
-    const result = existing
-      ? await client.from('saved_passengers').update(payload).eq('id', existing.id).eq('owner_id', state.user.id).select().single()
-      : await client.from('saved_passengers').insert(payload).select().single();
-    if (result.error) throw result.error;
-    const index = state.savedPassengers.findIndex(person => person.id === result.data.id);
-    if (index >= 0) state.savedPassengers[index] = result.data;
-    else state.savedPassengers.push(result.data);
-  }
-}
-
 async function saveTrip() {
   const client = await trySupabase();
   if (!client) {
@@ -4437,7 +4582,6 @@ async function saveTrip() {
 
       const passengerError = await saveTripPassengers(client, tripId);
       if (passengerError) throw passengerError;
-      await saveReusablePassengers(client);
 
       const dayError = await syncTripDaysForCount(client, tripId, values.start_date, dayCount, orderedSchema);
       if (dayError) throw dayError;
@@ -4514,7 +4658,6 @@ async function saveTrip() {
       throw failure;
     }
 
-    await saveReusablePassengers(client);
 
     await recordChange({
       tripId: trip.id,
@@ -4629,6 +4772,7 @@ dom.logoutButton.addEventListener('click', async () => {
   state.trips = [];
   state.passengers.clear();
   state.savedPassengers = [];
+  state.profileSavedPassengers = [];
   state.tripDataCache.clear();
   state.tripDataLoads.clear();
   syncTripList();
@@ -4640,6 +4784,7 @@ dom.deleteAccountButton.addEventListener('click', deleteAccount);
 for (const option of dom.tripColorPalette.querySelectorAll('.trip-color-option')) option.addEventListener('click', () => selectTripColor(option.dataset.color));
 dom.tripColorCustom.addEventListener('input', () => selectTripColor(dom.tripColorCustom.value, true));
 dom.addTripPassenger.addEventListener('click', addTripPassenger);
+dom.addProfileSavedPassenger.addEventListener('click', addProfileSavedPassenger);
 
 dom.coverInput.addEventListener('change', async () => {
   const file = dom.coverInput.files?.[0]; if (!file) return;
@@ -4779,7 +4924,7 @@ ensureSupabase()
       return;
     }
     if (!navigator.onLine && state.user) return;
-    state.user = null; state.profile = null; state.trips = []; state.passengers.clear(); state.savedPassengers = []; state.tripDataCache.clear(); state.tripDataLoads.clear();
+    state.user = null; state.profile = null; state.trips = []; state.passengers.clear(); state.savedPassengers = []; state.profileSavedPassengers = []; state.tripDataCache.clear(); state.tripDataLoads.clear();
     syncTripList(); closeSheets(); setSessionView('anonymous');
   }))
   .catch(() => {});

@@ -45,9 +45,9 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20260926-14" as="style">
-  <link rel="stylesheet" href="style.css?v=20260926-14" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20260926-14"></noscript>
+  <link rel="preload" href="style.css?v=20260926-15" as="style">
+  <link rel="stylesheet" href="style.css?v=20260926-15" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20260926-15"></noscript>
 </head>
 <body data-session="loading" data-active-sheet="none" data-editing="false" data-year-menu="closed" data-trip-page="closed" data-day-page="closed" data-day-attachments="closed" data-app-ready="false">
   <div id="app_splash" class="app-splash" aria-label="Carregando Viaggio">
@@ -176,6 +176,13 @@
             <div class="form-row"><label for="birth-date">Nascimento</label><input id="birth-date" name="birth_date" type="date"></div>
             <div class="form-row static-row"><span>Idade</span><output id="profile_age">—</output></div>
           </div><p class="form-note">A idade é calculada automaticamente pela data de nascimento.</p></section>
+          <section class="form-section"><h3>Passageiros salvos</h3>
+            <div class="form-group saved-passenger-manager">
+              <div id="profile_saved_passenger_list" class="profile-saved-passenger-list"></div>
+              <button id="add_profile_saved_passenger" class="add-trip-passenger profile-add-saved-passenger" type="button"><span>＋</span>Adicionar passageiro</button>
+            </div>
+            <p class="form-note">Família e pessoas frequentes ficam disponíveis em todas as viagens. Passageiros ocasionais são adicionados somente na viagem.</p>
+          </section>
           <section class="form-section"><h3>Integrações</h3>
             <div class="form-group account-actions">
               <button id="chatgpt_button" class="account-row account-row-detail integration-row" type="button">
@@ -364,7 +371,7 @@
       <button id="delete_selected_trips" type="button" disabled>Excluir selecionadas</button>
     </footer>
   </main>
-  <script type="module" src="src/main.js?v=20260926-14"></script>
-  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260926-14');</script>
+  <script type="module" src="src/main.js?v=20260926-15"></script>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260926-15');</script>
 </body>
 </html>
