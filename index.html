@@ -38,6 +38,8 @@
     .splash-content h1 { margin: 0; font-size: clamp(46px, 13vw, 72px); line-height: 1; letter-spacing: -.055em; }
     .splash-content p { max-width: 330px; margin: 13px auto 0; font-size: clamp(16px, 4.5vw, 20px); font-weight: 600; line-height: 1.3; }
     .splash-loading { display:flex; align-items:center; justify-content:center; gap:9px; min-height:22px; margin:22px auto 0; font-size:13px; font-weight:650; opacity:.9; }
+    #splash_retry { margin: 20px auto 0; padding: 12px 18px; border: 1px solid rgba(255,255,255,.75); border-radius: 12px; background: rgba(255,255,255,.18); color: #fff; font: inherit; font-weight: 650; }
+    #splash_retry[hidden] { display: none; }
     .splash-spinner { width:15px; height:15px; flex:0 0 15px; border:2px solid rgba(255,255,255,.36); border-top-color:#fff; border-radius:50%; animation:splash-spin .8s linear infinite; }
     @keyframes splash-spin { to { transform:rotate(360deg); } }
     .splash-cloud { position: absolute; z-index: 1; width: 180px; height: 52px; border-radius: 999px; background: rgba(255,255,255,.7); opacity: .65; }
@@ -45,17 +47,27 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20260926-24" as="style">
-  <link rel="stylesheet" href="style.css?v=20260926-24" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20260926-24"></noscript>
+  <link rel="preload" href="style.css?v=20260926-25" as="style">
+  <link rel="stylesheet" href="style.css?v=20260926-25" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20260926-25"></noscript>
   <script>
-    window.__viaggioBootGuard = window.setTimeout(function () {
-      if (!document.body) return;
-      document.body.dataset.appReady = 'true';
-      if (!document.body.dataset.session) document.body.dataset.session = 'anonymous';
+    function showViaggioStartupError(detail) {
+      if (!document.body || document.body.dataset.session !== 'loading') return;
       var status = document.getElementById('splash_status');
-      if (status) status.textContent = 'Abrindo o Viaggio…';
-    }, 5000);
+      var retry = document.getElementById('splash_retry');
+      if (status) status.textContent = 'Não foi possível abrir o Viaggio' + (detail ? ' · ' + detail : '') + '.';
+      if (retry) retry.hidden = false;
+    }
+    window.addEventListener('error', function (event) {
+      var file = event.filename && event.filename.split('/').pop().split('?')[0];
+      if (file === 'main.js' || file === 'offline-store.js') {
+        window.__viaggioStartupError = file + ':' + event.lineno + ':' + event.colno + ' ' + event.message;
+        showViaggioStartupError(window.__viaggioStartupError);
+      }
+    });
+    window.__viaggioBootGuard = window.setTimeout(function () {
+      showViaggioStartupError(window.__viaggioStartupError || 'inicialização interrompida');
+    }, 8000);
   </script>
 </head>
 <body data-session="loading" data-active-sheet="none" data-editing="false" data-year-menu="closed" data-trip-page="closed" data-day-page="closed" data-day-attachments="closed" data-app-ready="false">
@@ -71,6 +83,7 @@
         <span class="splash-spinner" aria-hidden="true"></span>
         <span id="splash_status">Preparando o Viaggio…</span>
       </div>
+      <button id="splash_retry" type="button" hidden onclick="location.reload()">Tentar novamente</button>
     </div>
   </div>
 
@@ -381,7 +394,7 @@
       <button id="delete_selected_trips" type="button" disabled>Excluir selecionadas</button>
     </footer>
   </main>
-  <script type="module" src="src/main.js?v=20260926-24"></script>
-  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260926-24');</script>
+  <script type="module" src="src/main.js?v=20260926-25"></script>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260926-25');</script>
 </body>
 </html>
