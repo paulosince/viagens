@@ -4909,6 +4909,19 @@ dom.authForm.addEventListener('submit', async event => {
 });
 
 async function boot() {
+  let bootSettled = false;
+  const bootWatchdog = setTimeout(() => {
+    if (bootSettled) return;
+    const cached = state.user;
+    if (cached) {
+      setSessionView('authenticated');
+      setSplashStatus('Abrindo com os dados disponíveis…');
+    } else {
+      setSessionView('anonymous');
+      setSplashStatus('A inicialização demorou demais. Tente entrar novamente.');
+    }
+  }, 5000);
+
   try {
     setSplashStatus('Preparando armazenamento local…');
     await offlineStore.open();
@@ -4977,9 +4990,9 @@ async function boot() {
       setSessionView('anonymous');
     }
   } finally {
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      document.body.dataset.appReady = 'true';
-    }));
+    bootSettled = true;
+    clearTimeout(bootWatchdog);
+    document.body.dataset.appReady = 'true';
   }
 }
 
