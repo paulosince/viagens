@@ -52,6 +52,7 @@ const state = {
   trips: [],
   passengers: new Map(),
   selectedTripIds: new Set(),
+  collapsedTripSections: new Set(),
   imageData: '',
   avatarFile: null,
   avatarPreview: '',
@@ -277,6 +278,7 @@ function setSessionView(session) {
   if (session === 'authenticated') refreshChatgptConnection().catch(console.warn);
   else {
     state.chatgptConnected = false;
+    state.collapsedTripSections.clear();
     dom.home.dataset.chatgptConnected = 'false';
   }
 }
@@ -3568,8 +3570,7 @@ function updateTripNode(item, trip) {
 }
 
 function syncTripSelectionUI() {
-  for (const item of dom.tripList.children) {
-    if (!item.dataset.tripId) continue;
+  for (const item of dom.tripList.querySelectorAll('li[data-trip-id]')) {
     const selected = state.selectedTripIds.has(String(item.dataset.tripId));
     if (item._refs?.selection) item._refs.selection.dataset.selected = String(selected);
     item._refs?.button?.setAttribute('aria-pressed', String(selected));
@@ -3657,13 +3658,56 @@ function compareTripsForHome(a, b, now = new Date()) {
   return String(a.start_date || '').localeCompare(String(b.start_date || ''));
 }
 
-function createTripSectionTitle(text) {
+function setTripSectionCollapsed(item, collapsed) {
+  item.dataset.collapsed = String(collapsed);
+  item._refs.button.setAttribute('aria-expanded', String(!collapsed));
+  item._refs.content.setAttribute('aria-hidden', String(collapsed));
+  item._refs.content.inert = collapsed;
+}
+
+function createTripSection(group, text) {
   const item = document.createElement('li');
-  item.className = 'trip-section-title';
+  item.className = 'trip-section';
+  item.dataset.tripSection = group;
 
   const heading = document.createElement('h2');
-  heading.textContent = text;
-  item.append(heading);
+  heading.className = 'trip-section-title';
+  const button = document.createElement('button');
+  button.className = 'trip-section-toggle';
+  button.type = 'button';
+  button.setAttribute('aria-controls', `trip-section-${group}`);
+  const label = document.createElement('span');
+  label.textContent = text;
+  const count = document.createElement('span');
+  count.className = 'trip-section-count';
+  const divider = document.createElement('span');
+  divider.className = 'trip-section-divider';
+  divider.setAttribute('aria-hidden', 'true');
+  const chevron = document.createElement('span');
+  chevron.className = 'trip-section-chevron';
+  chevron.setAttribute('aria-hidden', 'true');
+  button.append(label, count, divider, chevron);
+  heading.append(button);
+
+  const content = document.createElement('div');
+  content.className = 'trip-section-content';
+  content.id = `trip-section-${group}`;
+  const clip = document.createElement('div');
+  clip.className = 'trip-section-clip';
+  const cards = document.createElement('ol');
+  cards.className = 'trip-section-cards';
+  clip.append(cards);
+  content.append(clip);
+  item.append(heading, content);
+  item._refs = { button, count, content, cards };
+
+  button.addEventListener('click', () => {
+    const key = `${state.selectedYear}:${group}`;
+    const collapsed = !state.collapsedTripSections.has(key);
+    if (collapsed) state.collapsedTripSections.add(key);
+    else state.collapsedTripSections.delete(key);
+    setTripSectionCollapsed(item, collapsed);
+  });
 
   return item;
 }
@@ -3675,33 +3719,40 @@ function syncTripList() {
     .sort((a, b) => compareTripsForHome(a, b, now));
 
   const existingCards = new Map(
-    [...dom.tripList.children]
-      .filter(item => item.dataset.tripId)
+    [...dom.tripList.querySelectorAll('li[data-trip-id]')]
       .map(item => [String(item.dataset.tripId), item])
   );
-
-  dom.tripList.replaceChildren();
+  const existingSections = new Map(
+    [...dom.tripList.children]
+      .filter(item => item.dataset.tripSection)
+      .map(item => [item.dataset.tripSection, item])
+  );
 
   const sectionLabels = {
     current: 'Viagens em andamento',
     upcoming: 'Próximas viagens',
     past: 'Viagens realizadas'
   };
-  let previousGroup = null;
+  const sections = new Map();
   for (const trip of visibleTrips) {
     const group = tripListGroup(trip, now);
-
-    if (group !== previousGroup) {
-      dom.tripList.append(createTripSectionTitle(sectionLabels[group]));
-      previousGroup = group;
+    let section = sections.get(group);
+    if (!section) {
+      section = existingSections.get(group) || createTripSection(group, sectionLabels[group]);
+      section._refs.cards.replaceChildren();
+      setTripSectionCollapsed(section, state.collapsedTripSections.has(`${state.selectedYear}:${group}`));
+      sections.set(group, section);
     }
 
     let item = existingCards.get(String(trip.id));
     if (!item) item = createTripNode(trip);
     else updateTripNode(item, trip);
 
-    dom.tripList.append(item);
+    section._refs.cards.append(item);
+    section._refs.count.textContent = String(section._refs.cards.childElementCount);
   }
+
+  dom.tripList.replaceChildren(...sections.values());
 
   syncTripSelectionUI();
   const empty = visibleTrips.length === 0;

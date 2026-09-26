@@ -370,26 +370,75 @@ body[data-editing="true"] .home {
 .trip-list > li { background: transparent; }
 .trip-list::marker, .trip-list > li::marker { color: transparent; font-size: 0; }
 
-.trip-section-title {
-  margin: 18px 2px -2px;
-  padding-top: 8px;
-}
-.trip-section-title:first-child { margin-top: 0; padding-top: 0; }
-.trip-section-title h2 {
+.trip-section { min-width: 0; margin-top: 18px; }
+.trip-section:first-child { margin-top: 0; }
+.trip-section-title { margin: 0 2px 6px; }
+.trip-section-toggle {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin: 0;
+  width: 100%;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
   color: var(--text);
+  background: transparent;
+  font: inherit;
   font-size: 18px;
   font-weight: 750;
   letter-spacing: -.02em;
+  text-align: left;
+  cursor: pointer;
 }
-.trip-section-title h2::after {
+.trip-section-toggle:focus-visible { border-radius: 8px; outline: 2px solid var(--ios-blue); outline-offset: 3px; }
+.trip-section-count {
+  display: grid;
+  min-width: 25px;
+  height: 25px;
+  padding: 0 6px;
+  place-items: center;
+  border-radius: 999px;
+  color: #0066d6;
+  background: rgba(0, 122, 255, .1);
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: 0;
+}
+.trip-section-divider {
   height: 1px;
   flex: 1;
   background: rgba(60,60,67,.18);
-  content: "";
+}
+.trip-section-chevron {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 9px;
+  margin-right: 4px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(225deg);
+  transition: transform .38s ease;
+}
+.trip-section[data-collapsed="true"] .trip-section-chevron { transform: rotate(45deg); }
+.trip-section-content {
+  display: grid;
+  grid-template-rows: 1fr;
+  margin-inline: -18px;
+  opacity: 1;
+  transition: grid-template-rows .42s cubic-bezier(.2,.7,.2,1), opacity .28s ease;
+}
+.trip-section[data-collapsed="true"] .trip-section-content {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
+}
+.trip-section-clip { min-height: 0; overflow: hidden; }
+.trip-section-cards {
+  display: grid;
+  gap: 18px;
+  margin: 0;
+  padding: 4px 18px 30px;
+  list-style: none;
 }
 
 .trip-card {
@@ -2467,7 +2516,7 @@ body[data-active-sheet="change-log"] #change_log_sheet { transform: translateY(0
 .auth-card button { width: 100%; height: 50px; border: 0; border-radius: 13px; color: white; background: var(--ios-blue); font-weight: 600; }
 
 @media (min-width: 720px) {
-  .trip-list { grid-template-columns: repeat(2, 1fr); }
+  .trip-section-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .trip-card { min-height: 390px; }
 }
 
