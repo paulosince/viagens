@@ -700,8 +700,8 @@ body[data-trip-page="open"] .trip-page {
 .trip-page-share[hidden] { display: none; }
 .trip-page-cover-control svg { width: 27px; height: 27px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 .trip-page-cover-control input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
-.trip-page-cover-inline { position: relative; display: grid; flex: 0 0 32px; width: 32px; height: 32px; place-items: center; border: 1px solid rgba(255,255,255,.8); border-radius: 50%; background: rgba(20,20,24,.2); cursor: pointer; }
-.trip-page-cover-inline svg { width: 21px; height: 21px; }
+.trip-page-cover-inline { position: relative; display: grid; flex: 0 0 42px; width: 42px; height: 42px; place-items: center; border: 2px solid rgba(255,255,255,.9); border-radius: 50%; background: rgba(20,20,24,.2); cursor: pointer; }
+.trip-page-cover-inline svg { width: 29px; height: 29px; stroke-width: 2.2; }
 .trip-page-cover-control:focus-within { outline: 3px solid rgba(255,255,255,.65); outline-offset: 3px; }
 .trip-page-hero-copy {
   position: absolute;
@@ -713,21 +713,25 @@ body[data-trip-page="open"] .trip-page {
 }
 .trip-page-hero-copy h1 { margin: 0 0 7px; font-size: clamp(38px, 10vw, 58px); line-height: .96; letter-spacing: -.045em; }
 .trip-page-hero-copy p { margin: 0 0 18px; font-size: 16px; font-weight: 600; }
-.trip-page-inline-title, .trip-page-dates-button { display: block; max-width: 100%; padding: 0; border: 0; color: inherit; background: none; font: inherit; text-align: left; text-shadow: inherit; cursor: pointer; }
+.trip-page-inline-title, .trip-page-duration, .trip-page-dates-button { display: block; max-width: 100%; padding: 0; border: 0; color: inherit; background: none; font: inherit; text-align: left; text-shadow: inherit; cursor: pointer; }
 .trip-page-inline-title { line-height: inherit; letter-spacing: inherit; overflow-wrap: anywhere; }
 .trip-page-inline-title[hidden] { display: none; }
 .trip-page-title-input { width: 100%; padding: 0 0 3px; border: 0; border-bottom: 2px solid rgba(255,255,255,.8); border-radius: 0; outline: none; color: white; background: transparent; font: inherit; line-height: 1; letter-spacing: inherit; text-shadow: inherit; }
 .trip-page-title-input[hidden] { display: none; }
+.trip-page-duration { margin: 9px 0 3px; font-size: clamp(22px, 6vw, 30px); font-weight: 750; line-height: 1.1; }
 .trip-page-dates-button { margin: 0 0 16px; font-size: 16px; font-weight: 600; }
 .trip-page-date-editor { position: absolute; z-index: 4; bottom: calc(100% + 12px); left: 0; display: grid; grid-template-columns: minmax(0,1fr) 92px; gap: 11px; width: min(100%, 365px); padding: 17px; border: 1px solid rgba(255,255,255,.65); border-radius: 21px; background: rgba(27,38,51,.86); box-shadow: 0 14px 32px rgba(0,0,0,.3); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); text-shadow: none; }
 .trip-page-date-editor[hidden] { display: none; }
 .trip-page-date-editor label { display: grid; gap: 6px; min-width: 0; font-size: 13px; font-weight: 600; }
 .trip-page-date-editor input { width: 100%; min-width: 0; height: 42px; padding: 0 8px; border: 1px solid rgba(255,255,255,.35); border-radius: 10px; color: #172331; background: white; font-size: 15px; }
 .trip-page-date-editor button { grid-column: 1 / -1; justify-self: end; min-height: 36px; padding: 0 14px; border: 0; border-radius: 10px; color: white; background: rgba(255,255,255,.2); font: inherit; font-size: 14px; }
-.trip-page-hero-meta { display: flex; align-items: center; gap: 16px; }
-.trip-page-passengers { min-height: 36px; padding: 0; border: 0; color: inherit; background: transparent; text-shadow: inherit; cursor: pointer; }
-.trip-page-color-control { display: grid; flex: 0 0 31px; width: 31px; height: 31px; place-items: center; overflow: hidden; border: 2px solid white; border-radius: 50%; box-shadow: 0 2px 9px rgba(0,0,0,.3); cursor: pointer; }
-.trip-page-color-control input { width: 55px; height: 55px; padding: 0; border: 0; cursor: pointer; }
+.trip-page-hero-meta { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.trip-page-passengers { flex: 0 1 auto; min-width: 0; min-height: 42px; padding: 0; border: 0; color: inherit; background: transparent; text-shadow: inherit; cursor: pointer; }
+@media (max-width: 390px) { .trip-page-passengers { flex-wrap: wrap; } .trip-page-passengers .passenger-count { flex-basis: 100%; margin: 3px 0 0; text-align: left; } }
+.trip-page-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 12px; margin-left: auto; }
+.trip-page-color-control { position: relative; display: grid; flex: 0 0 42px; width: 42px; height: 42px; place-items: center; overflow: hidden; border: 2px solid white; border-radius: 50%; background: var(--trip-control-color, #4775d1); box-shadow: 0 2px 9px rgba(0,0,0,.3); cursor: pointer; }
+.trip-page-color-control input { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: 0; opacity: 0; cursor: pointer; }
+.trip-page-color-control:focus-within { outline: 3px solid rgba(255,255,255,.65); outline-offset: 3px; }
 .trip-page-save-status { display: block; min-height: 0; margin-top: 8px; font-size: 12px; font-weight: 600; text-shadow: 0 1px 4px rgba(0,0,0,.65); }
 .trip-page-save-status:empty { display: none; }
 .trip-page-save-status[data-kind="error"] { color: #fff3bb; }
@@ -2674,8 +2678,6 @@ body[data-active-sheet="change-log"] #change_log_sheet { transform: translateY(0
 
 /* Compartilhamento e permissões da viagem. */
 .trip-page-share svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-.trip-page-cover-inline { position: relative; display: grid; flex: 0 0 32px; width: 32px; height: 32px; place-items: center; border: 1px solid rgba(255,255,255,.8); border-radius: 50%; background: rgba(20,20,24,.2); cursor: pointer; }
-.trip-page-cover-inline svg { width: 21px; height: 21px; }
 .profile-saved-passenger-row .new-trip-passenger-field input[type="date"]::-webkit-date-and-time-value { width: auto; }
 .trip-share-scrim { position: fixed; z-index: 80; inset: 0; border: 0; background: rgba(20,20,24,.28); opacity: 0; visibility: hidden; pointer-events: none; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); transition: opacity .3s, visibility 0s linear .3s; }
 body[data-active-sheet="trip-share"] .trip-share-scrim { opacity: 1; visibility: visible; pointer-events: auto; transition-delay: 0s; }
@@ -2707,7 +2709,7 @@ body[data-active-sheet="trip-share"] #trip_share_sheet { transform: translateY(0
 .trip-share-row-remove { border: 0; color: #c03b35; background: transparent; font-size: 20px; }
 .trip-owner-avatar { display: inline-flex; flex: 0 0 23px; width: 23px; height: 23px; align-items: center; justify-content: center; overflow: hidden; margin-right: 5px; border: 2px solid white; border-radius: 50%; vertical-align: middle; color: white; background: var(--card-accent, #4775d1); font-size: 11px; }
 .trip-owner-avatar img { width: 100%; height: 100%; object-fit: cover; }
-body[data-trip-permission="viewer"] #trip_page_title, body[data-trip-permission="viewer"] #trip_page_dates, body[data-trip-permission="viewer"] #day_page_title { cursor: default; }
+body[data-trip-permission="viewer"] #trip_page_title, body[data-trip-permission="viewer"] #trip_page_duration, body[data-trip-permission="viewer"] #trip_page_dates, body[data-trip-permission="viewer"] #day_page_title { cursor: default; }
 body[data-trip-permission="viewer"] .trip-page-color-control, body[data-trip-permission="viewer"] .trip-page-cover-inline, body[data-trip-permission="viewer"] #add_day_page_activity, body[data-trip-permission="viewer"] #day_page_camera, body[data-trip-permission="viewer"] .day-inline-camera, body[data-trip-permission="viewer"] .day-inline-camera-empty, body[data-trip-permission="viewer"] .trip-day-recovery button, body[data-trip-permission="viewer"] .day-attachments-upload, body[data-trip-permission="viewer"] .day-attachment-remove { display: none !important; }
 body[data-trip-permission="viewer"] .day-view-agenda-item button { pointer-events: none; }
 body[data-trip-permission="viewer"] .day-view-agenda-item .day-inline-description[data-empty="true"] { display: none; }

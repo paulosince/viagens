@@ -47,9 +47,9 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20260926-35" as="style">
-  <link rel="stylesheet" href="style.css?v=20260926-35" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20260926-35"></noscript>
+  <link rel="preload" href="style.css?v=20260926-36" as="style">
+  <link rel="stylesheet" href="style.css?v=20260926-36" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20260926-36"></noscript>
   <script>
     function showViaggioStartupError(detail) {
       if (!document.body || document.body.dataset.session !== 'loading') return;
@@ -297,13 +297,20 @@
       <header id="trip_page_hero" class="trip-page-hero">
         <div class="trip-page-hero-copy">
           <h1><button id="trip_page_title" class="trip-page-inline-title" type="button" aria-label="Editar nome da viagem"></button><input id="trip_page_title_input" class="trip-page-title-input" type="text" maxlength="120" aria-label="Nome da viagem" hidden></h1>
+          <button id="trip_page_duration" class="trip-page-duration" type="button" aria-expanded="false" aria-controls="trip_page_date_editor" aria-label="Editar duração da viagem"></button>
           <button id="trip_page_dates" class="trip-page-dates-button" type="button" aria-expanded="false" aria-controls="trip_page_date_editor" aria-label="Editar início e duração da viagem"></button>
           <div id="trip_page_date_editor" class="trip-page-date-editor" hidden>
             <label>Início<input id="trip_page_start_date" type="date" aria-label="Data inicial da viagem"></label>
             <label>Dias<input id="trip_page_day_count" type="number" inputmode="numeric" min="1" max="365" step="1" aria-label="Quantidade de dias"></label>
             <button id="trip_page_date_done" type="button">Concluir</button>
           </div>
-          <div class="trip-page-hero-meta"><button id="trip_page_passengers" class="passenger-stack trip-page-passengers" type="button" aria-label="Editar passageiros da viagem"><span id="trip_page_passenger_count" class="passenger-count"></span></button><label class="trip-page-color-control" aria-label="Cor da viagem"><input id="trip_page_color" type="color" value="#4775d1" aria-label="Cor da viagem"></label><label class="trip-page-cover-control trip-page-cover-inline" aria-label="Trocar foto da viagem"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h3l1.6-2h6.8L17 7h3a2 2 0 0 1 2 2v9a2 2 0 0 1-2-2V9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2Z"/><circle cx="12" cy="13" r="3.5"/></svg><input id="trip_page_cover_input" type="file" accept="image/*" aria-label="Trocar foto da viagem"></label></div>
+          <div class="trip-page-hero-meta">
+            <button id="trip_page_passengers" class="passenger-stack trip-page-passengers" type="button" aria-label="Editar passageiros da viagem"><span id="trip_page_passenger_count" class="passenger-count"></span></button>
+            <div class="trip-page-actions">
+              <label class="trip-page-color-control" aria-label="Cor da viagem"><input id="trip_page_color" type="color" value="#4775d1" aria-label="Cor da viagem"></label>
+              <label class="trip-page-cover-control trip-page-cover-inline" aria-label="Trocar foto da viagem"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9a2 2 0 0 1 2-2h3l1.5-2h5L16 7h3a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><circle cx="12" cy="13.5" r="3.2"/></svg><input id="trip_page_cover_input" type="file" accept="image/*" aria-label="Trocar foto da viagem"></label>
+            </div>
+          </div>
           <span id="trip_page_save_status" class="trip-page-save-status" role="status" aria-live="polite"></span>
         </div>
       </header>
@@ -447,7 +454,7 @@
       <button id="delete_selected_trips" type="button" disabled>Excluir selecionadas</button>
     </footer>
   </main>
-  <script type="module" src="src/main.js?v=20260926-35"></script>
-  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260926-35');</script>
+  <script type="module" src="src/main.js?v=20260926-36"></script>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260926-36');</script>
 </body>
 </html>

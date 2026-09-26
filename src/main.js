@@ -93,6 +93,7 @@ const state = {
 };
 
 const dom = {
+  tripPageDuration: document.querySelector('#trip_page_duration'),
   tripPageShare: document.querySelector('#trip_page_share'), tripShareSheet: document.querySelector('#trip_share_sheet'), tripShareScrim: document.querySelector('#trip_share_scrim'), closeTripShare: document.querySelector('#close_trip_share'), tripShareForm: document.querySelector('#trip_share_form'), tripShareRecipient: document.querySelector('#trip_share_recipient'), sendTripShare: document.querySelector('#send_trip_share'), tripShareStatus: document.querySelector('#trip_share_status'), tripShareList: document.querySelector('#trip_share_list'),
   tripCreateMessage: document.querySelector('#trip_create_message'),
   splashStatus: document.querySelector('#splash_status'),
@@ -3695,6 +3696,7 @@ async function ensureTripBaselineSnapshot(tripId) {
 function syncTripHero(trip) {
   const editable = canEditTrip(trip);
   dom.tripPageTitle.disabled = !editable;
+  dom.tripPageDuration.disabled = !editable;
   dom.tripPageDates.disabled = !editable;
   dom.tripPageColor.disabled = !editable;
   dom.tripPageCoverInput.disabled = !editable;
@@ -3702,8 +3704,10 @@ function syncTripHero(trip) {
   dom.tripPage.style.setProperty('--trip-page-color', accent);
   dom.tripPageHero.style.backgroundImage = trip.cover_url ? `url("${trip.cover_url.replaceAll('"', '%22')}")` : '';
   dom.tripPageTitle.textContent = trip.name;
-  dom.tripPageDates.textContent = `${displayDate(trip.start_date)} — ${displayDate(tripEndDate(trip))} · ${tripDayCount(trip)} ${tripDayCount(trip) === 1 ? 'dia' : 'dias'}`;
+  dom.tripPageDuration.textContent = `${tripDayCount(trip)} ${tripDayCount(trip) === 1 ? 'dia' : 'dias'}`;
+  dom.tripPageDates.textContent = `${displayDate(trip.start_date)} — ${displayDate(tripEndDate(trip))}`;
   dom.tripPageColor.value = accent;
+  dom.tripPageColor.parentElement.style.setProperty('--trip-control-color', accent);
   dom.tripPagePassengers._count = dom.tripPagePassengerCount;
   syncPassengerList(dom.tripPagePassengers, state.passengers.get(trip.id) || []);
 }
@@ -3716,6 +3720,7 @@ async function openTrip(tripId, { pushHistory = true, forceRefresh = false } = {
   dom.tripPagePassengers.setAttribute('aria-label', canEditTrip(trip) ? 'Editar passageiros da viagem' : 'Ver passageiros da viagem');
   if (state.activeTripId !== String(trip.id)) {
     dom.tripDateEditor.hidden = true;
+    dom.tripPageDuration.setAttribute('aria-expanded', 'false');
     dom.tripPageDates.setAttribute('aria-expanded', 'false');
     dom.tripPageTitleInput.hidden = true;
     dom.tripPageTitle.hidden = false;
@@ -5201,24 +5206,31 @@ dom.tripPageTitleInput.addEventListener('keydown', event => {
     dom.tripPageTitle.hidden = false;
   }
 });
-dom.tripPageDates.addEventListener('click', () => {
+function toggleTripDateEditor() {
   if (!canEditActiveTrip()) return;
   const trip = state.trips.find(item => String(item.id) === String(state.activeTripId));
   if (!trip) return;
   const open = dom.tripDateEditor.hidden;
   dom.tripDateEditor.hidden = !open;
+  dom.tripPageDuration.setAttribute('aria-expanded', String(open));
   dom.tripPageDates.setAttribute('aria-expanded', String(open));
   if (open) {
     dom.tripStartDate.value = trip.start_date;
     dom.tripDayCount.value = String(tripDayCount(trip));
   }
-});
+}
+dom.tripPageDuration.addEventListener('click', toggleTripDateEditor);
+dom.tripPageDates.addEventListener('click', toggleTripDateEditor);
 dom.tripStartDate.addEventListener('change', () => saveTripSchedule().catch(console.warn));
 dom.tripDayCount.addEventListener('change', () => saveTripSchedule().catch(console.warn));
 dom.tripDateDone.addEventListener('click', async () => {
   if (!await saveTripSchedule()) return;
   dom.tripDateEditor.hidden = true;
+  dom.tripPageDuration.setAttribute('aria-expanded', 'false');
   dom.tripPageDates.setAttribute('aria-expanded', 'false');
+});
+dom.tripPageColor.addEventListener('input', () => {
+  dom.tripPageColor.parentElement.style.setProperty('--trip-control-color', dom.tripPageColor.value);
 });
 dom.tripPageColor.addEventListener('change', () => {
   saveTripFields({ secondary_color: dom.tripPageColor.value }, { summary: 'Cor da viagem alterada' }).catch(() => {});
