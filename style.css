@@ -978,6 +978,10 @@ body[data-day-page="open"] .day-page {
   right: 110px;
 }
 
+.day-page-badge {
+  transform: translateY(-2px);
+}
+
 .day-page-title-row {
   display: flex;
   align-items: center;
