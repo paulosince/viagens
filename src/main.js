@@ -4332,9 +4332,9 @@ function openNewTrip() {
   state.imageData = '';
   dom.newTripForm.reset();
   dom.newTripTitle.textContent = 'Nova viagem';
-  dom.tripSharingSection.hidden = true;
-  dom.tripShareEmail.value = '';
-  dom.tripMemberList.replaceChildren();
+  if (dom.tripSharingSection) dom.tripSharingSection.hidden = true;
+  if (dom.tripShareEmail) dom.tripShareEmail.value = '';
+  dom.tripMemberList?.replaceChildren();
   dom.saveNewTrip.setAttribute('aria-label', 'Criar viagem');
   selectTripColor('#4775d1');
   resetTripPassengers();
@@ -4378,9 +4378,9 @@ function openTripEditor() {
     dom.coverPreview.parentElement.dataset.hasImage = 'false';
   }
   dom.newTripTitle.textContent = 'Editar viagem';
-  dom.tripSharingSection.hidden = false;
-  dom.tripShareEmail.value = '';
-  dom.tripShareMessage.textContent = 'A pessoa usa a própria conta Viaggio e conecta o próprio ChatGPT.';
+  if (dom.tripSharingSection) dom.tripSharingSection.hidden = false;
+  if (dom.tripShareEmail) dom.tripShareEmail.value = '';
+  if (dom.tripShareMessage) dom.tripShareMessage.textContent = 'A pessoa usa a própria conta Viaggio e conecta o próprio ChatGPT.';
   loadTripMembers(trip.id).catch(error => { dom.tripShareMessage.textContent = error.message || 'Não foi possível carregar o compartilhamento.'; });
   dom.saveNewTrip.setAttribute('aria-label', 'Salvar viagem');
   dom.newTripMessage.textContent = '';
@@ -4870,7 +4870,7 @@ dom.deleteAccountButton.addEventListener('click', deleteAccount);
 for (const option of dom.tripColorPalette.querySelectorAll('.trip-color-option')) option.addEventListener('click', () => selectTripColor(option.dataset.color));
 dom.tripColorCustom.addEventListener('input', () => selectTripColor(dom.tripColorCustom.value, true));
 dom.addTripPassenger.addEventListener('click', addTripPassenger);
-dom.tripShareButton.addEventListener('click', shareActiveTrip);
+dom.tripShareButton?.addEventListener('click', shareActiveTrip);
 dom.addProfileSavedPassenger.addEventListener('click', addProfileSavedPassenger);
 
 dom.coverInput.addEventListener('change', async () => {

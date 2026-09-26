@@ -1,4 +1,4 @@
-const CACHE_NAME = 'viaggio-home-v67-trip-sharing';
+const CACHE_NAME = 'viaggio-home-v68-offline-boot';
 const SUPABASE_CLIENT = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const LEAFLET_CSS = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css';
 const LEAFLET_JS = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js';
@@ -6,8 +6,8 @@ const EXTERNAL_ASSETS = [SUPABASE_CLIENT, LEAFLET_CSS, LEAFLET_JS];
 const APP_SHELL = [
   './',
   './index.html',
-  './style.css?v=20260926-20',
-  './src/main.js?v=20260926-20',
+  './style.css?v=20260926-21',
+  './src/main.js?v=20260926-21',
   './src/offline-store.js',
   './manifest.webmanifest',
   './assets/app-icon.svg',
