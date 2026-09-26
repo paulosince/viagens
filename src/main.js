@@ -92,6 +92,7 @@ const state = {
 };
 
 const dom = {
+  tripCreateMessage: document.querySelector('#trip_create_message'),
   splashStatus: document.querySelector('#splash_status'),
   authView: document.querySelector('#auth_view'), authForm: document.querySelector('#auth_form'), authMessage: document.querySelector('#auth_message'), authIntro: document.querySelector('#auth_intro'), authCard: document.querySelector('.auth-card'), signupForm: document.querySelector('#signup_form'), signupMessage: document.querySelector('#signup_message'), signupPhotoInput: document.querySelector('#signup_photo'), signupPhotoPreview: document.querySelector('#signup_photo_preview'), signupPhotoPlaceholder: document.querySelector('#signup_photo_placeholder'), showSignup: document.querySelector('#show_signup'), showLogin: document.querySelector('#show_login'),
   home: document.querySelector('#user_home'), profileButton: document.querySelector('#profile_button'), headerProfileImage: document.querySelector('#header_profile_image'), headerProfileFallback: document.querySelector('#header_profile_fallback'), homeChatgptButton: document.querySelector('#home_chatgpt_button'),
@@ -822,6 +823,7 @@ async function saveProfileSavedPassengers(client) {
 
 function passengerImage(passenger) {
   const name = passenger.name || '';
+  if (passenger.user_id && String(passenger.user_id) === String(state.user?.id)) return { src: profileImage(), position: '50% 46%' };
   if (/c[ií]ntia/i.test(name)) return { src: profileImage(), position: '50% 46%' };
   const saved = state.savedPassengers.find(person => savedPassengerKey(person) === savedPassengerKey(passenger));
   if (saved?.photo_url) return { src: saved.photo_url, position: '50% 50%' };
@@ -4337,23 +4339,76 @@ function uniqueTripPassengers(passengers) {
   });
 }
 
-function openNewTrip() {
-  setYearMenu(false);
-  state.editingTripId = null;
-  state.imageData = '';
-  dom.newTripForm.reset();
-  dom.newTripTitle.textContent = 'Nova viagem';
-  if (dom.tripSharingSection) dom.tripSharingSection.hidden = true;
-  if (dom.tripShareEmail) dom.tripShareEmail.value = '';
-  dom.tripMemberList?.replaceChildren();
-  dom.saveNewTrip.setAttribute('aria-label', 'Criar viagem');
-  selectTripColor('#4775d1');
-  resetTripPassengers();
-  dom.coverPreview.removeAttribute('src');
-  dom.coverPreview.parentElement.dataset.hasImage = 'false';
-  dom.newTripMessage.textContent = '';
-  setActiveSheet('new-trip');
-  requestAnimationFrame(() => document.querySelector('#trip-name').focus({ preventScroll: true }));
+async function createTripInstantly() {
+  if (state.saving || !state.user?.id) return;
+  state.saving = true;
+  setLoading(dom.newTripButton, true);
+  setLoading(dom.emptyNewTripButton, true);
+  dom.tripCreateMessage.textContent = '';
+
+  try {
+    const client = await trySupabase();
+    if (!client) throw new Error('É necessária uma conexão para criar a viagem.');
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const orderedSchema = await supportsOrderedDaySchema(client);
+    const payload = {
+      user_id: state.user.id,
+      name: 'Nova viagem',
+      destination: '',
+      start_date: today,
+      secondary_color: '#4775d1',
+      ...(orderedSchema ? { day_count: 1 } : { end_date: today })
+    };
+    const created = await client.from('trips').insert(payload).select().single();
+    if (created.error) throw created.error;
+    const trip = created.data;
+
+    let failure = (await client.from('trip_members').insert({
+      trip_id: trip.id, user_id: state.user.id, role: 'owner'
+    })).error;
+    if (!failure) failure = (await client.from('passengers').insert({
+      trip_id: trip.id, user_id: state.user.id,
+      name: profileName(), birth_date: state.profile?.birth_date || null,
+      photo_url: null, age: ageFromBirthDate(state.profile?.birth_date)
+    })).error;
+    if (!failure) failure = (await client.from('trip_days').insert(createDays(trip.id, 1, today, orderedSchema))).error;
+    if (failure) {
+      await client.from('trip_days').delete().eq('trip_id', trip.id);
+      await client.from('passengers').delete().eq('trip_id', trip.id);
+      await client.from('trip_members').delete().eq('trip_id', trip.id);
+      await client.from('trips').delete().eq('id', trip.id);
+      throw failure;
+    }
+
+    state.selectedYear = now.getFullYear();
+    try {
+      await loadTrips({ allowLocalFallback: false });
+    } catch (error) {
+      console.warn('Atualização das viagens pendente:', error);
+      if (!state.trips.some(item => String(item.id) === String(trip.id))) state.trips.push(normalizeTripRecord(trip));
+      if (!state.passengers.has(trip.id)) state.passengers.set(trip.id, [{
+        trip_id: trip.id, user_id: state.user.id, name: profileName(),
+        birth_date: state.profile?.birth_date || null, photo_url: null
+      }]);
+      syncYearList();
+      syncTripList();
+      offlineStore.replaceWorkspace(state.user.id, state.trips, [...state.passengers.values()].flat()).catch(console.warn);
+    }
+    setYearMenu(false);
+    await openTrip(trip.id);
+    recordChange({
+      tripId: trip.id, entityType: 'trip', entityId: trip.id, action: 'create',
+      summary: 'Viagem “' + trip.name + '” criada', beforeState: null,
+      afterState: { name: trip.name, destination: '', start_date: today, day_count: 1 }
+    }).catch(console.warn);
+  } catch (error) {
+    dom.tripCreateMessage.textContent = error.message || 'Não foi possível criar a viagem.';
+  } finally {
+    state.saving = false;
+    setLoading(dom.newTripButton, false);
+    setLoading(dom.emptyNewTripButton, false);
+  }
 }
 
 const tripPassengerGroup = document.querySelector('.passenger-form-group');
@@ -5053,8 +5108,8 @@ window.addEventListener('popstate', event => {
   } else closeTripPage();
 });
 dom.profileButton.addEventListener('click', openProfile);
-dom.newTripButton.addEventListener('click', openNewTrip);
-dom.emptyNewTripButton.addEventListener('click', openNewTrip);
+dom.newTripButton.addEventListener('click', createTripInstantly);
+dom.emptyNewTripButton.addEventListener('click', createTripInstantly);
 dom.closeNewTrip.addEventListener('click', closeSheets);
 dom.closeProfile.addEventListener('click', closeSheets);
 dom.homeChatgptButton.addEventListener('click', openChatgptIntegration);

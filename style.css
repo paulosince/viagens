@@ -448,7 +448,7 @@ body[data-editing="true"] .home {
   border: 5px solid var(--card-accent, #4775d1);
   border-radius: 30px;
   color: white;
-  background: #5f7380 center / cover no-repeat;
+  background: linear-gradient(160deg, #7dc3e9 0%, #b9dded 54%, #dfc59c 100%) center / cover no-repeat;
   box-shadow: 0 18px 36px color-mix(in srgb, var(--card-accent, #4775d1) 42%, transparent);
   transform: scale(1);
   transition: transform .3s ease, box-shadow .3s ease;
@@ -619,6 +619,8 @@ body[data-editing="true"] .trip-edit-footer { transform: translateY(0); }
 .home-empty p { color: var(--secondary); }
 .trip-list[aria-hidden="true"],
 .home-empty[aria-hidden="true"] { display: none; }
+.trip-create-message { width: min(100%, 760px); margin: 12px auto; color: #a32832; font-weight: 600; text-align: center; }
+.trip-create-message:empty { display: none; }
 
 .trip-page {
   --trip-page-color: #4775d1;
@@ -646,7 +648,7 @@ body[data-trip-page="open"] .trip-page {
   min-height: 390px;
   overflow: hidden;
   border-bottom: 5px solid var(--trip-page-color);
-  background: #5f7380 center / cover no-repeat;
+  background: linear-gradient(160deg, #7dc3e9 0%, #b9dded 54%, #dfc59c 100%) center / cover no-repeat;
   box-shadow: 0 22px 44px color-mix(in srgb, var(--trip-page-color) 72%, rgba(0,0,0,.35));
 }
 .trip-page-hero:has(.trip-page-date-editor:not([hidden])) { min-height: 480px; transition: min-height .3s ease; }

@@ -47,9 +47,9 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20260926-33" as="style">
-  <link rel="stylesheet" href="style.css?v=20260926-33" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20260926-33"></noscript>
+  <link rel="preload" href="style.css?v=20260926-34" as="style">
+  <link rel="stylesheet" href="style.css?v=20260926-34" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20260926-34"></noscript>
   <script>
     function showViaggioStartupError(detail) {
       if (!document.body || document.body.dataset.session !== 'loading') return;
@@ -155,10 +155,11 @@
         <p>Sua próxima história começa aqui.</p>
         <button id="empty_new_trip_button" class="glass-button" type="button">Criar viagem</button>
       </section>
+      <p id="trip_create_message" class="trip-create-message" role="alert"></p>
 
       <button id="sheet_scrim" class="scrim" type="button" aria-label="Fechar formulário"></button>
 
-      <section id="home_new_trip" class="new-trip-sheet" aria-hidden="true" aria-labelledby="new-trip-title">
+      <section id="home_new_trip" class="new-trip-sheet" aria-hidden="true" aria-labelledby="new-trip-title" inert>
         <form id="new_trip_form">
           <header class="sheet-header">
             <button id="close_new_trip" class="sheet-control" type="button" aria-label="Cancelar">×</button>
@@ -433,7 +434,7 @@
       <button id="delete_selected_trips" type="button" disabled>Excluir selecionadas</button>
     </footer>
   </main>
-  <script type="module" src="src/main.js?v=20260926-33"></script>
-  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260926-33');</script>
+  <script type="module" src="src/main.js?v=20260926-34"></script>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260926-34');</script>
 </body>
 </html>
