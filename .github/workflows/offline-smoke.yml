@@ -37,6 +37,7 @@ jobs:
         run: |
           node tests/offline-sync.cjs
           node tests/day-map-order.cjs
+          node tests/inline-agenda.cjs
       - name: Verify offline app shell
         run: |
           test -f index.html

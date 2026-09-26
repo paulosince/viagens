@@ -98,5 +98,16 @@ vm.runInContext([
   assert.deepEqual(calls.filter(x => x.method === 'upsert').map(x => x.table), ['activities']);
   assert.equal(calls.find(x => x.table === 'activities').value.length, 1);
   assert.equal(calls.find(x => x.table === 'activities').value[0].id, 'a');
+
+  const created = {id: 'new', day_id: 'd', position: -1, period: 'morning',
+    start_time: '08:59:00', title: 'Nova atividade', description: 'Adicione uma descrição'};
+  await context.persistInlineDayChange(day, [...state.dayActivities.get('d'), created], locations, {},
+    {activityId: created.id, rerender: false});
+  assert.equal(saved.at(-1)[1].find(item => item.id === created.id).title, 'Nova atividade');
+  assert.equal(queued.at(-1).activity.description, 'Adicione uma descrição');
+  calls.length = 0;
+  await context.syncMutation(queued.at(-1));
+  assert.equal(calls.find(x => x.table === 'activities' && x.method === 'upsert').value.id, created.id);
+
   console.log('PASS: day cover, concurrent agenda images, isolated upload, old queue delta');
 })().catch(error => {console.error(error); process.exitCode = 1;});

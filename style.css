@@ -619,6 +619,7 @@ body[data-trip-page="open"] .trip-page {
   pointer-events: auto;
 }
 .trip-page-back { padding: 0 3px 3px 0; font-size: 42px; }
+.day-page-add { font-size: 34px; font-weight: 400; }
 .trip-page-edit svg { width: 25px; height: 25px; fill: currentColor; }
 .trip-page-hero-copy {
   position: absolute;
@@ -985,7 +986,7 @@ body[data-day-page="open"] .day-page {
   position: absolute;
   z-index: 3;
   right: 22px;
-  top: calc(max(18px, env(safe-area-inset-top)) + 1rem);
+  top: calc(max(18px, env(safe-area-inset-top)) + 5rem);
   display: grid;
   width: 46px;
   height: 46px;

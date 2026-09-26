@@ -4,6 +4,8 @@ const SUPABASE_URL = 'https://siabldasqinpfmxslwji.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_UgbBIOq1TnInuPRrQpAFag_JLIzYuFf';
 const VIAGGIO_MCP_URL = 'https://siabldasqinpfmxslwji.supabase.co/functions/v1/viaggio-mcp';
 const CHATGPT_PLUGIN_URL = '';
+const NEW_AGENDA_TITLE = 'Nova atividade';
+const NEW_AGENDA_DESCRIPTION = 'Adicione uma descrição';
 let supabase = null;
 let supabaseLoad = null;
 let leafletLoad = null;
@@ -89,7 +91,7 @@ const dom = {
   home: document.querySelector('#user_home'), profileButton: document.querySelector('#profile_button'), headerProfileImage: document.querySelector('#header_profile_image'), headerProfileFallback: document.querySelector('#header_profile_fallback'), homeChatgptButton: document.querySelector('#home_chatgpt_button'),
   editTripsButton: document.querySelector('#edit_trips_button'), newTripButton: document.querySelector('#new_trip_button'), emptyNewTripButton: document.querySelector('#empty_new_trip_button'), sessionEmail: document.querySelector('#session_email'), syncStatus: document.querySelector('#sync_status'), tripHeading: document.querySelector('#trip_heading'), yearButton: document.querySelector('#year_selector_button'), currentYear: document.querySelector('#current_year'), yearMenu: document.querySelector('#year_menu'), yearList: document.querySelector('#year_list'),
   tripList: document.querySelector('#trip_list'), homeEmpty: document.querySelector('#home_empty'), scrim: document.querySelector('#sheet_scrim'), tripEditFooter: document.querySelector('#trip_edit_footer'), deleteSelectedTrips: document.querySelector('#delete_selected_trips'), tripPage: document.querySelector('#trip_page'), closeTripPage: document.querySelector('#close_trip_page'), editTripButton: document.querySelector('#edit_trip_button'), tripPageHero: document.querySelector('#trip_page_hero'), tripPageTitle: document.querySelector('#trip_page_title'), tripPageDates: document.querySelector('#trip_page_dates'), tripPagePassengers: document.querySelector('#trip_page_passengers'), tripPagePassengerCount: document.querySelector('#trip_page_passenger_count'), tripDayList: document.querySelector('#trip_day_list'), tripDayMessage: document.querySelector('#trip_day_message'),
-  dayPage: document.querySelector('#day_page'), closeDayPage: document.querySelector('#close_day_page'), dayPageHero: document.querySelector('#day_page_hero'), dayPageBadge: document.querySelector('#day_page_badge'), dayPageTitle: document.querySelector('#day_page_title'), dayPageDate: document.querySelector('#day_page_date'), dayPageSaveStatus: document.querySelector('#day_page_save_status'), dayPagePhotoInput: document.querySelector('#day_page_photo_input'), dayPageCamera: document.querySelector('#day_page_camera'), dayPageAgenda: document.querySelector('#day_page_agenda'), dayPageEmpty: document.querySelector('#day_page_empty'), dayPageMap: document.querySelector('#day_page_map'), dayPageDirections: document.querySelector('#day_page_directions'),
+  dayPage: document.querySelector('#day_page'), closeDayPage: document.querySelector('#close_day_page'), addDayPageActivity: document.querySelector('#add_day_page_activity'), dayPageHero: document.querySelector('#day_page_hero'), dayPageBadge: document.querySelector('#day_page_badge'), dayPageTitle: document.querySelector('#day_page_title'), dayPageDate: document.querySelector('#day_page_date'), dayPageSaveStatus: document.querySelector('#day_page_save_status'), dayPagePhotoInput: document.querySelector('#day_page_photo_input'), dayPageCamera: document.querySelector('#day_page_camera'), dayPageAgenda: document.querySelector('#day_page_agenda'), dayPageEmpty: document.querySelector('#day_page_empty'), dayPageMap: document.querySelector('#day_page_map'), dayPageDirections: document.querySelector('#day_page_directions'),
   newTripSheet: document.querySelector('#home_new_trip'), newTripForm: document.querySelector('#new_trip_form'), newTripTitle: document.querySelector('#new-trip-title'), closeNewTrip: document.querySelector('#close_new_trip'), saveNewTrip: document.querySelector('#save_new_trip'), newTripMessage: document.querySelector('#new_trip_message'), coverInput: document.querySelector('#cover-image'), coverPreview: document.querySelector('#cover_preview_image'), tripColorValue: document.querySelector('#trip-color-value'), tripColorPalette: document.querySelector('#trip_color_palette'), tripColorCustom: document.querySelector('#trip-color-custom'), newTripPassengerList: document.querySelector('#new_trip_passenger_list'), addTripPassenger: document.querySelector('#add_trip_passenger'),
   dayEditSheet: document.querySelector('#day_edit_sheet'), daySheetScrim: document.querySelector('#day_sheet_scrim'), dayEditForm: document.querySelector('#day_edit_form'), closeDayEdit: document.querySelector('#close_day_edit'), saveDayEdit: document.querySelector('#save_day_edit'), dayEditTitle: document.querySelector('#day_edit_title'), dayEditDate: document.querySelector('#day_edit_date'), dayTitleInput: document.querySelector('#day-title-input'), dayLocationsEditor: document.querySelector('#day_locations_editor'), addDayLocation: document.querySelector('#add_day_location'), dayAgendaEditor: document.querySelector('#day_agenda_editor'), addDayActivity: document.querySelector('#add_day_activity'), dayNotesInput: document.querySelector('#day-notes-input'), dayEditMessage: document.querySelector('#day_edit_message'),
   placeSearchSheet: document.querySelector('#place_search_sheet'), placeSearchScrim: document.querySelector('#place_search_scrim'), placeSearchForm: document.querySelector('#place_search_form'), closePlaceSearch: document.querySelector('#close_place_search'), confirmPlaceSearch: document.querySelector('#confirm_place_search'), placeSearchInput: document.querySelector('#place_search_input'), runPlaceSearch: document.querySelector('#run_place_search'), placeSearchMessage: document.querySelector('#place_search_message'), placeSearchResults: document.querySelector('#place_search_results'), placePhotoSection: document.querySelector('#place_photo_section'), placePhotoMessage: document.querySelector('#place_photo_message'), placePhotoResults: document.querySelector('#place_photo_results'),
@@ -715,7 +717,7 @@ function primaryActivityPlace(activity) {
 function activityLooksGeocodable(activity) {
   const value = primaryActivityPlace(activity).toLocaleLowerCase('pt-BR');
   if (!value || value.length < 3) return false;
-  return !/^(almo[cç]o|jantar|caf[eé]|lanche|check[- ]?in|check[- ]?out|deslocamento|transfer|voo|trem|metr[oô]|[oô]nibus|chegada|sa[ií]da|manh[ãa]|tarde|noite|dia livre|tempo livre)(?:$|[\s,.:;—–-])/.test(value);
+  return !/^(almo[cç]o|jantar|caf[eé]|lanche|check[- ]?in|check[- ]?out|deslocamento|transfer|voo|trem|metr[oô]|[oô]nibus|chegada|sa[ií]da|manh[ãa]|tarde|noite|dia livre|tempo livre|nova atividade)(?:$|[\s,.:;—–-])/.test(value);
 }
 
 async function loadLeaflet() {
@@ -2164,7 +2166,7 @@ function beginInlineTextEdit(button, day, activity, field, multiline = false) {
     const target = records.activities.find(item => String(item.id) === String(activity.id));
     if (!target) return;
 
-    target[field] = value.trim() || null;
+    target[field] = value.trim() || (field === 'title' ? NEW_AGENDA_TITLE : null);
     updateInlineDayState(day, records.activities, records.locations);
     await persistInlineDayChange(day, records.activities, records.locations, {}, {
       activityId: activity.id,
@@ -2188,7 +2190,7 @@ function beginInlineTextEdit(button, day, activity, field, multiline = false) {
     const value = editor.value;
     try {
       await saveValue(value, { rerender: true });
-      const finalValue = value.trim();
+      const finalValue = value.trim() || (field === 'title' ? NEW_AGENDA_TITLE : '');
       if (finalValue !== originalValue) {
         await recordChange({
           tripId: day.trip_id || state.activeTripId,
@@ -2225,13 +2227,18 @@ function beginInlineTextEdit(button, day, activity, field, multiline = false) {
 
   button.replaceWith(editor);
   editor.focus({ preventScroll: true });
-  if (editor.setSelectionRange) editor.setSelectionRange(editor.value.length, editor.value.length);
+  if ((field === 'title' && originalValue === NEW_AGENDA_TITLE)
+    || (field === 'description' && originalValue === NEW_AGENDA_DESCRIPTION)) {
+    editor.select();
+  } else if (editor.setSelectionRange) {
+    editor.setSelectionRange(editor.value.length, editor.value.length);
+  }
 }
 
 function locationDraft(location, activity) {
   return {
     id: location?.id || crypto.randomUUID(),
-    name: location?.name || activity.place_name || primaryActivityPlace(activity) || '',
+    name: location?.name || activity.place_name || (activity.title === NEW_AGENDA_TITLE ? '' : primaryActivityPlace(activity)),
     selectedName: location?.name || activity.place_name || '',
     photoUrl: location?.photo_url || '',
     provider: location?.provider || '',
@@ -2341,7 +2348,54 @@ async function saveInlinePhoto(day, activity, location, file) {
 }
 
 function orderedDayActivities(activities = []) {
-  return [...activities].sort((a, b) => String(activityTime(a)).localeCompare(String(activityTime(b))) || (a.position || 0) - (b.position || 0));
+  return [...activities].sort((a, b) => String(activityTime(a) || '00:00').localeCompare(String(activityTime(b) || '00:00')) || (a.position || 0) - (b.position || 0));
+}
+
+function newAgendaActivity(day, activities = []) {
+  const first = orderedDayActivities(activities)[0];
+  const firstTime = first ? activityTime(first) : '09:01';
+  const firstMinutes = firstTime ? Number(firstTime.slice(0, 2)) * 60 + Number(firstTime.slice(3, 5)) : 0;
+  const minutes = Math.max(0, firstMinutes - 1);
+  const time = String(Math.floor(minutes / 60)).padStart(2, '0') + ':' + String(minutes % 60).padStart(2, '0');
+  const position = activities.length ? Math.min(...activities.map(item => Number(item.position) || 0)) - 1 : 0;
+  return {
+    id: crypto.randomUUID(),
+    day_id: day.id,
+    position,
+    period: periodFromTime(time),
+    start_time: time + ':00',
+    title: NEW_AGENDA_TITLE,
+    description: NEW_AGENDA_DESCRIPTION,
+    place_id: null,
+    place_name: null
+  };
+}
+
+async function addInlineDayActivity() {
+  const day = state.tripDays.find(item => String(item.id) === String(state.activeDayId));
+  if (!day) return;
+
+  const records = cloneDayRecords(day);
+  const activity = newAgendaActivity(day, records.activities);
+  records.activities.push(activity);
+  updateInlineDayState(day, records.activities, records.locations);
+  openDayPage(day.id, { pushHistory: false });
+  dom.dayPageAgenda.firstElementChild?.scrollIntoView({ block: 'center' });
+
+  try {
+    await persistInlineDayChange(day, records.activities, records.locations, {}, { activityId: activity.id });
+    await recordChange({
+      tripId: day.trip_id || state.activeTripId,
+      entityType: 'activity',
+      entityId: activity.id,
+      action: 'create',
+      summary: 'Item adicionado à agenda do dia ' + dayNumber(day),
+      afterState: { title: activity.title, start_time: activity.start_time }
+    });
+  } catch (error) {
+    setAgendaSaveState(activity.id, 'error');
+    console.warn('Não foi possível salvar o novo item da agenda', error);
+  }
 }
 
 function renderDayPageAgenda(day, activities, locations) {
@@ -2386,7 +2440,7 @@ function renderDayPageAgenda(day, activities, locations) {
     const place = document.createElement('button');
     place.type = 'button';
     place.className = 'day-inline-place-name';
-    place.textContent = location?.name || activity.place_name || 'Sem local definido';
+    place.textContent = location?.name || activity.place_name || (activity.title === NEW_AGENDA_TITLE ? 'Definir local' : 'Sem local definido');
     place.addEventListener('click', () => openInlinePlaceSearch(day, activity, location));
 
     copy.append(title, place);
@@ -2395,8 +2449,8 @@ function renderDayPageAgenda(day, activities, locations) {
     description.type = 'button';
     description.className = 'day-inline-description';
     description.textContent = activity.description || 'Adicionar observação';
-    description.dataset.empty = String(!activity.description);
-    description.setAttribute('aria-label', activity.description ? 'Editar observação' : 'Adicionar observação');
+    description.dataset.empty = String(!activity.description || activity.description === NEW_AGENDA_DESCRIPTION);
+    description.setAttribute('aria-label', activity.description && activity.description !== NEW_AGENDA_DESCRIPTION ? 'Editar observação' : 'Adicionar observação');
     description.addEventListener('click', () => beginInlineTextEdit(description, day, activity, 'description', true));
     copy.append(description);
 
@@ -4101,6 +4155,7 @@ dom.dayEditForm.addEventListener('submit', event => { event.preventDefault(); sa
 dom.closeTripPage.addEventListener('click', navigateBackFromTrip);
 dom.editTripButton.addEventListener('click', openTripEditor);
 dom.closeDayPage.addEventListener('click', navigateBackFromDay);
+dom.addDayPageActivity.addEventListener('click', addInlineDayActivity);
 ensureDayTitleControl();
 dom.dayPagePhotoInput.addEventListener('change', async () => {
   const file = dom.dayPagePhotoInput.files?.[0];
