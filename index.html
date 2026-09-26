@@ -45,11 +45,11 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20260926-07" as="style">
-  <link rel="stylesheet" href="style.css?v=20260926-07" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20260926-07"></noscript>
+  <link rel="preload" href="style.css?v=20260926-08" as="style">
+  <link rel="stylesheet" href="style.css?v=20260926-08" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20260926-08"></noscript>
 </head>
-<body data-session="loading" data-active-sheet="none" data-editing="false" data-year-menu="closed" data-trip-page="closed" data-day-page="closed" data-app-ready="false">
+<body data-session="loading" data-active-sheet="none" data-editing="false" data-year-menu="closed" data-trip-page="closed" data-day-page="closed" data-day-attachments="closed" data-app-ready="false">
   <div id="app_splash" class="app-splash" aria-label="Carregando Viaggio">
     <span class="splash-cloud splash-cloud-one" aria-hidden="true"></span>
     <span class="splash-cloud splash-cloud-two" aria-hidden="true"></span>
@@ -264,6 +264,10 @@
           </svg>
           <input id="day_page_photo_input" type="file" accept="image/*">
         </label>
+        <button id="day_attachments_button" class="day-hero-attachments" type="button" aria-label="Abrir arquivos do dia">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12.5 13.3 7.2a3.2 3.2 0 0 1 4.5 4.5l-7.2 7.2a5 5 0 0 1-7.1-7.1l8.1-8.1"/></svg>
+          <span>Arquivos</span><span id="day_attachments_count" class="day-attachments-count" hidden></span>
+        </button>
       </header>
       <div class="day-page-content">
         <span id="day_agenda_sticky_marker" class="day-agenda-sticky-marker" aria-hidden="true"></span>
@@ -279,6 +283,22 @@
           <div id="day_page_directions" class="day-view-directions"></div>
         </section>
       </div>
+    </section>
+
+    <button id="day_attachments_scrim" class="day-attachments-scrim" type="button" aria-label="Fechar arquivos do dia"></button>
+    <section id="day_attachments_sheet" class="day-attachments-sheet" aria-hidden="true" aria-label="Arquivos do dia">
+      <header class="sheet-header">
+        <button id="close_day_attachments" class="sheet-control" type="button" aria-label="Fechar">×</button>
+        <h2>Arquivos do dia</h2>
+        <span class="day-attachments-header-spacer" aria-hidden="true"></span>
+      </header>
+      <p class="day-attachments-intro">Ingressos, tickets, comprovantes, fotos e documentos ficam aqui, separados da capa do dia.</p>
+      <label class="day-attachments-upload">
+        <span>＋ Adicionar fotos ou documentos</span>
+        <input id="day_attachments_input" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.pdf,.doc,.docx" multiple>
+      </label>
+      <p id="day_attachments_status" class="day-attachments-status" role="status" aria-live="polite"></p>
+      <ul id="day_attachments_list" class="day-attachments-list"></ul>
     </section>
 
     <button id="day_sheet_scrim" class="day-sheet-scrim" type="button" aria-label="Fechar edição do dia"></button>
@@ -338,7 +358,7 @@
       <button id="delete_selected_trips" type="button" disabled>Excluir selecionadas</button>
     </footer>
   </main>
-  <script type="module" src="src/main.js?v=20260926-07"></script>
-  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260926-07');</script>
+  <script type="module" src="src/main.js?v=20260926-08"></script>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260926-08');</script>
 </body>
 </html>

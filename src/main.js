@@ -72,6 +72,8 @@ const state = {
   placeSearch: null,
   dayMap: null,
   dayMapRenderToken: 0,
+  dayAttachments: new Map(),
+  dayAttachmentLoads: new Map(),
   enrichingDays: new Set(),
   agendaSaveStates: new Map(),
   agendaSaveTimers: new Map(),
@@ -92,6 +94,7 @@ const dom = {
   editTripsButton: document.querySelector('#edit_trips_button'), newTripButton: document.querySelector('#new_trip_button'), emptyNewTripButton: document.querySelector('#empty_new_trip_button'), sessionEmail: document.querySelector('#session_email'), syncStatus: document.querySelector('#sync_status'), tripHeading: document.querySelector('#trip_heading'), yearButton: document.querySelector('#year_selector_button'), currentYear: document.querySelector('#current_year'), yearMenu: document.querySelector('#year_menu'), yearList: document.querySelector('#year_list'),
   tripList: document.querySelector('#trip_list'), homeEmpty: document.querySelector('#home_empty'), scrim: document.querySelector('#sheet_scrim'), tripEditFooter: document.querySelector('#trip_edit_footer'), deleteSelectedTrips: document.querySelector('#delete_selected_trips'), tripPage: document.querySelector('#trip_page'), closeTripPage: document.querySelector('#close_trip_page'), editTripButton: document.querySelector('#edit_trip_button'), tripPageHero: document.querySelector('#trip_page_hero'), tripPageTitle: document.querySelector('#trip_page_title'), tripPageDates: document.querySelector('#trip_page_dates'), tripPagePassengers: document.querySelector('#trip_page_passengers'), tripPagePassengerCount: document.querySelector('#trip_page_passenger_count'), tripDayList: document.querySelector('#trip_day_list'), tripDayMessage: document.querySelector('#trip_day_message'),
   dayPage: document.querySelector('#day_page'), closeDayPage: document.querySelector('#close_day_page'), addDayPageActivity: document.querySelector('#add_day_page_activity'), dayAgendaStickyMarker: document.querySelector('#day_agenda_sticky_marker'), dayPageHero: document.querySelector('#day_page_hero'), dayPageBadge: document.querySelector('#day_page_badge'), dayPageTitle: document.querySelector('#day_page_title'), dayPageDate: document.querySelector('#day_page_date'), dayPageSaveStatus: document.querySelector('#day_page_save_status'), dayPagePhotoInput: document.querySelector('#day_page_photo_input'), dayPageCamera: document.querySelector('#day_page_camera'), dayPageAgenda: document.querySelector('#day_page_agenda'), dayPageEmpty: document.querySelector('#day_page_empty'), dayPageMap: document.querySelector('#day_page_map'), dayPageDirections: document.querySelector('#day_page_directions'),
+  dayAttachmentsButton: document.querySelector('#day_attachments_button'), dayAttachmentsCount: document.querySelector('#day_attachments_count'), dayAttachmentsScrim: document.querySelector('#day_attachments_scrim'), dayAttachmentsSheet: document.querySelector('#day_attachments_sheet'), closeDayAttachments: document.querySelector('#close_day_attachments'), dayAttachmentsInput: document.querySelector('#day_attachments_input'), dayAttachmentsStatus: document.querySelector('#day_attachments_status'), dayAttachmentsList: document.querySelector('#day_attachments_list'),
   newTripSheet: document.querySelector('#home_new_trip'), newTripForm: document.querySelector('#new_trip_form'), newTripTitle: document.querySelector('#new-trip-title'), closeNewTrip: document.querySelector('#close_new_trip'), saveNewTrip: document.querySelector('#save_new_trip'), newTripMessage: document.querySelector('#new_trip_message'), coverInput: document.querySelector('#cover-image'), coverPreview: document.querySelector('#cover_preview_image'), tripColorValue: document.querySelector('#trip-color-value'), tripColorPalette: document.querySelector('#trip_color_palette'), tripColorCustom: document.querySelector('#trip-color-custom'), newTripPassengerList: document.querySelector('#new_trip_passenger_list'), addTripPassenger: document.querySelector('#add_trip_passenger'),
   dayEditSheet: document.querySelector('#day_edit_sheet'), daySheetScrim: document.querySelector('#day_sheet_scrim'), dayEditForm: document.querySelector('#day_edit_form'), closeDayEdit: document.querySelector('#close_day_edit'), saveDayEdit: document.querySelector('#save_day_edit'), dayEditTitle: document.querySelector('#day_edit_title'), dayEditDate: document.querySelector('#day_edit_date'), dayTitleInput: document.querySelector('#day-title-input'), dayLocationsEditor: document.querySelector('#day_locations_editor'), addDayLocation: document.querySelector('#add_day_location'), dayAgendaEditor: document.querySelector('#day_agenda_editor'), addDayActivity: document.querySelector('#add_day_activity'), dayNotesInput: document.querySelector('#day-notes-input'), dayEditMessage: document.querySelector('#day_edit_message'),
   placeSearchSheet: document.querySelector('#place_search_sheet'), placeSearchScrim: document.querySelector('#place_search_scrim'), placeSearchForm: document.querySelector('#place_search_form'), closePlaceSearch: document.querySelector('#close_place_search'), confirmPlaceSearch: document.querySelector('#confirm_place_search'), placeSearchInput: document.querySelector('#place_search_input'), runPlaceSearch: document.querySelector('#run_place_search'), placeSearchMessage: document.querySelector('#place_search_message'), placeSearchResults: document.querySelector('#place_search_results'), placePhotoSection: document.querySelector('#place_photo_section'), placePhotoMessage: document.querySelector('#place_photo_message'), placePhotoResults: document.querySelector('#place_photo_results'),
@@ -1707,6 +1710,164 @@ function updateAgendaAddStickyState() {
   dom.addDayPageActivity.dataset.stuck = markerTop <= backTop + 1 ? 'true' : 'false';
 }
 
+const DAY_ATTACHMENT_BUCKET = 'day-attachments';
+const DAY_ATTACHMENT_MAX_BYTES = 6 * 1024 * 1024;
+const DAY_ATTACHMENT_TYPES = {
+  jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp',
+  heic: 'image/heic', heif: 'image/heif', pdf: 'application/pdf',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+};
+
+function dayAttachmentType(file) {
+  const extension = String(file.name || '').split('.').pop().toLowerCase();
+  const type = DAY_ATTACHMENT_TYPES[extension];
+  if (!type) return null;
+  // The Photos/Files picker may omit the MIME type; extensions stay allowlisted.
+  if (file.type && file.type !== type && file.type !== 'application/octet-stream'
+    && !(type === 'image/jpeg' && file.type === 'image/jpg')) return null;
+  return { type, extension };
+}
+
+function dayAttachmentPath(day, extension) {
+  return `${day.trip_id}/${day.id}/${crypto.randomUUID()}.${extension}`;
+}
+
+function setDayAttachmentStatus(message, kind = 'info') {
+  dom.dayAttachmentsStatus.dataset.kind = kind;
+  dom.dayAttachmentsStatus.textContent = message;
+}
+
+function renderDayAttachments(dayId) {
+  if (state.activeDayId !== String(dayId)) return;
+  const items = state.dayAttachments.get(String(dayId)) || [];
+  dom.dayAttachmentsCount.textContent = String(items.length);
+  dom.dayAttachmentsCount.hidden = !items.length;
+  dom.dayAttachmentsList.replaceChildren();
+  for (const attachment of items) {
+    const row = document.createElement('li');
+    row.className = 'day-attachment';
+    const preview = document.createElement('span');
+    preview.className = 'day-attachment-preview';
+    if (attachment.mime_type.startsWith('image/') && attachment.signedUrl) {
+      const image = document.createElement('img');
+      image.src = attachment.signedUrl;
+      image.alt = '';
+      image.onerror = () => { image.remove(); preview.textContent = 'FOTO'; };
+      preview.append(image);
+    } else {
+      preview.textContent = attachment.mime_type === 'application/pdf' ? 'PDF' : 'DOC';
+    }
+    const link = document.createElement('a');
+    link.textContent = attachment.file_name;
+    if (attachment.signedUrl) {
+      link.href = attachment.signedUrl;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+    }
+    const size = document.createElement('small');
+    size.textContent = (attachment.size_bytes / 1024 / 1024).toFixed(1) + ' MB';
+    link.append(size);
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'day-attachment-remove';
+    remove.textContent = '×';
+    remove.setAttribute('aria-label', 'Excluir ' + attachment.file_name);
+    remove.addEventListener('click', () => removeDayAttachment(attachment));
+    row.append(preview, link, remove);
+    dom.dayAttachmentsList.append(row);
+  }
+  if (!items.length && document.body.dataset.dayAttachments === 'open') {
+    setDayAttachmentStatus(navigator.onLine ? 'Nenhum arquivo neste dia ainda.' : 'Os arquivos precisam de conexão para carregar.');
+  }
+}
+
+async function loadDayAttachments(dayId) {
+  const key = String(dayId);
+  if (state.dayAttachmentLoads.has(key)) return state.dayAttachmentLoads.get(key);
+  const loading = (async () => {
+    const client = await trySupabase(5000);
+    if (!client) throw new Error('Conecte-se à internet para acessar os arquivos do dia.');
+    const { data, error } = await client.from('day_attachments').select('*').eq('day_id', key).order('created_at');
+    if (error) throw error;
+    const signed = await Promise.all((data || []).map(async attachment => {
+      const result = await client.storage.from(DAY_ATTACHMENT_BUCKET).createSignedUrl(attachment.storage_path, 3600);
+      return { ...attachment, signedUrl: result.error ? '' : result.data?.signedUrl || '' };
+    }));
+    state.dayAttachments.set(key, signed);
+    renderDayAttachments(key);
+  })().finally(() => state.dayAttachmentLoads.delete(key));
+  state.dayAttachmentLoads.set(key, loading);
+  return loading;
+}
+
+function closeDayAttachments() {
+  document.body.dataset.dayAttachments = 'closed';
+  dom.dayAttachmentsSheet.setAttribute('aria-hidden', 'true');
+}
+
+function openDayAttachments() {
+  if (!state.activeDayId) return;
+  document.body.dataset.dayAttachments = 'open';
+  dom.dayAttachmentsSheet.setAttribute('aria-hidden', 'false');
+  renderDayAttachments(state.activeDayId);
+  setDayAttachmentStatus('Carregando arquivos…');
+  loadDayAttachments(state.activeDayId).then(() => {
+    if ((state.dayAttachments.get(state.activeDayId) || []).length) setDayAttachmentStatus('');
+  }).catch(error => setDayAttachmentStatus(error.message || 'Não foi possível carregar os arquivos.', 'error'));
+}
+
+async function uploadDayAttachments(files) {
+  const day = state.tripDays.find(item => String(item.id) === state.activeDayId);
+  if (!day || !files.length) return;
+  const client = await trySupabase(5000);
+  if (!client) { setDayAttachmentStatus('É preciso estar conectado para enviar arquivos.', 'error'); return; }
+  const uploadControl = dom.dayAttachmentsInput.closest('.day-attachments-upload');
+  uploadControl.dataset.busy = 'true';
+  try {
+    for (const [index, file] of files.entries()) {
+      const accepted = dayAttachmentType(file);
+      if (!accepted || !file.size || file.size > DAY_ATTACHMENT_MAX_BYTES) {
+        throw new Error('Use fotos, PDF ou Word de até 6 MB: ' + file.name);
+      }
+      setDayAttachmentStatus(`Enviando ${index + 1} de ${files.length}: ${file.name}`);
+      const path = dayAttachmentPath(day, accepted.extension);
+      const uploaded = await client.storage.from(DAY_ATTACHMENT_BUCKET).upload(path, file, {
+        contentType: accepted.type, upsert: false
+      });
+      if (uploaded.error) throw uploaded.error;
+      const inserted = await client.from('day_attachments').insert({
+        day_id: day.id, storage_path: path, file_name: file.name.slice(0, 180),
+        mime_type: accepted.type, size_bytes: file.size
+      });
+      if (inserted.error) {
+        await client.storage.from(DAY_ATTACHMENT_BUCKET).remove([path]);
+        throw inserted.error;
+      }
+    }
+    await loadDayAttachments(day.id);
+    setDayAttachmentStatus(files.length === 1 ? 'Arquivo salvo.' : `${files.length} arquivos salvos.`);
+  } catch (error) {
+    await loadDayAttachments(day.id).catch(() => {});
+    setDayAttachmentStatus(error.message || 'Falha no envio. Tente novamente.', 'error');
+  } finally {
+    uploadControl.dataset.busy = 'false';
+    dom.dayAttachmentsInput.value = '';
+  }
+}
+
+async function removeDayAttachment(attachment) {
+  if (!window.confirm('Excluir este arquivo do dia?')) return;
+  const client = await trySupabase(5000);
+  if (!client) { setDayAttachmentStatus('É preciso estar conectado para excluir.', 'error'); return; }
+  const removed = await client.from('day_attachments').delete().eq('id', attachment.id);
+  if (removed.error) { setDayAttachmentStatus(removed.error.message, 'error'); return; }
+  const file = await client.storage.from(DAY_ATTACHMENT_BUCKET).remove([attachment.storage_path]);
+  if (file.error) console.warn('Arquivo removido da lista; limpeza do armazenamento pendente', file.error);
+  await loadDayAttachments(attachment.day_id).catch(error => setDayAttachmentStatus(error.message, 'error'));
+  setDayAttachmentStatus('Arquivo excluído.');
+}
+
 function openDayPage(dayId, { pushHistory = true } = {}) {
   const day = state.tripDays.find(item => String(item.id) === String(dayId));
   if (!day) return;
@@ -1721,6 +1882,8 @@ function openDayPage(dayId, { pushHistory = true } = {}) {
     dom.dayPage.setAttribute('aria-hidden', 'false');
     document.body.dataset.dayPage = 'open';
     updateAgendaAddStickyState();
+    renderDayAttachments(day.id);
+    if (navigator.onLine) loadDayAttachments(day.id).catch(error => console.warn('Arquivos do dia indisponíveis', error));
     return;
   }
   const activities = state.dayActivities.get(String(day.id)) || [];
@@ -1739,6 +1902,8 @@ function openDayPage(dayId, { pushHistory = true } = {}) {
   dom.dayPage.setAttribute('aria-hidden', 'false');
   document.body.dataset.dayPage = 'open';
   updateAgendaAddStickyState();
+  renderDayAttachments(day.id);
+  if (navigator.onLine) loadDayAttachments(day.id).catch(error => console.warn('Arquivos do dia indisponíveis', error));
 }
 
 
@@ -2737,6 +2902,7 @@ function renderDayPageMap(day, locations, activities = []) {
 }
 
 function closeDayPage() {
+  closeDayAttachments();
   state.activeDayId = null;
   state.dayMapRenderToken += 1;
   if (state.dayMap) {
@@ -4205,6 +4371,10 @@ dom.closeTripPage.addEventListener('click', navigateBackFromTrip);
 dom.editTripButton.addEventListener('click', openTripEditor);
 dom.closeDayPage.addEventListener('click', navigateBackFromDay);
 dom.addDayPageActivity.addEventListener('click', addInlineDayActivity);
+dom.dayAttachmentsButton.addEventListener('click', openDayAttachments);
+dom.closeDayAttachments.addEventListener('click', closeDayAttachments);
+dom.dayAttachmentsScrim.addEventListener('click', closeDayAttachments);
+dom.dayAttachmentsInput.addEventListener('change', event => uploadDayAttachments([...event.target.files]));
 dom.dayPage.addEventListener('scroll', updateAgendaAddStickyState, { passive: true });
 ensureDayTitleControl();
 dom.dayPagePhotoInput.addEventListener('change', async () => {

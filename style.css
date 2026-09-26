@@ -1027,6 +1027,28 @@ body[data-day-page="open"] .day-page {
   opacity: 0;
   pointer-events: none;
 }
+.day-hero-attachments {
+  position: absolute;
+  z-index: 3;
+  top: calc(max(18px, env(safe-area-inset-top)) + 8.5rem);
+  right: 22px;
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 1px solid rgba(255,255,255,.5);
+  border-radius: 999px;
+  color: white;
+  background: rgba(20,20,24,.26);
+  font-size: 13px;
+  font-weight: 700;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+.day-hero-attachments svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.day-attachments-count { display: grid; min-width: 19px; height: 19px; padding: 0 4px; place-items: center; border-radius: 50%; color: var(--ios-blue); background: white; font-size: 10px; }
+.day-attachments-count[hidden] { display: none; }
 .day-page-content {
   width: min(100%, 796px);
   min-height: calc(100svh - 390px);
@@ -1556,6 +1578,67 @@ body[data-day-page="open"] .day-page {
   .day-view-map { height: 250px; }
 }
 
+.day-attachments-scrim {
+  position: fixed;
+  z-index: 94;
+  inset: 0;
+  border: 0;
+  background: rgba(20,20,24,.25);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity .3s ease, visibility 0s linear .3s;
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+.day-attachments-sheet {
+  position: fixed;
+  z-index: 95;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  max-height: calc(85svh - env(safe-area-inset-top));
+  min-height: min(45svh, 330px);
+  overflow: auto;
+  padding: 13px 18px calc(28px + env(safe-area-inset-bottom));
+  border-radius: 36px 36px 0 0;
+  color: var(--text);
+  background: var(--sheet);
+  box-shadow: 0 -20px 52px rgba(0,0,0,.2);
+  visibility: hidden;
+  transform: translateY(105%);
+  transition: transform .35s ease, visibility 0s linear .35s;
+  overscroll-behavior: contain;
+}
+body[data-day-attachments="open"] { overflow: hidden; }
+body[data-day-attachments="open"] .day-attachments-scrim { opacity: 1; visibility: visible; pointer-events: auto; transition-delay: 0s; }
+body[data-day-attachments="open"] .day-attachments-sheet { visibility: visible; transform: translateY(0); transition-delay: 0s; }
+.day-attachments-header-spacer { width: 48px; }
+.day-attachments-intro, .day-attachments-status { width: min(100%, 640px); margin: 8px auto 14px; color: var(--secondary); font-size: 13px; line-height: 1.4; }
+.day-attachments-status { min-height: 18px; margin-top: 10px; }
+.day-attachments-status[data-kind="error"] { color: var(--ios-red); }
+.day-attachments-upload {
+  display: grid;
+  width: min(100%, 640px);
+  min-height: 48px;
+  margin: 0 auto;
+  place-items: center;
+  border-radius: 15px;
+  color: white;
+  background: var(--ios-blue);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.day-attachments-upload[data-busy="true"] { opacity: .55; pointer-events: none; }
+.day-attachments-upload input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.day-attachments-list { display: grid; width: min(100%, 640px); gap: 9px; margin: 0 auto; padding: 0; list-style: none; }
+.day-attachment { display: grid; grid-template-columns: 48px minmax(0,1fr) 38px; min-height: 58px; align-items: center; gap: 10px; padding: 8px; border-radius: 16px; background: white; }
+.day-attachment-preview { display: grid; width: 48px; height: 48px; place-items: center; overflow: hidden; border-radius: 12px; color: var(--ios-blue); background: rgba(0,122,255,.09); font-size: 11px; font-weight: 800; }
+.day-attachment-preview img { width: 100%; height: 100%; object-fit: cover; }
+.day-attachment a { min-width: 0; overflow-wrap: anywhere; color: var(--text); font-size: 14px; font-weight: 650; text-decoration: none; }
+.day-attachment a small { display: block; margin-top: 3px; color: var(--secondary); font-size: 11px; font-weight: 400; }
+.day-attachment-remove { width: 36px; height: 36px; border: 0; border-radius: 50%; color: var(--ios-red); background: rgba(255,59,48,.1); font-size: 24px; line-height: 1; }
 .day-sheet-scrim {
   position: fixed;
   z-index: 90;
