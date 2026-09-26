@@ -728,6 +728,13 @@ body[data-trip-page="open"] .trip-page {
 .trip-passenger-sheet { z-index: 81; }
 .trip-passenger-message { min-height: 16px; margin: 0 8px 12px; color: #666; font-size: 13px; }
 .trip-passenger-message[data-kind="error"] { color: #b7312e; }
+.trip-passenger-self { display: flex; align-items: center; gap: 12px; min-height: 66px; margin: 0 0 14px; padding: 7px 12px; border-radius: 17px; background: white; }
+.trip-passenger-self[hidden] { display: none; }
+.trip-passenger-self img { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; }
+.trip-passenger-self span:nth-child(2) { display: grid; flex: 1; gap: 2px; }
+.trip-passenger-self strong { color: var(--text); font-size: 15px; }
+.trip-passenger-self small { color: var(--secondary); font-size: 12px; }
+.trip-passenger-self > span:last-child { color: #34c759; font-size: 19px; font-weight: 700; }
 .trip-page-content {
   width: min(100%, 796px);
   min-height: calc(100svh - 390px);

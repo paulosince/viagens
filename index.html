@@ -47,9 +47,9 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20260926-32" as="style">
-  <link rel="stylesheet" href="style.css?v=20260926-32" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20260926-32"></noscript>
+  <link rel="preload" href="style.css?v=20260926-33" as="style">
+  <link rel="stylesheet" href="style.css?v=20260926-33" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20260926-33"></noscript>
   <script>
     function showViaggioStartupError(detail) {
       if (!document.body || document.body.dataset.session !== 'loading') return;
@@ -315,6 +315,7 @@
     <section id="trip_passenger_sheet" class="new-trip-sheet trip-passenger-sheet" aria-hidden="true" aria-labelledby="trip_passenger_title">
       <header class="sheet-header"><button id="close_trip_passengers" class="sheet-control" type="button" aria-label="Fechar passageiros">×</button><h2 id="trip_passenger_title">Passageiros</h2><span class="sheet-header-spacer" aria-hidden="true"></span></header>
       <p id="trip_passenger_message" class="trip-passenger-message" role="status" aria-live="polite"></p>
+      <div id="trip_passenger_self" class="trip-passenger-self" hidden><img id="trip_passenger_self_image" alt=""><span><strong id="trip_passenger_self_name"></strong><small>Seu perfil · incluído na viagem</small></span><span aria-hidden="true">✓</span></div>
       <div id="trip_passenger_sheet_body"></div>
     </section>
 
@@ -432,7 +433,7 @@
       <button id="delete_selected_trips" type="button" disabled>Excluir selecionadas</button>
     </footer>
   </main>
-  <script type="module" src="src/main.js?v=20260926-32"></script>
-  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260926-32');</script>
+  <script type="module" src="src/main.js?v=20260926-33"></script>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260926-33');</script>
 </body>
 </html>
