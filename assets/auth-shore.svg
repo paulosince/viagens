@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 320" preserveAspectRatio="none" aria-hidden="true">
+  <defs>
+    <linearGradient id="sea" x2="0" y2="1"><stop stop-color="#4bc8dc"/><stop offset=".65" stop-color="#25adbf"/><stop offset="1" stop-color="#6fcac8"/></linearGradient>
+    <linearGradient id="sand" x2="0" y2="1"><stop stop-color="#fbe8bb"/><stop offset="1" stop-color="#f1d49d"/></linearGradient>
+  </defs>
+  <path d="M0 17 Q260 4 510 19 T1000 13 V320 H0Z" fill="url(#sea)"/>
+  <path d="M0 183 Q130 165 266 185 T535 187 Q680 171 786 196 T1000 180 V320 H0Z" fill="url(#sand)"/>
+  <path d="M0 179 Q130 161 266 181 T535 183 Q680 167 786 192 T1000 176" fill="none" stroke="#fffaf0" stroke-width="10" opacity=".85"/>
+  <path d="M0 194 Q130 176 266 196 T535 198 Q680 182 786 207 T1000 191" fill="none" stroke="#fff" stroke-width="3" opacity=".48"/>
+</svg>

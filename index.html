@@ -47,9 +47,9 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20260926-26" as="style">
-  <link rel="stylesheet" href="style.css?v=20260926-26" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20260926-26"></noscript>
+  <link rel="preload" href="style.css?v=20260926-27" as="style">
+  <link rel="stylesheet" href="style.css?v=20260926-27" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20260926-27"></noscript>
   <script>
     function showViaggioStartupError(detail) {
       if (!document.body || document.body.dataset.session !== 'loading') return;
@@ -89,14 +89,32 @@
 
   <main id="app" aria-live="polite">
     <section id="auth_view" class="auth" aria-hidden="true">
-      <form id="auth_form" class="auth-card">
-        <h1>Viaggio</h1>
-        <p>Entre para acessar suas viagens como passageiro.</p>
-        <input name="email" type="email" autocomplete="email" placeholder="E-mail" required>
-        <input name="password" type="password" autocomplete="current-password" placeholder="Senha" required>
-        <button type="submit">Entrar</button>
-        <p id="auth_message" class="form-message" role="status"></p>
-      </form>
+      <div class="auth-card" data-mode="login">
+        <div class="auth-brand"><h1>Viaggio</h1><img src="assets/splash-plane.png" alt="" aria-hidden="true"></div>
+        <p id="auth_intro" class="auth-intro">Suas viagens começam muito antes do embarque.</p>
+        <form id="auth_form" class="auth-form" aria-hidden="false">
+          <label class="visually-hidden" for="auth_email">E-mail</label>
+          <input id="auth_email" name="email" type="email" autocomplete="email" placeholder="E-mail" required>
+          <label class="visually-hidden" for="auth_password">Senha</label>
+          <input id="auth_password" name="password" type="password" autocomplete="current-password" placeholder="Senha" required>
+          <button class="auth-submit" type="submit">Entrar</button>
+          <p id="auth_message" class="auth-message" role="status" aria-live="polite"></p>
+          <p class="auth-switch">Ainda não tem conta? <button id="show_signup" type="button">Criar conta</button></p>
+        </form>
+        <form id="signup_form" class="auth-form" aria-hidden="true" inert>
+          <label class="visually-hidden" for="signup_name">Seu nome</label>
+          <input id="signup_name" name="name" type="text" autocomplete="name" placeholder="Seu nome" maxlength="120" required>
+          <label class="visually-hidden" for="signup_email">E-mail</label>
+          <input id="signup_email" name="email" type="email" autocomplete="email" placeholder="E-mail" required>
+          <label class="visually-hidden" for="signup_password">Senha</label>
+          <input id="signup_password" name="password" type="password" autocomplete="new-password" placeholder="Senha · pelo menos 6 caracteres" minlength="6" required>
+          <label class="visually-hidden" for="signup_confirm_password">Confirmar senha</label>
+          <input id="signup_confirm_password" name="confirm_password" type="password" autocomplete="new-password" placeholder="Confirme sua senha" minlength="6" required>
+          <button class="auth-submit" type="submit">Criar minha conta</button>
+          <p id="signup_message" class="auth-message" role="status" aria-live="polite"></p>
+          <p class="auth-switch">Já tem conta? <button id="show_login" type="button">Entrar</button></p>
+        </form>
+      </div>
     </section>
 
     <section id="user_home" class="home" aria-hidden="true">
@@ -394,7 +412,7 @@
       <button id="delete_selected_trips" type="button" disabled>Excluir selecionadas</button>
     </footer>
   </main>
-  <script type="module" src="src/main.js?v=20260926-26"></script>
-  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260926-26');</script>
+  <script type="module" src="src/main.js?v=20260926-27"></script>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260926-27');</script>
 </body>
 </html>

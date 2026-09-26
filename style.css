@@ -2545,11 +2545,68 @@ body[data-active-sheet="change-log"] #change_log_sheet { transform: translateY(0
 .form-note, .form-message { margin: 8px 14px 0; color: #8e8e93; font-size: 13px; line-height: 1.35; }
 .form-message { min-height: 18px; color: var(--ios-red); }
 
-.auth { display: grid; min-height: 100svh; padding: 28px; place-items: center; background: var(--page); }
-.auth-card { width: min(100%, 420px); padding: 24px; border-radius: 28px; background: white; }
-.auth-card h1 { margin-top: 0; }
-.auth-card input { width: 100%; height: 50px; margin-bottom: 10px; padding: 0 14px; border: 1px solid var(--line); border-radius: 13px; }
-.auth-card button { width: 100%; height: 50px; border: 0; border-radius: 13px; color: white; background: var(--ios-blue); font-weight: 600; }
+.auth {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  min-height: 100svh;
+  padding: max(28px, env(safe-area-inset-top)) 20px max(32px, env(safe-area-inset-bottom));
+  place-items: center;
+  overflow: hidden;
+  background: linear-gradient(180deg, #58baf1 0%, #8cddf3 42%, #c9f2ee 77%, #b6ece9 100%);
+}
+.auth::before {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 105px 20px at 16% 16%, rgba(255,255,255,.63) 0 76%, transparent 80%),
+    radial-gradient(ellipse 145px 24px at 84% 30%, rgba(255,255,255,.53) 0 72%, transparent 78%),
+    radial-gradient(circle 145px at 82% 8%, rgba(255,250,214,.35), transparent 82%);
+  content: "";
+  pointer-events: none;
+}
+.auth::after {
+  position: absolute;
+  z-index: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: clamp(190px, 28svh, 340px);
+  background: url("assets/auth-shore.svg") center bottom / 100% 100% no-repeat;
+  content: "";
+  pointer-events: none;
+}
+.auth-card {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 420px);
+  padding: 30px 26px 24px;
+  border: 1px solid rgba(255,255,255,.86);
+  border-radius: 32px;
+  background: rgba(255,255,255,.91);
+  box-shadow: 0 22px 68px rgba(11,84,125,.18), 0 2px 12px rgba(11,84,125,.08);
+  -webkit-backdrop-filter: blur(28px);
+  backdrop-filter: blur(28px);
+}
+.auth-brand { display: flex; align-items: center; gap: 8px; }
+.auth-brand h1 { margin: 0; font-size: clamp(34px, 9vw, 44px); line-height: 1.12; letter-spacing: -.055em; }
+.auth-brand img { display: block; width: 84px; height: 53px; object-fit: contain; animation: auth-plane-float 3.8s ease-in-out infinite alternate; }
+@keyframes auth-plane-float { to { transform: translateY(-5px) rotate(-2deg); } }
+.auth-intro { margin: 13px 0 24px; color: #3c5266; font-size: 16px; line-height: 1.4; }
+.auth-form { max-height: 580px; opacity: 1; visibility: visible; transform: translateY(0); transition: max-height .38s ease, opacity .26s ease, transform .38s ease, visibility 0s; overflow: hidden; }
+.auth-form[aria-hidden="true"] { max-height: 0; opacity: 0; visibility: hidden; pointer-events: none; transform: translateY(12px); transition: max-height .38s ease, opacity .2s ease, transform .38s ease, visibility 0s linear .38s; }
+.auth-form input { display: block; width: 100%; height: 52px; margin: 0 0 11px; padding: 0 15px; border: 1px solid rgba(18,76,112,.18); border-radius: 14px; outline: 0; color: var(--text); background: rgba(255,255,255,.9); font-size: 16px; }
+.auth-form input:focus { border-color: #168ce2; box-shadow: 0 0 0 3px rgba(0,122,255,.13); }
+.auth-form .auth-submit { width: 100%; min-height: 53px; margin-top: 4px; border: 0; border-radius: 14px; color: white; background: #087df4; font: inherit; font-weight: 700; }
+.auth-submit:disabled { opacity: .6; }
+.auth-message { margin: 12px 0 0; color: #b7312e; font-size: 13px; line-height: 1.4; }
+.auth-message:empty { display: none; }
+.auth-message[data-kind="success"] { color: #176b52; }
+.auth-switch { margin: 18px 0 0; padding-top: 16px; border-top: 1px solid rgba(18,76,112,.12); color: #456176; font-size: 14px; text-align: center; }
+.auth-switch button { padding: 5px 2px; border: 0; color: #006ed6; background: transparent; font: inherit; font-weight: 700; }
+.auth-switch button:focus-visible, .auth-submit:focus-visible { outline: 3px solid rgba(0,122,255,.4); outline-offset: 3px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 
 @media (min-width: 720px) {
   .trip-section-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }

@@ -93,7 +93,7 @@ const state = {
 
 const dom = {
   splashStatus: document.querySelector('#splash_status'),
-  authView: document.querySelector('#auth_view'), authForm: document.querySelector('#auth_form'), authMessage: document.querySelector('#auth_message'),
+  authView: document.querySelector('#auth_view'), authForm: document.querySelector('#auth_form'), authMessage: document.querySelector('#auth_message'), authIntro: document.querySelector('#auth_intro'), authCard: document.querySelector('.auth-card'), signupForm: document.querySelector('#signup_form'), signupMessage: document.querySelector('#signup_message'), showSignup: document.querySelector('#show_signup'), showLogin: document.querySelector('#show_login'),
   home: document.querySelector('#user_home'), profileButton: document.querySelector('#profile_button'), headerProfileImage: document.querySelector('#header_profile_image'), headerProfileFallback: document.querySelector('#header_profile_fallback'), homeChatgptButton: document.querySelector('#home_chatgpt_button'),
   editTripsButton: document.querySelector('#edit_trips_button'), newTripButton: document.querySelector('#new_trip_button'), emptyNewTripButton: document.querySelector('#empty_new_trip_button'), sessionEmail: document.querySelector('#session_email'), syncStatus: document.querySelector('#sync_status'), tripHeading: document.querySelector('#trip_heading'), yearButton: document.querySelector('#year_selector_button'), currentYear: document.querySelector('#current_year'), yearMenu: document.querySelector('#year_menu'), yearList: document.querySelector('#year_list'),
   tripList: document.querySelector('#trip_list'), homeEmpty: document.querySelector('#home_empty'), scrim: document.querySelector('#sheet_scrim'), tripEditFooter: document.querySelector('#trip_edit_footer'), deleteSelectedTrips: document.querySelector('#delete_selected_trips'), tripPage: document.querySelector('#trip_page'), closeTripPage: document.querySelector('#close_trip_page'), editTripButton: document.querySelector('#edit_trip_button'), tripPageHero: document.querySelector('#trip_page_hero'), tripPageTitle: document.querySelector('#trip_page_title'), tripPageDates: document.querySelector('#trip_page_dates'), tripPagePassengers: document.querySelector('#trip_page_passengers'), tripPagePassengerCount: document.querySelector('#trip_page_passenger_count'), tripDayList: document.querySelector('#trip_day_list'), tripDayMessage: document.querySelector('#trip_day_message'),
@@ -4880,22 +4880,83 @@ dom.profilePhotoInput.addEventListener('change', async () => {
 
 dom.newTripForm.addEventListener('submit', event => { event.preventDefault(); saveTrip(); });
 dom.profileForm.addEventListener('submit', event => { event.preventDefault(); saveProfile(); });
+
+function setAuthMode(mode) {
+  const signup = mode === 'signup';
+  dom.authCard.dataset.mode = signup ? 'signup' : 'login';
+  dom.authIntro.textContent = signup ? 'Comece a planejar suas próximas viagens.' : 'Suas viagens começam muito antes do embarque.';
+  dom.authForm.setAttribute('aria-hidden', String(signup));
+  dom.signupForm.setAttribute('aria-hidden', String(!signup));
+  dom.authForm.inert = signup;
+  dom.signupForm.inert = !signup;
+  dom.authMessage.textContent = '';
+  dom.signupMessage.textContent = '';
+}
+
+async function enterWithUser(user) {
+  state.user = user;
+  await offlineStore.cacheSession(user);
+  await loadProfile();
+  await loadTrips();
+  setSessionView('authenticated');
+  refreshSyncStatus().catch(console.warn);
+  cacheCompleteWorkspace().catch(error => console.warn('Snapshot offline incompleto', error));
+}
+
+dom.showSignup.addEventListener('click', () => setAuthMode('signup'));
+dom.showLogin.addEventListener('click', () => setAuthMode('login'));
 dom.authForm.addEventListener('submit', async event => {
-  event.preventDefault(); dom.authMessage.textContent = '';
-  const client = await trySupabase();
-  if (!client) { dom.authMessage.textContent = 'Sem conexão. Abra o app normalmente se este aparelho já tiver uma cópia da viagem.'; return; }
-  const result = await client.auth.signInWithPassword(Object.fromEntries(new FormData(dom.authForm)));
-  if (result.error) { dom.authMessage.textContent = result.error.message; return; }
-  state.user = result.data.user;
-  await offlineStore.cacheSession(state.user);
+  event.preventDefault(); dom.authMessage.textContent = ''; dom.authMessage.dataset.kind = 'error';
+  const button = dom.authForm.querySelector('.auth-submit');
+  button.disabled = true;
   try {
-    await loadProfile();
-    await loadTrips();
-    await cacheCompleteWorkspace().catch(error => console.warn('Snapshot offline incompleto', error));
-    setSessionView('authenticated');
-    await refreshSyncStatus();
-  }
-  catch (error) { dom.authMessage.textContent = error.message; setSessionView('anonymous'); }
+    const client = await trySupabase();
+    if (!client) { dom.authMessage.textContent = 'Sem conexão. Abra o app normalmente se este aparelho já tiver uma cópia da viagem.'; return; }
+    const result = await client.auth.signInWithPassword(Object.fromEntries(new FormData(dom.authForm)));
+    if (result.error) { dom.authMessage.textContent = result.error.message; return; }
+    await enterWithUser(result.data.user);
+  } catch (error) {
+    dom.authMessage.textContent = error.message || 'Não foi possível entrar.';
+    setSessionView('anonymous');
+  } finally { button.disabled = false; }
+});
+
+dom.signupForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  dom.signupMessage.textContent = '';
+  const fields = new FormData(dom.signupForm);
+  const name = String(fields.get('name') || '').trim();
+  const email = String(fields.get('email') || '').trim();
+  const password = String(fields.get('password') || '');
+  if (!name) { dom.signupMessage.textContent = 'Informe seu nome.'; return; }
+  if (password !== fields.get('confirm_password')) { dom.signupMessage.textContent = 'As senhas não coincidem.'; return; }
+
+  const button = dom.signupForm.querySelector('.auth-submit');
+  button.disabled = true;
+  try {
+    const client = await trySupabase();
+    if (!client) throw new Error('A criação de conta precisa de conexão com a internet.');
+    const { data, error } = await client.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { name },
+        emailRedirectTo: new URL('./', window.location.href).href
+      }
+    });
+    if (error) throw error;
+    if (data.session && data.user) {
+      await enterWithUser(data.user);
+      return;
+    }
+    dom.authForm.querySelector('[name="email"]').value = email;
+    dom.signupForm.reset();
+    setAuthMode('login');
+    dom.authMessage.dataset.kind = 'success';
+    dom.authMessage.textContent = 'Conta criada. Confirme seu e-mail pelo link que enviamos e depois entre aqui.';
+  } catch (error) {
+    dom.signupMessage.textContent = error.message || 'Não foi possível criar a conta.';
+  } finally { button.disabled = false; }
 });
 
 async function boot() {
