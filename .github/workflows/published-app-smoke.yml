@@ -22,14 +22,16 @@ jobs:
           url='https://paulosince.github.io/viagens/'
           for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
             html="$(curl --location --silent --show-error --max-time 20 "$url" || true)"
-            js="$(curl --location --silent --show-error --max-time 20 "$url/src/main.js?v=20260926-04" || true)"
-            css="$(curl --location --silent --show-error --max-time 20 "$url/style.css?v=20260926-05" || true)"
+            js="$(curl --location --silent --show-error --max-time 20 "$url/src/main.js?v=20260926-06" || true)"
+            css="$(curl --location --silent --show-error --max-time 20 "$url/style.css?v=20260926-06" || true)"
             offline="$(curl --location --silent --show-error --max-time 20 "$url/src/offline-store.js?v=snapshot-order" || true)"
             consent="$(curl --location --silent --show-error --max-time 20 "$url/oauth/consent/" || true)"
             mcp_headers="$(curl --silent --show-error --max-time 20 -i 'https://siabldasqinpfmxslwji.supabase.co/functions/v1/viaggio-mcp' || true)"
-            if grep -q 'src/main.js?v=20260926-04' <<<"$html" &&
-               grep -q 'style.css?v=20260926-05' <<<"$html" &&
+            if grep -q 'src/main.js?v=20260926-06' <<<"$html" &&
+               grep -q 'style.css?v=20260926-06' <<<"$html" &&
                grep -q 'id="add_day_page_activity"' <<<"$html" &&
+               grep -q 'id="day_agenda_sticky_marker"' <<<"$html" &&
+               grep -q 'updateAgendaAddStickyState' <<<"$js" &&
                grep -q 'trip-page-back svg, .day-page-add svg' <<<"$css" &&
                grep -q 'newAgendaActivity' <<<"$js" &&
                grep -q 'id="sync_status"' <<<"$html" &&

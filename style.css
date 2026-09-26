@@ -1031,6 +1031,39 @@ body[data-day-page="open"] .day-page {
   margin: 0 auto;
   padding: 26px 18px calc(38px + env(safe-area-inset-bottom));
 }
+.day-agenda-sticky-marker { display: block; height: 0; }
+.day-page-add {
+  position: sticky;
+  z-index: 5;
+  top: calc(max(18px, env(safe-area-inset-top)) + 1rem);
+  float: right;
+  display: grid;
+  width: 50px;
+  height: 50px;
+  margin-bottom: 14px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 12px;
+  color: var(--ios-blue);
+  background: rgba(0,122,255,.06);
+  cursor: pointer;
+  transition: color .2s ease, background .2s ease, border-color .2s ease, border-radius .2s ease, box-shadow .2s ease, backdrop-filter .2s ease;
+}
+.day-page-add[data-stuck="true"] {
+  border: 1px solid rgba(255,255,255,.55);
+  border-radius: 50%;
+  color: white;
+  background: rgba(20,20,24,.25);
+  box-shadow: 0 8px 22px rgba(0,0,0,.18);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.day-page-add:active { background: rgba(0,122,255,.14); }
+.day-page-add[data-stuck="true"]:active { background: rgba(20,20,24,.4); }
+.day-view-section:first-of-type h2 { padding-top: 11px; }
+.day-view-section:first-of-type .day-view-agenda,
+.day-view-section:first-of-type .day-view-empty { clear: both; }
 .day-view-section + .day-view-section { margin-top: 30px; }
 .day-view-section h2 {
   margin: 0 0 14px;

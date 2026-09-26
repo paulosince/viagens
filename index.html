@@ -45,9 +45,9 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20260926-05" as="style">
-  <link rel="stylesheet" href="style.css?v=20260926-05" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20260926-05"></noscript>
+  <link rel="preload" href="style.css?v=20260926-06" as="style">
+  <link rel="stylesheet" href="style.css?v=20260926-06" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20260926-06"></noscript>
 </head>
 <body data-session="loading" data-active-sheet="none" data-editing="false" data-year-menu="closed" data-trip-page="closed" data-day-page="closed" data-app-ready="false">
   <div id="app_splash" class="app-splash" aria-label="Carregando Viaggio">
@@ -247,7 +247,6 @@
     <section id="day_page" class="day-page" aria-hidden="true">
       <nav class="trip-page-nav day-page-nav" aria-label="Navegação do dia">
         <button id="close_day_page" class="trip-page-control trip-page-back" type="button" aria-label="Voltar"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 4 7 12l8 8"/></svg></button>
-        <button id="add_day_page_activity" class="trip-page-control day-page-add" type="button" aria-label="Adicionar item à agenda"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 4v16M4 12h16"/></svg></button>
       </nav>
       <header id="day_page_hero" class="day-page-hero">
         <div class="trip-page-hero-copy day-page-hero-copy">
@@ -267,6 +266,8 @@
         </label>
       </header>
       <div class="day-page-content">
+        <span id="day_agenda_sticky_marker" class="day-agenda-sticky-marker" aria-hidden="true"></span>
+        <button id="add_day_page_activity" class="day-page-add" type="button" aria-label="Adicionar item à agenda" data-stuck="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 4v16M4 12h16"/></svg></button>
         <section class="day-view-section">
           <h2>Agenda</h2>
           <ol id="day_page_agenda" class="day-view-agenda"></ol>
@@ -337,7 +338,7 @@
       <button id="delete_selected_trips" type="button" disabled>Excluir selecionadas</button>
     </footer>
   </main>
-  <script type="module" src="src/main.js?v=20260926-04"></script>
-  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260926-05');</script>
+  <script type="module" src="src/main.js?v=20260926-06"></script>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260926-06');</script>
 </body>
 </html>
