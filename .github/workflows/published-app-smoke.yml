@@ -55,7 +55,7 @@ jobs:
                grep -q 'saveDayHeroPhoto' <<<"$js" &&
                grep -q 'day-hero-camera' <<<"$css" &&
                grep -q 'day-photo-icon' <<<"$css" &&
-               grep -q 'L.polyline(bounds' <<<"$js" &&
+               grep -q 'L.polyline(route.map' <<<"$js" &&
                grep -q "changing one agenda item's photo must never mutate" <<<"$js" &&
                grep -q "activity.photo_url || location?.photo_url" <<<"$js" &&
                grep -q "save-inline-activity" <<<"$js" &&
