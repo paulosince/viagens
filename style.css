@@ -164,7 +164,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .home {
   position: relative;
   min-height: 100svh;
-  padding: max(18px, env(safe-area-inset-top)) 18px calc(36px + env(safe-area-inset-bottom));
+  padding: max(28px, calc(env(safe-area-inset-top) + 28px)) 18px calc(36px + env(safe-area-inset-bottom));
   overflow: hidden;
   isolation: isolate;
   background: var(--page);
@@ -194,18 +194,18 @@ button { -webkit-tap-highlight-color: transparent; }
 .chatgpt-header-button img { display: block; width: 20px; height: 20px; }
 .home[data-chatgpt-connected="true"] .chatgpt-header-button {
   position: absolute;
-  right: -10px;
-  bottom: -8px;
-  width: 32px;
-  height: 32px;
-  min-height: 32px;
-  padding: 4px;
-  border: 2px solid var(--page);
+  right: -5px;
+  bottom: -5px;
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
+  padding: 2px;
+  border: 1.5px solid var(--page);
   border-radius: 50%;
   background: white;
   box-shadow: 0 2px 9px rgba(0,0,0,.18);
 }
-.home[data-chatgpt-connected="true"] .chatgpt-header-button img { width: 20px; height: 20px; }
+.home[data-chatgpt-connected="true"] .chatgpt-header-button img { width: 17px; height: 17px; }
 .home[data-chatgpt-connected="true"] .chatgpt-header-button span { display: none; }
 .home[data-chatgpt-connected="true"] .profile-with-integration { flex: 0 0 52px; }
 
