@@ -3018,20 +3018,26 @@ async function syncMutation(mutation, previousDay = null) {
 
   if (mutation.type === 'record-change') {
     if (mutation.snapshotId && mutation.tripId) {
-      const snapshot = await client.rpc('capture_trip_snapshot', {
-        p_snapshot_id: mutation.snapshotId,
-        p_trip_id: mutation.tripId,
-        p_label: mutation.entry?.summary || null
-      });
-      if (snapshot.error) throw snapshot.error;
+      const existing = await client.from('state_snapshots').select('id')
+        .eq('id', mutation.snapshotId).eq('trip_id', mutation.tripId).maybeSingle();
+      if (existing.error || !existing.data) {
+        const snapshot = await client.rpc('capture_trip_snapshot', {
+          p_snapshot_id: mutation.snapshotId,
+          p_trip_id: mutation.tripId,
+          p_label: mutation.entry?.summary || null
+        });
+        if (snapshot.error) throw snapshot.error;
+      }
     }
-    const saved = await client.from('change_log').upsert(mutation.entry);
+    // History rows are immutable. Retrying an existing entry must not require
+    // UPDATE permission, which the change_log RLS policy deliberately omits.
+    const saved = await client.from('change_log').upsert(mutation.entry, { onConflict: 'id', ignoreDuplicates: true });
     if (saved.error) throw saved.error;
     return;
   }
 
   if (mutation.type === 'change-log') {
-    const saved = await client.from('change_log').upsert(mutation.entry);
+    const saved = await client.from('change_log').upsert(mutation.entry, { onConflict: 'id', ignoreDuplicates: true });
     if (saved.error) throw saved.error;
     return;
   }
@@ -3356,8 +3362,8 @@ function groupByDay(records = []) {
 // the offline copy once every smaller batch has completed successfully.
 async function loadDayRecords(client, dayIds) {
   const activities = [], locations = [];
-  for (let index = 0; index < dayIds.length; index += 4) {
-    const ids = dayIds.slice(index, index + 4);
+  for (let index = 0; index < dayIds.length; index += 1) {
+    const ids = dayIds.slice(index, index + 1);
     const [activityResult, locationResult] = await Promise.all([
       client.from('activities').select('*').in('day_id', ids).order('position'),
       client.from('day_locations').select('*').in('day_id', ids).order('position')
@@ -3746,6 +3752,7 @@ function applyPassengers(records = []) {
 
 async function cacheCompleteWorkspace() {
   if (!state.user?.id || !state.trips.length || !navigator.onLine) return;
+  if ((await offlineStore.listOutbox()).length) return;
   const client = await trySupabase();
   if (!client) return;
   const lastSnapshot = await offlineStore.getMeta(`complete_snapshot:${state.user.id}`);
