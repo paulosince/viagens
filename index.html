@@ -47,9 +47,9 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20260926-27" as="style">
-  <link rel="stylesheet" href="style.css?v=20260926-27" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20260926-27"></noscript>
+  <link rel="preload" href="style.css?v=20260926-28" as="style">
+  <link rel="stylesheet" href="style.css?v=20260926-28" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20260926-28"></noscript>
   <script>
     function showViaggioStartupError(detail) {
       if (!document.body || document.body.dataset.session !== 'loading') return;
@@ -89,8 +89,11 @@
 
   <main id="app" aria-live="polite">
     <section id="auth_view" class="auth" aria-hidden="true">
+      <span class="splash-cloud splash-cloud-one" aria-hidden="true"></span>
+      <span class="splash-cloud splash-cloud-two" aria-hidden="true"></span>
+      <span class="splash-cloud splash-cloud-three" aria-hidden="true"></span>
       <div class="auth-card" data-mode="login">
-        <div class="auth-brand"><h1>Viaggio</h1><img src="assets/splash-plane.png" alt="" aria-hidden="true"></div>
+        <div class="auth-brand"><img src="assets/splash-plane.png" alt="" aria-hidden="true"><h1>Viaggio</h1></div>
         <p id="auth_intro" class="auth-intro">Suas viagens começam muito antes do embarque.</p>
         <form id="auth_form" class="auth-form" aria-hidden="false">
           <label class="visually-hidden" for="auth_email">E-mail</label>
@@ -413,6 +416,6 @@
     </footer>
   </main>
   <script type="module" src="src/main.js?v=20260926-27"></script>
-  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260926-27');</script>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260926-28');</script>
 </body>
 </html>
