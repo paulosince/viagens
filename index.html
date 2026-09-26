@@ -47,9 +47,9 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20260926-31" as="style">
-  <link rel="stylesheet" href="style.css?v=20260926-31" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20260926-31"></noscript>
+  <link rel="preload" href="style.css?v=20260926-32" as="style">
+  <link rel="stylesheet" href="style.css?v=20260926-32" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20260926-32"></noscript>
   <script>
     function showViaggioStartupError(detail) {
       if (!document.body || document.body.dataset.session !== 'loading') return;
@@ -291,19 +291,31 @@
     <section id="trip_page" class="trip-page" aria-hidden="true">
       <nav class="trip-page-nav" aria-label="Navegação da viagem">
         <button id="close_trip_page" class="trip-page-control trip-page-back" type="button" aria-label="Voltar"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 4 7 12l8 8"/></svg></button>
-        <button id="edit_trip_button" class="trip-page-control trip-page-edit" type="button" aria-label="Editar viagem"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4.2L19 9.2 14.8 5 4 15.8V20Zm12-16.2L20.2 8 22 6.2a1.4 1.4 0 0 0 0-2L19.8 2a1.4 1.4 0 0 0-2 0L16 3.8Z"/></svg></button>
+        <label class="trip-page-control trip-page-cover-control" aria-label="Trocar foto da viagem"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h3l1.6-2h6.8L17 7h3a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2Z"/><circle cx="12" cy="13" r="3.5"/></svg><input id="trip_page_cover_input" type="file" accept="image/*" aria-label="Trocar foto da viagem"></label>
       </nav>
       <header id="trip_page_hero" class="trip-page-hero">
         <div class="trip-page-hero-copy">
-          <h1 id="trip_page_title"></h1>
-          <p id="trip_page_dates"></p>
-          <div id="trip_page_passengers" class="passenger-stack trip-page-passengers"><span id="trip_page_passenger_count" class="passenger-count"></span></div>
+          <h1><button id="trip_page_title" class="trip-page-inline-title" type="button" aria-label="Editar nome da viagem"></button><input id="trip_page_title_input" class="trip-page-title-input" type="text" maxlength="120" aria-label="Nome da viagem" hidden></h1>
+          <button id="trip_page_dates" class="trip-page-dates-button" type="button" aria-expanded="false" aria-controls="trip_page_date_editor" aria-label="Editar início e duração da viagem"></button>
+          <div id="trip_page_date_editor" class="trip-page-date-editor" hidden>
+            <label>Início<input id="trip_page_start_date" type="date" aria-label="Data inicial da viagem"></label>
+            <label>Dias<input id="trip_page_day_count" type="number" inputmode="numeric" min="1" max="365" step="1" aria-label="Quantidade de dias"></label>
+            <button id="trip_page_date_done" type="button">Concluir</button>
+          </div>
+          <div class="trip-page-hero-meta"><button id="trip_page_passengers" class="passenger-stack trip-page-passengers" type="button" aria-label="Editar passageiros da viagem"><span id="trip_page_passenger_count" class="passenger-count"></span></button><label class="trip-page-color-control" aria-label="Cor da viagem"><input id="trip_page_color" type="color" value="#4775d1" aria-label="Cor da viagem"></label></div>
+          <span id="trip_page_save_status" class="trip-page-save-status" role="status" aria-live="polite"></span>
         </div>
       </header>
       <div class="trip-page-content">
         <ol id="trip_day_list" class="trip-day-list"></ol>
         <p id="trip_day_message" class="trip-day-message" role="status"></p>
       </div>
+    </section>
+
+    <section id="trip_passenger_sheet" class="new-trip-sheet trip-passenger-sheet" aria-hidden="true" aria-labelledby="trip_passenger_title">
+      <header class="sheet-header"><button id="close_trip_passengers" class="sheet-control" type="button" aria-label="Fechar passageiros">×</button><h2 id="trip_passenger_title">Passageiros</h2><span class="sheet-header-spacer" aria-hidden="true"></span></header>
+      <p id="trip_passenger_message" class="trip-passenger-message" role="status" aria-live="polite"></p>
+      <div id="trip_passenger_sheet_body"></div>
     </section>
 
     <section id="day_page" class="day-page" aria-hidden="true">
@@ -420,7 +432,7 @@
       <button id="delete_selected_trips" type="button" disabled>Excluir selecionadas</button>
     </footer>
   </main>
-  <script type="module" src="src/main.js?v=20260926-31"></script>
-  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260926-31');</script>
+  <script type="module" src="src/main.js?v=20260926-32"></script>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260926-32');</script>
 </body>
 </html>

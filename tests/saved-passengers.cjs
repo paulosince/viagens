@@ -35,6 +35,7 @@ const context = {
   state, dom, profileName: () => 'Cintia',
   document: { createElement: () => new Element() },
   crypto: { randomUUID: () => 'new-trip-passenger' },
+  schedulePassengerSave: () => {},
   renderTripPassengers: () => context.renderSavedTripPassengers()
 };
 vm.createContext(context);
