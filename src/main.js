@@ -95,6 +95,7 @@ const state = {
 
 const dom = {
   dayMapSection: document.querySelector('#day_map_section'),
+  dayMapScrim: document.querySelector('#day_map_scrim'),
   dayMapToggle: document.querySelector('#day_map_toggle'),
   tripPageDuration: document.querySelector('#trip_page_duration'),
   tripPageShare: document.querySelector('#trip_page_share'), tripShareSheet: document.querySelector('#trip_share_sheet'), tripShareScrim: document.querySelector('#trip_share_scrim'), closeTripShare: document.querySelector('#close_trip_share'), tripShareForm: document.querySelector('#trip_share_form'), tripShareRecipient: document.querySelector('#trip_share_recipient'), sendTripShare: document.querySelector('#send_trip_share'), tripShareStatus: document.querySelector('#trip_share_status'), tripShareList: document.querySelector('#trip_share_list'),
@@ -2968,8 +2969,18 @@ function dayMapGroups(points) {
 }
 
 function setDayMapExpanded(expanded) {
+  if (expanded && dom.dayMapSection.dataset.expanded !== 'true') {
+    const anchor = document.createComment('Posição do mapa no dia');
+    dom.dayMapSection.replaceWith(anchor);
+    dom.dayMapSection._homeAnchor = anchor;
+    document.body.append(dom.dayMapSection);
+  } else if (!expanded && dom.dayMapSection._homeAnchor) {
+    dom.dayMapSection._homeAnchor.replaceWith(dom.dayMapSection);
+    dom.dayMapSection._homeAnchor = null;
+  }
   dom.dayMapSection.dataset.expanded = String(expanded);
-  dom.dayPage.dataset.mapExpanded = String(expanded);
+  dom.dayMapScrim.hidden = !expanded;
+  dom.dayPage.inert = expanded;
   dom.dayMapToggle.setAttribute('aria-expanded', String(expanded));
   dom.dayMapToggle.setAttribute('aria-label', expanded ? 'Reduzir mapa' : 'Ampliar mapa');
   dom.dayMapToggle.querySelector('span').textContent = expanded ? 'Reduzir' : 'Ampliar';
@@ -5269,6 +5280,10 @@ dom.tripPagePassengers.addEventListener('click', openTripPassengers);
 dom.tripPassengerClose.addEventListener('click', () => closeTripPassengers().catch(console.warn));
 dom.closeDayPage.addEventListener('click', navigateBackFromDay);
 dom.dayMapToggle.addEventListener('click', () => setDayMapExpanded(dom.dayMapSection.dataset.expanded !== 'true'));
+dom.dayMapScrim.addEventListener('click', () => setDayMapExpanded(false));
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && dom.dayMapSection.dataset.expanded === 'true') setDayMapExpanded(false);
+});
 dom.addDayPageActivity.addEventListener('click', addInlineDayActivity);
 dom.dayAttachmentsButton.addEventListener('click', openDayAttachments);
 dom.closeDayAttachments.addEventListener('click', closeDayAttachments);
