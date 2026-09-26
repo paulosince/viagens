@@ -2292,21 +2292,9 @@ async function saveInlinePhoto(day, activity, location, file) {
   const targetActivity = records.activities.find(item => String(item.id) === String(activity.id));
   if (!targetActivity) return;
 
+  // Photos belong to agenda items. A shared place may provide a fallback image,
+  // but changing one agenda item's photo must never mutate the place or siblings.
   targetActivity.photo_url = photoUrl;
-
-  if (location) {
-    const targetLocation = records.locations.find(item => String(item.id) === String(location.id));
-    if (targetLocation) {
-      targetLocation.photo_url = photoUrl;
-      targetLocation.photo_provider = null;
-      targetLocation.photo_author = null;
-      targetLocation.photo_author_url = null;
-      targetLocation.photo_source_url = null;
-      for (const linkedActivity of records.activities) {
-        if (String(linkedActivity.place_id || '') === String(targetLocation.id)) linkedActivity.photo_url = photoUrl;
-      }
-    }
-  }
 
   const patch = day.photo_url ? {} : { photo_url: photoUrl };
   await persistInlineDayChange(day, records.activities, records.locations, patch, { activityId: activity.id });
@@ -2377,7 +2365,7 @@ function renderDayPageAgenda(day, activities, locations) {
     description.addEventListener('click', () => beginInlineTextEdit(description, day, activity, 'description', true));
     copy.append(description);
 
-    const photoUrl = location?.photo_url || activity.photo_url || '';
+    const photoUrl = activity.photo_url || location?.photo_url || '';
     item.dataset.hasPhoto = String(Boolean(photoUrl));
     item.append(time, pin, saveStatus, copy);
 
