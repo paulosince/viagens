@@ -88,10 +88,12 @@ const state = {
   daySaveQueues: new Map(),
   daySaveVersions: new Map(),
   changeLog: [],
-  baselineSnapshotsEnsured: new Set()
+  baselineSnapshotsEnsured: new Set(),
+  tripRoles: new Map(), tripOwners: new Map()
 };
 
 const dom = {
+  tripPageShare: document.querySelector('#trip_page_share'), tripShareSheet: document.querySelector('#trip_share_sheet'), tripShareScrim: document.querySelector('#trip_share_scrim'), closeTripShare: document.querySelector('#close_trip_share'), tripShareForm: document.querySelector('#trip_share_form'), tripShareRecipient: document.querySelector('#trip_share_recipient'), sendTripShare: document.querySelector('#send_trip_share'), tripShareStatus: document.querySelector('#trip_share_status'), tripShareList: document.querySelector('#trip_share_list'),
   tripCreateMessage: document.querySelector('#trip_create_message'),
   splashStatus: document.querySelector('#splash_status'),
   authView: document.querySelector('#auth_view'), authForm: document.querySelector('#auth_form'), authMessage: document.querySelector('#auth_message'), authIntro: document.querySelector('#auth_intro'), authCard: document.querySelector('.auth-card'), signupForm: document.querySelector('#signup_form'), signupMessage: document.querySelector('#signup_message'), signupPhotoInput: document.querySelector('#signup_photo'), signupPhotoPreview: document.querySelector('#signup_photo_preview'), signupPhotoPlaceholder: document.querySelector('#signup_photo_placeholder'), showSignup: document.querySelector('#show_signup'), showLogin: document.querySelector('#show_login'),
@@ -168,6 +170,15 @@ function derivedDayDate(day, trip = activeTripForDay(day)) {
 function normalizeTripRecord(trip) {
   return { ...trip, day_count: tripDayCount(trip) };
 }
+
+function tripRole(trip) {
+  if (!trip) return 'viewer';
+  if (String(trip.user_id) === String(state.user?.id)) return 'owner';
+  return state.tripRoles.get(String(trip.id)) || trip.access_role || 'viewer';
+}
+
+function canEditTrip(trip) { return tripRole(trip) !== 'viewer'; }
+function canEditActiveTrip() { return canEditTrip(state.trips.find(trip => String(trip.id) === String(state.activeTripId))); }
 
 function normalizeDayRecord(day) {
   return {
@@ -296,6 +307,7 @@ function setActiveSheet(name = 'none') {
   document.body.dataset.activeSheet = name;
   dom.newTripSheet.setAttribute('aria-hidden', String(name !== 'new-trip'));
   dom.tripPassengerSheet.setAttribute('aria-hidden', String(name !== 'trip-passengers'));
+  dom.tripShareSheet.setAttribute('aria-hidden', String(name !== 'trip-share'));
   dom.profileSheet.setAttribute('aria-hidden', String(name !== 'profile'));
   dom.chatgptSheet.setAttribute('aria-hidden', String(name !== 'chatgpt'));
   dom.changeLogSheet.setAttribute('aria-hidden', String(name !== 'change-log'));
@@ -1424,7 +1436,7 @@ function renderTripDays(days, activitiesByDay = new Map(), locationsByDay = new 
       button.addEventListener('pointercancel', releasePress);
       button.addEventListener('click', () => {
         button.blur();
-        if (empty) openDayEditor(day);
+        if (empty && canEditActiveTrip()) openDayEditor(day);
         else openDayPage(day.id);
       });
     } else {
@@ -2087,6 +2099,8 @@ function openDayPage(dayId, { pushHistory = true } = {}) {
     const activities = state.dayActivities.get(String(day.id)) || [];
     const locations = state.dayLocations.get(String(day.id)) || [];
     ensureDayTitleControl().textContent = dayTitle(day, activities, locations);
+    ensureDayTitleControl().disabled = !canEditActiveTrip();
+    dom.addDayPageActivity.disabled = !canEditActiveTrip();
     dom.dayPageSaveStatus.dataset.state = state.daySaveStates.get(String(day.id)) || 'idle';
     dom.dayPage.setAttribute('aria-hidden', 'false');
     document.body.dataset.dayPage = 'open';
@@ -2101,12 +2115,15 @@ function openDayPage(dayId, { pushHistory = true } = {}) {
   dom.dayPageHero.style.backgroundImage = photo ? `url("${String(photo).replaceAll('"', '%22')}")` : '';
   dom.dayPageBadge.textContent = `dia ${dayNumber(day)}`;
   ensureDayTitleControl().textContent = dayTitle(day, activities, locations);
+  ensureDayTitleControl().disabled = !canEditActiveTrip();
+  dom.addDayPageActivity.disabled = !canEditActiveTrip();
+  dom.dayPagePhotoInput.disabled = !canEditActiveTrip();
   dom.dayPageSaveStatus.dataset.state = state.daySaveStates.get(String(day.id)) || 'idle';
   const derivedDate = derivedDayDate(day);
   dom.dayPageDate.textContent = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' }).format(new Date(`${derivedDate}T12:00:00`));
   renderDayPageAgenda(day, activities, locations);
   renderDayPageMap(day, locations, activities);
-  enrichDayPage(day, activities, locations).catch(error => console.warn('Não foi possível enriquecer o dia', error));
+  if (canEditActiveTrip()) enrichDayPage(day, activities, locations).catch(error => console.warn('Não foi possível enriquecer o dia', error));
   dom.dayPage.dataset.renderKey = renderKey;
   dom.dayPage.setAttribute('aria-hidden', 'false');
   document.body.dataset.dayPage = 'open';
@@ -2204,6 +2221,7 @@ async function persistDayHeroChange(day, dayPatch, { rerender = true } = {}) {
 }
 
 function beginInlineDayTitleEdit() {
+  if (!canEditActiveTrip()) return;
   const day = state.tripDays.find(item => String(item.id) === String(state.activeDayId));
   if (!day) return;
 
@@ -2482,6 +2500,7 @@ function recordsDiffer(after, before) {
 }
 
 function beginInlineTimeEdit(button, day, activity) {
+  if (!canEditActiveTrip()) return;
   const input = document.createElement('input');
   input.type = 'time';
   input.className = 'day-inline-time-input';
@@ -2528,6 +2547,7 @@ function beginInlineTimeEdit(button, day, activity) {
 }
 
 function beginInlineTextEdit(button, day, activity, field, multiline = false) {
+  if (!canEditActiveTrip()) return;
   const editor = document.createElement(multiline ? 'textarea' : 'input');
   editor.className = multiline ? 'day-inline-textarea' : 'day-inline-text-input';
   if (!multiline) editor.type = 'text';
@@ -2754,6 +2774,7 @@ function newAgendaActivity(day, activities = []) {
 }
 
 async function addInlineDayActivity() {
+  if (!canEditActiveTrip()) return;
   const day = state.tripDays.find(item => String(item.id) === String(state.activeDayId));
   if (!day) return;
 
@@ -3128,6 +3149,7 @@ function navigateBackFromDay() {
 }
 
 function openDayEditor(day) {
+  if (!canEditActiveTrip()) return;
   const locations = state.dayLocations.get(String(day.id)) || [];
   const activities = state.dayActivities.get(String(day.id)) || [];
   state.dayEditor = {
@@ -3401,6 +3423,7 @@ function applyLocalDaySave(day, activities, locations) {
 }
 
 async function saveDayEditor() {
+  if (!canEditActiveTrip()) return;
   if (!state.dayEditor) return;
   state.saving = true;
   setLoading(dom.saveDayEdit, true);
@@ -3670,6 +3693,11 @@ async function ensureTripBaselineSnapshot(tripId) {
 }
 
 function syncTripHero(trip) {
+  const editable = canEditTrip(trip);
+  dom.tripPageTitle.disabled = !editable;
+  dom.tripPageDates.disabled = !editable;
+  dom.tripPageColor.disabled = !editable;
+  dom.tripPageCoverInput.disabled = !editable;
   const accent = /^#[0-9a-f]{6}$/i.test(trip.secondary_color || '') ? trip.secondary_color : '#4775d1';
   dom.tripPage.style.setProperty('--trip-page-color', accent);
   dom.tripPageHero.style.backgroundImage = trip.cover_url ? `url("${trip.cover_url.replaceAll('"', '%22')}")` : '';
@@ -3683,6 +3711,9 @@ function syncTripHero(trip) {
 async function openTrip(tripId, { pushHistory = true, forceRefresh = false } = {}) {
   const trip = state.trips.find(item => String(item.id) === String(tripId));
   if (!trip) return;
+  document.body.dataset.tripPermission = tripRole(trip);
+  dom.tripPageShare.hidden = tripRole(trip) !== 'owner';
+  dom.tripPagePassengers.setAttribute('aria-label', canEditTrip(trip) ? 'Editar passageiros da viagem' : 'Ver passageiros da viagem');
   if (state.activeTripId !== String(trip.id)) {
     dom.tripDateEditor.hidden = true;
     dom.tripPageDates.setAttribute('aria-expanded', 'false');
@@ -3694,7 +3725,7 @@ async function openTrip(tripId, { pushHistory = true, forceRefresh = false } = {
     window.history.pushState({ view: 'trip', tripId: String(trip.id) }, '', `#trip-${trip.id}`);
   }
   state.activeTripId = String(trip.id);
-  ensureTripBaselineSnapshot(trip.id).catch(error => console.warn('Ponto de segurança inicial indisponível', error));
+  if (canEditTrip(trip)) ensureTripBaselineSnapshot(trip.id).catch(error => console.warn('Ponto de segurança inicial indisponível', error));
   syncTripHero(trip);
   dom.tripPage.setAttribute('aria-hidden', 'false');
   document.body.dataset.tripPage = 'open';
@@ -3738,6 +3769,7 @@ async function openTrip(tripId, { pushHistory = true, forceRefresh = false } = {
 }
 
 function closeTripPage() {
+  document.body.dataset.tripPermission = '';
   state.activeTripId = null;
   state.tripDays = [];
   state.dayActivities = new Map();
@@ -3762,7 +3794,7 @@ function createTripNode(trip) {
   button.addEventListener('pointercancel', releasePress);
   button.addEventListener('click', () => {
     button.blur();
-    if (state.editing) toggleTripSelection(button.dataset.tripId);
+    if (state.editing && tripRole(state.trips.find(trip => String(trip.id) === String(button.dataset.tripId))) === 'owner') toggleTripSelection(button.dataset.tripId);
     else openTrip(button.dataset.tripId);
   });
   const owner = document.createElement('span'); owner.className = 'trip-owner-flag';
@@ -3788,11 +3820,27 @@ function updateTripNode(item, trip) {
   refs.article.style.backgroundImage = trip.cover_url ? `url("${trip.cover_url.replaceAll('"', '%22')}")` : '';
   refs.button.dataset.tripId = trip.id;
   refs.button.setAttribute('aria-label', `Abrir ${trip.name}`);
-  refs.owner.textContent = owned ? 'criada por você' : 'viagem compartilhada';
+  refs.owner.replaceChildren();
+  if (owned) refs.owner.textContent = 'criada por você';
+  else {
+    const sharedOwner = state.tripOwners.get(String(trip.id));
+    if (sharedOwner) {
+      const avatar = document.createElement('span'); avatar.className = 'trip-owner-avatar';
+      avatar.setAttribute('aria-label', `Foto de ${sharedOwner.name}`);
+      if (sharedOwner.avatarUrl) {
+        const image = document.createElement('img'); image.src = sharedOwner.avatarUrl; image.alt = '';
+        image.addEventListener('error', () => { avatar.textContent = sharedOwner.name?.trim()[0]?.toUpperCase() || '?'; });
+        avatar.append(image);
+      } else avatar.textContent = sharedOwner.name?.trim()[0]?.toUpperCase() || '?';
+      refs.owner.append(avatar);
+    }
+    refs.owner.append(document.createTextNode(sharedOwner?.name ? `Compartilhada por ${sharedOwner.name}` : 'Viagem compartilhada'));
+  }
   refs.timing.textContent = tripTiming(trip);
   refs.title.textContent = trip.name;
   refs.dates.textContent = `${displayDate(trip.start_date)} — ${displayDate(tripEndDate(trip))}`;
   refs.selection.dataset.selected = String(state.selectedTripIds.has(String(trip.id)));
+  refs.selection.style.display = owned ? '' : 'none';
   syncPassengerList(refs.stack, state.passengers.get(trip.id) || []);
 }
 
@@ -3807,6 +3855,7 @@ function syncTripSelectionUI() {
 
 function toggleTripSelection(tripId) {
   const id = String(tripId);
+  if (tripRole(state.trips.find(trip => String(trip.id) === id)) !== 'owner') return;
   if (state.selectedTripIds.has(id)) state.selectedTripIds.delete(id);
   else state.selectedTripIds.add(id);
   syncTripSelectionUI();
@@ -4094,9 +4143,28 @@ async function loadTrips({ allowLocalFallback = true } = {}) {
   try {
     const client = await trySupabase();
     if (!client) throw new Error('Backend indisponível.');
+    const claimed = await client.rpc('claim_trip_invitations');
+    if (claimed.error) console.warn('Convites aguardando atualização:', claimed.error);
     const result = await client.from('trips').select('*').is('deleted_at', null).order('start_date', { ascending: true });
     if (result.error) throw result.error;
     state.trips = (result.data || []).map(normalizeTripRecord);
+    const memberships = await client.from('trip_members').select('trip_id,role').eq('user_id', state.user.id);
+    if (memberships.error) throw memberships.error;
+    state.tripRoles = new Map((memberships.data || []).map(member => [String(member.trip_id), member.role]));
+    for (const trip of state.trips) trip.access_role = tripRole(trip);
+    state.tripOwners.clear();
+    if (state.trips.some(trip => trip.access_role !== 'owner')) {
+      const owners = await client.rpc('shared_trip_owners');
+      if (owners.error) console.warn('Foto do proprietário indisponível:', owners.error);
+      else await Promise.all((owners.data || []).map(async owner => {
+        let avatarUrl = '';
+        if (owner.avatar_path) {
+          const signed = await client.storage.from('profile-photos').createSignedUrl(owner.avatar_path, 3600);
+          if (!signed.error) avatarUrl = signed.data.signedUrl;
+        }
+        state.tripOwners.set(String(owner.trip_id), { name: owner.owner_name, avatarUrl });
+      }));
+    }
     let passengerRecords = [];
     if (state.trips.length) {
       const passengers = await client.from('passengers').select('*').in('trip_id', state.trips.map(trip => trip.id)).order('created_at');
@@ -4117,6 +4185,15 @@ async function loadTrips({ allowLocalFallback = true } = {}) {
   }
   syncYearList();
   syncTripList();
+  if (state.activeTripId) {
+    const active = state.trips.find(trip => String(trip.id) === String(state.activeTripId));
+    if (!active) closeTripPage();
+    else {
+      document.body.dataset.tripPermission = tripRole(active);
+      dom.tripPageShare.hidden = tripRole(active) !== 'owner';
+      if (document.body.dataset.tripPage === 'open') syncTripHero(active);
+    }
+  }
 }
 
 async function loadProfile({ allowLocalFallback = true } = {}) {
@@ -4425,7 +4502,7 @@ function openTripPassengers() {
   passengerEditorTripId = String(trip.id);
   passengerSaveRevision = 0;
   passengerSavedRevision = 0;
-  dom.tripPassengerMessage.textContent = '';
+  dom.tripPassengerMessage.textContent = canEditTrip(trip) ? '' : 'Somente leitura';
   dom.tripPassengerMessage.dataset.kind = 'info';
   state.newTripPassengers = uniqueTripPassengers((state.passengers.get(trip.id) || []).map(passenger => ({
     id: passenger.id || crypto.randomUUID(),
@@ -4445,6 +4522,7 @@ function openTripPassengers() {
     dom.tripPassengerSelfName.textContent = self.name;
   }
   renderTripPassengers();
+  tripPassengerGroup.inert = !canEditTrip(trip);
   dom.tripPassengerSheetBody.append(tripPassengerGroup);
   setActiveSheet('trip-passengers');
 }
@@ -4480,6 +4558,74 @@ async function shareActiveTrip() {
     await loadTripMembers(tripId);
   } catch (error) { dom.tripShareMessage.textContent = error.message || 'Não foi possível compartilhar.'; }
   finally { dom.tripShareButton.disabled = false; }
+}
+
+async function refreshTripShares() {
+  const trip = state.trips.find(item => String(item.id) === String(state.activeTripId));
+  if (tripRole(trip) !== 'owner') return;
+  const client = await trySupabase();
+  if (!client) throw new Error('É necessária uma conexão para ver os convites.');
+  const { data, error } = await client.rpc('list_trip_shares', { p_trip_id: trip.id });
+  if (error) throw error;
+  dom.tripShareList.replaceChildren();
+  if (!data?.length) { dom.tripShareList.textContent = 'Ainda não há convidados.'; return; }
+  for (const person of data) {
+    const row = document.createElement('div'); row.className = 'trip-share-row';
+    const copy = document.createElement('div'); copy.className = 'trip-share-row-copy';
+    const name = document.createElement('strong'); name.textContent = person.display_name || person.email;
+    const email = document.createElement('small'); email.textContent = person.pending ? `${person.email} · aguardando conta` : person.email;
+    copy.append(name, email);
+    const role = document.createElement('span'); role.className = 'trip-share-row-role';
+    role.textContent = person.role === 'editor' ? 'Pode editar' : 'Só visualiza';
+    const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'trip-share-row-remove';
+    remove.textContent = '×'; remove.setAttribute('aria-label', `Remover acesso de ${person.email}`);
+    remove.addEventListener('click', async () => {
+      remove.disabled = true;
+      try {
+        const removed = await client.rpc('remove_trip_share', { p_trip_id: trip.id, p_email: person.email });
+        if (removed.error) throw removed.error;
+        await refreshTripShares();
+        dom.tripShareStatus.textContent = 'Acesso removido.';
+      } catch (error) { dom.tripShareStatus.dataset.kind = 'error'; dom.tripShareStatus.textContent = error.message || 'Não foi possível remover o acesso.'; remove.disabled = false; }
+    });
+    row.append(copy, role, remove); dom.tripShareList.append(row);
+  }
+}
+
+function openTripShare() {
+  const trip = state.trips.find(item => String(item.id) === String(state.activeTripId));
+  if (tripRole(trip) !== 'owner') return;
+  dom.tripShareForm.reset();
+  dom.tripShareStatus.textContent = '';
+  dom.tripShareStatus.dataset.kind = 'info';
+  dom.tripShareList.textContent = 'Carregando…';
+  setActiveSheet('trip-share');
+  refreshTripShares().catch(error => {
+    dom.tripShareStatus.dataset.kind = 'error';
+    dom.tripShareStatus.textContent = error.message || 'Não foi possível carregar os convites.';
+  });
+}
+
+async function submitTripShare(event) {
+  event.preventDefault();
+  const trip = state.trips.find(item => String(item.id) === String(state.activeTripId));
+  if (tripRole(trip) !== 'owner' || dom.sendTripShare.disabled) return;
+  const email = dom.tripShareRecipient.value.trim();
+  const role = new FormData(dom.tripShareForm).get('permission');
+  if (!email || !['viewer', 'editor'].includes(role)) return;
+  dom.sendTripShare.disabled = true;
+  dom.tripShareStatus.dataset.kind = 'info';
+  dom.tripShareStatus.textContent = 'Compartilhando…';
+  try {
+    const client = await trySupabase();
+    if (!client) throw new Error('É necessária uma conexão para compartilhar.');
+    const { data, error } = await client.rpc('invite_trip_by_email', { p_trip_id: trip.id, p_email: email, p_role: role });
+    if (error) throw error;
+    dom.tripShareRecipient.value = '';
+    dom.tripShareStatus.textContent = data === 'pending' ? 'Convite salvo. A viagem aparecerá quando essa pessoa criar a conta com esse e-mail.' : 'Viagem compartilhada.';
+    await refreshTripShares();
+  } catch (error) { dom.tripShareStatus.dataset.kind = 'error'; dom.tripShareStatus.textContent = error.message || 'Não foi possível compartilhar.'; }
+  finally { dom.sendTripShare.disabled = false; }
 }
 
 function openProfile() {
@@ -4718,6 +4864,7 @@ async function saveTripPassengers(client, tripId) {
 }
 
 function schedulePassengerSave() {
+  if (!canEditActiveTrip()) return;
   if (document.body.dataset.activeSheet !== 'trip-passengers') return;
   passengerSaveRevision += 1;
   dom.tripPassengerMessage.dataset.kind = 'info';
@@ -4727,6 +4874,7 @@ function schedulePassengerSave() {
 }
 
 async function persistPassengerEdits() {
+  if (!canEditActiveTrip()) return true;
   clearTimeout(passengerSaveTimer);
   const tripId = passengerEditorTripId;
   const revision = passengerSaveRevision;
@@ -4770,6 +4918,7 @@ async function closeTripPassengers() {
   }
   if (!await persistPassengerEdits()) return;
   passengerEditorTripId = null;
+  tripPassengerGroup.inert = false;
   tripPassengerHome.append(tripPassengerGroup);
   setActiveSheet('none');
 }
@@ -4777,6 +4926,7 @@ async function closeTripPassengers() {
 let tripFieldSaveTask = Promise.resolve();
 
 async function saveTripFields(changes, { syncDays = false, summary = 'Dados da viagem alterados' } = {}) {
+  if (!canEditActiveTrip()) throw new Error('Você só pode visualizar esta viagem.');
   const tripId = String(state.activeTripId || '');
   const task = tripFieldSaveTask.catch(() => {}).then(async () => {
     const trip = state.trips.find(item => String(item.id) === tripId);
@@ -4828,6 +4978,7 @@ async function saveTripFields(changes, { syncDays = false, summary = 'Dados da v
 }
 
 function showTripNameInput() {
+  if (!canEditActiveTrip()) return;
   const trip = state.trips.find(item => String(item.id) === String(state.activeTripId));
   if (!trip) return;
   dom.tripPageTitleInput.value = trip.name || '';
@@ -4856,6 +5007,7 @@ async function commitTripName() {
 }
 
 async function saveTripSchedule() {
+  if (!canEditActiveTrip()) return false;
   const startDate = dom.tripStartDate.value;
   const dayCount = Number(dom.tripDayCount.value);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !Number.isInteger(dayCount) || dayCount < 1 || dayCount > 365) {
@@ -5036,6 +5188,10 @@ dom.dayNotesInput.addEventListener('input', () => { if (state.dayEditor) state.d
 dom.dayEditForm.addEventListener('submit', event => { event.preventDefault(); saveDayEditor(); });
 
 dom.closeTripPage.addEventListener('click', navigateBackFromTrip);
+dom.tripPageShare.addEventListener('click', openTripShare);
+dom.closeTripShare.addEventListener('click', () => setActiveSheet('none'));
+dom.tripShareScrim.addEventListener('click', () => setActiveSheet('none'));
+dom.tripShareForm.addEventListener('submit', submitTripShare);
 dom.tripPageTitle.addEventListener('click', showTripNameInput);
 dom.tripPageTitleInput.addEventListener('blur', () => commitTripName().catch(console.warn));
 dom.tripPageTitleInput.addEventListener('keydown', event => {
@@ -5046,6 +5202,7 @@ dom.tripPageTitleInput.addEventListener('keydown', event => {
   }
 });
 dom.tripPageDates.addEventListener('click', () => {
+  if (!canEditActiveTrip()) return;
   const trip = state.trips.find(item => String(item.id) === String(state.activeTripId));
   if (!trip) return;
   const open = dom.tripDateEditor.hidden;
@@ -5133,6 +5290,7 @@ dom.logoutButton.addEventListener('click', async () => {
   state.profile = null;
   state.trips = [];
   state.passengers.clear();
+  state.tripRoles.clear(); state.tripOwners.clear();
   state.savedPassengers = [];
   state.profileSavedPassengers = [];
   state.tripDataCache.clear();
@@ -5431,6 +5589,7 @@ async function boot() {
 window.addEventListener('offline', () => { refreshSyncStatus().catch(console.warn); });
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && state.user) {
+    if (navigator.onLine) loadTrips().catch(error => console.warn('Viagens compartilhadas aguardando atualização', error));
     flushOutbox().catch(error => console.warn('Fila local aguardando sincronização', error));
     refreshChatgptConnection().catch(console.warn);
   }
@@ -5455,7 +5614,7 @@ ensureSupabase()
       return;
     }
     if (!navigator.onLine && state.user) return;
-    state.user = null; state.profile = null; state.trips = []; state.passengers.clear(); state.savedPassengers = []; state.profileSavedPassengers = []; state.tripDataCache.clear(); state.tripDataLoads.clear();
+    state.user = null; state.profile = null; state.trips = []; state.passengers.clear(); state.tripRoles.clear(); state.tripOwners.clear(); state.savedPassengers = []; state.profileSavedPassengers = []; state.tripDataCache.clear(); state.tripDataLoads.clear();
     syncTripList(); closeSheets(); setSessionView('anonymous');
   }))
   .catch(() => {});
