@@ -277,6 +277,7 @@ function setSessionView(session) {
   document.body.dataset.session = session;
   dom.authView.setAttribute('aria-hidden', String(session !== 'anonymous'));
   dom.home.setAttribute('aria-hidden', String(session !== 'authenticated'));
+  document.body.dataset.appReady = 'true';
   if (session === 'authenticated') refreshChatgptConnection().catch(console.warn);
   else {
     state.chatgptConnected = false;
@@ -4976,11 +4977,9 @@ async function boot() {
       setSessionView('anonymous');
     }
   } finally {
-    const revealApp = () => requestAnimationFrame(() => requestAnimationFrame(() => {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
       document.body.dataset.appReady = 'true';
     }));
-    if (window.__appStylesReady) revealApp();
-    else document.addEventListener('appstylesready', revealApp, { once: true });
   }
 }
 
