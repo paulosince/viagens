@@ -618,8 +618,15 @@ body[data-trip-page="open"] .trip-page {
   -webkit-backdrop-filter: blur(20px);
   pointer-events: auto;
 }
-.trip-page-back { padding: 0 3px 3px 0; font-size: 42px; }
-.day-page-add { font-size: 34px; font-weight: 400; }
+.trip-page-back svg, .day-page-add svg {
+  width: 32px;
+  height: 32px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 .trip-page-edit svg { width: 25px; height: 25px; fill: currentColor; }
 .trip-page-hero-copy {
   position: absolute;
