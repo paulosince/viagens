@@ -2575,14 +2575,25 @@ function renderDayPageMap(locations, activities = []) {
       const icon = L.divIcon({
         className: 'day-map-numbered-marker',
         html: '<span><b>' + String(index + 1) + '</b></span>',
-        iconSize: [30, 36],
-        iconAnchor: [15, 36],
-        popupAnchor: [0, -34]
+        iconSize: [34, 40],
+        iconAnchor: [17, 40],
+        popupAnchor: [0, -38]
       });
       L.marker(latLng, { icon })
         .addTo(map)
         .bindPopup(point.name || ('Local ' + String(index + 1)));
     });
+
+    if (bounds.length > 1) {
+      L.polyline(bounds, {
+        color: '#0a84ff',
+        weight: 4,
+        opacity: .72,
+        dashArray: '8 9',
+        lineCap: 'round',
+        lineJoin: 'round'
+      }).addTo(map);
+    }
 
     if (bounds.length === 1) {
       map.setView(bounds[0], 16);
