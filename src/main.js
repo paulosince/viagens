@@ -715,7 +715,7 @@ function primaryActivityPlace(activity) {
 function activityLooksGeocodable(activity) {
   const value = primaryActivityPlace(activity).toLocaleLowerCase('pt-BR');
   if (!value || value.length < 3) return false;
-  return !/^(almo[cç]o|jantar|caf[eé]|lanche|check[- ]?in|check[- ]?out|deslocamento|transfer|voo|trem|metr[oô]|[oô]nibus|chegada|sa[ií]da)\b/.test(value);
+  return !/^(almo[cç]o|jantar|caf[eé]|lanche|check[- ]?in|check[- ]?out|deslocamento|transfer|voo|trem|metr[oô]|[oô]nibus|chegada|sa[ií]da|manh[ãa]|tarde|noite|dia livre|tempo livre)(?:$|[\s,.:;—–-])/.test(value);
 }
 
 async function loadLeaflet() {
@@ -2340,9 +2340,13 @@ async function saveInlinePhoto(day, activity, location, file) {
   });
 }
 
+function orderedDayActivities(activities = []) {
+  return [...activities].sort((a, b) => String(activityTime(a)).localeCompare(String(activityTime(b))) || (a.position || 0) - (b.position || 0));
+}
+
 function renderDayPageAgenda(day, activities, locations) {
   dom.dayPageAgenda.replaceChildren();
-  const ordered = [...activities].sort((a, b) => String(activityTime(a)).localeCompare(String(activityTime(b))) || (a.position || 0) - (b.position || 0));
+  const ordered = orderedDayActivities(activities);
 
   for (const activity of ordered) {
     const location = activityLocation(activity, locations);
@@ -2474,15 +2478,20 @@ function dayMapPoints(locations, activities = []) {
     points.push({ ...point, latitude, longitude });
   };
 
-  locations.forEach(addPoint);
-  activities.forEach(activity => {
-    if (activity.place_id && locations.some(location => String(location.id) === String(activity.place_id))) return;
+  // The route follows the agenda, not the order in which places were saved.
+  orderedDayActivities(activities).forEach(activity => {
+    const location = activityLocation(activity, locations);
+    const hasLocationCoordinates = Number.isFinite(numericCoordinate(location?.latitude))
+      && Number.isFinite(numericCoordinate(location?.longitude));
+    const source = hasLocationCoordinates ? location : activity;
     addPoint({
-      name: activity.place_name || activity.title || 'Local',
-      latitude: activity.latitude,
-      longitude: activity.longitude
+      name: location?.name || activity.place_name || activity.title || 'Local',
+      latitude: source.latitude,
+      longitude: source.longitude
     });
   });
+  // Places without an agenda item remain visible after the scheduled stops.
+  locations.forEach(addPoint);
 
   return points;
 }
