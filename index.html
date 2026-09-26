@@ -45,9 +45,9 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20260926-08" as="style">
-  <link rel="stylesheet" href="style.css?v=20260926-08" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20260926-08"></noscript>
+  <link rel="preload" href="style.css?v=20260926-09" as="style">
+  <link rel="stylesheet" href="style.css?v=20260926-09" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20260926-09"></noscript>
 </head>
 <body data-session="loading" data-active-sheet="none" data-editing="false" data-year-menu="closed" data-trip-page="closed" data-day-page="closed" data-day-attachments="closed" data-app-ready="false">
   <div id="app_splash" class="app-splash" aria-label="Carregando Viaggio">
@@ -80,12 +80,14 @@
     <section id="user_home" class="home" aria-hidden="true">
       <header class="home-header">
         <div class="header-actions">
-          <button id="profile_button" class="profile-button" type="button" aria-label="Abrir perfil">
-            <img id="header_profile_image" src="assets/cintia.png" alt="">
-            <span id="header_profile_fallback" class="profile-fallback" aria-hidden="true">C</span>
-          </button>
+          <div class="profile-with-integration">
+            <button id="profile_button" class="profile-button" type="button" aria-label="Abrir perfil">
+              <img id="header_profile_image" src="assets/cintia.png" alt="">
+              <span id="header_profile_fallback" class="profile-fallback" aria-hidden="true">C</span>
+            </button>
+            <button id="home_chatgpt_button" class="glass-button chatgpt-header-button" type="button" aria-label="Conectar o Viaggio ao ChatGPT"><img src="assets/chatgpt-mark.svg" alt="" aria-hidden="true"><span>ChatGPT</span></button>
+          </div>
           <div class="header-buttons">
-            <button id="home_chatgpt_button" class="glass-button chatgpt-header-button" type="button" aria-label="Conectar o Viaggio ao ChatGPT">✦ ChatGPT</button>
             <button id="edit_trips_button" class="glass-button" type="button">Editar</button>
             <button id="new_trip_button" class="circle-button" type="button" aria-label="Nova viagem">＋</button>
           </div>
@@ -196,7 +198,7 @@
           <span class="sheet-header-spacer" aria-hidden="true"></span>
         </header>
         <section class="chatgpt-integration-card">
-          <div class="chatgpt-integration-mark" aria-hidden="true">✦</div>
+          <div class="chatgpt-integration-mark" aria-hidden="true"><img src="assets/chatgpt-mark.svg" alt=""></div>
           <h3>Dirija o Viaggio conversando</h3>
           <p>Depois de conectar sua conta, o ChatGPT pode criar viagens, organizar dias, editar agenda, passageiros, checklist e orçamento, além de restaurar snapshots quando você pedir.</p>
           <ul>
@@ -358,7 +360,7 @@
       <button id="delete_selected_trips" type="button" disabled>Excluir selecionadas</button>
     </footer>
   </main>
-  <script type="module" src="src/main.js?v=20260926-08"></script>
-  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260926-08');</script>
+  <script type="module" src="src/main.js?v=20260926-09"></script>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260926-09');</script>
 </body>
 </html>

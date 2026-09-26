@@ -47,6 +47,7 @@ let lastPlaceSearchAt = 0;
 
 const state = {
   user: null,
+  chatgptConnected: false,
   profile: null,
   trips: [],
   passengers: new Map(),
@@ -273,6 +274,11 @@ function setSessionView(session) {
   document.body.dataset.session = session;
   dom.authView.setAttribute('aria-hidden', String(session !== 'anonymous'));
   dom.home.setAttribute('aria-hidden', String(session !== 'authenticated'));
+  if (session === 'authenticated') refreshChatgptConnection().catch(console.warn);
+  else {
+    state.chatgptConnected = false;
+    dom.home.dataset.chatgptConnected = 'false';
+  }
 }
 
 function setActiveSheet(name = 'none') {
@@ -305,7 +311,7 @@ async function refreshSyncStatus() {
     const count = `${pending} ${pending === 1 ? 'alteração pendente' : 'alterações pendentes'}`;
     dom.syncStatus.textContent = outboxSyncing
       ? `Sincronizando · ${count}`
-      : `Salvo neste iPhone · ${count}${lastOutboxError ? ' · tocar para tentar novamente' : ''}`;
+      : `Salvo neste iPhone · ${count}${lastOutboxError ? ` · ${lastOutboxError.code === '57014' ? 'servidor demorou a responder' : 'falha na sincronização'} · tocar para tentar novamente` : ''}`;
     dom.syncStatus.title = lastOutboxError ? `Última falha: ${lastOutboxError.message || lastOutboxError}` : '';
     return;
   }
@@ -476,10 +482,28 @@ async function refreshChangeLog() {
 
 function openChatgptIntegration() {
   dom.chatgptMcpUrl.textContent = VIAGGIO_MCP_URL;
-  dom.chatgptMessage.textContent = CHATGPT_PLUGIN_URL
-    ? 'A integração pública está disponível para instalação.'
-    : 'O servidor do Viaggio já está pronto. A publicação no diretório do ChatGPT ainda precisa ser concluída.';
+  dom.chatgptMessage.textContent = state.chatgptConnected
+    ? 'ChatGPT conectado à sua conta.'
+    : CHATGPT_PLUGIN_URL
+      ? 'A integração pública está disponível para instalação.'
+      : 'O servidor do Viaggio já está pronto. A publicação no diretório do ChatGPT ainda precisa ser concluída.';
   setActiveSheet('chatgpt');
+  refreshChatgptConnection().catch(console.warn);
+}
+
+async function refreshChatgptConnection() {
+  const userId = state.user?.id;
+  if (!userId) return;
+  const client = await trySupabase();
+  if (!client) return;
+  const { data, error } = await client.rpc('has_chatgpt_connection');
+  if (error || state.user?.id !== userId) return;
+  state.chatgptConnected = data === true;
+  dom.home.dataset.chatgptConnected = String(state.chatgptConnected);
+  dom.homeChatgptButton.setAttribute('aria-label', state.chatgptConnected ? 'ChatGPT conectado · abrir integração' : 'Conectar o Viaggio ao ChatGPT');
+  if (document.body.dataset.activeSheet === 'chatgpt' && state.chatgptConnected) {
+    dom.chatgptMessage.textContent = 'ChatGPT conectado à sua conta.';
+  }
 }
 
 async function copyMcpUrl() {
@@ -3136,7 +3160,6 @@ async function flushOutbox() {
 
     const syncedDays = new Map();
     outboxSyncing = true;
-    lastOutboxError = null;
     await refreshSyncStatus();
     try {
       while (true) {
@@ -3146,6 +3169,7 @@ async function flushOutbox() {
           await syncMutation(mutation, syncedDays.get(String(mutation.dayId)));
           rememberSyncedDayMutation(syncedDays, mutation);
           await offlineStore.removeMutation(mutation.id);
+          lastOutboxError = null;
           await refreshSyncStatus();
         } catch (error) {
           lastOutboxError = error;
@@ -3328,6 +3352,23 @@ function groupByDay(records = []) {
   return grouped;
 }
 
+// Large inline photos can time out one trip-wide API response. Only replace
+// the offline copy once every smaller batch has completed successfully.
+async function loadDayRecords(client, dayIds) {
+  const activities = [], locations = [];
+  for (let index = 0; index < dayIds.length; index += 4) {
+    const ids = dayIds.slice(index, index + 4);
+    const [activityResult, locationResult] = await Promise.all([
+      client.from('activities').select('*').in('day_id', ids).order('position'),
+      client.from('day_locations').select('*').in('day_id', ids).order('position')
+    ]);
+    if (activityResult.error || locationResult.error) throw activityResult.error || locationResult.error;
+    activities.push(...(activityResult.data || []).map(normalizeActivityRecord));
+    locations.push(...(locationResult.data || []));
+  }
+  return { activities, locations };
+}
+
 function applyTripData(data) {
   const days = (data.days || []).map(normalizeDayRecord).sort((a, b) => dayPosition(a) - dayPosition(b));
   const activitiesByDay = new Map();
@@ -3372,13 +3413,7 @@ async function fetchTripData(tripId) {
       const days = (result.data || []).map(normalizeDayRecord);
       let activities = [], locations = [];
       if (days.length) {
-        const [activityResult, locationResult] = await Promise.all([
-          client.from('activities').select('*').in('day_id', days.map(day => day.id)).order('position'),
-          client.from('day_locations').select('*').in('day_id', days.map(day => day.id)).order('position')
-        ]);
-        if (activityResult.error || locationResult.error) throw activityResult.error || locationResult.error;
-        activities = (activityResult.data || []).map(normalizeActivityRecord);
-        locations = locationResult.data || [];
+        ({ activities, locations } = await loadDayRecords(client, days.map(day => day.id)));
       }
       await offlineStore.replaceTripData(key, days, activities, locations);
       const data = {
@@ -3725,14 +3760,7 @@ async function cacheCompleteWorkspace() {
   let allActivities = [];
   let allLocations = [];
   if (allDays.length) {
-    const dayIds = allDays.map(day => day.id);
-    const [activityResult, locationResult] = await Promise.all([
-      client.from('activities').select('*').in('day_id', dayIds).order('position'),
-      client.from('day_locations').select('*').in('day_id', dayIds).order('position')
-    ]);
-    if (activityResult.error || locationResult.error) throw activityResult.error || locationResult.error;
-    allActivities = (activityResult.data || []).map(normalizeActivityRecord);
-    allLocations = locationResult.data || [];
+    ({ activities: allActivities, locations: allLocations } = await loadDayRecords(client, allDays.map(day => day.id)));
   }
 
   const dayById = new Map(allDays.map(day => [String(day.id), day]));
@@ -4552,6 +4580,7 @@ window.addEventListener('offline', () => { refreshSyncStatus().catch(console.war
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && state.user) {
     flushOutbox().catch(error => console.warn('Fila local aguardando sincronização', error));
+    refreshChatgptConnection().catch(console.warn);
   }
 });
 dom.syncStatus.addEventListener('click', () => {
