@@ -2432,6 +2432,21 @@ body[data-active-sheet="change-log"] #change_log_sheet { transform: translateY(0
 .trip-color-custom span { display: block; width: 100%; height: 100%; border-radius: inherit; background: conic-gradient(#f44, #fc0, #3c6, #18f, #a4e, #f44); }
 
 .new-trip-passenger-list { padding-left: 16px; }
+.saved-trip-passengers { padding: 13px 16px 5px; border-bottom: 1px solid var(--line); }
+.saved-trip-passengers[hidden] { display: none; }
+.saved-trip-heading { margin: 0 0 10px; color: var(--secondary); font-size: 13px; font-weight: 650; }
+.saved-trip-passenger-list { display: flex; flex-wrap: wrap; gap: 8px; padding-bottom: 10px; }
+.saved-trip-passenger {
+  display: inline-flex; align-items: center; gap: 8px; max-width: 100%; min-height: 43px;
+  padding: 4px 12px 4px 5px; border: 1px solid var(--line); border-radius: 999px;
+  color: var(--primary); background: #f7f8fb; font: inherit; font-size: 14px; font-weight: 600;
+  transition: background-color .2s ease, border-color .2s ease, color .2s ease, transform .2s ease;
+}
+.saved-trip-passenger:active { transform: scale(.96); }
+.saved-trip-passenger[aria-pressed="true"] { background: #e6f3ff; border-color: var(--ios-blue); color: var(--ios-blue); }
+.saved-trip-passenger-avatar { display: grid; place-items: center; width: 32px; height: 32px; flex: 0 0 32px; overflow: hidden; border-radius: 50%; color: white; background: #6385a0; }
+.saved-trip-passenger-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.saved-trip-passenger > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .new-trip-passenger-row {
   display: grid;
   grid-template-columns: 52px minmax(0, 1fr) 38px;
@@ -2494,6 +2509,8 @@ body[data-active-sheet="change-log"] #change_log_sheet { transform: translateY(0
   font-size: 24px;
 }
 .new-trip-passenger-session-mark { color: var(--ios-blue); text-align: center; font-size: 21px; font-weight: 700; }
+.new-trip-passenger-save { display: flex; align-items: center; gap: 5px; margin: 6px 0 9px; color: var(--secondary); font-size: 12px; }
+.new-trip-passenger-save input { accent-color: var(--ios-blue); }
 .add-trip-passenger {
   width: 100%;
   min-height: 54px;

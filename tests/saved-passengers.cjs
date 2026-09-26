@@ -1,0 +1,86 @@
+const fs = require('node:fs');
+const vm = require('node:vm');
+const assert = require('node:assert/strict');
+
+const source = fs.readFileSync('src/main.js', 'utf8');
+function extract(name) {
+  const start = source.indexOf(`function ${name}(`);
+  const end = source.indexOf('\n}\n', start);
+  assert.ok(start >= 0 && end > start, `${name} exists`);
+  return source.slice(start, end + 2);
+}
+
+class Element {
+  constructor() { this.children = []; this.listeners = {}; this.attributes = {}; }
+  append(...children) { this.children.push(...children); }
+  replaceChildren() { this.children = []; }
+  setAttribute(name, value) { this.attributes[name] = value; }
+  addEventListener(name, callback) { this.listeners[name] = callback; }
+}
+
+const state = {
+  user: { id: 'user-1' }, profile: { birth_date: '1980-01-01' },
+  savedPassengers: [{ id: 'saved-1', owner_id: 'user-1', name: 'Gabriel', birth_date: '2010-02-03', photo_url: 'saved-photo' }],
+  passengers: new Map([['trip-1', [
+    { id: 'old-1', name: 'Gabriel', birth_date: '2010-02-03', photo_url: 'older-photo' },
+    { id: 'old-2', name: 'Manuela', birth_date: '2012-04-05', photo_url: 'family-photo' },
+    { id: 'old-3', user_id: 'user-1', name: 'Cintia', birth_date: '1980-01-01' }
+  ]]]), newTripPassengers: []
+};
+const dom = { savedTripPassengers: new Element(), savedTripPassengerList: new Element() };
+const context = {
+  state, dom, profileName: () => 'Cintia',
+  document: { createElement: () => new Element() },
+  crypto: { randomUUID: () => 'new-trip-passenger' },
+  renderTripPassengers: () => context.renderSavedTripPassengers()
+};
+vm.createContext(context);
+vm.runInContext([
+  'savedPassengerKey', 'availableSavedPassengers', 'matchesSavedPassenger', 'renderSavedTripPassengers',
+  'passengerEditorKey', 'uniqueTripPassengers'
+].map(extract).join('\n'), context);
+
+assert.deepEqual(Array.from(context.availableSavedPassengers(), item => item.name), ['Gabriel', 'Manuela']);
+context.renderSavedTripPassengers();
+assert.equal(dom.savedTripPassengerList.children.length, 2);
+const manuela = dom.savedTripPassengerList.children[1];
+manuela.listeners.click();
+assert.equal(state.newTripPassengers.length, 1);
+assert.equal(state.newTripPassengers[0].photoUrl, 'family-photo');
+assert.equal(state.newTripPassengers[0].birthDate, '2012-04-05');
+state.newTripPassengers[0].name = 'Manuela Silva';
+assert.equal(context.matchesSavedPassenger(state.newTripPassengers[0], state.passengers.get('trip-1')[1]), true);
+assert.equal(dom.savedTripPassengerList.children[1].attributes['aria-pressed'], 'true');
+dom.savedTripPassengerList.children[1].listeners.click();
+assert.equal(state.newTripPassengers.length, 0);
+
+const duplicate = context.uniqueTripPassengers([
+  { name: 'Gabriel', birthDate: '2010-02-03', photoUrl: 'first' },
+  { name: ' gabriel ', birthDate: '2010-02-03', photoUrl: 'second' }
+]);
+assert.equal(duplicate.length, 1);
+
+const saveStart = source.indexOf('async function saveReusablePassengers(');
+const saveEnd = source.indexOf('\n}\n', saveStart);
+vm.runInContext(source.slice(saveStart, saveEnd + 2), context);
+const writes = [];
+const client = { from(table) {
+  assert.equal(table, 'saved_passengers');
+  return {
+    insert(payload) {
+      writes.push(payload);
+      return { select: () => ({ single: async () => ({ data: { ...payload, id: 'new-saved' }, error: null }) }) };
+    }
+  };
+} };
+state.newTripPassengers = [
+  { name: 'Manuela', birthDate: '2012-04-05', photoUrl: 'family-photo', session: false, saveForLater: true },
+  { name: 'Convidado', birthDate: '', photoUrl: '', session: false, saveForLater: false },
+  { name: 'Cintia', session: true }
+];
+context.saveReusablePassengers(client).then(() => {
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].name, 'Manuela');
+  assert.equal(writes[0].photo_url, 'family-photo');
+  console.log('PASS: saved family members retain photos; manual guests can opt out');
+}).catch(error => { console.error(error); process.exitCode = 1; });

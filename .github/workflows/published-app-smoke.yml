@@ -22,14 +22,16 @@ jobs:
           url='https://paulosince.github.io/viagens/'
           for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
             html="$(curl --location --silent --show-error --max-time 20 "$url" || true)"
-            js="$(curl --location --silent --show-error --max-time 20 "$url/src/main.js?v=20260926-13" || true)"
-            css="$(curl --location --silent --show-error --max-time 20 "$url/style.css?v=20260926-13" || true)"
+            js="$(curl --location --silent --show-error --max-time 20 "$url/src/main.js?v=20260926-14" || true)"
+            css="$(curl --location --silent --show-error --max-time 20 "$url/style.css?v=20260926-14" || true)"
             chatgpt_icon="$(curl --location --silent --show-error --max-time 20 "$url/assets/chatgpt-mark.svg" || true)"
             offline="$(curl --location --silent --show-error --max-time 20 "$url/src/offline-store.js?v=snapshot-order" || true)"
             consent="$(curl --location --silent --show-error --max-time 20 "$url/oauth/consent/" || true)"
             mcp_headers="$(curl --silent --show-error --max-time 20 -i 'https://siabldasqinpfmxslwji.supabase.co/functions/v1/viaggio-mcp' || true)"
-            if grep -q 'src/main.js?v=20260926-13' <<<"$html" &&
-               grep -q 'style.css?v=20260926-13' <<<"$html" &&
+            if grep -q 'src/main.js?v=20260926-14' <<<"$html" &&
+               grep -q 'id="saved_trip_passenger_list"' <<<"$html" &&
+               grep -q 'saveReusablePassengers' <<<"$js" &&
+               grep -q 'style.css?v=20260926-14' <<<"$html" &&
                grep -q 'assets/chatgpt-mark.svg' <<<"$html" &&
                grep -q 'viewBox="0 0 180 180"' <<<"$chatgpt_icon" &&
                grep -q 'has_chatgpt_connection' <<<"$js" &&

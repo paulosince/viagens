@@ -45,9 +45,9 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20260926-13" as="style">
-  <link rel="stylesheet" href="style.css?v=20260926-13" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20260926-13"></noscript>
+  <link rel="preload" href="style.css?v=20260926-14" as="style">
+  <link rel="stylesheet" href="style.css?v=20260926-14" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20260926-14"></noscript>
 </head>
 <body data-session="loading" data-active-sheet="none" data-editing="false" data-year-menu="closed" data-trip-page="closed" data-day-page="closed" data-day-attachments="closed" data-app-ready="false">
   <div id="app_splash" class="app-splash" aria-label="Carregando Viaggio">
@@ -144,8 +144,12 @@
           </section>
           <section class="form-section"><h3>Passageiros</h3>
             <div class="form-group passenger-form-group">
+              <div id="saved_trip_passengers" class="saved-trip-passengers" hidden>
+                <p class="saved-trip-heading">Passageiros salvos</p>
+                <div id="saved_trip_passenger_list" class="saved-trip-passenger-list" aria-label="Selecionar passageiros salvos"></div>
+              </div>
               <div id="new_trip_passenger_list" class="new-trip-passenger-list"></div>
-              <button id="add_trip_passenger" class="add-trip-passenger" type="button"><span>＋</span>Adicionar passageiro</button>
+              <button id="add_trip_passenger" class="add-trip-passenger" type="button"><span>＋</span>Adicionar outro passageiro</button>
             </div>
             <p class="form-note">Você já está incluído nesta viagem.</p>
           </section>
@@ -360,7 +364,7 @@
       <button id="delete_selected_trips" type="button" disabled>Excluir selecionadas</button>
     </footer>
   </main>
-  <script type="module" src="src/main.js?v=20260926-13"></script>
-  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260926-13');</script>
+  <script type="module" src="src/main.js?v=20260926-14"></script>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260926-14');</script>
 </body>
 </html>
