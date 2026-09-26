@@ -2577,7 +2577,7 @@ body[data-active-sheet="change-log"] #change_log_sheet { transform: translateY(0
 .auth .splash-cloud { animation-duration: 18s; }
 .auth .splash-cloud-one { animation-delay: -3s; }
 .auth .splash-cloud-two { animation-delay: -9s; }
-.auth .splash-cloud-three { animation-delay: -15s; }
+.auth .splash-cloud-three { top: 31%; animation-delay: -15s; }
 .auth-card {
   position: relative;
   z-index: 2;
