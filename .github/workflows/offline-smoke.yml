@@ -8,6 +8,7 @@ on:
       - 'style.css'
       - 'sw.js'
       - 'src/**'
+      - 'tests/**'
       - 'supabase/migrations/**'
   pull_request:
     paths:
@@ -15,6 +16,7 @@ on:
       - 'style.css'
       - 'sw.js'
       - 'src/**'
+      - 'tests/**'
       - 'supabase/migrations/**'
   workflow_dispatch:
 
@@ -31,6 +33,8 @@ jobs:
           node --check src/main.js
           node --check src/offline-store.js
           node --check sw.js
+      - name: Verify offline sync and independent agenda photos
+        run: node tests/offline-sync.cjs
       - name: Verify offline app shell
         run: |
           test -f index.html

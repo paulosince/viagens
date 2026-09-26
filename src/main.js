@@ -9,6 +9,8 @@ let supabaseLoad = null;
 let leafletLoad = null;
 let orderedDaySchemaSupport = null;
 let outboxFlushPromise = null;
+let outboxSyncing = false;
+let lastOutboxError = null;
 
 async function ensureSupabase() {
   if (supabase) return supabase;
@@ -295,10 +297,15 @@ async function refreshSyncStatus() {
 
   if (pending) {
     dom.syncStatus.dataset.kind = 'pending';
-    dom.syncStatus.textContent = `Salvo neste iPhone · ${pending} ${pending === 1 ? 'alteração pendente' : 'alterações pendentes'}`;
+    const count = `${pending} ${pending === 1 ? 'alteração pendente' : 'alterações pendentes'}`;
+    dom.syncStatus.textContent = outboxSyncing
+      ? `Sincronizando · ${count}`
+      : `Salvo neste iPhone · ${count}${lastOutboxError ? ' · tocar para tentar novamente' : ''}`;
+    dom.syncStatus.title = lastOutboxError ? `Última falha: ${lastOutboxError.message || lastOutboxError}` : '';
     return;
   }
 
+  dom.syncStatus.title = '';
   if (!snapshotAt) {
     dom.syncStatus.dataset.kind = 'pending';
     dom.syncStatus.textContent = 'Cópia offline ainda não concluída';
@@ -878,23 +885,25 @@ async function enrichDayPage(day, activities, locations) {
 
     if (!changed) return;
 
-    const updatedDay = { ...day };
+    await queueDaySave(dayId, async () => {
+      // An image search can take seconds. Let a newer user edit win if this day
+      // changed while the search was running; enrichment can retry next opening.
+      if (state.dayActivities.get(dayId) !== activities || state.dayLocations.get(dayId) !== locations) return;
 
-    await offlineStore.saveDayBundle(updatedDay, updatedActivities, updatedLocations);
-    await offlineStore.enqueueMutation({
-      type: 'save-day',
-      tripId: String(day.trip_id || state.activeTripId),
-      dayId: day.id,
-      dayPatch: { status: day.status || 'planned' },
-      locations: updatedLocations,
-      activities: updatedActivities,
-      removedLocationIds: [],
-      removedActivityIds: []
+      const updatedDay = state.tripDays.find(item => String(item.id) === dayId) || day;
+      await offlineStore.saveDayBundle(updatedDay, updatedActivities, updatedLocations);
+      await offlineStore.enqueueMutation({
+        type: 'save-day-items',
+        tripId: String(day.trip_id || state.activeTripId),
+        dayId: day.id,
+        locations: updatedLocations.filter(location => recordsDiffer(location, locations.find(item => String(item.id) === String(location.id)))),
+        activities: updatedActivities.filter(activity => recordsDiffer(activity, activities.find(item => String(item.id) === String(activity.id))))
+      });
+      await refreshSyncStatus();
+
+      applyLocalDaySave(updatedDay, updatedActivities, updatedLocations);
+      flushOutbox().catch(error => console.warn('Enriquecimento aguardando sincronização', error));
     });
-    await refreshSyncStatus();
-
-    applyLocalDaySave(updatedDay, updatedActivities, updatedLocations);
-    flushOutbox().catch(error => console.warn('Enriquecimento aguardando sincronização', error));
   } finally {
     state.enrichingDays.delete(dayId);
   }
@@ -1774,42 +1783,22 @@ async function persistDayHeroChange(day, dayPatch, { rerender = true } = {}) {
   state.daySaveVersions.set(dayId, saveVersion);
   setDaySaveState(dayId, 'saving');
 
-  const activities = (state.dayActivities.get(dayId) || []).map(activity => ({ ...activity }));
-  const locations = (state.dayLocations.get(dayId) || []).map(location => ({ ...location }));
   const patch = { status: day.status || 'planned', ...dayPatch };
-  const updatedDay = { ...day, ...patch };
 
   return queueDaySave(dayId, async () => {
     try {
       setDaySaveState(dayId, 'saving');
+      const currentDay = state.tripDays.find(item => String(item.id) === dayId) || day;
+      const updatedDay = { ...currentDay, ...patch };
+      const activities = state.dayActivities.get(dayId) || [];
+      const locations = state.dayLocations.get(dayId) || [];
       await offlineStore.saveDayBundle(updatedDay, activities, locations);
-      if (activityId) {
-        const targetActivity = activities.find(item => String(item.id) === String(activityId)) || null;
-        const locationId = options.locationId || null;
-        const targetLocation = locationId
-          ? locations.find(item => String(item.id) === String(locationId)) || null
-          : null;
-
-        await offlineStore.enqueueMutation({
-          type: 'save-inline-activity',
-          tripId: String(day.trip_id || state.activeTripId),
-          dayId: day.id,
-          dayPatch: patch,
-          activity: targetActivity,
-          location: targetLocation
-        });
-      } else {
-        await offlineStore.enqueueMutation({
-          type: 'save-day',
-          tripId: String(day.trip_id || state.activeTripId),
-          dayId: day.id,
-          dayPatch: patch,
-          locations,
-          activities,
-          removedLocationIds: [],
-          removedActivityIds: []
-        });
-      }
+      await offlineStore.enqueueMutation({
+        type: 'save-day-patch',
+        tripId: String(day.trip_id || state.activeTripId),
+        dayId: day.id,
+        dayPatch: patch
+      });
 
       updateInlineDayState(updatedDay, activities, locations);
       await refreshSyncStatus();
@@ -2019,9 +2008,8 @@ function updateInlineDayState(day, activities, locations) {
 }
 
 async function persistInlineDayChange(day, activities, locations, dayPatch = {}, options = {}) {
-  const { activityId = null, rerender = true } = options;
+  const { activityId = null, locationId = null, rerender = true } = options;
   const patch = { status: day.status || 'planned', ...dayPatch };
-  const updatedDay = { ...day, ...patch };
   const saveVersion = activityId
     ? (state.agendaSaveVersions.get(String(activityId)) || 0) + 1
     : 0;
@@ -2034,19 +2022,37 @@ async function persistInlineDayChange(day, activities, locations, dayPatch = {},
   const save = async () => {
     try {
       if (activityId) setAgendaSaveState(activityId, 'saving');
-      await offlineStore.saveDayBundle(updatedDay, activities, locations);
+      const dayId = String(day.id);
+      const currentDay = state.tripDays.find(item => String(item.id) === dayId) || day;
+      const updatedDay = { ...currentDay, ...patch };
+      const targetActivity = activityId ? activities.find(item => String(item.id) === String(activityId)) : null;
+      const targetLocation = locationId ? locations.find(item => String(item.id) === String(locationId)) : null;
+      const currentActivities = state.dayActivities.get(dayId) || activities;
+      const currentLocations = state.dayLocations.get(dayId) || locations;
+      const mergedActivities = targetActivity
+        ? currentActivities.some(item => String(item.id) === String(activityId))
+          ? currentActivities.map(item => String(item.id) === String(activityId) ? targetActivity : item)
+          : [...currentActivities, targetActivity]
+        : currentActivities;
+      const mergedLocations = targetLocation
+        ? currentLocations.some(item => String(item.id) === String(locationId))
+          ? currentLocations.map(item => String(item.id) === String(locationId) ? targetLocation : item)
+          : [...currentLocations, targetLocation]
+        : currentLocations;
+
+      await offlineStore.saveDayBundle(updatedDay, mergedActivities, mergedLocations);
       await offlineStore.enqueueMutation({
-        type: 'save-day',
+        type: activityId ? 'save-inline-activity' : 'save-day-patch',
         tripId: String(day.trip_id || state.activeTripId),
         dayId: day.id,
         dayPatch: patch,
-        locations,
-        activities,
-        removedLocationIds: [],
-        removedActivityIds: []
+        ...(activityId ? {
+          activity: targetActivity || null,
+          location: targetLocation || null
+        } : {})
       });
 
-      updateInlineDayState(updatedDay, activities, locations);
+      updateInlineDayState(updatedDay, mergedActivities, mergedLocations);
       await refreshSyncStatus();
 
       if (activityId && state.agendaSaveVersions.get(String(activityId)) === saveVersion) {
@@ -2068,7 +2074,8 @@ async function persistInlineDayChange(day, activities, locations, dayPatch = {},
     }
   };
 
-  return activityId ? queueAgendaSave(activityId, save) : save();
+  const serializedSave = () => queueDaySave(day.id, save);
+  return activityId ? queueAgendaSave(activityId, serializedSave) : serializedSave();
 }
 
 function cloneDayRecords(day) {
@@ -2077,6 +2084,17 @@ function cloneDayRecords(day) {
     activities: (state.dayActivities.get(dayId) || []).map(activity => ({ ...activity })),
     locations: (state.dayLocations.get(dayId) || []).map(location => ({ ...location }))
   };
+}
+
+function recordsDiffer(after, before) {
+  if (!before) return true;
+  return [...new Set([...Object.keys(after), ...Object.keys(before)])].some(key => {
+    if (after[key] === before[key]) return false;
+    if (after[key] && before[key] && typeof after[key] === 'object' && typeof before[key] === 'object') {
+      return JSON.stringify(after[key]) !== JSON.stringify(before[key]);
+    }
+    return true;
+  });
 }
 
 function beginInlineTimeEdit(button, day, activity) {
@@ -2215,7 +2233,7 @@ function locationDraft(location, activity) {
     id: location?.id || crypto.randomUUID(),
     name: location?.name || activity.place_name || primaryActivityPlace(activity) || '',
     selectedName: location?.name || activity.place_name || '',
-    photoUrl: activity.photo_url || location?.photo_url || '',
+    photoUrl: location?.photo_url || '',
     provider: location?.provider || '',
     providerPlaceId: location?.provider_place_id || '',
     formattedAddress: location?.formatted_address || activity.address || '',
@@ -2270,7 +2288,7 @@ async function saveInlinePlaceSelection(context, draft) {
     photo_author: draft.photoAuthor || null,
     photo_author_url: draft.photoAuthorUrl || null,
     photo_source_url: draft.photoSourceUrl || null,
-    photo_url: draft.photoUrl || location?.photo_url || activity.photo_url || null
+    photo_url: draft.photoUrl || location?.photo_url || null
   };
 
   if (location) Object.assign(location, record);
@@ -2310,8 +2328,7 @@ async function saveInlinePhoto(day, activity, location, file) {
   // but changing one agenda item's photo must never mutate the place or siblings.
   targetActivity.photo_url = photoUrl;
 
-  const patch = day.photo_url ? {} : { photo_url: photoUrl };
-  await persistInlineDayChange(day, records.activities, records.locations, patch, { activityId: activity.id });
+  await persistInlineDayChange(day, records.activities, records.locations, {}, { activityId: activity.id });
   await recordChange({
     tripId: day.trip_id || state.activeTripId,
     entityType: 'activity',
@@ -2693,7 +2710,7 @@ function locationForRemote(location) {
   };
 }
 
-async function syncMutation(mutation) {
+async function syncMutation(mutation, previousDay = null) {
   const client = await trySupabase();
   if (!client) throw new Error('Backend indisponível.');
 
@@ -2760,21 +2777,31 @@ async function syncMutation(mutation) {
     return;
   }
 
-  if (mutation.type !== 'save-day') return;
-  const savedDay = await client
-    .from('trip_days')
-    .update(dayPatchForRemote(mutation.dayPatch || {}, orderedSchema))
-    .eq('id', mutation.dayId);
-  if (savedDay.error) throw savedDay.error;
+  if (mutation.type !== 'save-day' && mutation.type !== 'save-day-patch' && mutation.type !== 'save-day-items') return;
+  if (mutation.type !== 'save-day-items') {
+    const savedDay = await client
+      .from('trip_days')
+      .update(dayPatchForRemote(mutation.dayPatch || {}, orderedSchema))
+      .eq('id', mutation.dayId);
+    if (savedDay.error) throw savedDay.error;
+  }
+  if (mutation.type === 'save-day-patch') return;
 
-  if (mutation.locations?.length) {
-    const savedLocations = await client.from('day_locations').upsert(mutation.locations.map(locationForRemote));
+  // Older queued edits include the whole day and repeat large photos. Preserve
+  // every edit and snapshot, but upload only rows changed since the last edit.
+  const locations = (mutation.locations || []).filter(location =>
+    recordsDiffer(location, previousDay?.locations.get(String(location.id))));
+  const activities = (mutation.activities || []).filter(activity =>
+    recordsDiffer(activity, previousDay?.activities.get(String(activity.id))));
+
+  if (locations.length) {
+    const savedLocations = await client.from('day_locations').upsert(locations.map(locationForRemote));
     if (savedLocations.error) throw savedLocations.error;
   }
 
-  if (mutation.activities?.length) {
+  if (activities.length) {
     const day = state.tripDays.find(item => String(item.id) === String(mutation.dayId)) || null;
-    const remoteActivities = mutation.activities.map(activity => activityForRemote(activity, orderedSchema, day));
+    const remoteActivities = activities.map(activity => activityForRemote(activity, orderedSchema, day));
     const savedActivities = await client.from('activities').upsert(remoteActivities);
     if (savedActivities.error) throw savedActivities.error;
   }
@@ -2790,6 +2817,31 @@ async function syncMutation(mutation) {
   }
 }
 
+function rememberSyncedDayMutation(map, mutation) {
+  const dayId = String(mutation.dayId || '');
+  if (!dayId || !['save-day', 'save-day-items', 'save-inline-activity'].includes(mutation.type)) return;
+
+  let previous = map.get(dayId);
+  if (!previous && mutation.type === 'save-day' && !mutation.partialDay) {
+    previous = { activities: new Map(), locations: new Map() };
+    map.set(dayId, previous);
+  }
+  if (!previous) return;
+
+  if (mutation.type === 'save-day' && !mutation.partialDay) {
+    previous.activities = new Map((mutation.activities || []).map(item => [String(item.id), item]));
+    previous.locations = new Map((mutation.locations || []).map(item => [String(item.id), item]));
+  } else if (mutation.type === 'save-inline-activity') {
+    if (mutation.activity) previous.activities.set(String(mutation.activity.id), mutation.activity);
+    if (mutation.location) previous.locations.set(String(mutation.location.id), mutation.location);
+  } else {
+    for (const item of mutation.activities || []) previous.activities.set(String(item.id), item);
+    for (const item of mutation.locations || []) previous.locations.set(String(item.id), item);
+  }
+  for (const id of mutation.removedActivityIds || []) previous.activities.delete(String(id));
+  for (const id of mutation.removedLocationIds || []) previous.locations.delete(String(id));
+}
+
 async function flushOutbox() {
   if (outboxFlushPromise) return outboxFlushPromise;
 
@@ -2799,24 +2851,34 @@ async function flushOutbox() {
       return false;
     }
     if (!await trySupabase()) {
+      lastOutboxError = new Error('Não foi possível conectar ao Supabase.');
       await refreshSyncStatus();
       return false;
     }
 
-    const mutations = await offlineStore.listOutbox();
-    for (const mutation of mutations) {
-      try {
-        await syncMutation(mutation);
-        await offlineStore.removeMutation(mutation.id);
-      } catch (error) {
-        console.warn('Sincronização pendente', error);
-        await refreshSyncStatus();
-        return false;
-      }
-    }
-
+    const syncedDays = new Map();
+    outboxSyncing = true;
+    lastOutboxError = null;
     await refreshSyncStatus();
-    return true;
+    try {
+      while (true) {
+        const [mutation] = await offlineStore.listOutbox();
+        if (!mutation) return true;
+        try {
+          await syncMutation(mutation, syncedDays.get(String(mutation.dayId)));
+          rememberSyncedDayMutation(syncedDays, mutation);
+          await offlineStore.removeMutation(mutation.id);
+          await refreshSyncStatus();
+        } catch (error) {
+          lastOutboxError = error;
+          console.warn('Sincronização pendente', error);
+          return false;
+        }
+      }
+    } finally {
+      outboxSyncing = false;
+      await refreshSyncStatus();
+    }
   })();
 
   try {
@@ -2898,8 +2960,12 @@ async function saveDayEditor() {
     .filter(activity => activity.text.trim())
     .map((activity, position) => {
       const location = editor.locations.find(item => item.id === activity.locationId);
+      const previous = previousActivityById.get(String(activity.id));
+      const previousPlacePhoto = previous && activityLocation(previous, previousLocations)?.photo_url;
+      const ownPhoto = previous?.photo_url && previous.photo_url !== previousPlacePhoto
+        ? previous.photo_url : null;
       return {
-        ...(previousActivityById.get(String(activity.id)) || {}),
+        ...(previous || {}),
         id: activity.id,
         day_id: editor.day.id,
         period: periodFromTime(activity.time),
@@ -2911,7 +2977,7 @@ async function saveDayEditor() {
         address: location?.formattedAddress || null,
         latitude: location?.latitude ?? null,
         longitude: location?.longitude ?? null,
-        photo_url: previousActivityById.get(String(activity.id))?.photo_url || location?.photoUrl || null
+        photo_url: ownPhoto
       };
     });
 
@@ -2929,11 +2995,12 @@ async function saveDayEditor() {
     await offlineStore.saveDayBundle(localDay, activities, locations);
     await offlineStore.enqueueMutation({
       type: 'save-day',
+      partialDay: true,
       tripId: String(editor.day.trip_id || state.activeTripId),
       dayId: editor.day.id,
       dayPatch,
-      locations,
-      activities,
+      locations: locations.filter(location => recordsDiffer(location, previousLocationById.get(String(location.id)))),
+      activities: activities.filter(activity => recordsDiffer(activity, previousActivityById.get(String(activity.id)))),
       removedLocationIds,
       removedActivityIds
     });
@@ -4198,6 +4265,14 @@ async function boot() {
 }
 
 window.addEventListener('offline', () => { refreshSyncStatus().catch(console.warn); });
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && state.user) {
+    flushOutbox().catch(error => console.warn('Fila local aguardando sincronização', error));
+  }
+});
+dom.syncStatus.addEventListener('click', () => {
+  flushOutbox().catch(error => console.warn('Fila local aguardando sincronização', error));
+});
 window.addEventListener('online', () => {
   refreshSyncStatus().catch(console.warn);
   flushOutbox().then(synced => {

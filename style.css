@@ -250,6 +250,12 @@ button { -webkit-tap-highlight-color: transparent; }
 .home-context { margin: 0; color: var(--text); font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
 .session-reference { margin: 2px 0 4px; color: var(--secondary); font-size: 11px; opacity: .8; }
 .sync-status {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 6px;
