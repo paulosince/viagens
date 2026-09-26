@@ -812,7 +812,7 @@ async function enrichDayPage(day, activities, locations) {
             photo_author: null,
             photo_author_url: null,
             photo_source_url: null,
-            photo_url: activity.photo_url || null
+            photo_url: null
           };
           updatedLocations.push(location);
           changed = true;
@@ -849,7 +849,7 @@ async function enrichDayPage(day, activities, locations) {
             photo_author: null,
             photo_author_url: null,
             photo_source_url: null,
-            photo_url: activity.photo_url || null
+            photo_url: null
           };
           updatedLocations.push(location);
           changed = true;
@@ -871,12 +871,8 @@ async function enrichDayPage(day, activities, locations) {
           location.photo_author = photo.author || null;
           location.photo_author_url = photo.authorUrl || null;
           location.photo_source_url = photo.sourceUrl || null;
-          activity.photo_url = photo.imageUrl;
           changed = true;
         }
-      } else if (!activity.photo_url) {
-        activity.photo_url = location.photo_url;
-        changed = true;
       }
     }
 
@@ -1787,16 +1783,33 @@ async function persistDayHeroChange(day, dayPatch, { rerender = true } = {}) {
     try {
       setDaySaveState(dayId, 'saving');
       await offlineStore.saveDayBundle(updatedDay, activities, locations);
-      await offlineStore.enqueueMutation({
-        type: 'save-day',
-        tripId: String(day.trip_id || state.activeTripId),
-        dayId: day.id,
-        dayPatch: patch,
-        locations,
-        activities,
-        removedLocationIds: [],
-        removedActivityIds: []
-      });
+      if (activityId) {
+        const targetActivity = activities.find(item => String(item.id) === String(activityId)) || null;
+        const locationId = options.locationId || null;
+        const targetLocation = locationId
+          ? locations.find(item => String(item.id) === String(locationId)) || null
+          : null;
+
+        await offlineStore.enqueueMutation({
+          type: 'save-inline-activity',
+          tripId: String(day.trip_id || state.activeTripId),
+          dayId: day.id,
+          dayPatch: patch,
+          activity: targetActivity,
+          location: targetLocation
+        });
+      } else {
+        await offlineStore.enqueueMutation({
+          type: 'save-day',
+          tripId: String(day.trip_id || state.activeTripId),
+          dayId: day.id,
+          dayPatch: patch,
+          locations,
+          activities,
+          removedLocationIds: [],
+          removedActivityIds: []
+        });
+      }
 
       updateInlineDayState(updatedDay, activities, locations);
       await refreshSyncStatus();
@@ -2202,7 +2215,7 @@ function locationDraft(location, activity) {
     id: location?.id || crypto.randomUUID(),
     name: location?.name || activity.place_name || primaryActivityPlace(activity) || '',
     selectedName: location?.name || activity.place_name || '',
-    photoUrl: location?.photo_url || activity.photo_url || '',
+    photoUrl: activity.photo_url || location?.photo_url || '',
     provider: location?.provider || '',
     providerPlaceId: location?.provider_place_id || '',
     formattedAddress: location?.formatted_address || activity.address || '',
@@ -2268,10 +2281,11 @@ async function saveInlinePlaceSelection(context, draft) {
   activity.address = record.formatted_address;
   activity.latitude = record.latitude;
   activity.longitude = record.longitude;
-  if (record.photo_url) activity.photo_url = record.photo_url;
-
   setAgendaSaveState(activity.id, 'saving');
-  await persistInlineDayChange(day, records.activities, records.locations, {}, { activityId: activity.id });
+  await persistInlineDayChange(day, records.activities, records.locations, {}, {
+    activityId: activity.id,
+    locationId: record.id
+  });
   if (previousPlace !== record.name) {
     await recordChange({
       tripId: day.trip_id || state.activeTripId,
@@ -2672,6 +2686,13 @@ function activityForRemote(activity, orderedSchema, day = null) {
   return record;
 }
 
+function locationForRemote(location) {
+  return {
+    ...location,
+    created_at: location?.created_at || new Date().toISOString()
+  };
+}
+
 async function syncMutation(mutation) {
   const client = await trySupabase();
   if (!client) throw new Error('Backend indisponível.');
@@ -2717,6 +2738,28 @@ async function syncMutation(mutation) {
     return;
   }
 
+  if (mutation.type === 'save-inline-activity') {
+    const savedDay = await client
+      .from('trip_days')
+      .update(dayPatchForRemote(mutation.dayPatch || {}, orderedSchema))
+      .eq('id', mutation.dayId);
+    if (savedDay.error) throw savedDay.error;
+
+    if (mutation.location) {
+      const savedLocation = await client.from('day_locations').upsert(locationForRemote(mutation.location));
+      if (savedLocation.error) throw savedLocation.error;
+    }
+
+    if (mutation.activity) {
+      const day = state.tripDays.find(item => String(item.id) === String(mutation.dayId)) || null;
+      const savedActivity = await client
+        .from('activities')
+        .upsert(activityForRemote(mutation.activity, orderedSchema, day));
+      if (savedActivity.error) throw savedActivity.error;
+    }
+    return;
+  }
+
   if (mutation.type !== 'save-day') return;
   const savedDay = await client
     .from('trip_days')
@@ -2725,7 +2768,7 @@ async function syncMutation(mutation) {
   if (savedDay.error) throw savedDay.error;
 
   if (mutation.locations?.length) {
-    const savedLocations = await client.from('day_locations').upsert(mutation.locations);
+    const savedLocations = await client.from('day_locations').upsert(mutation.locations.map(locationForRemote));
     if (savedLocations.error) throw savedLocations.error;
   }
 
@@ -2868,7 +2911,7 @@ async function saveDayEditor() {
         address: location?.formattedAddress || null,
         latitude: location?.latitude ?? null,
         longitude: location?.longitude ?? null,
-        photo_url: location?.photoUrl || null
+        photo_url: previousActivityById.get(String(activity.id))?.photo_url || location?.photoUrl || null
       };
     });
 
