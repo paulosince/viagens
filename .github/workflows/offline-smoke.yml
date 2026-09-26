@@ -30,8 +30,8 @@ jobs:
           node-version: '22'
       - name: Parse JavaScript
         run: |
-          node --check src/main.js
-          node --check src/offline-store.js
+          node --input-type=module --check < src/main.js
+          node --input-type=module --check < src/offline-store.js
           node --check sw.js
       - name: Verify offline sync and independent agenda photos
         run: |

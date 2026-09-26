@@ -3586,6 +3586,7 @@ async function fetchTripData(tripId, { preferLocal = false } = {}) {
         stale: true
       };
     }
+    return null;
   }
   if (state.tripDataLoads.has(key)) return state.tripDataLoads.get(key);
   const load = (async () => {
@@ -3664,39 +3665,7 @@ async function ensureTripBaselineSnapshot(tripId) {
   return result.data || null;
 }
 
-async function openTrip(tripId, { pushHistory = true, forceRefresh = false   const key = String(trip.id);
-  const cached = forceRefresh ? null : state.tripDataCache.get(key);
-  if (cached) {
-    applyTripData(cached);
-    dom.tripDayMessage.textContent = '';
-    if (state.activeDayId && cached.days.some(day => String(day.id) === String(state.activeDayId))) openDayPage(state.activeDayId, { pushHistory: false });
-    if (Date.now() - cached.loadedAt < TRIP_CACHE_FRESH_MS) return;
-  } else if (!forceRefresh) {
-    const local = await fetchTripData(trip.id, { preferLocal: true });
-    if (state.activeTripId !== key) return;
-    if (local && local.days.length) {
-      state.tripDataCache.set(key, local);
-      applyTripData(local);
-      dom.tripDayMessage.textContent = '';
-      if (state.activeDayId && local.days.some(day => String(day.id) === String(state.activeDayId))) openDayPage(state.activeDayId, { pushHistory: false });
-    } else {
-      dom.tripDayList.replaceChildren();
-      dom.tripDayMessage.textContent = 'Carregando dias…';
-    }
-  } else {
-    dom.tripDayList.replaceChildren();
-    dom.tripDayMessage.textContent = 'Carregando dias…';
-  }
-  try {
-    const data = await fetchTripData(trip.id);
-    if (state.activeTripId !== key) return;
-    applyTripData(data);
-    dom.tripDayMessage.textContent = '';
-    if (state.activeDayId && data.days.some(day => String(day.id) === String(state.activeDayId))) openDayPage(state.activeDayId, { pushHistory: false });
-  } catch (error) {
-    if (state.activeTripId === key && !state.tripDataCache.get(key)?.days?.length) dom.tripDayMessage.textContent = error.message;
-  }
-} = {}) {
+async function openTrip(tripId, { pushHistory = true, forceRefresh = false } = {}) {
   const trip = state.trips.find(item => String(item.id) === String(tripId));
   if (!trip) return;
   if (pushHistory && (document.body.dataset.tripPage !== 'open' || state.activeTripId !== String(trip.id))) {
@@ -3720,6 +3689,23 @@ async function openTrip(tripId, { pushHistory = true, forceRefresh = false   con
     dom.tripDayMessage.textContent = '';
     if (state.activeDayId && cached.days.some(day => String(day.id) === String(state.activeDayId))) openDayPage(state.activeDayId, { pushHistory: false });
     if (Date.now() - cached.loadedAt < TRIP_CACHE_FRESH_MS) return;
+  } else if (!forceRefresh) {
+    try {
+      const local = await fetchTripData(trip.id, { preferLocal: true });
+      if (state.activeTripId !== key) return;
+      if (local?.days.length) {
+        state.tripDataCache.set(key, local);
+        applyTripData(local);
+        dom.tripDayMessage.textContent = '';
+        if (state.activeDayId && local.days.some(day => String(day.id) === String(state.activeDayId))) openDayPage(state.activeDayId, { pushHistory: false });
+      } else {
+        dom.tripDayList.replaceChildren();
+        dom.tripDayMessage.textContent = 'Carregando dias…';
+      }
+    } catch (error) {
+      dom.tripDayList.replaceChildren();
+      dom.tripDayMessage.textContent = 'Carregando dias…';
+    }
   } else {
     dom.tripDayList.replaceChildren();
     dom.tripDayMessage.textContent = 'Carregando dias…';
@@ -3731,7 +3717,7 @@ async function openTrip(tripId, { pushHistory = true, forceRefresh = false   con
     dom.tripDayMessage.textContent = '';
     if (state.activeDayId && data.days.some(day => String(day.id) === String(state.activeDayId))) openDayPage(state.activeDayId, { pushHistory: false });
   } catch (error) {
-    if (state.activeTripId === key && !cached) dom.tripDayMessage.textContent = error.message;
+    if (state.activeTripId === key && !state.tripDataCache.get(key)?.days?.length) dom.tripDayMessage.textContent = error.message;
   }
 }
 

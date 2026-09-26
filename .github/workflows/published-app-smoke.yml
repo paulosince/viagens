@@ -14,117 +14,38 @@ on:
 jobs:
   published:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
     steps:
-      - name: Wait for GitHub Pages and verify build
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify the exact published app shell
         shell: bash
         run: |
-          url='https://paulosince.github.io/viagens/'
-          for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
-            html="$(curl --location --silent --show-error --max-time 20 "$url" || true)"
-            js="$(curl --location --silent --show-error --max-time 20 "$url/src/main.js?v=20260926-14" || true)"
-            css="$(curl --location --silent --show-error --max-time 20 "$url/style.css?v=20260926-14" || true)"
-            chatgpt_icon="$(curl --location --silent --show-error --max-time 20 "$url/assets/chatgpt-mark.svg" || true)"
-            offline="$(curl --location --silent --show-error --max-time 20 "$url/src/offline-store.js?v=snapshot-order" || true)"
-            consent="$(curl --location --silent --show-error --max-time 20 "$url/oauth/consent/" || true)"
-            mcp_headers="$(curl --silent --show-error --max-time 20 -i 'https://siabldasqinpfmxslwji.supabase.co/functions/v1/viaggio-mcp' || true)"
-            if grep -q 'src/main.js?v=20260926-14' <<<"$html" &&
-               grep -q 'id="saved_trip_passenger_list"' <<<"$html" &&
-               grep -q 'saveReusablePassengers' <<<"$js" &&
-               grep -q 'style.css?v=20260926-14' <<<"$html" &&
-               grep -q 'assets/chatgpt-mark.svg' <<<"$html" &&
-               grep -q 'viewBox="0 0 180 180"' <<<"$chatgpt_icon" &&
-               grep -q 'has_chatgpt_connection' <<<"$js" &&
-               grep -q 'loadDayRecords' <<<"$js" &&
-               grep -q 'id="day_attachments_button"' <<<"$html" &&
-               grep -q 'DAY_ATTACHMENT_BUCKET' <<<"$js" &&
-               grep -q 'day-attachments-sheet' <<<"$css" &&
-               grep -q 'id="add_day_page_activity"' <<<"$html" &&
-               grep -q 'dayMapGroups(points)' <<<"$js" &&
-               grep -q 'Sem posição no mapa' <<<"$js" &&
-               grep -q 'id="day_agenda_sticky_marker"' <<<"$html" &&
-               grep -q 'updateAgendaAddStickyState' <<<"$js" &&
-               grep -q 'trip-page-back svg, .day-page-add svg' <<<"$css" &&
-               grep -q 'newAgendaActivity' <<<"$js" &&
-               grep -q 'id="sync_status"' <<<"$html" &&
-               grep -q 'enrichDayPage' <<<"$js" &&
-               grep -q 'loadLocalWorkspace' <<<"$js" &&
-               grep -q 'refreshWorkspaceInBackground' <<<"$js" &&
-               grep -q 'fitBounds' <<<"$js" &&
-               grep -q 'orderedDayActivities(activities)' <<<"$js" &&
-               grep -q 'beginInlineTimeEdit' <<<"$js" &&
-               grep -q 'openInlinePlaceSearch' <<<"$js" &&
-               grep -q 'saveInlinePhoto' <<<"$js" &&
-               grep -q 'day-inline-camera' <<<"$css" &&
-               grep -q 'day-inline-title' <<<"$css" &&
-               grep -q 'agenda-save-pulse' <<<"$css" &&
-               grep -q 'agendaSaveVersions' <<<"$js" &&
-               grep -q 'setAgendaSaveState' <<<"$js" &&
-               grep -q 'persistDayHeroChange' <<<"$js" &&
-               grep -q 'beginInlineDayTitleEdit' <<<"$js" &&
-               grep -q 'saveDayHeroPhoto' <<<"$js" &&
-               grep -q 'day-hero-camera' <<<"$css" &&
-               grep -q 'day-photo-icon' <<<"$css" &&
-               grep -q 'L.polyline(route.map' <<<"$js" &&
-               grep -q "changing one agenda item's photo must never mutate" <<<"$js" &&
-               grep -q "activity.photo_url || location?.photo_url" <<<"$js" &&
-               grep -q "save-inline-activity" <<<"$js" &&
-               grep -q "locationForRemote" <<<"$js" &&
-               grep -q "locationId: record.id" <<<"$js" &&
-               ! grep -q "linkedActivity.photo_url = photoUrl" <<<"$js" &&
-               grep -q 'overflow: visible !important' <<<"$css" &&
-               ! grep -q 'id="edit_day_button"' <<<"$html" &&
-               ! grep -q "document.createTextNode('📷')" <<<"$js" &&
-               grep -q 'day-hero-save-status' <<<"$css" &&
-               grep -q 'tripDayCount' <<<"$js" &&
-               grep -q 'derivedDayDate' <<<"$js" &&
-               grep -q 'persistDayOrder' <<<"$js" &&
-               grep -q 'reorder-days' <<<"$js" &&
-               grep -q 'trip-day-order-controls' <<<"$css" &&
-               grep -q 'moveDayByOffset' <<<"$js" &&
-               ! grep -q 'startDayDrag' <<<"$js" &&
-               grep -q 'compareTripsForHome' <<<"$js" &&
-               grep -q 'Viagens realizadas' <<<"$js" &&
-               grep -q 'Próximas viagens' <<<"$js" &&
-               grep -q 'Viagens em andamento' <<<"$js" &&
-               grep -q 'trip-section-title' <<<"$css" &&
-               grep -q 'trip-section-count' <<<"$css" &&
-               grep -q 'setTripSectionCollapsed' <<<"$js" &&
-               grep -q 'revealMovedDay' <<<"$js" &&
-               grep -q "scrollIntoView" <<<"$js" &&
-               grep -q 'recordChange' <<<"$js" &&
-               grep -q 'refreshChangeLog' <<<"$js" &&
-               grep -q 'id="change_log_sheet"' <<<"$html" &&
-               grep -q 'change-log-list' <<<"$css" &&
-               grep -q 'restoreSnapshot' <<<"$js" &&
-               grep -q 'capture_trip_snapshot' <<<"$js" &&
-               grep -q 'ensureTripBaselineSnapshot' <<<"$js" &&
-               grep -q 'change-log-restore' <<<"$css" &&
-               grep -q 'change-log-snapshot-id' <<<"$css" &&
-               grep -q 'lastQueueSequence' <<<"$offline" &&
-               grep -q 'sequence' <<<"$offline" &&
-               grep -q 'id="chatgpt_sheet"' <<<"$html" &&
-               grep -q 'id="home_chatgpt_button"' <<<"$html" &&
-               grep -q 'openChatgptApp' <<<"$js" &&
-               grep -q 'chatgpt://' <<<"$js" &&
-               grep -q 'VIAGGIO_MCP_URL' <<<"$js" &&
-               grep -q 'chatgpt-integration-card' <<<"$css" &&
-               grep -q 'approveAuthorization' <<<"$consent" &&
-               grep -qi 'www-authenticate: Bearer' <<<"$mcp_headers" &&
-               grep -q 'oauth-protected-resource' <<<"$mcp_headers" &&
-               grep -q 'trip-day-recovery' <<<"$css" &&
-               grep -q 'name="day_count"' <<<"$html" &&
-               ! grep -q 'name="end_date"' <<<"$html" &&
-               grep -q 'grid-row: 2' <<<"$css" &&
-               grep -q 'width: 50px' <<<"$css" &&
-               grep -q 'id="splash_status"' <<<"$html" &&
-               grep -q 'day-map-numbered-marker' <<<"$css" &&
-               grep -q '100dvh' <<<"$css"; then
-              echo "Published app is current on attempt $attempt."
+          set -eu
+          base='https://paulosince.github.io/viagens/'
+          main_asset="$(grep -oE 'src/main\.js\?v=[^" ]+' index.html | head -1)"
+          style_asset="$(grep -oE 'style\.css\?v=[^" ]+' index.html | head -1)"
+          test -n "$main_asset" && test -n "$style_asset"
+          mkdir -p /tmp/viaggio-smoke
+          for attempt in $(seq 1 18); do
+            if curl -fsSL --max-time 15 "$base" -o /tmp/viaggio-smoke/index.html &&
+               grep -Fq "$main_asset" /tmp/viaggio-smoke/index.html &&
+               grep -Fq "$style_asset" /tmp/viaggio-smoke/index.html &&
+               curl -fsSL --max-time 15 "$base$main_asset" -o /tmp/viaggio-smoke/main.js &&
+               curl -fsSL --max-time 15 "$base$style_asset" -o /tmp/viaggio-smoke/style.css &&
+               curl -fsSL --max-time 15 "${base}src/offline-store.js" -o /tmp/viaggio-smoke/offline-store.js &&
+               cmp -s src/main.js /tmp/viaggio-smoke/main.js &&
+               cmp -s style.css /tmp/viaggio-smoke/style.css &&
+               cmp -s src/offline-store.js /tmp/viaggio-smoke/offline-store.js; then
+              node --input-type=module --check < /tmp/viaggio-smoke/main.js
+              node --input-type=module --check < /tmp/viaggio-smoke/offline-store.js
+              echo "Published app matches this commit and parses as browser modules."
               exit 0
             fi
-            echo "Attempt $attempt: current build not visible yet."
+            echo "Attempt $attempt: waiting for this commit on GitHub Pages."
             sleep 5
           done
-          echo "Expected offline-first build is not being served at $url"
+          echo 'GitHub Pages did not serve the current, parseable app shell.' >&2
           exit 1
