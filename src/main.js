@@ -3566,8 +3566,22 @@ function applyTripData(data) {
   renderTripDays(days, activitiesByDay, locationsByDay);
 }
 
-async function fetchTripData(tripId) {
+async function fetchTripData(tripId, { preferLocal = false } = {}) {
   const key = String(tripId);
+  if (preferLocal) {
+    const local = await offlineStore.loadTripData(key);
+    if (local.days.length) {
+      return {
+        days: local.days,
+        activitiesByDay: groupByDay(local.activities),
+        locationsByDay: groupByDay(local.locations),
+        loadedAt: 0,
+        version: Date.now(),
+        offline: true,
+        stale: true
+      };
+    }
+  }
   if (state.tripDataLoads.has(key)) return state.tripDataLoads.get(key);
   const load = (async () => {
     const pendingLocalChanges = await offlineStore.hasPendingForTrip(key);
@@ -3645,7 +3659,39 @@ async function ensureTripBaselineSnapshot(tripId) {
   return result.data || null;
 }
 
-async function openTrip(tripId, { pushHistory = true, forceRefresh = false } = {}) {
+async function openTrip(tripId, { pushHistory = true, forceRefresh = false   const key = String(trip.id);
+  const cached = forceRefresh ? null : state.tripDataCache.get(key);
+  if (cached) {
+    applyTripData(cached);
+    dom.tripDayMessage.textContent = '';
+    if (state.activeDayId && cached.days.some(day => String(day.id) === String(state.activeDayId))) openDayPage(state.activeDayId, { pushHistory: false });
+    if (Date.now() - cached.loadedAt < TRIP_CACHE_FRESH_MS) return;
+  } else if (!forceRefresh) {
+    const local = await fetchTripData(trip.id, { preferLocal: true });
+    if (state.activeTripId !== key) return;
+    if (local && local.days.length) {
+      state.tripDataCache.set(key, local);
+      applyTripData(local);
+      dom.tripDayMessage.textContent = '';
+      if (state.activeDayId && local.days.some(day => String(day.id) === String(state.activeDayId))) openDayPage(state.activeDayId, { pushHistory: false });
+    } else {
+      dom.tripDayList.replaceChildren();
+      dom.tripDayMessage.textContent = 'Carregando dias…';
+    }
+  } else {
+    dom.tripDayList.replaceChildren();
+    dom.tripDayMessage.textContent = 'Carregando dias…';
+  }
+  try {
+    const data = await fetchTripData(trip.id);
+    if (state.activeTripId !== key) return;
+    applyTripData(data);
+    dom.tripDayMessage.textContent = '';
+    if (state.activeDayId && data.days.some(day => String(day.id) === String(state.activeDayId))) openDayPage(state.activeDayId, { pushHistory: false });
+  } catch (error) {
+    if (state.activeTripId === key && !state.tripDataCache.get(key)?.days?.length) dom.tripDayMessage.textContent = error.message;
+  }
+} = {}) {
   const trip = state.trips.find(item => String(item.id) === String(tripId));
   if (!trip) return;
   if (pushHistory && (document.body.dataset.tripPage !== 'open' || state.activeTripId !== String(trip.id))) {
