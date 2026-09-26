@@ -1733,7 +1733,7 @@ function openDayPage(dayId, { pushHistory = true } = {}) {
   const derivedDate = derivedDayDate(day);
   dom.dayPageDate.textContent = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' }).format(new Date(`${derivedDate}T12:00:00`));
   renderDayPageAgenda(day, activities, locations);
-  renderDayPageMap(locations, activities);
+  renderDayPageMap(day, locations, activities);
   enrichDayPage(day, activities, locations).catch(error => console.warn('Não foi possível enriquecer o dia', error));
   dom.dayPage.dataset.renderKey = renderKey;
   dom.dayPage.setAttribute('aria-hidden', 'false');
@@ -2528,34 +2528,44 @@ function renderDayPageAgenda(day, activities, locations) {
 
 function dayMapPoints(locations, activities = []) {
   const points = [];
-  const keys = new Set();
+  const scheduledLocationIds = new Set();
 
-  const addPoint = point => {
-    const latitude = numericCoordinate(point.latitude);
-    const longitude = numericCoordinate(point.longitude);
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
-    const key = latitude.toFixed(6) + ':' + longitude.toFixed(6);
-    if (keys.has(key)) return;
-    keys.add(key);
-    points.push({ ...point, latitude, longitude });
-  };
-
-  // The route follows the agenda, not the order in which places were saved.
+  // Every agenda entry stays visible, even when it shares a position or lacks coordinates.
   orderedDayActivities(activities).forEach(activity => {
     const location = activityLocation(activity, locations);
+    if (location?.id != null) scheduledLocationIds.add(String(location.id));
     const hasLocationCoordinates = Number.isFinite(numericCoordinate(location?.latitude))
       && Number.isFinite(numericCoordinate(location?.longitude));
     const source = hasLocationCoordinates ? location : activity;
-    addPoint({
+    points.push({
       name: location?.name || activity.place_name || activity.title || 'Local',
-      latitude: source.latitude,
-      longitude: source.longitude
+      latitude: numericCoordinate(source.latitude),
+      longitude: numericCoordinate(source.longitude),
+      activityId: activity.id,
+      time: activityTime(activity)
     });
   });
-  // Places without an agenda item remain visible after the scheduled stops.
-  locations.forEach(addPoint);
+  // Show independently saved places only if they do not already belong to an agenda item.
+  locations.filter(location => !scheduledLocationIds.has(String(location.id))).forEach(location => {
+    const latitude = numericCoordinate(location.latitude);
+    const longitude = numericCoordinate(location.longitude);
+    if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+      points.push({ name: location.name || 'Local', latitude, longitude });
+    }
+  });
 
   return points;
+}
+
+function dayMapGroups(points) {
+  const groups = new Map();
+  points.forEach((point, index) => {
+    if (!Number.isFinite(point.latitude) || !Number.isFinite(point.longitude)) return;
+    const key = point.latitude.toFixed(6) + ':' + point.longitude.toFixed(6);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push({ ...point, number: index + 1 });
+  });
+  return [...groups.values()];
 }
 
 function renderOsmMapFallback(points, token) {
@@ -2594,8 +2604,11 @@ function renderOsmMapFallback(points, token) {
   dom.dayPageMap.replaceChildren(iframe);
 }
 
-function renderDayPageMap(locations, activities = []) {
+function renderDayPageMap(day, locations, activities = []) {
   const points = dayMapPoints(locations, activities);
+  const mapped = points.filter(point => Number.isFinite(point.latitude) && Number.isFinite(point.longitude));
+  const route = mapped.filter((point, index) => index === 0
+    || point.latitude !== mapped[index - 1].latitude || point.longitude !== mapped[index - 1].longitude);
   const token = ++state.dayMapRenderToken;
 
   if (state.dayMap) {
@@ -2615,29 +2628,51 @@ function renderDayPageMap(locations, activities = []) {
   pinList.className = 'day-view-map-pins';
   points.forEach((point, index) => {
     const item = document.createElement('li');
+    item.dataset.mapped = String(mapped.includes(point));
     const marker = document.createElement('span');
     marker.textContent = String(index + 1);
     const name = document.createElement('strong');
     name.textContent = point.name || ('Local ' + String(index + 1));
-    item.append(marker, name);
+    const details = document.createElement('small');
+    details.textContent = (point.time ? point.time + ' · ' : '')
+      + (item.dataset.mapped === 'true' ? 'No mapa' : 'Sem posição no mapa');
+    const copy = document.createElement('div');
+    copy.append(name, details);
+    item.append(marker, copy);
+    if (item.dataset.mapped === 'false' && point.activityId != null) {
+      const activity = activities.find(entry => String(entry.id) === String(point.activityId));
+      if (activity) {
+        const choosePlace = document.createElement('button');
+        choosePlace.type = 'button';
+        choosePlace.textContent = 'Definir local';
+        choosePlace.addEventListener('click', () => openInlinePlaceSearch(day, activity, activityLocation(activity, locations)));
+        item.append(choosePlace);
+      }
+    }
     pinList.append(item);
   });
+  dom.dayPageDirections.append(pinList);
+
+  if (!mapped.length) {
+    dom.dayPageMap.textContent = 'Os locais da agenda ainda não têm posição no mapa.';
+    return;
+  }
 
   const routeLink = document.createElement('a');
   routeLink.className = 'day-view-route-link';
   routeLink.target = '_blank';
   routeLink.rel = 'noopener';
-  if (points.length > 1) {
+  if (route.length > 1) {
     routeLink.href = 'https://www.openstreetmap.org/directions?engine=fossgis_osrm_foot&route='
-      + points.map(point => point.latitude + '%2C' + point.longitude).join('%3B');
+      + route.map(point => point.latitude + '%2C' + point.longitude).join('%3B');
     routeLink.textContent = 'Abrir direções do dia';
   } else {
-    routeLink.href = 'https://www.openstreetmap.org/?mlat=' + points[0].latitude
-      + '&mlon=' + points[0].longitude
-      + '#map=16/' + points[0].latitude + '/' + points[0].longitude;
+    routeLink.href = 'https://www.openstreetmap.org/?mlat=' + mapped[0].latitude
+      + '&mlon=' + mapped[0].longitude
+      + '#map=16/' + mapped[0].latitude + '/' + mapped[0].longitude;
     routeLink.textContent = 'Abrir local no mapa';
   }
-  dom.dayPageDirections.append(pinList, routeLink);
+  dom.dayPageDirections.append(routeLink);
 
   dom.dayPageMap.textContent = 'Carregando mapa…';
 
@@ -2659,23 +2694,29 @@ function renderDayPageMap(locations, activities = []) {
     }).addTo(map);
 
     const bounds = [];
-    points.forEach((point, index) => {
-      const latLng = [point.latitude, point.longitude];
+    dayMapGroups(points).forEach(group => {
+      const first = group[0];
+      const latLng = [first.latitude, first.longitude];
       bounds.push(latLng);
       const icon = L.divIcon({
         className: 'day-map-numbered-marker',
-        html: '<span><b>' + String(index + 1) + '</b></span>',
+        html: '<span><b>' + String(first.number) + '</b>'
+          + (group.length > 1 ? '<i>+' + String(group.length - 1) + '</i>' : '') + '</span>',
         iconSize: [34, 40],
         iconAnchor: [17, 40],
         popupAnchor: [0, -38]
       });
-      L.marker(latLng, { icon })
-        .addTo(map)
-        .bindPopup(point.name || ('Local ' + String(index + 1)));
+      const popup = document.createElement('div');
+      group.forEach(point => {
+        const label = document.createElement('div');
+        label.textContent = point.number + '. ' + point.name + (point.time ? ' · ' + point.time : '');
+        popup.append(label);
+      });
+      L.marker(latLng, { icon }).addTo(map).bindPopup(popup);
     });
 
-    if (bounds.length > 1) {
-      L.polyline(bounds, {
+    if (route.length > 1) {
+      L.polyline(route.map(point => [point.latitude, point.longitude]), {
         color: '#0a84ff',
         weight: 4,
         opacity: .72,
@@ -2692,7 +2733,7 @@ function renderDayPageMap(locations, activities = []) {
     }
 
     requestAnimationFrame(() => map.invalidateSize());
-  }).catch(() => renderOsmMapFallback(points, token));
+  }).catch(() => renderOsmMapFallback(mapped, token));
 }
 
 function closeDayPage() {

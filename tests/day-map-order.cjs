@@ -14,7 +14,7 @@ function extract(name) {
 const context = vm.createContext({});
 vm.runInContext(
   ['activityTime', 'activityLocation', 'numericCoordinate', 'primaryActivityPlace',
-    'activityLooksGeocodable', 'orderedDayActivities', 'dayMapPoints']
+    'activityLooksGeocodable', 'orderedDayActivities', 'dayMapPoints', 'dayMapGroups']
     .map(extract).join('\n'),
   context
 );
@@ -34,9 +34,21 @@ const activities = [
 ];
 
 const route = context.dayMapPoints(locations, activities);
-assert.deepEqual(Array.from(route, point => point.name), ['Guarulhos', 'Heathrow']);
-assert.deepEqual(Array.from(route, point => point.latitude), [-23.4356, 51.467739]);
+assert.deepEqual(Array.from(route, point => point.name), ['Guarulhos', 'Sala VIP', 'Guarulhos', 'Heathrow']);
+assert.deepEqual(Array.from(route, point => point.latitude), [-23.4356, -23.4356, -23.4356, 51.467739]);
 assert.equal(activities[0].title, 'Voo Guarulhos → Londres'); // No mutation of source order.
+
+// Two stops at the same airport and a place without coordinates still appear in the list.
+const withMissing = context.dayMapPoints(locations, [
+  {id: 'home-activity', title: 'Saída de casa', place_id: 'home', start_time: '12:00:00'},
+  ...activities
+]);
+assert.equal(withMissing.length, 5);
+assert.equal(withMissing[0].name, 'Casa');
+assert.equal(withMissing[0].latitude, null);
+assert.equal(withMissing[0].activityId, 'home-activity');
+assert.equal(withMissing[0].time, '12:00');
+assert.deepEqual(Array.from(context.dayMapGroups(withMissing), group => Array.from(group, point => point.number)), [[2, 3, 4], [5]]);
 
 // A saved place with missing coordinates can use its activity's coordinates.
 const incomplete = context.dayMapPoints(
