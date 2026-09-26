@@ -3660,7 +3660,6 @@ function compareTripsForHome(a, b, now = new Date()) {
 function createTripSectionTitle(text) {
   const item = document.createElement('li');
   item.className = 'trip-section-title';
-  item.setAttribute('aria-hidden', 'true');
 
   const heading = document.createElement('h2');
   heading.textContent = text;
@@ -3683,13 +3682,18 @@ function syncTripList() {
 
   dom.tripList.replaceChildren();
 
-  let pastSectionAdded = false;
+  const sectionLabels = {
+    current: 'Viagens em andamento',
+    upcoming: 'Próximas viagens',
+    past: 'Viagens realizadas'
+  };
+  let previousGroup = null;
   for (const trip of visibleTrips) {
     const group = tripListGroup(trip, now);
 
-    if (group === 'past' && !pastSectionAdded) {
-      dom.tripList.append(createTripSectionTitle('Viagens realizadas'));
-      pastSectionAdded = true;
+    if (group !== previousGroup) {
+      dom.tripList.append(createTripSectionTitle(sectionLabels[group]));
+      previousGroup = group;
     }
 
     let item = existingCards.get(String(trip.id));
