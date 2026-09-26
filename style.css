@@ -1211,6 +1211,15 @@ body[data-day-page="open"] .day-page {
   line-height: 1;
   letter-spacing: -.035em;
 }
+.day-map-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.day-map-heading h2 { margin: 0; }
+.day-map-toggle { display: inline-flex; min-height: 44px; align-items: center; gap: 7px; padding: 0 14px; border: 0; border-radius: 999px; color: var(--ios-blue); background: rgba(0,122,255,.1); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.day-map-toggle svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.day-map-toggle:focus-visible { outline: 3px solid var(--ios-blue); outline-offset: 2px; }
+.day-page[data-map-expanded="true"] { overflow: hidden; }
+.day-map-section[data-expanded="true"] { position: fixed; z-index: 25; inset: calc(env(safe-area-inset-top) + 10px) 10px calc(env(safe-area-inset-bottom) + 10px); display: flex; flex-direction: column; min-width: 0; margin: 0; padding: 16px; border-radius: 24px; background: #f2f2f7; box-shadow: 0 0 0 100vmax rgba(12,20,32,.55), 0 12px 36px rgba(0,0,0,.25); }
+.day-map-section[data-expanded="true"] .day-view-map { flex: 1 1 auto; min-height: 0; height: auto; }
+.day-map-section[data-expanded="true"] .day-view-directions { flex: 0 1 auto; max-height: min(25svh, 200px); overflow-y: auto; overscroll-behavior: contain; }
 .day-view-agenda {
   margin: 0;
   padding: 0;

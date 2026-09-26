@@ -75,6 +75,7 @@ const state = {
   dayEditor: null,
   placeSearch: null,
   dayMap: null,
+  dayMapBounds: null,
   dayMapRenderToken: 0,
   dayAttachments: new Map(),
   dayAttachmentLoads: new Map(),
@@ -93,6 +94,8 @@ const state = {
 };
 
 const dom = {
+  dayMapSection: document.querySelector('#day_map_section'),
+  dayMapToggle: document.querySelector('#day_map_toggle'),
   tripPageDuration: document.querySelector('#trip_page_duration'),
   tripPageShare: document.querySelector('#trip_page_share'), tripShareSheet: document.querySelector('#trip_share_sheet'), tripShareScrim: document.querySelector('#trip_share_scrim'), closeTripShare: document.querySelector('#close_trip_share'), tripShareForm: document.querySelector('#trip_share_form'), tripShareRecipient: document.querySelector('#trip_share_recipient'), sendTripShare: document.querySelector('#send_trip_share'), tripShareStatus: document.querySelector('#trip_share_status'), tripShareList: document.querySelector('#trip_share_list'),
   tripCreateMessage: document.querySelector('#trip_create_message'),
@@ -2964,6 +2967,21 @@ function dayMapGroups(points) {
   return [...groups.values()];
 }
 
+function setDayMapExpanded(expanded) {
+  dom.dayMapSection.dataset.expanded = String(expanded);
+  dom.dayPage.dataset.mapExpanded = String(expanded);
+  dom.dayMapToggle.setAttribute('aria-expanded', String(expanded));
+  dom.dayMapToggle.setAttribute('aria-label', expanded ? 'Reduzir mapa' : 'Ampliar mapa');
+  dom.dayMapToggle.querySelector('span').textContent = expanded ? 'Reduzir' : 'Ampliar';
+  if (state.dayMap) requestAnimationFrame(() => {
+    if (!state.dayMap || document.body.dataset.dayPage !== 'open') return;
+    state.dayMap.invalidateSize({ pan: false });
+    const bounds = state.dayMapBounds;
+    if (bounds?.length === 1) state.dayMap.setView(bounds[0], 16);
+    else if (bounds?.length > 1) state.dayMap.fitBounds(bounds, { padding: [30, 30], maxZoom: 15 });
+  });
+}
+
 function renderOsmMapFallback(points, token) {
   if (token !== state.dayMapRenderToken || !points.length) return;
   const latitudes = points.map(point => point.latitude);
@@ -3011,6 +3029,7 @@ function renderDayPageMap(day, locations, activities = []) {
     state.dayMap.remove();
     state.dayMap = null;
   }
+  state.dayMapBounds = null;
 
   dom.dayPageMap.replaceChildren();
   dom.dayPageDirections.replaceChildren();
@@ -3110,6 +3129,7 @@ function renderDayPageMap(day, locations, activities = []) {
       });
       L.marker(latLng, { icon }).addTo(map).bindPopup(popup);
     });
+    state.dayMapBounds = bounds;
 
     if (route.length > 1) {
       L.polyline(route.map(point => [point.latitude, point.longitude]), {
@@ -3134,6 +3154,7 @@ function renderDayPageMap(day, locations, activities = []) {
 
 function closeDayPage() {
   closeDayAttachments();
+  setDayMapExpanded(false);
   state.activeDayId = null;
   state.dayMapRenderToken += 1;
   if (state.dayMap) {
@@ -5247,6 +5268,7 @@ dom.tripPageCoverInput.addEventListener('change', async () => {
 dom.tripPagePassengers.addEventListener('click', openTripPassengers);
 dom.tripPassengerClose.addEventListener('click', () => closeTripPassengers().catch(console.warn));
 dom.closeDayPage.addEventListener('click', navigateBackFromDay);
+dom.dayMapToggle.addEventListener('click', () => setDayMapExpanded(dom.dayMapSection.dataset.expanded !== 'true'));
 dom.addDayPageActivity.addEventListener('click', addInlineDayActivity);
 dom.dayAttachmentsButton.addEventListener('click', openDayAttachments);
 dom.closeDayAttachments.addEventListener('click', closeDayAttachments);

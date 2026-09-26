@@ -47,9 +47,9 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20260926-36" as="style">
-  <link rel="stylesheet" href="style.css?v=20260926-36" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20260926-36"></noscript>
+  <link rel="preload" href="style.css?v=20260926-37" as="style">
+  <link rel="stylesheet" href="style.css?v=20260926-37" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20260926-37"></noscript>
   <script>
     function showViaggioStartupError(detail) {
       if (!document.body || document.body.dataset.session !== 'loading') return;
@@ -373,8 +373,11 @@
           <ol id="day_page_agenda" class="day-view-agenda"></ol>
           <p id="day_page_empty" class="day-view-empty"></p>
         </section>
-        <section class="day-view-section day-map-section">
-          <h2>Mapa</h2>
+        <section id="day_map_section" class="day-view-section day-map-section" data-expanded="false">
+          <div class="day-map-heading">
+            <h2>Mapa</h2>
+            <button id="day_map_toggle" class="day-map-toggle" type="button" aria-controls="day_page_map" aria-expanded="false" aria-label="Ampliar mapa"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5m0-5 7 7m6-7h5v5m0-5-7 7M3 16v5h5m-5 0 7-7m11 2v5h-5m5 0-7-7"/></svg><span>Ampliar</span></button>
+          </div>
           <div id="day_page_map" class="day-view-map"></div>
           <div id="day_page_directions" class="day-view-directions"></div>
         </section>
@@ -454,7 +457,7 @@
       <button id="delete_selected_trips" type="button" disabled>Excluir selecionadas</button>
     </footer>
   </main>
-  <script type="module" src="src/main.js?v=20260926-36"></script>
-  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260926-36');</script>
+  <script type="module" src="src/main.js?v=20260926-37"></script>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260926-37');</script>
 </body>
 </html>
