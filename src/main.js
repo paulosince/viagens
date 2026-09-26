@@ -99,7 +99,7 @@ const dom = {
   tripList: document.querySelector('#trip_list'), homeEmpty: document.querySelector('#home_empty'), scrim: document.querySelector('#sheet_scrim'), tripEditFooter: document.querySelector('#trip_edit_footer'), deleteSelectedTrips: document.querySelector('#delete_selected_trips'), tripPage: document.querySelector('#trip_page'), closeTripPage: document.querySelector('#close_trip_page'), editTripButton: document.querySelector('#edit_trip_button'), tripPageHero: document.querySelector('#trip_page_hero'), tripPageTitle: document.querySelector('#trip_page_title'), tripPageDates: document.querySelector('#trip_page_dates'), tripPagePassengers: document.querySelector('#trip_page_passengers'), tripPagePassengerCount: document.querySelector('#trip_page_passenger_count'), tripDayList: document.querySelector('#trip_day_list'), tripDayMessage: document.querySelector('#trip_day_message'),
   dayPage: document.querySelector('#day_page'), closeDayPage: document.querySelector('#close_day_page'), addDayPageActivity: document.querySelector('#add_day_page_activity'), dayAgendaStickyMarker: document.querySelector('#day_agenda_sticky_marker'), dayPageHero: document.querySelector('#day_page_hero'), dayPageBadge: document.querySelector('#day_page_badge'), dayPageTitle: document.querySelector('#day_page_title'), dayPageDate: document.querySelector('#day_page_date'), dayPageSaveStatus: document.querySelector('#day_page_save_status'), dayPagePhotoInput: document.querySelector('#day_page_photo_input'), dayPageCamera: document.querySelector('#day_page_camera'), dayPageAgenda: document.querySelector('#day_page_agenda'), dayPageEmpty: document.querySelector('#day_page_empty'), dayPageMap: document.querySelector('#day_page_map'), dayPageDirections: document.querySelector('#day_page_directions'),
   dayAttachmentsButton: document.querySelector('#day_attachments_button'), dayAttachmentsCount: document.querySelector('#day_attachments_count'), dayAttachmentsScrim: document.querySelector('#day_attachments_scrim'), dayAttachmentsSheet: document.querySelector('#day_attachments_sheet'), closeDayAttachments: document.querySelector('#close_day_attachments'), dayAttachmentsInput: document.querySelector('#day_attachments_input'), dayAttachmentsStatus: document.querySelector('#day_attachments_status'), dayAttachmentsList: document.querySelector('#day_attachments_list'),
-  newTripSheet: document.querySelector('#home_new_trip'), newTripForm: document.querySelector('#new_trip_form'), newTripTitle: document.querySelector('#new-trip-title'), closeNewTrip: document.querySelector('#close_new_trip'), saveNewTrip: document.querySelector('#save_new_trip'), newTripMessage: document.querySelector('#new_trip_message'), coverInput: document.querySelector('#cover-image'), coverPreview: document.querySelector('#cover_preview_image'), tripColorValue: document.querySelector('#trip-color-value'), tripColorPalette: document.querySelector('#trip_color_palette'), tripColorCustom: document.querySelector('#trip-color-custom'), savedTripPassengers: document.querySelector('#saved_trip_passengers'), savedTripPassengerList: document.querySelector('#saved_trip_passenger_list'), newTripPassengerList: document.querySelector('#new_trip_passenger_list'), addTripPassenger: document.querySelector('#add_trip_passenger'),
+  newTripSheet: document.querySelector('#home_new_trip'), newTripForm: document.querySelector('#new_trip_form'), newTripTitle: document.querySelector('#new-trip-title'), closeNewTrip: document.querySelector('#close_new_trip'), saveNewTrip: document.querySelector('#save_new_trip'), newTripMessage: document.querySelector('#new_trip_message'), coverInput: document.querySelector('#cover-image'), coverPreview: document.querySelector('#cover_preview_image'), tripColorValue: document.querySelector('#trip-color-value'), tripColorPalette: document.querySelector('#trip_color_palette'), tripColorCustom: document.querySelector('#trip-color-custom'), savedTripPassengers: document.querySelector('#saved_trip_passengers'), savedTripPassengerList: document.querySelector('#saved_trip_passenger_list'), newTripPassengerList: document.querySelector('#new_trip_passenger_list'), addTripPassenger: document.querySelector('#add_trip_passenger'), tripSharingSection: document.querySelector('#trip_sharing_section'), tripMemberList: document.querySelector('#trip_member_list'), tripShareEmail: document.querySelector('#trip_share_email'), tripShareButton: document.querySelector('#trip_share_button'), tripShareMessage: document.querySelector('#trip_share_message'),
   dayEditSheet: document.querySelector('#day_edit_sheet'), daySheetScrim: document.querySelector('#day_sheet_scrim'), dayEditForm: document.querySelector('#day_edit_form'), closeDayEdit: document.querySelector('#close_day_edit'), saveDayEdit: document.querySelector('#save_day_edit'), dayEditTitle: document.querySelector('#day_edit_title'), dayEditDate: document.querySelector('#day_edit_date'), dayTitleInput: document.querySelector('#day-title-input'), dayLocationsEditor: document.querySelector('#day_locations_editor'), addDayLocation: document.querySelector('#add_day_location'), dayAgendaEditor: document.querySelector('#day_agenda_editor'), addDayActivity: document.querySelector('#add_day_activity'), dayNotesInput: document.querySelector('#day-notes-input'), dayEditMessage: document.querySelector('#day_edit_message'),
   placeSearchSheet: document.querySelector('#place_search_sheet'), placeSearchScrim: document.querySelector('#place_search_scrim'), placeSearchForm: document.querySelector('#place_search_form'), closePlaceSearch: document.querySelector('#close_place_search'), confirmPlaceSearch: document.querySelector('#confirm_place_search'), placeSearchInput: document.querySelector('#place_search_input'), runPlaceSearch: document.querySelector('#run_place_search'), placeSearchMessage: document.querySelector('#place_search_message'), placeSearchResults: document.querySelector('#place_search_results'), placePhotoSection: document.querySelector('#place_photo_section'), placePhotoMessage: document.querySelector('#place_photo_message'), placePhotoResults: document.querySelector('#place_photo_results'),
   profileSheet: document.querySelector('#profile-sheet'), profileForm: document.querySelector('#profile_form'), closeProfile: document.querySelector('#close_profile'), saveProfile: document.querySelector('#save_profile'), profileMessage: document.querySelector('#profile_message'), profileEditorImage: document.querySelector('#profile_editor_image'), profilePhotoInput: document.querySelector('#profile-photo'), profileDisplayName: document.querySelector('#profile_display_name'), profileEmail: document.querySelector('#profile_email'), profileNameInput: document.querySelector('#profile-name'), birthDateInput: document.querySelector('#birth-date'), profileAge: document.querySelector('#profile_age'), profileCreatedAt: document.querySelector('#profile_created_at'), profileSavedPassengerList: document.querySelector('#profile_saved_passenger_list'), addProfileSavedPassenger: document.querySelector('#add_profile_saved_passenger'), chatgptButton: document.querySelector('#chatgpt_button'), chatgptSheet: document.querySelector('#chatgpt_sheet'), closeChatgpt: document.querySelector('#close_chatgpt'), connectChatgpt: document.querySelector('#connect_chatgpt'), copyMcpUrl: document.querySelector('#copy_mcp_url'), chatgptMessage: document.querySelector('#chatgpt_message'), chatgptMcpUrl: document.querySelector('#chatgpt_mcp_url'), changeLogButton: document.querySelector('#change_log_button'), changeLogSheet: document.querySelector('#change_log_sheet'), closeChangeLog: document.querySelector('#close_change_log'), changeLogList: document.querySelector('#change_log_list'), changeLogEmpty: document.querySelector('#change_log_empty'), changeLogMessage: document.querySelector('#change_log_message'), logoutButton: document.querySelector('#logout_button'), deleteAccountButton: document.querySelector('#delete_account_button')
@@ -4332,6 +4332,9 @@ function openNewTrip() {
   state.imageData = '';
   dom.newTripForm.reset();
   dom.newTripTitle.textContent = 'Nova viagem';
+  dom.tripSharingSection.hidden = true;
+  dom.tripShareEmail.value = '';
+  dom.tripMemberList.replaceChildren();
   dom.saveNewTrip.setAttribute('aria-label', 'Criar viagem');
   selectTripColor('#4775d1');
   resetTripPassengers();
@@ -4375,9 +4378,46 @@ function openTripEditor() {
     dom.coverPreview.parentElement.dataset.hasImage = 'false';
   }
   dom.newTripTitle.textContent = 'Editar viagem';
+  dom.tripSharingSection.hidden = false;
+  dom.tripShareEmail.value = '';
+  dom.tripShareMessage.textContent = 'A pessoa usa a própria conta Viaggio e conecta o próprio ChatGPT.';
+  loadTripMembers(trip.id).catch(error => { dom.tripShareMessage.textContent = error.message || 'Não foi possível carregar o compartilhamento.'; });
   dom.saveNewTrip.setAttribute('aria-label', 'Salvar viagem');
   dom.newTripMessage.textContent = '';
   setActiveSheet('new-trip');
+}
+
+async function loadTripMembers(tripId) {
+  const client = await trySupabase();
+  if (!client) return;
+  const { data, error } = await client.rpc('list_trip_members', { p_trip_id: tripId });
+  if (error) throw error;
+  dom.tripMemberList.replaceChildren();
+  for (const member of data || []) {
+    const row = document.createElement('div'); row.className = 'trip-member-row';
+    const copy = document.createElement('span'), name = document.createElement('strong'), detail = document.createElement('small');
+    name.textContent = member.display_name || member.email;
+    detail.textContent = member.role === 'owner' ? 'Proprietário' : member.email;
+    copy.append(name, detail);
+    const role = document.createElement('span'); role.className = 'trip-member-role';
+    role.textContent = member.role === 'owner' ? 'dono' : member.role === 'editor' ? 'pode editar' : 'visualiza';
+    row.append(copy, role); dom.tripMemberList.append(row);
+  }
+}
+
+async function shareActiveTrip() {
+  const tripId = state.editingTripId, email = dom.tripShareEmail.value.trim();
+  if (!tripId || !email) return;
+  dom.tripShareButton.disabled = true; dom.tripShareMessage.textContent = 'Compartilhando…';
+  try {
+    const client = await trySupabase(); if (!client) throw new Error('Compartilhar requer conexão.');
+    const { error } = await client.rpc('share_trip_with_email', { p_trip_id: tripId, p_email: email, p_role: 'editor' });
+    if (error) throw error;
+    dom.tripShareEmail.value = '';
+    dom.tripShareMessage.textContent = 'Viagem compartilhada. Cada pessoa pode conectar o próprio ChatGPT em sua conta.';
+    await loadTripMembers(tripId);
+  } catch (error) { dom.tripShareMessage.textContent = error.message || 'Não foi possível compartilhar.'; }
+  finally { dom.tripShareButton.disabled = false; }
 }
 
 function openProfile() {
@@ -4830,6 +4870,7 @@ dom.deleteAccountButton.addEventListener('click', deleteAccount);
 for (const option of dom.tripColorPalette.querySelectorAll('.trip-color-option')) option.addEventListener('click', () => selectTripColor(option.dataset.color));
 dom.tripColorCustom.addEventListener('input', () => selectTripColor(dom.tripColorCustom.value, true));
 dom.addTripPassenger.addEventListener('click', addTripPassenger);
+dom.tripShareButton.addEventListener('click', shareActiveTrip);
 dom.addProfileSavedPassenger.addEventListener('click', addProfileSavedPassenger);
 
 dom.coverInput.addEventListener('change', async () => {

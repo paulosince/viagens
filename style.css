@@ -2559,3 +2559,5 @@ body[data-active-sheet="change-log"] #change_log_sheet { transform: translateY(0
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
 }
+
+.trip-member-row{min-height:58px;padding:9px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid rgba(60,60,67,.18)}.trip-member-row>span:first-child{min-width:0;display:flex;flex-direction:column}.trip-member-row small,.trip-member-role{color:rgba(60,60,67,.62);font-size:14px}.trip-share-entry{display:flex;align-items:center;min-height:58px;padding-left:16px;gap:8px}.trip-share-entry input{flex:1;min-width:0;border:0;background:transparent;font:inherit;font-size:16px;outline:none}.trip-share-entry button{align-self:stretch;border:0;background:transparent;color:#007aff;font:inherit;font-weight:600;padding:0 16px}.trip-share-entry button:disabled{opacity:.45}
