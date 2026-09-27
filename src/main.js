@@ -83,6 +83,7 @@ const state = {
   dayAttachmentLoads: new Map(),
   budgetByTrip: new Map(),
   tripFilesByTrip: new Map(),
+  tripFileDeckIndexes: new Map(),
   tripTabScroll: new Map(),
   activeTripTab: 'roteiro',
   enrichingDays: new Set(),
@@ -1988,22 +1989,22 @@ function dayAttachmentType(file) {
   return { type, extension };
 }
 
-function dayAttachmentPath(day, extension) {
-  return `${day.trip_id}/${day.id}/${crypto.randomUUID()}.${extension}`;
+function dayAttachmentPath(tripId, dayId, extension) {
+  return `${tripId}/${dayId || 'general'}/${crypto.randomUUID()}.${extension}`;
 }
 
-async function storeDayAttachment(client, day, file) {
+async function storeTripAttachment(client, tripId, dayId, file) {
   const accepted = dayAttachmentType(file);
   if (!accepted || !file.size || file.size > DAY_ATTACHMENT_MAX_BYTES) {
     throw new Error('Use fotos, PDF ou Word de até 6 MB: ' + file.name);
   }
-  const path = dayAttachmentPath(day, accepted.extension);
+  const path = dayAttachmentPath(tripId, dayId, accepted.extension);
   const uploaded = await client.storage.from(DAY_ATTACHMENT_BUCKET).upload(path, file, {
     contentType: accepted.type, upsert: false
   });
   if (uploaded.error) throw uploaded.error;
   const inserted = await client.from('day_attachments').insert({
-    day_id: day.id, storage_path: path, file_name: file.name.slice(0, 180),
+    trip_id: tripId, day_id: dayId, storage_path: path, file_name: file.name.slice(0, 180),
     mime_type: accepted.type, size_bytes: file.size
   });
   if (inserted.error) {
@@ -2106,7 +2107,7 @@ async function uploadDayAttachments(files) {
   try {
     for (const [index, file] of files.entries()) {
       setDayAttachmentStatus(`Enviando ${index + 1} de ${files.length}: ${file.name}`);
-      await storeDayAttachment(client, day, file);
+      await storeTripAttachment(client, day.trip_id, day.id, file);
     }
     await loadDayAttachments(day.id);
     if (state.activeTripTab === 'arquivos') loadTripFiles(day.trip_id).catch(console.warn);
@@ -2121,16 +2122,21 @@ async function uploadDayAttachments(files) {
 }
 
 async function removeDayAttachment(attachment) {
-  if (!window.confirm('Excluir este arquivo do dia?')) return;
+  if (!canEditActiveTrip() || !window.confirm(attachment.day_id ? 'Excluir este arquivo do dia?' : 'Excluir este arquivo da viagem?')) return;
   const client = await trySupabase(5000);
-  if (!client) { setDayAttachmentStatus('É preciso estar conectado para excluir.', 'error'); return; }
+  const setStatus = document.body.dataset.dayAttachments === 'open'
+    ? setDayAttachmentStatus
+    : (message, kind) => setTripPanelStatus(dom.tripFilesStatus, message, kind);
+  if (!client) { setStatus('É preciso estar conectado para excluir.', 'error'); return; }
   const removed = await client.from('day_attachments').delete().eq('id', attachment.id);
-  if (removed.error) { setDayAttachmentStatus(removed.error.message, 'error'); return; }
+  if (removed.error) { setStatus(removed.error.message, 'error'); return; }
   const file = await client.storage.from(DAY_ATTACHMENT_BUCKET).remove([attachment.storage_path]);
   if (file.error) console.warn('Arquivo removido da lista; limpeza do armazenamento pendente', file.error);
-  await loadDayAttachments(attachment.day_id).catch(error => setDayAttachmentStatus(error.message, 'error'));
-  if (state.activeTripTab === 'arquivos') loadTripFiles(String(state.activeTripId)).catch(console.warn);
-  setDayAttachmentStatus('Arquivo excluído.');
+  if (attachment.day_id) await loadDayAttachments(attachment.day_id).catch(error => setDayAttachmentStatus(error.message, 'error'));
+  if (state.activeTripTab === 'arquivos') {
+    await loadTripFiles(String(state.activeTripId)).catch(error => setTripPanelStatus(dom.tripFilesStatus, error.message, 'error'));
+  }
+  setStatus('Arquivo excluído.');
 }
 
 function openDayPage(dayId, { pushHistory = true } = {}) {
@@ -4182,56 +4188,206 @@ async function deleteBudgetItem(item) {
   recordChange({ tripId, entityType: 'budget_item', entityId: item.id, action: 'delete', summary: `Orçamento: ${item.label} excluído`, beforeState: item }).catch(console.warn);
 }
 
+function tripFileSize(file) {
+  const kilobytes = (file.size_bytes || 0) / 1024;
+  return kilobytes < 1024 ? Math.max(1, Math.round(kilobytes)) + ' KB'
+    : (kilobytes / 1024).toFixed(1) + ' MB';
+}
+
+function tripFileLink(file) {
+  const link = document.createElement('a');
+  if (file.signedUrl) {
+    link.href = file.signedUrl;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+  } else link.title = 'Conecte-se para abrir este arquivo';
+  return link;
+}
+
+function tripFileRemoveButton(file) {
+  const remove = document.createElement('button');
+  remove.type = 'button';
+  remove.className = 'trip-file-remove';
+  remove.textContent = '×';
+  remove.setAttribute('aria-label', `Excluir ${file.file_name}`);
+  remove.addEventListener('click', () => removeDayAttachment(file));
+  return remove;
+}
+
+function renderTripFileDeck(tripId, day, entries) {
+  const label = `Dia ${dayNumber(day)} · ${day.title || displayDate(derivedDayDate(day))}`;
+  const group = document.createElement('section');
+  group.className = 'trip-files-group';
+  const heading = document.createElement('div');
+  heading.className = 'trip-files-group-heading';
+  const title = document.createElement('button');
+  title.type = 'button'; title.className = 'trip-files-day'; title.textContent = label;
+  title.addEventListener('click', () => openDayPage(day.id));
+  const count = document.createElement('span');
+  count.className = 'trip-files-group-count';
+  count.textContent = `${entries.length} ${entries.length === 1 ? 'arquivo' : 'arquivos'}`;
+  heading.append(title, count);
+
+  const deck = document.createElement('div');
+  deck.className = 'trip-files-deck';
+  deck.tabIndex = 0;
+  deck.setAttribute('aria-label', entries.length > 1 ? `${label}. Deslize para ver os arquivos.` : label);
+  const previews = [];
+  const cards = entries.map(file => {
+    const card = document.createElement('article');
+    card.className = 'trip-file-card';
+    card.dataset.kind = file.mime_type?.startsWith('image/') ? 'image' : 'document';
+    const link = tripFileLink(file);
+    link.className = 'trip-file-card-link';
+    link.setAttribute('aria-label', `Abrir ${file.file_name}`);
+    const visual = document.createElement('span');
+    visual.className = 'trip-file-card-visual';
+    let image = null;
+    if (card.dataset.kind === 'image' && file.signedUrl) {
+      image = document.createElement('img');
+      image.alt = '';
+      image.decoding = 'async';
+      image.onerror = () => { image.remove(); visual.textContent = 'FOTO'; };
+      visual.append(image);
+    } else {
+      visual.textContent = card.dataset.kind === 'image' ? 'FOTO'
+        : file.mime_type === 'application/pdf' ? 'PDF' : 'DOC';
+    }
+    previews.push({ image, url: file.signedUrl });
+    const caption = document.createElement('span');
+    caption.className = 'trip-file-card-caption';
+    const name = document.createElement('strong'); name.textContent = file.file_name;
+    const size = document.createElement('small'); size.textContent = tripFileSize(file);
+    caption.append(name, size);
+    link.append(visual, caption);
+    card.append(link);
+    if (canEditActiveTrip()) card.append(tripFileRemoveButton(file));
+    deck.append(card);
+    return card;
+  });
+
+  const controls = document.createElement('div'); controls.className = 'trip-files-deck-controls';
+  const previous = document.createElement('button');
+  previous.type = 'button'; previous.textContent = '‹';
+  previous.setAttribute('aria-label', `Arquivo anterior de ${label}`);
+  const position = document.createElement('span');
+  position.className = 'trip-files-deck-position';
+  position.setAttribute('aria-live', 'polite');
+  const next = document.createElement('button');
+  next.type = 'button'; next.textContent = '›';
+  next.setAttribute('aria-label', `Próximo arquivo de ${label}`);
+  controls.append(previous, position, next);
+  controls.hidden = entries.length < 2;
+  const deckKey = `${tripId}:${day.id}`;
+  let active = Math.min(state.tripFileDeckIndexes.get(deckKey) || 0, entries.length - 1);
+  const show = index => {
+    active = Math.max(0, Math.min(index, entries.length - 1));
+    state.tripFileDeckIndexes.set(deckKey, active);
+    cards.forEach((card, cardIndex) => {
+      const distance = cardIndex - active;
+      card.dataset.position = distance === 0 ? 'current'
+        : distance < 0 ? 'previous' : distance <= 2 ? 'queued' : 'hidden';
+      const depth = Math.min(Math.max(distance, 0), 2);
+      card.style.setProperty('--stack-x', `${depth * 13}px`);
+      card.style.setProperty('--stack-y', `${depth * 6}px`);
+      card.style.setProperty('--stack-scale', String(1 - depth * .04));
+      card.style.zIndex = String(entries.length - cardIndex);
+      card.inert = distance !== 0;
+      card.setAttribute('aria-hidden', String(distance !== 0));
+      const preview = previews[cardIndex];
+      if (distance >= 0 && distance <= 2 && preview.image && !preview.image.getAttribute('src')) {
+        preview.image.src = preview.url;
+      }
+    });
+    previous.disabled = active === 0;
+    next.disabled = active === entries.length - 1;
+    position.textContent = `${active + 1} de ${entries.length}`;
+  };
+  previous.addEventListener('click', () => show(active - 1));
+  next.addEventListener('click', () => show(active + 1));
+  let gesture = null;
+  let lastSwipeAt = 0;
+  deck.addEventListener('pointerdown', event => {
+    if (!event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0)) return;
+    gesture = { id: event.pointerId, x: event.clientX, y: event.clientY };
+  });
+  deck.addEventListener('pointerup', event => {
+    if (!gesture || event.pointerId !== gesture.id) return;
+    const distanceX = event.clientX - gesture.x;
+    const distanceY = event.clientY - gesture.y;
+    gesture = null;
+    if (Math.abs(distanceX) < 45 || Math.abs(distanceX) < Math.abs(distanceY) * 1.3) return;
+    event.preventDefault();
+    lastSwipeAt = Date.now();
+    show(active + (distanceX < 0 ? 1 : -1));
+  });
+  deck.addEventListener('pointercancel', () => { gesture = null; });
+  deck.addEventListener('click', event => {
+    if (Date.now() - lastSwipeAt >= 450) return;
+    event.preventDefault();
+    event.stopPropagation();
+  }, true);
+  deck.addEventListener('keydown', event => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    event.preventDefault();
+    show(active + (event.key === 'ArrowRight' ? 1 : -1));
+  });
+  show(active);
+  group.append(heading, deck, controls);
+  return group;
+}
+
 function renderTripFiles(tripId, days) {
   if (String(state.activeTripId) !== String(tripId)) return;
   const selected = dom.tripFilesDay.value;
   dom.tripFilesDay.replaceChildren();
+  const noDay = document.createElement('option');
+  noDay.value = ''; noDay.textContent = 'Sem dia';
+  dom.tripFilesDay.append(noDay);
   for (const day of days) {
     const option = document.createElement('option'); option.value = String(day.id);
     option.textContent = `Dia ${dayNumber(day)} · ${day.title || displayDate(derivedDayDate(day))}`;
     dom.tripFilesDay.append(option);
   }
-  if (days.some(day => String(day.id) === selected)) dom.tripFilesDay.value = selected;
+  dom.tripFilesDay.value = days.some(day => String(day.id) === selected) ? selected : '';
   dom.tripFilesList.replaceChildren();
   const rows = state.tripFilesByTrip.get(String(tripId)) || [];
-  for (const day of days) {
-    const entries = rows.filter(row => String(row.day_id) === String(day.id));
-    if (!entries.length) continue;
-    const group = document.createElement('section'); group.className = 'trip-files-group';
-    const title = document.createElement('button'); title.type = 'button'; title.className = 'trip-files-day';
-    title.textContent = `Dia ${dayNumber(day)} · ${day.title || displayDate(derivedDayDate(day))}`;
-    title.addEventListener('click', () => openDayPage(day.id));
+  const general = rows.filter(row => !row.day_id);
+  if (general.length) {
+    const group = document.createElement('section'); group.className = 'trip-files-group trip-files-general';
+    const title = document.createElement('h3'); title.textContent = 'Arquivos da viagem';
     group.append(title);
-    for (const file of entries) {
+    for (const file of general) {
       const row = document.createElement('div'); row.className = 'trip-files-entry';
-      const icon = document.createElement('span'); icon.textContent = file.mime_type?.startsWith('image/') ? '📷' : '📄';
-      const link = document.createElement('a'); link.textContent = file.file_name;
-      if (file.signedUrl) { link.href = file.signedUrl; link.target = '_blank'; link.rel = 'noopener noreferrer'; }
-      else link.title = 'Conecte-se para abrir este arquivo';
-      const size = document.createElement('small'); size.textContent = ` ${((file.size_bytes || 0) / 1048576).toFixed(1)} MB`;
-      link.append(size); row.append(icon, link);
-      if (canEditActiveTrip()) {
-        const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = 'Excluir';
-        remove.setAttribute('aria-label', `Excluir ${file.file_name}`);
-        remove.addEventListener('click', async () => {
-          await removeDayAttachment(file);
-          await loadTripFiles(tripId).catch(error => setTripPanelStatus(dom.tripFilesStatus, error.message, 'error'));
-        });
-        row.append(remove);
-      }
+      const preview = document.createElement('span'); preview.className = 'trip-files-entry-preview';
+      if (file.mime_type?.startsWith('image/') && file.signedUrl) {
+        const image = document.createElement('img'); image.src = file.signedUrl; image.alt = '';
+        preview.append(image);
+      } else preview.textContent = file.mime_type?.startsWith('image/') ? 'FOTO'
+        : file.mime_type === 'application/pdf' ? 'PDF' : 'DOC';
+      const link = tripFileLink(file); link.className = 'trip-files-entry-link';
+      const name = document.createElement('strong'); name.textContent = file.file_name;
+      const size = document.createElement('small'); size.textContent = tripFileSize(file);
+      link.append(name, size);
+      row.append(preview, link);
+      if (canEditActiveTrip()) row.append(tripFileRemoveButton(file));
       group.append(row);
     }
     dom.tripFilesList.append(group);
   }
+  for (const day of days) {
+    const entries = rows.filter(row => String(row.day_id) === String(day.id));
+    if (entries.length) dom.tripFilesList.append(renderTripFileDeck(tripId, day, entries));
+  }
   if (!rows.length) {
     const empty = document.createElement('p'); empty.className = 'trip-files-empty';
     empty.textContent = state.tripFilesByTrip.has(String(tripId))
-      ? 'Nenhum arquivo nesta viagem ainda. Os documentos enviados em cada dia aparecerão aqui.'
+      ? 'Nenhum arquivo nesta viagem ainda.'
       : 'Conecte-se para consultar os arquivos desta viagem.';
     dom.tripFilesList.append(empty);
   }
-  dom.tripFilesInput.closest('.trip-files-pick').hidden = !days.length || !canEditActiveTrip();
-  dom.tripFilesDay.disabled = !days.length || !canEditActiveTrip();
+  dom.tripFilesInput.closest('.trip-files-pick').hidden = !canEditActiveTrip();
+  dom.tripFilesDay.disabled = !canEditActiveTrip();
 }
 
 async function loadTripFiles(tripId) {
@@ -4247,14 +4403,13 @@ async function loadTripFiles(tripId) {
   }
   if (state.activeTripId !== key) return;
   if (state.tripFilesByTrip.has(key)) renderTripFiles(key, days);
-  if (!days.length) { state.tripFilesByTrip.set(key, []); renderTripFiles(key, days); setTripPanelStatus(dom.tripFilesStatus, 'Adicione um dia ao roteiro para vincular arquivos.'); return; }
   const client = await trySupabase(5000);
   if (!client) {
     renderTripFiles(key, days);
     setTripPanelStatus(dom.tripFilesStatus, 'Conecte-se para consultar e enviar arquivos.');
     return;
   }
-  const { data, error } = await client.from('day_attachments').select('*').in('day_id', days.map(day => day.id)).order('created_at');
+  const { data, error } = await client.from('day_attachments').select('*').eq('trip_id', key).order('created_at');
   if (error) throw error;
   const signed = await Promise.all((data || []).map(async file => {
     const result = await client.storage.from(DAY_ATTACHMENT_BUCKET).createSignedUrl(file.storage_path, 3600);
@@ -4267,15 +4422,16 @@ async function loadTripFiles(tripId) {
 async function uploadTripFiles(files) {
   const tripId = String(state.activeTripId || '');
   const dayId = dom.tripFilesDay.value;
-  const day = state.tripDays.find(item => String(item.id) === dayId && String(item.trip_id) === tripId);
-  if (!day || !canEditActiveTrip() || !files.length) return;
+  const day = dayId ? state.tripDays.find(item => String(item.id) === dayId && String(item.trip_id) === tripId) : null;
+  if (!tripId || !canEditActiveTrip() || !files.length) return;
+  if (dayId && !day) { setTripPanelStatus(dom.tripFilesStatus, 'Escolha um dia válido ou deixe sem dia.', 'error'); return; }
   const client = await trySupabase(5000);
   if (!client) { setTripPanelStatus(dom.tripFilesStatus, 'Conecte-se para enviar arquivos.', 'error'); return; }
   const button = dom.tripFilesInput.closest('.trip-files-pick'); button.dataset.busy = 'true';
   try {
     for (const [index, file] of files.entries()) {
       setTripPanelStatus(dom.tripFilesStatus, `Enviando ${index + 1} de ${files.length}: ${file.name}`);
-      await storeDayAttachment(client, day, file);
+      await storeTripAttachment(client, tripId, day?.id || null, file);
     }
     await loadTripFiles(tripId);
     setTripPanelStatus(dom.tripFilesStatus, files.length === 1 ? 'Arquivo salvo.' : `${files.length} arquivos salvos.`);
@@ -5975,7 +6131,7 @@ dom.logoutButton.addEventListener('click', async () => {
   state.profileSavedPassengers = [];
   state.tripDataCache.clear();
   state.tripDataLoads.clear();
-  state.budgetByTrip.clear(); state.tripFilesByTrip.clear(); state.tripTabScroll.clear();
+  state.budgetByTrip.clear(); state.tripFilesByTrip.clear(); state.tripFileDeckIndexes.clear(); state.tripTabScroll.clear();
   syncTripList();
   closeSheets();
   setSessionView('anonymous');
@@ -6298,7 +6454,7 @@ ensureSupabase()
       return;
     }
     if (!navigator.onLine && state.user) return;
-    state.user = null; state.profile = null; state.trips = []; state.passengers.clear(); state.tripRoles.clear(); state.tripOwners.clear(); state.savedPassengers = []; state.profileSavedPassengers = []; state.tripDataCache.clear(); state.tripDataLoads.clear(); state.budgetByTrip.clear(); state.tripFilesByTrip.clear(); state.tripTabScroll.clear();
+    state.user = null; state.profile = null; state.trips = []; state.passengers.clear(); state.tripRoles.clear(); state.tripOwners.clear(); state.savedPassengers = []; state.profileSavedPassengers = []; state.tripDataCache.clear(); state.tripDataLoads.clear(); state.budgetByTrip.clear(); state.tripFilesByTrip.clear(); state.tripFileDeckIndexes.clear(); state.tripTabScroll.clear();
     syncTripList(); closeSheets(); setSessionView('anonymous');
   }))
   .catch(() => {});

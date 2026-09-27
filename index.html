@@ -47,9 +47,9 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20260927-48" as="style">
-  <link rel="stylesheet" href="style.css?v=20260927-48" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20260927-48"></noscript>
+  <link rel="preload" href="style.css?v=20260927-50" as="style">
+  <link rel="stylesheet" href="style.css?v=20260927-50" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20260927-50"></noscript>
   <script>
     function showViaggioStartupError(detail) {
       if (!document.body || document.body.dataset.session !== 'loading') return;
@@ -327,7 +327,7 @@
       <section id="trip_panel_arquivos" class="trip-page-content trip-detail-panel" role="tabpanel" aria-labelledby="trip_tab_arquivos" hidden>
         <div class="trip-panel-heading"><h2>Arquivos</h2></div>
         <p id="trip_files_status" class="trip-panel-status" role="status" aria-live="polite"></p>
-        <div class="trip-files-upload"><label for="trip_files_day">Dia do arquivo</label><select id="trip_files_day" aria-label="Escolher dia do arquivo" disabled></select><label class="trip-files-pick" hidden>+ Adicionar fotos ou documentos<input id="trip_files_input" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.pdf,.doc,.docx" multiple></label></div>
+        <div class="trip-files-upload"><label for="trip_files_day">Dia (opcional)</label><select id="trip_files_day" aria-label="Vincular arquivos a um dia, opcional" disabled><option value="">Sem dia</option></select><label class="trip-files-pick" hidden>+ Adicionar fotos ou documentos<input id="trip_files_input" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.pdf,.doc,.docx" multiple></label></div>
         <div id="trip_files_list" class="trip-files-list"></div>
       </section>
     </section>
@@ -485,7 +485,7 @@
       <button id="delete_selected_trips" type="button" disabled>Excluir selecionadas</button>
     </footer>
   </main>
-  <script type="module" src="src/main.js?v=20260927-49"></script>
-  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260927-49');</script>
+  <script type="module" src="src/main.js?v=20260927-50"></script>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260927-50');</script>
 </body>
 </html>

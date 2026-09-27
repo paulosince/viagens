@@ -827,14 +827,39 @@ body[data-budget-page="open"] .budget-item-page { visibility: visible; pointer-e
 .trip-files-pick[hidden] { display: none; }
 .trip-files-pick[data-busy="true"] { opacity: .5; pointer-events: none; }
 .trip-files-list { display: grid; gap: 15px; }
-.trip-files-group { padding: 15px; border: 1px solid rgba(255,255,255,.65); border-radius: 20px; background: rgba(255,255,255,.95); }
-.trip-files-day { display: block; width: 100%; margin: 0 0 12px; padding: 0; border: 0; color: #1679dd; background: none; font: inherit; font-weight: 750; text-align: left; cursor: pointer; }
-.trip-files-entry { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid #e4e8ed; }
-.trip-files-entry > a { flex: 1; min-width: 0; overflow-wrap: anywhere; color: #16243c; font-size: 14px; }
-.trip-files-entry small { color: #6c7484; font-size: 11px; }
-.trip-files-entry button { flex: 0 0 auto; padding: 7px 9px; border: 0; color: #b93636; background: none; font: inherit; }
+.trip-files-group { min-width: 0; padding: 16px; border: 1px solid rgba(255,255,255,.65); border-radius: 24px; background: rgba(255,255,255,.95); }
+.trip-files-group-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.trip-files-day { min-width: 0; padding: 0; border: 0; color: #16243c; background: none; font: inherit; font-size: 17px; font-weight: 750; text-align: left; cursor: pointer; }
+.trip-files-group-count { flex: 0 0 auto; color: #6c7484; font-size: 12px; white-space: nowrap; }
+.trip-files-general h3 { margin: 0 0 9px; font-size: 17px; }
+.trip-files-entry { display: flex; min-height: 70px; align-items: center; gap: 12px; padding: 10px 0; }
+.trip-files-entry + .trip-files-entry { border-top: 1px solid #e4e8ed; }
+.trip-files-entry-preview { display: grid; flex: 0 0 50px; width: 50px; height: 50px; place-items: center; overflow: hidden; border-radius: 12px; color: #087afa; background: #eaf3ff; font-size: 12px; font-weight: 800; }
+.trip-files-entry-preview img { width: 100%; height: 100%; object-fit: cover; }
+.trip-files-entry-link { display: grid; flex: 1; min-width: 0; gap: 3px; overflow-wrap: anywhere; color: #16243c; font-size: 14px; text-decoration: none; }
+.trip-files-entry-link small { color: #6c7484; font-size: 12px; }
+.trip-file-remove { display: grid; flex: 0 0 42px; width: 42px; height: 42px; padding: 0; place-items: center; border: 0; border-radius: 50%; color: #b93636; background: rgba(255,59,48,.1); font: inherit; font-size: 25px; cursor: pointer; }
+.trip-files-deck { position: relative; width: calc(100% - 18px); height: clamp(210px, 62vw, 320px); margin: 16px 18px 11px 0; touch-action: pan-y; }
+.trip-files-deck:focus-visible { outline: 3px solid #087afa; outline-offset: 5px; border-radius: 22px; }
+.trip-file-card { position: absolute; inset: 0; overflow: hidden; border: 1px solid rgba(255,255,255,.84); border-radius: 22px; background: #e5f0fa; box-shadow: 0 12px 24px rgba(15,36,65,.22); opacity: 1; transform: translate3d(var(--stack-x, 0px), var(--stack-y, 0px), 0) scale(var(--stack-scale, 1)); transform-origin: center bottom; transition: transform .34s cubic-bezier(.2,.82,.22,1), opacity .27s ease; }
+.trip-file-card[data-position="previous"] { opacity: 0; transform: translate3d(-82%, -5%, 0) rotate(-7deg) scale(.92); pointer-events: none; }
+.trip-file-card[data-position="hidden"] { opacity: 0; transform: translate3d(36px, 18px, 0) scale(.84); pointer-events: none; }
+.trip-file-card[data-position="queued"] { pointer-events: none; }
+.trip-file-card-link { position: relative; display: block; width: 100%; height: 100%; color: #15243b; text-decoration: none; }
+.trip-file-card-visual { display: grid; width: 100%; height: 100%; place-items: center; overflow: hidden; color: #087afa; background: linear-gradient(145deg, #eaf4ff, #cbdff2); font-size: clamp(48px, 12vw, 70px); font-weight: 850; letter-spacing: -.06em; }
+.trip-file-card-visual img { width: 100%; height: 100%; object-fit: cover; }
+.trip-file-card-caption { position: absolute; right: 0; bottom: 0; left: 0; display: grid; gap: 3px; padding: 38px 16px 16px; color: white; background: linear-gradient(transparent, rgba(4,15,30,.83)); text-shadow: 0 1px 3px rgba(0,0,0,.35); }
+.trip-file-card-caption strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; }
+.trip-file-card-caption small { font-size: 12px; }
+.trip-file-card[data-kind="document"] .trip-file-card-caption { color: #16243c; background: linear-gradient(transparent, rgba(231,241,251,.98)); text-shadow: none; }
+.trip-file-card .trip-file-remove { position: absolute; z-index: 2; top: 12px; right: 12px; border: 1px solid rgba(255,255,255,.75); background: rgba(255,255,255,.88); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+.trip-files-deck-controls { display: flex; min-height: 44px; align-items: center; justify-content: center; gap: 22px; }
+.trip-files-deck-controls[hidden] { display: none; }
+.trip-files-deck-controls button { display: grid; width: 44px; height: 44px; padding: 0; place-items: center; border: 1px solid #d8e0eb; border-radius: 50%; color: #087afa; background: #f3f7fc; font-size: 30px; line-height: 1; cursor: pointer; }
+.trip-files-deck-controls button:disabled { opacity: .35; cursor: default; }
+.trip-files-deck-position { min-width: 52px; color: #536275; font-size: 13px; font-weight: 700; text-align: center; }
 .trip-files-empty { padding: 22px; border-radius: 18px; color: #566378; background: white; }
-body[data-trip-permission="viewer"] #budget_add, body[data-trip-permission="viewer"] .trip-files-upload, body[data-trip-permission="viewer"] .trip-files-entry button { display: none !important; }
+body[data-trip-permission="viewer"] #budget_add, body[data-trip-permission="viewer"] .trip-files-upload, body[data-trip-permission="viewer"] .trip-file-remove { display: none !important; }
 .trip-day-list {
   display: grid;
   grid-template-columns: 1fr;

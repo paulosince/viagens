@@ -155,7 +155,7 @@ assert.equal(tabsContext.state.tripTabScroll.get('trip:orcamento'), 920);
 assert.equal(navStyle['--active-index'], '0');
 assert.equal(panels.roteiro.dataset.enter, 'previous');
 
-assert.match(source, /\.from\('day_attachments'\)\.select\('\*'\)\.in\('day_id'/);
-assert.match(source, /await storeDayAttachment\(client, day, file\)/);
+assert.match(source, /\.from\('day_attachments'\)\.select\('\*'\)\.eq\('trip_id', key\)/);
+assert.match(source, /await storeTripAttachment\(client, tripId, day\?\.id \|\| null, file\)/);
 assert.match(source, /if \(!canEditActiveTrip\(\)\) return;\s+const tripId = String\(state.activeTripId\);\s+const form = event.currentTarget;/);
 console.log('PASS: trip tabs, per-currency totals, edit permissions and shared day files');
