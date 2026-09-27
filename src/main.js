@@ -81,6 +81,10 @@ const state = {
   dayMapRenderToken: 0,
   dayAttachments: new Map(),
   dayAttachmentLoads: new Map(),
+  budgetByTrip: new Map(),
+  tripFilesByTrip: new Map(),
+  tripTabScroll: new Map(),
+  activeTripTab: 'roteiro',
   enrichingDays: new Set(),
   agendaSaveStates: new Map(),
   agendaSaveTimers: new Map(),
@@ -106,6 +110,7 @@ const dom = {
   home: document.querySelector('#user_home'), profileButton: document.querySelector('#profile_button'), headerProfileImage: document.querySelector('#header_profile_image'), headerProfileFallback: document.querySelector('#header_profile_fallback'), homeChatgptButton: document.querySelector('#home_chatgpt_button'),
   editTripsButton: document.querySelector('#edit_trips_button'), newTripButton: document.querySelector('#new_trip_button'), emptyNewTripButton: document.querySelector('#empty_new_trip_button'), sessionEmail: document.querySelector('#session_email'), syncStatus: document.querySelector('#sync_status'), tripHeading: document.querySelector('#trip_heading'), yearButton: document.querySelector('#year_selector_button'), currentYear: document.querySelector('#current_year'), yearMenu: document.querySelector('#year_menu'), yearList: document.querySelector('#year_list'),
   tripList: document.querySelector('#trip_list'), homeEmpty: document.querySelector('#home_empty'), scrim: document.querySelector('#sheet_scrim'), tripEditFooter: document.querySelector('#trip_edit_footer'), deleteSelectedTrips: document.querySelector('#delete_selected_trips'), tripPage: document.querySelector('#trip_page'), closeTripPage: document.querySelector('#close_trip_page'), tripPageHero: document.querySelector('#trip_page_hero'), tripPageTitle: document.querySelector('#trip_page_title'), tripPageTitleInput: document.querySelector('#trip_page_title_input'), tripPageDates: document.querySelector('#trip_page_dates'), tripDateEditor: document.querySelector('#trip_page_date_editor'), tripStartDate: document.querySelector('#trip_page_start_date'), tripDayCount: document.querySelector('#trip_page_day_count'), tripDateDone: document.querySelector('#trip_page_date_done'), tripPageColor: document.querySelector('#trip_page_color'), tripPageCoverInput: document.querySelector('#trip_page_cover_input'), tripPageSaveStatus: document.querySelector('#trip_page_save_status'), tripPagePassengers: document.querySelector('#trip_page_passengers'), tripPagePassengerCount: document.querySelector('#trip_page_passenger_count'), tripPassengerSheet: document.querySelector('#trip_passenger_sheet'), tripPassengerSheetBody: document.querySelector('#trip_passenger_sheet_body'), tripPassengerSelf: document.querySelector('#trip_passenger_self'), tripPassengerSelfImage: document.querySelector('#trip_passenger_self_image'), tripPassengerSelfName: document.querySelector('#trip_passenger_self_name'), tripPassengerClose: document.querySelector('#close_trip_passengers'), tripPassengerMessage: document.querySelector('#trip_passenger_message'), tripDayList: document.querySelector('#trip_day_list'), tripDayMessage: document.querySelector('#trip_day_message'),
+  tripTabs: document.querySelector('.trip-tabs'), tripPanels: { roteiro: document.querySelector('#trip_panel_roteiro'), orcamento: document.querySelector('#trip_panel_orcamento'), arquivos: document.querySelector('#trip_panel_arquivos') }, budgetSummary: document.querySelector('#budget_summary'), budgetStatus: document.querySelector('#budget_status'), budgetList: document.querySelector('#budget_list'), budgetEditor: document.querySelector('#budget_editor'), budgetAdd: document.querySelector('#budget_add'), tripFilesStatus: document.querySelector('#trip_files_status'), tripFilesList: document.querySelector('#trip_files_list'), tripFilesDay: document.querySelector('#trip_files_day'), tripFilesInput: document.querySelector('#trip_files_input'),
   dayPage: document.querySelector('#day_page'), closeDayPage: document.querySelector('#close_day_page'), addDayPageActivity: document.querySelector('#add_day_page_activity'), dayAgendaStickyMarker: document.querySelector('#day_agenda_sticky_marker'), dayPageHero: document.querySelector('#day_page_hero'), dayPageBadge: document.querySelector('#day_page_badge'), dayPageTitle: document.querySelector('#day_page_title'), dayPageDate: document.querySelector('#day_page_date'), dayPageSaveStatus: document.querySelector('#day_page_save_status'), dayPagePhotoInput: document.querySelector('#day_page_photo_input'), dayPageCamera: document.querySelector('#day_page_camera'), dayPageAgenda: document.querySelector('#day_page_agenda'), dayPageEmpty: document.querySelector('#day_page_empty'), dayPageMap: document.querySelector('#day_page_map'), dayPageDirections: document.querySelector('#day_page_directions'),
   dayAttachmentsButton: document.querySelector('#day_attachments_button'), dayAttachmentsCount: document.querySelector('#day_attachments_count'), dayAttachmentsScrim: document.querySelector('#day_attachments_scrim'), dayAttachmentsSheet: document.querySelector('#day_attachments_sheet'), closeDayAttachments: document.querySelector('#close_day_attachments'), dayAttachmentsInput: document.querySelector('#day_attachments_input'), dayAttachmentsStatus: document.querySelector('#day_attachments_status'), dayAttachmentsList: document.querySelector('#day_attachments_list'),
   newTripSheet: document.querySelector('#home_new_trip'), newTripForm: document.querySelector('#new_trip_form'), newTripTitle: document.querySelector('#new-trip-title'), closeNewTrip: document.querySelector('#close_new_trip'), saveNewTrip: document.querySelector('#save_new_trip'), newTripMessage: document.querySelector('#new_trip_message'), coverInput: document.querySelector('#cover-image'), coverPreview: document.querySelector('#cover_preview_image'), tripColorValue: document.querySelector('#trip-color-value'), tripColorPalette: document.querySelector('#trip_color_palette'), tripColorCustom: document.querySelector('#trip-color-custom'), savedTripPassengers: document.querySelector('#saved_trip_passengers'), savedTripPassengerList: document.querySelector('#saved_trip_passenger_list'), newTripPassengerList: document.querySelector('#new_trip_passenger_list'), addTripPassenger: document.querySelector('#add_trip_passenger'), tripSharingSection: document.querySelector('#trip_sharing_section'), tripMemberList: document.querySelector('#trip_member_list'), tripShareEmail: document.querySelector('#trip_share_email'), tripShareButton: document.querySelector('#trip_share_button'), tripShareMessage: document.querySelector('#trip_share_message'),
@@ -1987,6 +1992,26 @@ function dayAttachmentPath(day, extension) {
   return `${day.trip_id}/${day.id}/${crypto.randomUUID()}.${extension}`;
 }
 
+async function storeDayAttachment(client, day, file) {
+  const accepted = dayAttachmentType(file);
+  if (!accepted || !file.size || file.size > DAY_ATTACHMENT_MAX_BYTES) {
+    throw new Error('Use fotos, PDF ou Word de até 6 MB: ' + file.name);
+  }
+  const path = dayAttachmentPath(day, accepted.extension);
+  const uploaded = await client.storage.from(DAY_ATTACHMENT_BUCKET).upload(path, file, {
+    contentType: accepted.type, upsert: false
+  });
+  if (uploaded.error) throw uploaded.error;
+  const inserted = await client.from('day_attachments').insert({
+    day_id: day.id, storage_path: path, file_name: file.name.slice(0, 180),
+    mime_type: accepted.type, size_bytes: file.size
+  });
+  if (inserted.error) {
+    await client.storage.from(DAY_ATTACHMENT_BUCKET).remove([path]);
+    throw inserted.error;
+  }
+}
+
 function setDayAttachmentStatus(message, kind = 'info') {
   dom.dayAttachmentsStatus.dataset.kind = kind;
   dom.dayAttachmentsStatus.textContent = message;
@@ -2080,26 +2105,11 @@ async function uploadDayAttachments(files) {
   uploadControl.dataset.busy = 'true';
   try {
     for (const [index, file] of files.entries()) {
-      const accepted = dayAttachmentType(file);
-      if (!accepted || !file.size || file.size > DAY_ATTACHMENT_MAX_BYTES) {
-        throw new Error('Use fotos, PDF ou Word de até 6 MB: ' + file.name);
-      }
       setDayAttachmentStatus(`Enviando ${index + 1} de ${files.length}: ${file.name}`);
-      const path = dayAttachmentPath(day, accepted.extension);
-      const uploaded = await client.storage.from(DAY_ATTACHMENT_BUCKET).upload(path, file, {
-        contentType: accepted.type, upsert: false
-      });
-      if (uploaded.error) throw uploaded.error;
-      const inserted = await client.from('day_attachments').insert({
-        day_id: day.id, storage_path: path, file_name: file.name.slice(0, 180),
-        mime_type: accepted.type, size_bytes: file.size
-      });
-      if (inserted.error) {
-        await client.storage.from(DAY_ATTACHMENT_BUCKET).remove([path]);
-        throw inserted.error;
-      }
+      await storeDayAttachment(client, day, file);
     }
     await loadDayAttachments(day.id);
+    if (state.activeTripTab === 'arquivos') loadTripFiles(day.trip_id).catch(console.warn);
     setDayAttachmentStatus(files.length === 1 ? 'Arquivo salvo.' : `${files.length} arquivos salvos.`);
   } catch (error) {
     await loadDayAttachments(day.id).catch(() => {});
@@ -2119,6 +2129,7 @@ async function removeDayAttachment(attachment) {
   const file = await client.storage.from(DAY_ATTACHMENT_BUCKET).remove([attachment.storage_path]);
   if (file.error) console.warn('Arquivo removido da lista; limpeza do armazenamento pendente', file.error);
   await loadDayAttachments(attachment.day_id).catch(error => setDayAttachmentStatus(error.message, 'error'));
+  if (state.activeTripTab === 'arquivos') loadTripFiles(String(state.activeTripId)).catch(console.warn);
   setDayAttachmentStatus('Arquivo excluído.');
 }
 
@@ -3804,9 +3815,308 @@ function syncTripHero(trip) {
   syncPassengerList(dom.tripPagePassengers, state.passengers.get(trip.id) || []);
 }
 
+function selectTripTab(name, { reset = false } = {}) {
+  if (!dom.tripPanels[name] || !state.activeTripId) return;
+  const key = String(state.activeTripId);
+  if (!reset && name === state.activeTripTab) return;
+  if (!reset) state.tripTabScroll.set(`${key}:${state.activeTripTab}`, dom.tripPage.scrollTop);
+  state.activeTripTab = name;
+  for (const [tab, panel] of Object.entries(dom.tripPanels)) {
+    panel.hidden = tab !== name;
+    const button = document.querySelector(`#trip_tab_${tab}`);
+    button.setAttribute('aria-selected', String(tab === name));
+    button.tabIndex = tab === name ? 0 : -1;
+  }
+  requestAnimationFrame(() => {
+    if (state.activeTripId !== key || state.activeTripTab !== name) return;
+    dom.tripPage.scrollTop = reset ? 0 : state.tripTabScroll.get(`${key}:${name}`) ?? dom.tripTabs.offsetTop;
+  });
+  if (name === 'orcamento') loadTripBudget(key).catch(error => setTripPanelStatus(dom.budgetStatus, error.message, 'error'));
+  if (name === 'arquivos') loadTripFiles(key).catch(error => setTripPanelStatus(dom.tripFilesStatus, error.message, 'error'));
+}
+
+function setTripPanelStatus(node, message = '', kind = 'info') {
+  node.dataset.kind = kind;
+  node.textContent = message;
+}
+
+function tripMoney(value, currency) {
+  try { return new Intl.NumberFormat('pt-BR', { style: 'currency', currency }).format(Number(value) || 0); }
+  catch { return `${currency} ${(Number(value) || 0).toFixed(2)}`; }
+}
+
+function amountFromInput(value) {
+  const normalized = String(value || '').trim().replace(',', '.');
+  if (!normalized) return null;
+  if (!/^\d+(?:\.\d{1,2})?$/.test(normalized)) throw new Error('Informe um valor válido, com até duas casas decimais.');
+  return Number(normalized);
+}
+
+function summarizeTripBudget(items) {
+  const totals = new Map();
+  for (const item of items) {
+    const currency = item.currency || 'BRL';
+    const current = totals.get(currency) || { planned: 0, paid: 0, toBuy: 0 };
+    current.planned += Number(item.planned_amount) || 0;
+    if (item.purchase_status === 'purchased') current.paid += Number(item.actual_amount) || 0;
+    else current.toBuy += Number(item.planned_amount) || 0;
+    totals.set(currency, current);
+  }
+  return totals;
+}
+
+function renderTripBudget(tripId) {
+  if (String(state.activeTripId) !== String(tripId)) return;
+  const items = state.budgetByTrip.get(String(tripId)) || [];
+  const totals = summarizeTripBudget(items);
+  dom.budgetSummary.replaceChildren();
+  for (const [currency, amounts] of totals) {
+    for (const [label, value] of [['Previsto', amounts.planned], ['Pago', amounts.paid], ['Ainda previsto', amounts.toBuy]]) {
+      const card = document.createElement('div'); card.className = 'budget-summary-card';
+      const caption = document.createElement('small'); caption.textContent = `${label} · ${currency}`;
+      const money = document.createElement('strong'); money.textContent = tripMoney(value, currency);
+      card.append(caption, money); dom.budgetSummary.append(card);
+    }
+  }
+  dom.budgetList.replaceChildren();
+  const categories = new Map();
+  for (const item of items) {
+    const name = item.category?.trim() || 'Outros gastos';
+    if (!categories.has(name)) categories.set(name, []);
+    categories.get(name).push(item);
+  }
+  for (const [name, entries] of categories) {
+    const group = document.createElement('section'); group.className = 'budget-group';
+    const heading = document.createElement('h3'); heading.textContent = name;
+    group.append(heading);
+    for (const item of entries) {
+      const editable = canEditActiveTrip();
+      const row = document.createElement(editable ? 'button' : 'div');
+      row.className = 'budget-item';
+      if (editable) { row.type = 'button'; row.addEventListener('click', () => openBudgetEditor(item)); }
+      const title = document.createElement('strong'); title.textContent = item.label;
+      const meta = document.createElement('span'); meta.className = 'budget-item-meta';
+      const estimate = document.createElement('span'); estimate.textContent = `Previsto: ${item.planned_amount == null ? '—' : tripMoney(item.planned_amount, item.currency)}`;
+      const paid = document.createElement('b'); paid.dataset.purchased = String(item.purchase_status === 'purchased');
+      paid.textContent = item.purchase_status === 'purchased'
+        ? `Pago: ${item.actual_amount == null ? 'valor não informado' : tripMoney(item.actual_amount, item.currency)}`
+        : 'A comprar';
+      meta.append(estimate, paid); row.append(title, meta); group.append(row);
+    }
+    dom.budgetList.append(group);
+  }
+  if (!items.length) {
+    const empty = document.createElement('p'); empty.className = 'trip-files-empty';
+    empty.textContent = 'Nenhum gasto planejado ainda.'; dom.budgetList.append(empty);
+  }
+}
+
+async function loadTripBudget(tripId) {
+  const key = String(tripId);
+  if (state.activeTripId !== key) return;
+  if (state.budgetByTrip.has(key)) renderTripBudget(key);
+  setTripPanelStatus(dom.budgetStatus, 'Atualizando orçamento…');
+  const client = await trySupabase(5000);
+  if (!client) {
+    setTripPanelStatus(dom.budgetStatus, state.budgetByTrip.has(key) ? 'Mostrando a última consulta deste acesso.' : 'Conecte-se para consultar o orçamento.');
+    return;
+  }
+  const { data, error } = await client.from('budget_items').select('*').eq('trip_id', key).order('category');
+  if (error) throw error;
+  state.budgetByTrip.set(key, data || []);
+  if (state.activeTripId === key) {
+    renderTripBudget(key);
+    setTripPanelStatus(dom.budgetStatus);
+  }
+}
+
+function openBudgetEditor(item = null) {
+  if (!canEditActiveTrip()) return;
+  const box = dom.budgetEditor;
+  box.replaceChildren(); box.hidden = false;
+  const form = document.createElement('form');
+  form.innerHTML = `<h3>${item ? 'Editar gasto' : 'Novo gasto'}</h3>
+    <label>Descrição<input name="label" maxlength="180" required autocomplete="off"></label>
+    <label>Categoria<input name="category" maxlength="100" autocomplete="off" placeholder="Ex.: Transporte"></label>
+    <div class="budget-editor-fields"><label>Moeda<input name="currency" maxlength="3" required autocapitalize="characters"></label>
+    <label>Situação<select name="purchase_status"><option value="pending">A comprar</option><option value="purchased">Pago</option></select></label>
+    <label>Previsto<input name="planned_amount" inputmode="decimal" placeholder="0,00"></label>
+    <label>Pago<input name="actual_amount" inputmode="decimal" placeholder="0,00"></label></div>
+    <div class="budget-editor-actions"><button type="submit">Salvar</button><button type="button" data-action="cancel">Cancelar</button>${item ? '<button type="button" data-action="delete">Excluir</button>' : ''}</div>`;
+  const input = field => form.elements.namedItem(field);
+  input('label').value = item?.label || '';
+  input('category').value = item?.category || '';
+  input('currency').value = item?.currency || 'BRL';
+  input('purchase_status').value = item?.purchase_status === 'purchased' ? 'purchased' : 'pending';
+  input('planned_amount').value = item?.planned_amount ?? '';
+  input('actual_amount').value = item?.actual_amount ?? '';
+  form.addEventListener('submit', event => saveBudgetEditor(event, item));
+  form.querySelector('[data-action="cancel"]').addEventListener('click', () => { box.hidden = true; box.replaceChildren(); });
+  form.querySelector('[data-action="delete"]')?.addEventListener('click', () => deleteBudgetItem(item));
+  box.append(form);
+  box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  input('label').focus({ preventScroll: true });
+}
+
+async function saveBudgetEditor(event, existing) {
+  event.preventDefault();
+  if (!canEditActiveTrip()) return;
+  const tripId = String(state.activeTripId);
+  const form = event.currentTarget;
+  const value = field => form.elements.namedItem(field).value.trim();
+  const submit = form.querySelector('button[type="submit"]');
+  submit.disabled = true;
+  try {
+    const currency = value('currency').toUpperCase();
+    if (!/^[A-Z]{3}$/.test(currency)) throw new Error('Use uma moeda de três letras, como BRL ou EUR.');
+    const payload = { trip_id: tripId, label: value('label'), category: value('category') || null,
+      currency, purchase_status: value('purchase_status'),
+      planned_amount: amountFromInput(value('planned_amount')),
+      actual_amount: amountFromInput(value('actual_amount')) };
+    if (!payload.label) throw new Error('Informe a descrição do gasto.');
+    const client = await trySupabase(5000);
+    if (!client) throw new Error('É necessária uma conexão para salvar o orçamento.');
+    const result = existing
+      ? await client.from('budget_items').update(payload).eq('id', existing.id).eq('trip_id', tripId).select('*').single()
+      : await client.from('budget_items').insert(payload).select('*').single();
+    if (result.error) throw result.error;
+    if (state.activeTripId !== tripId) return;
+    dom.budgetEditor.hidden = true; dom.budgetEditor.replaceChildren();
+    setTripPanelStatus(dom.budgetStatus, 'Gasto salvo.');
+    const items = state.budgetByTrip.get(tripId) || [];
+    state.budgetByTrip.set(tripId, existing ? items.map(row => row.id === existing.id ? result.data : row) : [...items, result.data]);
+    renderTripBudget(tripId);
+    recordChange({ tripId, entityType: 'budget_item', entityId: result.data.id,
+      action: existing ? 'update' : 'create', summary: `Orçamento: ${payload.label}`,
+      beforeState: existing || null, afterState: result.data }).catch(console.warn);
+  } catch (error) {
+    setTripPanelStatus(dom.budgetStatus, error.message || 'Não foi possível salvar.', 'error');
+    submit.disabled = false;
+  }
+}
+
+async function deleteBudgetItem(item) {
+  if (!canEditActiveTrip() || !window.confirm(`Excluir “${item.label}” do orçamento?`)) return;
+  const tripId = String(state.activeTripId);
+  const client = await trySupabase(5000);
+  if (!client) { setTripPanelStatus(dom.budgetStatus, 'Conecte-se para excluir.', 'error'); return; }
+  const { error } = await client.from('budget_items').delete().eq('id', item.id).eq('trip_id', tripId);
+  if (error) { setTripPanelStatus(dom.budgetStatus, error.message, 'error'); return; }
+  state.budgetByTrip.set(tripId, (state.budgetByTrip.get(tripId) || []).filter(row => row.id !== item.id));
+  if (state.activeTripId === tripId) {
+    dom.budgetEditor.hidden = true; dom.budgetEditor.replaceChildren();
+    renderTripBudget(tripId); setTripPanelStatus(dom.budgetStatus, 'Gasto excluído.');
+  }
+  recordChange({ tripId, entityType: 'budget_item', entityId: item.id, action: 'delete', summary: `Orçamento: ${item.label} excluído`, beforeState: item }).catch(console.warn);
+}
+
+function renderTripFiles(tripId, days) {
+  if (String(state.activeTripId) !== String(tripId)) return;
+  const selected = dom.tripFilesDay.value;
+  dom.tripFilesDay.replaceChildren();
+  for (const day of days) {
+    const option = document.createElement('option'); option.value = String(day.id);
+    option.textContent = `Dia ${dayNumber(day)} · ${day.title || displayDate(derivedDayDate(day))}`;
+    dom.tripFilesDay.append(option);
+  }
+  if (days.some(day => String(day.id) === selected)) dom.tripFilesDay.value = selected;
+  dom.tripFilesList.replaceChildren();
+  const rows = state.tripFilesByTrip.get(String(tripId)) || [];
+  for (const day of days) {
+    const entries = rows.filter(row => String(row.day_id) === String(day.id));
+    if (!entries.length) continue;
+    const group = document.createElement('section'); group.className = 'trip-files-group';
+    const title = document.createElement('button'); title.type = 'button'; title.className = 'trip-files-day';
+    title.textContent = `Dia ${dayNumber(day)} · ${day.title || displayDate(derivedDayDate(day))}`;
+    title.addEventListener('click', () => openDayPage(day.id));
+    group.append(title);
+    for (const file of entries) {
+      const row = document.createElement('div'); row.className = 'trip-files-entry';
+      const icon = document.createElement('span'); icon.textContent = file.mime_type?.startsWith('image/') ? '📷' : '📄';
+      const link = document.createElement('a'); link.textContent = file.file_name;
+      if (file.signedUrl) { link.href = file.signedUrl; link.target = '_blank'; link.rel = 'noopener noreferrer'; }
+      else link.title = 'Conecte-se para abrir este arquivo';
+      const size = document.createElement('small'); size.textContent = ` ${((file.size_bytes || 0) / 1048576).toFixed(1)} MB`;
+      link.append(size); row.append(icon, link);
+      if (canEditActiveTrip()) {
+        const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = 'Excluir';
+        remove.setAttribute('aria-label', `Excluir ${file.file_name}`);
+        remove.addEventListener('click', async () => {
+          await removeDayAttachment(file);
+          await loadTripFiles(tripId).catch(error => setTripPanelStatus(dom.tripFilesStatus, error.message, 'error'));
+        });
+        row.append(remove);
+      }
+      group.append(row);
+    }
+    dom.tripFilesList.append(group);
+  }
+  if (!rows.length) {
+    const empty = document.createElement('p'); empty.className = 'trip-files-empty';
+    empty.textContent = state.tripFilesByTrip.has(String(tripId))
+      ? 'Nenhum arquivo nesta viagem ainda. Os documentos enviados em cada dia aparecerão aqui.'
+      : 'Conecte-se para consultar os arquivos desta viagem.';
+    dom.tripFilesList.append(empty);
+  }
+  dom.tripFilesInput.closest('.trip-files-pick').hidden = !days.length || !canEditActiveTrip();
+  dom.tripFilesDay.disabled = !days.length || !canEditActiveTrip();
+}
+
+async function loadTripFiles(tripId) {
+  const key = String(tripId);
+  if (state.activeTripId !== key) return;
+  setTripPanelStatus(dom.tripFilesStatus, 'Carregando arquivos…');
+  let days = state.tripDays.filter(day => String(day.trip_id) === key);
+  if (!days.length) {
+    const data = await fetchTripData(key, { preferLocal: true }) || await fetchTripData(key);
+    if (state.activeTripId !== key) return;
+    applyTripData(data);
+    days = data.days;
+  }
+  if (state.activeTripId !== key) return;
+  if (state.tripFilesByTrip.has(key)) renderTripFiles(key, days);
+  if (!days.length) { state.tripFilesByTrip.set(key, []); renderTripFiles(key, days); setTripPanelStatus(dom.tripFilesStatus, 'Adicione um dia ao roteiro para vincular arquivos.'); return; }
+  const client = await trySupabase(5000);
+  if (!client) {
+    renderTripFiles(key, days);
+    setTripPanelStatus(dom.tripFilesStatus, 'Conecte-se para consultar e enviar arquivos.');
+    return;
+  }
+  const { data, error } = await client.from('day_attachments').select('*').in('day_id', days.map(day => day.id)).order('created_at');
+  if (error) throw error;
+  const signed = await Promise.all((data || []).map(async file => {
+    const result = await client.storage.from(DAY_ATTACHMENT_BUCKET).createSignedUrl(file.storage_path, 3600);
+    return { ...file, signedUrl: result.error ? '' : result.data?.signedUrl || '' };
+  }));
+  state.tripFilesByTrip.set(key, signed);
+  if (state.activeTripId === key) { renderTripFiles(key, days); setTripPanelStatus(dom.tripFilesStatus); }
+}
+
+async function uploadTripFiles(files) {
+  const tripId = String(state.activeTripId || '');
+  const dayId = dom.tripFilesDay.value;
+  const day = state.tripDays.find(item => String(item.id) === dayId && String(item.trip_id) === tripId);
+  if (!day || !canEditActiveTrip() || !files.length) return;
+  const client = await trySupabase(5000);
+  if (!client) { setTripPanelStatus(dom.tripFilesStatus, 'Conecte-se para enviar arquivos.', 'error'); return; }
+  const button = dom.tripFilesInput.closest('.trip-files-pick'); button.dataset.busy = 'true';
+  try {
+    for (const [index, file] of files.entries()) {
+      setTripPanelStatus(dom.tripFilesStatus, `Enviando ${index + 1} de ${files.length}: ${file.name}`);
+      await storeDayAttachment(client, day, file);
+    }
+    await loadTripFiles(tripId);
+    setTripPanelStatus(dom.tripFilesStatus, files.length === 1 ? 'Arquivo salvo.' : `${files.length} arquivos salvos.`);
+  } catch (error) {
+    await loadTripFiles(tripId).catch(() => {});
+    setTripPanelStatus(dom.tripFilesStatus, error.message || 'Não foi possível enviar.', 'error');
+  } finally { button.dataset.busy = 'false'; dom.tripFilesInput.value = ''; }
+}
+
 async function openTrip(tripId, { pushHistory = true, forceRefresh = false } = {}) {
   const trip = state.trips.find(item => String(item.id) === String(tripId));
   if (!trip) return;
+  const enteringTrip = state.activeTripId !== String(trip.id) || document.body.dataset.tripPage !== 'open';
   if (tripColorDraft && tripColorDraft.tripId !== String(tripId)) savePendingTripColor();
   document.body.dataset.tripPermission = tripRole(trip);
   dom.tripPageShare.hidden = tripRole(trip) !== 'owner';
@@ -3823,6 +4133,12 @@ async function openTrip(tripId, { pushHistory = true, forceRefresh = false } = {
     window.history.pushState({ view: 'trip', tripId: String(trip.id) }, '', `#trip-${trip.id}`);
   }
   state.activeTripId = String(trip.id);
+  if (enteringTrip) {
+    dom.budgetList.replaceChildren(); dom.budgetSummary.replaceChildren();
+    dom.tripFilesList.replaceChildren(); dom.tripFilesDay.replaceChildren();
+    dom.tripFilesDay.disabled = true; dom.tripFilesInput.closest('.trip-files-pick').hidden = true;
+    selectTripTab('roteiro', { reset: true });
+  }
   if (canEditTrip(trip)) ensureTripBaselineSnapshot(trip.id).catch(error => console.warn('Ponto de segurança inicial indisponível', error));
   syncTripHero(trip);
   dom.tripPage.setAttribute('aria-hidden', 'false');
@@ -3870,6 +4186,8 @@ function closeTripPage() {
   if (tripColorSaveTimer) savePendingTripColor();
   document.body.dataset.tripPermission = '';
   state.activeTripId = null;
+  dom.budgetEditor.hidden = true;
+  dom.budgetEditor.replaceChildren();
   state.tripDays = [];
   state.dayActivities = new Map();
   state.dayLocations = new Map();
@@ -5342,6 +5660,20 @@ dom.dayNotesInput.addEventListener('input', () => { if (state.dayEditor) state.d
 dom.dayEditForm.addEventListener('submit', event => { event.preventDefault(); saveDayEditor(); });
 
 dom.closeTripPage.addEventListener('click', navigateBackFromTrip);
+for (const tab of dom.tripTabs.querySelectorAll('[role="tab"]')) {
+  tab.addEventListener('click', () => selectTripTab(tab.id.slice('trip_tab_'.length)));
+  tab.addEventListener('keydown', event => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const tabs = [...dom.tripTabs.querySelectorAll('[role="tab"]')];
+    const index = tabs.indexOf(tab);
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1
+      : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+    tabs[next].focus(); tabs[next].click();
+  });
+}
+dom.budgetAdd.addEventListener('click', () => openBudgetEditor());
+dom.tripFilesInput.addEventListener('change', () => uploadTripFiles([...dom.tripFilesInput.files]).catch(error => setTripPanelStatus(dom.tripFilesStatus, error.message, 'error')));
 dom.tripPageShare.addEventListener('click', openTripShare);
 dom.closeTripShare.addEventListener('click', () => setActiveSheet('none'));
 dom.tripShareScrim.addEventListener('click', () => setActiveSheet('none'));
@@ -5456,6 +5788,7 @@ dom.logoutButton.addEventListener('click', async () => {
   state.profileSavedPassengers = [];
   state.tripDataCache.clear();
   state.tripDataLoads.clear();
+  state.budgetByTrip.clear(); state.tripFilesByTrip.clear(); state.tripTabScroll.clear();
   syncTripList();
   closeSheets();
   setSessionView('anonymous');
@@ -5778,7 +6111,7 @@ ensureSupabase()
       return;
     }
     if (!navigator.onLine && state.user) return;
-    state.user = null; state.profile = null; state.trips = []; state.passengers.clear(); state.tripRoles.clear(); state.tripOwners.clear(); state.savedPassengers = []; state.profileSavedPassengers = []; state.tripDataCache.clear(); state.tripDataLoads.clear();
+    state.user = null; state.profile = null; state.trips = []; state.passengers.clear(); state.tripRoles.clear(); state.tripOwners.clear(); state.savedPassengers = []; state.profileSavedPassengers = []; state.tripDataCache.clear(); state.tripDataLoads.clear(); state.budgetByTrip.clear(); state.tripFilesByTrip.clear(); state.tripTabScroll.clear();
     syncTripList(); closeSheets(); setSessionView('anonymous');
   }))
   .catch(() => {});

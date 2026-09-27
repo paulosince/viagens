@@ -47,9 +47,9 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20260927-44" as="style">
-  <link rel="stylesheet" href="style.css?v=20260927-44" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20260927-44"></noscript>
+  <link rel="preload" href="style.css?v=20260927-45" as="style">
+  <link rel="stylesheet" href="style.css?v=20260927-45" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20260927-45"></noscript>
   <script>
     function showViaggioStartupError(detail) {
       if (!document.body || document.body.dataset.session !== 'loading') return;
@@ -314,10 +314,28 @@
           <span id="trip_page_save_status" class="trip-page-save-status" role="status" aria-live="polite"></span>
         </div>
       </header>
-      <div class="trip-page-content">
+      <nav class="trip-tabs" role="tablist" aria-label="Seções da viagem">
+        <button id="trip_tab_roteiro" class="trip-tab" role="tab" type="button" aria-controls="trip_panel_roteiro" aria-selected="true" tabindex="0">Roteiro</button>
+        <button id="trip_tab_orcamento" class="trip-tab" role="tab" type="button" aria-controls="trip_panel_orcamento" aria-selected="false" tabindex="-1">Orçamento</button>
+        <button id="trip_tab_arquivos" class="trip-tab" role="tab" type="button" aria-controls="trip_panel_arquivos" aria-selected="false" tabindex="-1">Arquivos</button>
+      </nav>
+      <div id="trip_panel_roteiro" class="trip-page-content" role="tabpanel" aria-labelledby="trip_tab_roteiro">
         <ol id="trip_day_list" class="trip-day-list"></ol>
         <p id="trip_day_message" class="trip-day-message" role="status"></p>
       </div>
+      <section id="trip_panel_orcamento" class="trip-page-content trip-detail-panel" role="tabpanel" aria-labelledby="trip_tab_orcamento" hidden>
+        <div class="trip-panel-heading"><h2>Orçamento</h2><button id="budget_add" class="trip-panel-add" type="button">+ Adicionar</button></div>
+        <p id="budget_status" class="trip-panel-status" role="status" aria-live="polite"></p>
+        <div id="budget_summary" class="budget-summary"></div>
+        <div id="budget_editor" class="budget-editor" hidden></div>
+        <div id="budget_list" class="budget-list"></div>
+      </section>
+      <section id="trip_panel_arquivos" class="trip-page-content trip-detail-panel" role="tabpanel" aria-labelledby="trip_tab_arquivos" hidden>
+        <div class="trip-panel-heading"><h2>Arquivos</h2></div>
+        <p id="trip_files_status" class="trip-panel-status" role="status" aria-live="polite"></p>
+        <div class="trip-files-upload"><label for="trip_files_day">Dia do arquivo</label><select id="trip_files_day" aria-label="Escolher dia do arquivo" disabled></select><label class="trip-files-pick" hidden>+ Adicionar fotos ou documentos<input id="trip_files_input" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.pdf,.doc,.docx" multiple></label></div>
+        <div id="trip_files_list" class="trip-files-list"></div>
+      </section>
     </section>
 
     <button id="trip_share_scrim" class="trip-share-scrim" type="button" aria-label="Fechar compartilhamento"></button>
@@ -457,7 +475,7 @@
       <button id="delete_selected_trips" type="button" disabled>Excluir selecionadas</button>
     </footer>
   </main>
-  <script type="module" src="src/main.js?v=20260927-44"></script>
-  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260927-44');</script>
+  <script type="module" src="src/main.js?v=20260927-45"></script>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260927-45');</script>
 </body>
 </html>
