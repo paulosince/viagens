@@ -26,10 +26,10 @@ const days = [
   { id: 'two', trip_id: 'trip', position: 1, title: 'Chegada' }
 ];
 const attachment = (id, dayId, mimeType = 'image/jpeg') => ({
-  id, day_id: dayId, file_name: id + '.jpg', mime_type: mimeType,
+  id, day_id: dayId, file_name: id + (mimeType === 'application/pdf' ? '.pdf' : '.jpg'), mime_type: mimeType,
   size_bytes: 2048, signedUrl: 'https://example.test/' + id
 });
-const files = [attachment('passagem', null, 'application/pdf'), attachment('foto1', 'one'),
+const files = [attachment('passagem', null, 'application/pdf'), attachment('reserva', null), attachment('foto1', 'one'),
   attachment('foto2', 'one'), attachment('foto3', 'one'), attachment('hotel', 'two')];
 const pick = element('label');
 const daySelect = element('select');
@@ -56,9 +56,20 @@ assert.equal(daySelect.value, '');
 assert.equal(pick.hidden, false);
 assert.equal(context.dom.tripFilesList.children.length, 3, 'general files and each day form separate groups');
 const [general, firstDay] = context.dom.tripFilesList.children;
-assert.equal(general.children[0].textContent, 'Arquivos da viagem');
-assert.equal(general.children[1].children[1].children[0].textContent, 'passagem.jpg');
-assert.equal(general.children[1].children[1].children[1].textContent, '2 KB');
+assert.equal(general.children[0].children[0].textContent, 'Arquivos da viagem');
+assert.equal(general.children[0].children[1].textContent, '2 arquivos');
+const generalDeck = general.children[1];
+assert.equal(generalDeck.children.length, 2, 'files without a day form a swipeable stack');
+assert.equal(generalDeck.children[0].dataset.kind, 'document');
+assert.equal(generalDeck.children[1].dataset.kind, 'image');
+assert.equal(generalDeck.children[0].children[0].children[1].children[0].textContent, 'passagem.pdf');
+assert.equal(generalDeck.children[0].children[0].children[1].children[1].textContent, '2 KB');
+const [generalPrevious, generalPosition, generalNext] = general.children[2].children;
+assert.equal(generalPosition.textContent, '1 de 2');
+assert.equal(generalPrevious.disabled, true);
+generalNext.fire('click');
+assert.equal(generalPosition.textContent, '2 de 2');
+assert.equal(generalDeck.children[1].dataset.position, 'current');
 assert.equal(firstDay.children[0].children[1].textContent, '3 arquivos');
 const deck = firstDay.children[1];
 const [previous, position, next] = firstDay.children[2].children;
@@ -80,15 +91,17 @@ deck.fire('keydown', { key: 'ArrowLeft', preventDefault() {} });
 assert.equal(position.textContent, '2 de 3', 'keyboard navigation also works');
 
 context.renderTripFiles('trip', days);
+assert.equal(context.dom.tripFilesList.children[0].children[2].children[1].textContent, '2 de 2',
+  'the trip-wide deck remembers its selected card');
 assert.equal(context.dom.tripFilesList.children[1].children[2].children[1].textContent, '2 de 3',
-  'the selected card survives a data refresh');
+  'each day deck retains its position independently');
 context.dom.tripFilesList.children[1].children[0].children[0].fire('click');
 assert.equal(openedDay, 'one');
 
 editing = false;
 context.renderTripFiles('trip', days);
 assert.equal(pick.hidden, true);
-assert.equal(context.dom.tripFilesList.children[0].children[1].children.length, 2,
+assert.equal(context.dom.tripFilesList.children[0].children[1].children[1].children.length, 1,
   'a viewer cannot delete trip-wide files');
 assert.equal(context.dom.tripFilesList.children[1].children[1].children[0].children.length, 1,
   'a viewer cannot delete files in the deck');
@@ -113,5 +126,5 @@ vm.runInContext(source.slice(uploadStart, uploadEnd), uploadContext);
   uploadContext.dom.tripFilesDay.value = 'two';
   await uploadContext.uploadTripFiles([{ name: 'vinculado.pdf' }]);
   assert.deepEqual(stored, [['trip', null, 'livre.pdf'], ['trip', 'two', 'vinculado.pdf']]);
-  console.log('PASS: trip files allow no day and day decks swipe, persist position and respect view-only access');
+  console.log('PASS: trip files allow no day; every group stacks and swipes independently, persists position and respects view-only access');
 })().catch(error => { console.error(error); process.exitCode = 1; });

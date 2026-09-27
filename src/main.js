@@ -4215,14 +4215,18 @@ function tripFileRemoveButton(file) {
 }
 
 function renderTripFileDeck(tripId, day, entries) {
-  const label = `Dia ${dayNumber(day)} · ${day.title || displayDate(derivedDayDate(day))}`;
+  const label = day ? `Dia ${dayNumber(day)} · ${day.title || displayDate(derivedDayDate(day))}`
+    : 'Arquivos da viagem';
   const group = document.createElement('section');
-  group.className = 'trip-files-group';
+  group.className = day ? 'trip-files-group' : 'trip-files-group trip-files-general';
   const heading = document.createElement('div');
   heading.className = 'trip-files-group-heading';
-  const title = document.createElement('button');
-  title.type = 'button'; title.className = 'trip-files-day'; title.textContent = label;
-  title.addEventListener('click', () => openDayPage(day.id));
+  const title = document.createElement(day ? 'button' : 'h3');
+  title.className = 'trip-files-day'; title.textContent = label;
+  if (day) {
+    title.type = 'button';
+    title.addEventListener('click', () => openDayPage(day.id));
+  }
   const count = document.createElement('span');
   count.className = 'trip-files-group-count';
   count.textContent = `${entries.length} ${entries.length === 1 ? 'arquivo' : 'arquivos'}`;
@@ -4278,7 +4282,7 @@ function renderTripFileDeck(tripId, day, entries) {
   next.setAttribute('aria-label', `Próximo arquivo de ${label}`);
   controls.append(previous, position, next);
   controls.hidden = entries.length < 2;
-  const deckKey = `${tripId}:${day.id}`;
+  const deckKey = `${tripId}:${day?.id || 'general'}`;
   let active = Math.min(state.tripFileDeckIndexes.get(deckKey) || 0, entries.length - 1);
   const show = index => {
     active = Math.max(0, Math.min(index, entries.length - 1));
@@ -4353,28 +4357,7 @@ function renderTripFiles(tripId, days) {
   dom.tripFilesList.replaceChildren();
   const rows = state.tripFilesByTrip.get(String(tripId)) || [];
   const general = rows.filter(row => !row.day_id);
-  if (general.length) {
-    const group = document.createElement('section'); group.className = 'trip-files-group trip-files-general';
-    const title = document.createElement('h3'); title.textContent = 'Arquivos da viagem';
-    group.append(title);
-    for (const file of general) {
-      const row = document.createElement('div'); row.className = 'trip-files-entry';
-      const preview = document.createElement('span'); preview.className = 'trip-files-entry-preview';
-      if (file.mime_type?.startsWith('image/') && file.signedUrl) {
-        const image = document.createElement('img'); image.src = file.signedUrl; image.alt = '';
-        preview.append(image);
-      } else preview.textContent = file.mime_type?.startsWith('image/') ? 'FOTO'
-        : file.mime_type === 'application/pdf' ? 'PDF' : 'DOC';
-      const link = tripFileLink(file); link.className = 'trip-files-entry-link';
-      const name = document.createElement('strong'); name.textContent = file.file_name;
-      const size = document.createElement('small'); size.textContent = tripFileSize(file);
-      link.append(name, size);
-      row.append(preview, link);
-      if (canEditActiveTrip()) row.append(tripFileRemoveButton(file));
-      group.append(row);
-    }
-    dom.tripFilesList.append(group);
-  }
+  if (general.length) dom.tripFilesList.append(renderTripFileDeck(tripId, null, general));
   for (const day of days) {
     const entries = rows.filter(row => String(row.day_id) === String(day.id));
     if (entries.length) dom.tripFilesList.append(renderTripFileDeck(tripId, day, entries));
