@@ -3863,13 +3863,21 @@ function amountFromInput(value) {
   return Number(normalized);
 }
 
+const budgetToggleJobs = new Map();
+const budgetToggleErrors = new Map();
+const budgetToggleRevisions = new Map();
+let budgetToggleRevision = 0;
+
 function summarizeTripBudget(items) {
   const totals = new Map();
   for (const item of items) {
     const currency = item.currency || 'BRL';
-    const current = totals.get(currency) || { planned: 0, paid: 0, toBuy: 0 };
+    const current = totals.get(currency) || { planned: 0, paid: 0, toBuy: 0, paidEstimate: false };
     current.planned += Number(item.planned_amount) || 0;
-    if (item.purchase_status === 'purchased') current.paid += Number(item.actual_amount) || 0;
+    if (item.purchase_status === 'purchased') {
+      current.paid += Number(item.actual_amount ?? item.planned_amount) || 0;
+      if (item.actual_amount == null && item.planned_amount != null) current.paidEstimate = true;
+    }
     else current.toBuy += Number(item.planned_amount) || 0;
     totals.set(currency, current);
   }
@@ -3882,7 +3890,7 @@ function renderTripBudget(tripId) {
   const totals = summarizeTripBudget(items);
   dom.budgetSummary.replaceChildren();
   for (const [currency, amounts] of totals) {
-    for (const [label, value] of [['Previsto', amounts.planned], ['Pago', amounts.paid], ['Ainda previsto', amounts.toBuy]]) {
+    for (const [label, value] of [['Previsto', amounts.planned], [amounts.paidEstimate ? 'Pago · inclui estimativas' : 'Pago', amounts.paid], ['Ainda previsto', amounts.toBuy]]) {
       const card = document.createElement('div'); card.className = 'budget-summary-card';
       const caption = document.createElement('small'); caption.textContent = `${label} · ${currency}`;
       const money = document.createElement('strong'); money.textContent = tripMoney(value, currency);
@@ -3902,15 +3910,33 @@ function renderTripBudget(tripId) {
     const list = document.createElement('div'); list.className = 'budget-group-list';
     for (const item of entries) {
       const editable = canEditActiveTrip();
-      const row = document.createElement(editable ? 'button' : 'div');
+      const row = document.createElement('div');
       row.className = 'budget-item';
-      if (editable) { row.type = 'button'; row.addEventListener('click', () => openBudgetEditor(item)); }
+      const purchased = item.purchase_status === 'purchased';
+      const toggleKey = `${tripId}:${item.id}`;
+      const check = document.createElement(editable ? 'button' : 'span');
+      check.className = 'budget-item-check';
+      check.dataset.checked = String(purchased);
+      const circle = document.createElement('span'); circle.className = 'budget-item-check-circle';
+      circle.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4.5 4.5L19 7"/></svg>';
+      check.append(circle);
+      if (editable) {
+        check.type = 'button';
+        check.setAttribute('role', 'checkbox');
+        check.setAttribute('aria-checked', String(purchased));
+        check.setAttribute('aria-label', `${item.label}: ${purchased ? 'pago' : 'pendente'}. Alternar pagamento`);
+        check.dataset.saving = String(budgetToggleJobs.has(toggleKey));
+        check.addEventListener('click', () => toggleBudgetItem(tripId, item.id));
+      } else check.setAttribute('aria-hidden', 'true');
+      const detail = document.createElement(editable ? 'button' : 'div');
+      detail.className = 'budget-item-detail';
+      if (editable) { detail.type = 'button'; detail.addEventListener('click', () => openBudgetEditor(item)); }
       const main = document.createElement('span'); main.className = 'budget-item-main';
       const title = document.createElement('strong'); title.textContent = item.label;
       const meta = document.createElement('span'); meta.className = 'budget-item-meta';
-      const purchased = item.purchase_status === 'purchased';
       meta.dataset.purchased = String(purchased);
-      meta.textContent = purchased
+      meta.dataset.error = String(budgetToggleErrors.has(toggleKey));
+      meta.textContent = budgetToggleErrors.has(toggleKey) ? 'Não foi possível salvar · tente de novo' : purchased
         ? item.actual_amount != null ? 'Pago' : item.planned_amount != null ? 'Pago · valor previsto' : 'Pago · sem valor informado'
         : item.planned_amount != null ? 'A comprar · previsto' : 'A comprar · sem valor previsto';
       main.append(title, meta);
@@ -3923,7 +3949,7 @@ function renderTripBudget(tripId) {
         const chevron = document.createElement('span'); chevron.className = 'budget-item-chevron';
         chevron.setAttribute('aria-hidden', 'true'); right.append(chevron);
       }
-      row.append(main, right); list.append(row);
+      detail.append(main, right); row.append(check, detail); list.append(row);
     }
     group.append(heading, list);
     dom.budgetList.append(group);
@@ -3937,6 +3963,7 @@ function renderTripBudget(tripId) {
 async function loadTripBudget(tripId) {
   const key = String(tripId);
   if (state.activeTripId !== key) return;
+  const revisionAtStart = budgetToggleRevision;
   if (state.budgetByTrip.has(key)) renderTripBudget(key);
   setTripPanelStatus(dom.budgetStatus, 'Atualizando orçamento…');
   const client = await trySupabase(5000);
@@ -3946,10 +3973,95 @@ async function loadTripBudget(tripId) {
   }
   const { data, error } = await client.from('budget_items').select('*').eq('trip_id', key).order('category');
   if (error) throw error;
-  state.budgetByTrip.set(key, data || []);
+  const local = new Map((state.budgetByTrip.get(key) || []).map(item => [String(item.id), item]));
+  state.budgetByTrip.set(key, (data || []).map(item => budgetToggleJobs.has(`${key}:${item.id}`) || (budgetToggleRevisions.get(`${key}:${item.id}`) || 0) > revisionAtStart
+    ? { ...item, purchase_status: local.get(String(item.id))?.purchase_status ?? item.purchase_status }
+    : item));
+  for (const item of data || []) {
+    const itemKey = `${key}:${item.id}`;
+    if (!budgetToggleJobs.has(itemKey)) budgetToggleErrors.delete(itemKey);
+  }
   if (state.activeTripId === key) {
     renderTripBudget(key);
     setTripPanelStatus(dom.budgetStatus);
+  }
+}
+
+function replaceBudgetItem(tripId, itemId, patch) {
+  const items = state.budgetByTrip.get(tripId) || [];
+  state.budgetByTrip.set(tripId, items.map(item => String(item.id) === String(itemId) ? { ...item, ...patch } : item));
+  if (state.activeTripId === tripId) renderTripBudget(tripId);
+}
+
+function scheduleBudgetToggle(job, delay = 300) {
+  clearTimeout(job.timer);
+  job.timer = setTimeout(() => {
+    job.timer = null;
+    persistBudgetToggle(job).catch(console.warn);
+  }, delay);
+}
+
+function toggleBudgetItem(tripId, itemId) {
+  if (String(state.activeTripId) !== String(tripId) || !canEditActiveTrip()) return;
+  const current = (state.budgetByTrip.get(tripId) || []).find(item => String(item.id) === String(itemId));
+  if (!current) return;
+  const key = `${tripId}:${itemId}`;
+  const job = budgetToggleJobs.get(key) || { key, tripId, itemId, saved: current, desired: current.purchase_status, timer: null, inFlight: null };
+  budgetToggleJobs.set(key, job);
+  budgetToggleErrors.delete(key);
+  budgetToggleRevisions.set(key, ++budgetToggleRevision);
+  job.desired = current.purchase_status === 'purchased' ? 'pending' : 'purchased';
+  replaceBudgetItem(tripId, itemId, { purchase_status: job.desired });
+  setTripPanelStatus(dom.budgetStatus);
+  scheduleBudgetToggle(job);
+}
+
+async function persistBudgetToggle(job) {
+  if (job.inFlight) return job.inFlight;
+  if (job.timer) { clearTimeout(job.timer); job.timer = null; }
+  if (job.desired === job.saved.purchase_status) {
+    budgetToggleJobs.delete(job.key);
+    if (state.activeTripId === job.tripId) renderTripBudget(job.tripId);
+    return;
+  }
+  const before = job.saved;
+  const status = job.desired;
+  job.inFlight = (async () => {
+    try {
+      const client = await trySupabase(5000);
+      if (!client) throw new Error('Conecte-se para salvar o orçamento.');
+      const { data, error } = await client.from('budget_items').update({ purchase_status: status })
+        .eq('id', job.itemId).eq('trip_id', job.tripId).select('*').single();
+      if (error) throw error;
+      job.saved = data;
+      recordChange({ tripId: job.tripId, entityType: 'budget_item', entityId: job.itemId,
+        action: 'update', summary: `Orçamento: ${data.label} ${status === 'purchased' ? 'marcado como pago' : 'marcado como pendente'}`,
+        beforeState: before, afterState: data }).catch(console.warn);
+    } catch (error) {
+      job.desired = job.saved.purchase_status;
+      budgetToggleErrors.set(job.key, error.message || 'Não foi possível salvar.');
+      replaceBudgetItem(job.tripId, job.itemId, { purchase_status: job.saved.purchase_status });
+      if (state.activeTripId === job.tripId) setTripPanelStatus(dom.budgetStatus, error.message || 'Não foi possível salvar.', 'error');
+    } finally {
+      job.inFlight = null;
+      if (!job.timer) {
+        if (job.desired !== job.saved.purchase_status) scheduleBudgetToggle(job, 0);
+        else {
+          budgetToggleJobs.delete(job.key);
+          if (state.activeTripId === job.tripId) renderTripBudget(job.tripId);
+        }
+      }
+    }
+  })();
+  return job.inFlight;
+}
+
+async function flushBudgetToggle(tripId, itemId) {
+  const key = `${tripId}:${itemId}`;
+  while (budgetToggleJobs.has(key)) {
+    const job = budgetToggleJobs.get(key);
+    if (job.timer) { clearTimeout(job.timer); job.timer = null; }
+    await persistBudgetToggle(job);
   }
 }
 
@@ -4029,6 +4141,7 @@ async function saveBudgetEditor(event, existing) {
       planned_amount: amountFromInput(value('planned_amount')),
       actual_amount: amountFromInput(value('actual_amount')) };
     if (!payload.label) throw new Error('Informe a descrição do gasto.');
+    if (existing) await flushBudgetToggle(tripId, existing.id);
     const client = await trySupabase(5000);
     if (!client) throw new Error('É necessária uma conexão para salvar o orçamento.');
     const result = existing
@@ -4040,6 +4153,7 @@ async function saveBudgetEditor(event, existing) {
     setTripPanelStatus(dom.budgetStatus, 'Gasto salvo.');
     const items = state.budgetByTrip.get(tripId) || [];
     state.budgetByTrip.set(tripId, existing ? items.map(row => row.id === existing.id ? result.data : row) : [...items, result.data]);
+    budgetToggleErrors.delete(`${tripId}:${result.data.id}`);
     renderTripBudget(tripId);
     recordChange({ tripId, entityType: 'budget_item', entityId: result.data.id,
       action: existing ? 'update' : 'create', summary: `Orçamento: ${payload.label}`,
@@ -4054,11 +4168,13 @@ async function saveBudgetEditor(event, existing) {
 async function deleteBudgetItem(item) {
   if (!canEditActiveTrip() || !window.confirm(`Excluir “${item.label}” do orçamento?`)) return;
   const tripId = String(state.activeTripId);
+  await flushBudgetToggle(tripId, item.id);
   const client = await trySupabase(5000);
   if (!client) { setTripPanelStatus(dom.budgetStatus, 'Conecte-se para excluir.', 'error'); dom.budgetPageMessage.textContent = 'Conecte-se para excluir.'; return; }
   const { error } = await client.from('budget_items').delete().eq('id', item.id).eq('trip_id', tripId);
   if (error) { setTripPanelStatus(dom.budgetStatus, error.message, 'error'); dom.budgetPageMessage.textContent = error.message; return; }
   state.budgetByTrip.set(tripId, (state.budgetByTrip.get(tripId) || []).filter(row => row.id !== item.id));
+  budgetToggleErrors.delete(`${tripId}:${item.id}`);
   if (state.activeTripId === tripId) {
     navigateBackFromBudget();
     renderTripBudget(tripId); setTripPanelStatus(dom.budgetStatus, 'Gasto excluído.');

@@ -20,6 +20,8 @@ assert.match(html, /id="budget_item_page"[^>]+aria-hidden="true"[^>]+inert/);
 assert.match(html, /id="close_budget_item_page"[^>]+aria-label="Voltar ao orçamento"/);
 assert.match(css, /\.budget-group-list \{[^}]+overflow: hidden; border-radius: 22px/);
 assert.match(css, /\.budget-item:not\(:last-child\) \{ border-bottom: 1px solid/);
+assert.match(css, /\.budget-item-check \{[^}]+width: 58px; min-height: 58px/);
+assert.match(css, /\.budget-item-check-circle \{[^}]+width: 40px; height: 40px/);
 assert.match(css, /body\[data-budget-page="open"\] \.budget-item-page \{[^}]+transform: translateX\(0\)/);
 
 const source = fs.readFileSync('src/main.js', 'utf8');
@@ -39,6 +41,9 @@ assert.equal(totals.get('BRL').planned, 180);
 assert.equal(totals.get('BRL').paid, 75);
 assert.equal(totals.get('BRL').toBuy, 100);
 assert.equal(totals.get('EUR').paid, 43);
+const estimatedPaid = context.summarizeTripBudget([{ currency: 'BRL', planned_amount: 70, actual_amount: null, purchase_status: 'purchased' }]);
+assert.equal(estimatedPaid.get('BRL').paid, 70);
+assert.equal(estimatedPaid.get('BRL').paidEstimate, true, 'paid totals identify when they include planned amounts');
 assert.equal(context.amountFromInput('22,50'), 22.5);
 assert.equal(context.amountFromInput(''), null);
 assert.throws(() => context.amountFromInput('99,999'), /duas casas/);
@@ -53,6 +58,7 @@ function element(tagName) {
   };
 }
 let opened;
+let toggled;
 context.document = { createElement: element };
 context.dom = { budgetSummary: element('div'), budgetList: element('div') };
 context.state = {
@@ -64,6 +70,7 @@ context.state = {
 };
 context.canEditActiveTrip = () => true;
 context.openBudgetEditor = item => { opened = item; };
+context.toggleBudgetItem = (tripId, itemId) => { toggled = { tripId, itemId }; };
 const renderStart = source.indexOf('function renderTripBudget(');
 const renderEnd = source.indexOf('\nasync function loadTripBudget(', renderStart);
 vm.runInContext(source.slice(renderStart, renderEnd), context);
@@ -73,15 +80,22 @@ const group = context.dom.budgetList.children[0];
 assert.equal(group.children[1].className, 'budget-group-list');
 assert.equal(group.children[1].children.length, 2, 'items are rows inside a shared container');
 const paid = group.children[1].children[0];
-assert.equal(paid.children[1].children[0].textContent, 'R$ 2.908,21', 'right side shows paid amount');
-assert.equal(paid.children[1].children[1].className, 'budget-item-chevron');
-paid.listeners.click();
+assert.equal(paid.children[0].tagName, 'button', 'the check is an independent button');
+assert.equal(paid.children[0].attributes['aria-checked'], 'true');
+assert.equal(paid.children[1].children[1].children[0].textContent, 'R$ 2.908,21', 'right side shows paid amount');
+assert.equal(paid.children[1].children[1].children[1].className, 'budget-item-chevron');
+paid.children[0].listeners.click();
+assert.equal(toggled.itemId, 1, 'tapping the circle changes payment status');
+assert.equal(opened, undefined, 'tapping the circle does not open the editor');
+paid.children[1].listeners.click();
 assert.equal(opened.id, 1, 'tapping a row opens the correct editor');
 context.canEditActiveTrip = () => false;
 context.renderTripBudget('trip');
 const viewerRow = context.dom.budgetList.children[0].children[1].children[0];
 assert.equal(viewerRow.tagName, 'div', 'viewer cannot open editor');
-assert.equal(viewerRow.children[1].children.length, 1, 'viewer has no edit chevron');
+assert.equal(viewerRow.children[0].tagName, 'span', 'viewer cannot toggle payment');
+assert.equal(viewerRow.children[1].tagName, 'div', 'viewer cannot open editor');
+assert.equal(viewerRow.children[1].children[1].children.length, 1, 'viewer has no edit chevron');
 
 const editorStart = source.indexOf('let budgetPageBackPending =');
 const editorEnd = source.indexOf('\nasync function saveBudgetEditor(', editorStart);
