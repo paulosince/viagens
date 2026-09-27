@@ -41,6 +41,7 @@ jobs:
           node tests/day-attachments.cjs
           node tests/history-reset.cjs
           node tests/saved-passengers.cjs
+          node tests/shared-owner-photos.cjs
           node tests/trip-sections.cjs
       - name: Verify offline app shell
         run: |

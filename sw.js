@@ -1,4 +1,4 @@
-const CACHE_NAME = 'viaggio-home-v89-history-reset';
+const CACHE_NAME = 'viaggio-home-v90-profile-photos';
 const SUPABASE_CLIENT = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const LEAFLET_CSS = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css';
 const LEAFLET_JS = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js';
@@ -6,12 +6,12 @@ const EXTERNAL_ASSETS = [SUPABASE_CLIENT, LEAFLET_CSS, LEAFLET_JS];
 const APP_SHELL = [
   './',
   './index.html',
-  './style.css?v=20260926-41',
-  './src/main.js?v=20260927-42',
+  './style.css?v=20260927-43',
+  './src/main.js?v=20260927-43',
   './src/offline-store.js?v=20260927-42',
   './manifest.webmanifest',
   './assets/app-icon.svg',
-  './assets/cintia.png',
+  './assets/avatar-placeholder.svg',
   './assets/paulo.jpeg',
   './assets/splash-plane.png',
   './assets/auth-shore.svg'

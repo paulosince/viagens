@@ -41,7 +41,7 @@ async function trySupabase(timeoutMs = 1800) {
     return null;
   }
 }
-const profilePhoto = 'assets/cintia.png';
+const profilePlaceholder = 'assets/avatar-placeholder.svg';
 const placeSearchCache = new Map();
 const TRIP_CACHE_FRESH_MS = 60_000;
 let lastPlaceSearchAt = 0;
@@ -213,8 +213,9 @@ async function supportsOrderedDaySchema(client = null) {
   }
   return orderedDaySchemaSupport;
 }
-const profileName = () => state.profile?.name || state.user?.user_metadata?.full_name || state.user?.user_metadata?.name || 'Cíntia';
-const profileImage = () => state.avatarPreview || state.profile?.avatar_url || state.user?.user_metadata?.avatar_url || profilePhoto;
+const defaultProfileName = user => user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Viajante';
+const profileName = () => state.profile?.name || defaultProfileName(state.user);
+const profileImage = () => state.avatarPreview || state.profile?.avatar_url || state.user?.user_metadata?.avatar_url || '';
 
 function ageFromBirthDate(value) {
   if (!value) return null;
@@ -254,18 +255,20 @@ async function loadLocalWorkspace(user) {
   if (!user?.id) return false;
 
   setSplashStatus('Abrindo suas viagens salvas…');
-  const [profile, workspace] = await Promise.all([
+  const [profile, workspace, cachedOwners] = await Promise.all([
     offlineStore.getProfile(user.id),
-    offlineStore.loadWorkspace(user.id)
+    offlineStore.loadWorkspace(user.id),
+    offlineStore.getMeta(`shared_trip_owners:${user.id}`)
   ]);
 
   state.profile = profile || {
     user_id: user.id,
-    name: user.user_metadata?.name || user.user_metadata?.full_name || 'Cíntia',
+    name: defaultProfileName(user),
     birth_date: null,
     avatar_path: null
   };
   state.trips = (workspace.trips || []).map(normalizeTripRecord);
+  state.tripOwners = new Map((cachedOwners || []).map(owner => [String(owner.tripId), { name: owner.name, avatarUrl: owner.avatarUrl || '' }]));
   applyPassengers(workspace.passengers || []);
   syncProfileUI();
   syncYearList();
@@ -279,8 +282,13 @@ async function refreshWorkspaceInBackground() {
 
   setTimeout(async () => {
     try {
+      // The avatar and shared-owner badge should not wait for pending trip edits.
+      const client = await trySupabase(5000);
+      if (client) {
+        await Promise.allSettled([loadProfile(), refreshSharedTripOwners(client)]);
+        syncTripList();
+      }
       await flushOutbox().catch(error => console.warn('Fila local aguardando sincronização', error));
-      await loadProfile();
       await applyPendingSignupAvatar().catch(error => console.warn('Foto de cadastro aguardando envio', error));
       await loadTrips();
       await cacheCompleteWorkspace().catch(error => console.warn('Snapshot offline incompleto', error));
@@ -641,6 +649,12 @@ function setLoading(button, loading) {
 
 function setImage(image, fallback, source, label) {
   fallback.textContent = label?.trim()?.[0]?.toUpperCase() || '?';
+  if (!source) {
+    image.removeAttribute('src');
+    image.hidden = true;
+    fallback.hidden = false;
+    return;
+  }
   fallback.hidden = true;
   image.hidden = false;
   image.onload = () => { image.hidden = false; fallback.hidden = true; };
@@ -654,7 +668,8 @@ function syncProfileUI() {
   setImage(dom.headerProfileImage, dom.headerProfileFallback, image, name);
   dom.profileButton.setAttribute('aria-label', `Abrir perfil de ${name}`);
   dom.sessionEmail.textContent = state.user?.email || '';
-  dom.profileEditorImage.src = image;
+  dom.profileEditorImage.onerror = () => { dom.profileEditorImage.onerror = null; dom.profileEditorImage.src = profilePlaceholder; };
+  dom.profileEditorImage.src = image || profilePlaceholder;
   dom.profileEditorImage.alt = name;
   dom.profileDisplayName.textContent = name;
   dom.profileEmail.textContent = state.user?.email || '';
@@ -842,10 +857,17 @@ async function saveProfileSavedPassengers(client) {
 function passengerImage(passenger) {
   const name = passenger.name || '';
   if (passenger.user_id && String(passenger.user_id) === String(state.user?.id)) return { src: profileImage(), position: '50% 46%' };
-  if (/c[ií]ntia/i.test(name)) return { src: profileImage(), position: '50% 46%' };
   const saved = state.savedPassengers.find(person => savedPassengerKey(person) === savedPassengerKey(passenger));
   if (saved?.photo_url) return { src: saved.photo_url, position: '50% 50%' };
-  if (/paulo/i.test(name)) return { src: 'assets/paulo.jpeg', position: '50% 50%' };
+  if (passenger.photo_url) return { src: passenger.photo_url, position: '50% 50%' };
+  const trip = state.trips.find(item => String(item.id) === String(passenger.trip_id));
+  const owner = state.tripOwners.get(String(passenger.trip_id));
+  const sameName = (a, b) => String(a || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLocaleLowerCase('pt-BR')
+    === String(b || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLocaleLowerCase('pt-BR');
+  if (owner && sameName(name, owner.name)) return { src: owner.avatarUrl || '', position: '50% 46%' };
+  if (trip && String(trip.user_id) === String(state.user?.id) && sameName(name, profileName())) {
+    return { src: profileImage(), position: '50% 46%' };
+  }
   return { src: passenger.photo_url || '', position: '50% 50%' };
 }
 
@@ -4206,6 +4228,28 @@ async function cacheCompleteWorkspace() {
   await offlineStore.setMeta(`complete_snapshot:${state.user.id}`, new Date().toISOString());
 }
 
+async function refreshSharedTripOwners(client) {
+  if (!state.trips.some(trip => tripRole(trip) !== 'owner')) {
+    state.tripOwners.clear();
+    await offlineStore.setMeta(`shared_trip_owners:${state.user.id}`, []).catch(console.warn);
+    return;
+  }
+  const owners = await client.rpc('shared_trip_owners');
+  if (owners.error) throw owners.error;
+  const entries = await Promise.all((owners.data || []).map(async owner => {
+    let avatarUrl = '';
+    if (owner.avatar_path) {
+      const signed = await client.storage.from('profile-photos').createSignedUrl(owner.avatar_path, 3600);
+      if (signed.error) console.warn('Foto do proprietário indisponível:', signed.error);
+      else avatarUrl = signed.data.signedUrl;
+    }
+    return [String(owner.trip_id), { name: owner.owner_name, avatarUrl }];
+  }));
+  state.tripOwners = new Map(entries);
+  await offlineStore.setMeta(`shared_trip_owners:${state.user.id}`,
+    entries.map(([tripId, owner]) => ({ tripId, ...owner }))).catch(console.warn);
+}
+
 async function loadTrips({ allowLocalFallback = true } = {}) {
   try {
     const client = await trySupabase();
@@ -4219,19 +4263,7 @@ async function loadTrips({ allowLocalFallback = true } = {}) {
     if (memberships.error) throw memberships.error;
     state.tripRoles = new Map((memberships.data || []).map(member => [String(member.trip_id), member.role]));
     for (const trip of state.trips) trip.access_role = tripRole(trip);
-    state.tripOwners.clear();
-    if (state.trips.some(trip => trip.access_role !== 'owner')) {
-      const owners = await client.rpc('shared_trip_owners');
-      if (owners.error) console.warn('Foto do proprietário indisponível:', owners.error);
-      else await Promise.all((owners.data || []).map(async owner => {
-        let avatarUrl = '';
-        if (owner.avatar_path) {
-          const signed = await client.storage.from('profile-photos').createSignedUrl(owner.avatar_path, 3600);
-          if (!signed.error) avatarUrl = signed.data.signedUrl;
-        }
-        state.tripOwners.set(String(owner.trip_id), { name: owner.owner_name, avatarUrl });
-      }));
-    }
+    await refreshSharedTripOwners(client).catch(error => console.warn('Proprietários compartilhados indisponíveis:', error));
     let passengerRecords = [];
     if (state.trips.length) {
       const passengers = await client.from('passengers').select('*').in('trip_id', state.trips.map(trip => trip.id)).order('created_at');
@@ -4269,7 +4301,7 @@ async function loadProfile({ allowLocalFallback = true } = {}) {
     if (!client) throw new Error('Backend indisponível.');
     const result = await client.from('passenger_profiles').select('*').eq('user_id', state.user.id).maybeSingle();
     if (result.error) throw result.error;
-    state.profile = result.data || { user_id: state.user.id, name: state.user.user_metadata?.name || 'Cíntia', birth_date: null, avatar_path: null };
+    state.profile = result.data || { user_id: state.user.id, name: defaultProfileName(state.user), birth_date: null, avatar_path: null };
     if (state.profile.is_deleted) { await client.auth.signOut(); throw new Error('Esta conta está desativada. Seus dados continuam preservados.'); }
     if (state.profile.avatar_path) {
       const signed = await client.storage.from('profile-photos').createSignedUrl(state.profile.avatar_path, 3600);
@@ -4279,7 +4311,7 @@ async function loadProfile({ allowLocalFallback = true } = {}) {
   } catch (remoteError) {
     if (!allowLocalFallback) throw remoteError;
     state.profile = await offlineStore.getProfile(state.user.id);
-    if (!state.profile) state.profile = { user_id: state.user.id, name: state.user.user_metadata?.name || 'Cíntia', birth_date: null, avatar_path: null };
+    if (!state.profile) state.profile = { user_id: state.user.id, name: defaultProfileName(state.user), birth_date: null, avatar_path: null };
   }
   syncProfileUI();
 }
@@ -5669,6 +5701,7 @@ window.addEventListener('offline', () => { refreshSyncStatus().catch(console.war
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && state.user) {
     if (navigator.onLine) loadTrips().catch(error => console.warn('Viagens compartilhadas aguardando atualização', error));
+    if (navigator.onLine && document.body.dataset.activeSheet !== 'profile') loadProfile().catch(error => console.warn('Foto do perfil aguardando atualização', error));
     flushOutbox().catch(error => console.warn('Fila local aguardando sincronização', error));
     refreshChatgptConnection().catch(console.warn);
   }
