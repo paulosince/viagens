@@ -1,4 +1,4 @@
-const CACHE_NAME = 'viaggio-home-v88-day-overlay-touch';
+const CACHE_NAME = 'viaggio-home-v89-history-reset';
 const SUPABASE_CLIENT = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const LEAFLET_CSS = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css';
 const LEAFLET_JS = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js';
@@ -7,8 +7,8 @@ const APP_SHELL = [
   './',
   './index.html',
   './style.css?v=20260926-41',
-  './src/main.js?v=20260926-41',
-  './src/offline-store.js',
+  './src/main.js?v=20260927-42',
+  './src/offline-store.js?v=20260927-42',
   './manifest.webmanifest',
   './assets/app-icon.svg',
   './assets/cintia.png',

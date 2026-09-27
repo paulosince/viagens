@@ -1,4 +1,4 @@
-import { offlineStore } from './offline-store.js';
+import { offlineStore } from './offline-store.js?v=20260927-42';
 
 const SUPABASE_URL = 'https://siabldasqinpfmxslwji.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_UgbBIOq1TnInuPRrQpAFag_JLIzYuFf';
@@ -6,6 +6,7 @@ const VIAGGIO_MCP_URL = 'https://siabldasqinpfmxslwji.supabase.co/functions/v1/v
 const CHATGPT_PLUGIN_URL = '';
 const NEW_AGENDA_TITLE = 'Nova atividade';
 const NEW_AGENDA_DESCRIPTION = 'Adicione uma descrição';
+const HISTORY_RESET_AT = '2026-09-27T01:32:01.347Z';
 let supabase = null;
 let supabaseLoad = null;
 let leafletLoad = null;
@@ -5592,6 +5593,7 @@ async function boot() {
   try {
     setSplashStatus('Preparando armazenamento local…');
     await offlineStore.open();
+    await offlineStore.discardHistoryBefore(HISTORY_RESET_AT);
     navigator.storage?.persist?.().catch(() => {});
 
     const cachedUser = await offlineStore.getCachedSession();

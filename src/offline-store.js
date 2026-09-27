@@ -319,6 +319,25 @@ async function listChangeLogs(userId, limit = 100) {
     .slice(0, Math.max(1, Number(limit) || 100));
 }
 
+async function discardHistoryBefore(cutoff) {
+  const db = await openDb();
+  const tx = db.transaction(['change_log', 'outbox'], 'readwrite');
+  const logs = tx.objectStore('change_log');
+  const outbox = tx.objectStore('outbox');
+  const [oldLogs, mutations] = await Promise.all([
+    requestResult(logs.getAll()),
+    requestResult(outbox.getAll())
+  ]);
+  for (const entry of oldLogs) {
+    if (String(entry.created_at || '') < cutoff) logs.delete(entry.id);
+  }
+  for (const mutation of mutations) {
+    if (['record-change', 'change-log'].includes(mutation.type)
+      && String(mutation.created_at || '') < cutoff) outbox.delete(mutation.id);
+  }
+  await transactionDone(tx);
+}
+
 async function hasWorkspace(userId) {
   return (await loadWorkspace(userId)).trips.length > 0;
 }
@@ -343,6 +362,7 @@ export const offlineStore = {
   saveChangeLog,
   saveChangeLogs,
   listChangeLogs,
+  discardHistoryBefore,
   getMeta,
   setMeta,
   deleteMeta
