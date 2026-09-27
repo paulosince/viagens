@@ -76,6 +76,7 @@ const state = {
   placeSearch: null,
   dayMap: null,
   dayMapBounds: null,
+  dayMapScrollTop: null,
   dayMapRenderToken: 0,
   dayAttachments: new Map(),
   dayAttachmentLoads: new Map(),
@@ -95,7 +96,6 @@ const state = {
 
 const dom = {
   dayMapSection: document.querySelector('#day_map_section'),
-  dayMapScrim: document.querySelector('#day_map_scrim'),
   dayMapToggle: document.querySelector('#day_map_toggle'),
   tripPageDuration: document.querySelector('#trip_page_duration'),
   tripPageShare: document.querySelector('#trip_page_share'), tripShareSheet: document.querySelector('#trip_share_sheet'), tripShareScrim: document.querySelector('#trip_share_scrim'), closeTripShare: document.querySelector('#close_trip_share'), tripShareForm: document.querySelector('#trip_share_form'), tripShareRecipient: document.querySelector('#trip_share_recipient'), sendTripShare: document.querySelector('#send_trip_share'), tripShareStatus: document.querySelector('#trip_share_status'), tripShareList: document.querySelector('#trip_share_list'),
@@ -2969,21 +2969,21 @@ function dayMapGroups(points) {
 }
 
 function setDayMapExpanded(expanded) {
-  if (expanded && dom.dayMapSection.dataset.expanded !== 'true') {
-    const anchor = document.createComment('Posição do mapa no dia');
-    dom.dayMapSection.replaceWith(anchor);
-    dom.dayMapSection._homeAnchor = anchor;
-    document.body.append(dom.dayMapSection);
-  } else if (!expanded && dom.dayMapSection._homeAnchor) {
-    dom.dayMapSection._homeAnchor.replaceWith(dom.dayMapSection);
-    dom.dayMapSection._homeAnchor = null;
+  const wasExpanded = dom.dayMapSection.dataset.expanded === 'true';
+  if (expanded && !wasExpanded) {
+    state.dayMapScrollTop = dom.dayPage.scrollTop;
+    dom.dayPage.scrollTop = 0;
   }
   dom.dayMapSection.dataset.expanded = String(expanded);
-  dom.dayMapScrim.hidden = !expanded;
-  dom.dayPage.inert = expanded;
+  dom.dayPage.dataset.mapExpanded = String(expanded);
+  for (const node of dom.dayPage.querySelectorAll('.day-page-nav, .day-page-hero, .day-page-content > :not(.day-map-section)')) node.inert = expanded;
   dom.dayMapToggle.setAttribute('aria-expanded', String(expanded));
   dom.dayMapToggle.setAttribute('aria-label', expanded ? 'Reduzir mapa' : 'Ampliar mapa');
   dom.dayMapToggle.querySelector('span').textContent = expanded ? 'Reduzir' : 'Ampliar';
+  if (!expanded && wasExpanded) {
+    dom.dayPage.scrollTop = state.dayMapScrollTop ?? 0;
+    state.dayMapScrollTop = null;
+  }
   if (state.dayMap) requestAnimationFrame(() => {
     if (!state.dayMap || document.body.dataset.dayPage !== 'open') return;
     state.dayMap.invalidateSize({ pan: false });
@@ -5280,7 +5280,6 @@ dom.tripPagePassengers.addEventListener('click', openTripPassengers);
 dom.tripPassengerClose.addEventListener('click', () => closeTripPassengers().catch(console.warn));
 dom.closeDayPage.addEventListener('click', navigateBackFromDay);
 dom.dayMapToggle.addEventListener('click', () => setDayMapExpanded(dom.dayMapSection.dataset.expanded !== 'true'));
-dom.dayMapScrim.addEventListener('click', () => setDayMapExpanded(false));
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape' && dom.dayMapSection.dataset.expanded === 'true') setDayMapExpanded(false);
 });
