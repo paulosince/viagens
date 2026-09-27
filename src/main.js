@@ -112,6 +112,7 @@ const dom = {
   editTripsButton: document.querySelector('#edit_trips_button'), newTripButton: document.querySelector('#new_trip_button'), emptyNewTripButton: document.querySelector('#empty_new_trip_button'), sessionEmail: document.querySelector('#session_email'), syncStatus: document.querySelector('#sync_status'), tripHeading: document.querySelector('#trip_heading'), yearButton: document.querySelector('#year_selector_button'), currentYear: document.querySelector('#current_year'), yearMenu: document.querySelector('#year_menu'), yearList: document.querySelector('#year_list'),
   tripList: document.querySelector('#trip_list'), homeEmpty: document.querySelector('#home_empty'), scrim: document.querySelector('#sheet_scrim'), tripEditFooter: document.querySelector('#trip_edit_footer'), deleteSelectedTrips: document.querySelector('#delete_selected_trips'), tripPage: document.querySelector('#trip_page'), closeTripPage: document.querySelector('#close_trip_page'), tripPageHero: document.querySelector('#trip_page_hero'), tripPageTitle: document.querySelector('#trip_page_title'), tripPageTitleInput: document.querySelector('#trip_page_title_input'), tripPageDates: document.querySelector('#trip_page_dates'), tripDateEditor: document.querySelector('#trip_page_date_editor'), tripStartDate: document.querySelector('#trip_page_start_date'), tripDayCount: document.querySelector('#trip_page_day_count'), tripDateDone: document.querySelector('#trip_page_date_done'), tripPageColor: document.querySelector('#trip_page_color'), tripPageCoverInput: document.querySelector('#trip_page_cover_input'), tripPageSaveStatus: document.querySelector('#trip_page_save_status'), tripPagePassengers: document.querySelector('#trip_page_passengers'), tripPagePassengerCount: document.querySelector('#trip_page_passenger_count'), tripPassengerSheet: document.querySelector('#trip_passenger_sheet'), tripPassengerSheetBody: document.querySelector('#trip_passenger_sheet_body'), tripPassengerSelf: document.querySelector('#trip_passenger_self'), tripPassengerSelfImage: document.querySelector('#trip_passenger_self_image'), tripPassengerSelfName: document.querySelector('#trip_passenger_self_name'), tripPassengerClose: document.querySelector('#close_trip_passengers'), tripPassengerMessage: document.querySelector('#trip_passenger_message'), tripDayList: document.querySelector('#trip_day_list'), tripDayMessage: document.querySelector('#trip_day_message'),
   tripTabs: document.querySelector('.trip-tabs'), tripPanels: { roteiro: document.querySelector('#trip_panel_roteiro'), orcamento: document.querySelector('#trip_panel_orcamento'), arquivos: document.querySelector('#trip_panel_arquivos') }, budgetSummary: document.querySelector('#budget_summary'), budgetStatus: document.querySelector('#budget_status'), budgetList: document.querySelector('#budget_list'), budgetPage: document.querySelector('#budget_item_page'), budgetPageTitle: document.querySelector('#budget_item_page_title'), closeBudgetPage: document.querySelector('#close_budget_item_page'), budgetEditor: document.querySelector('#budget_editor'), budgetPageMessage: document.querySelector('#budget_item_message'), budgetAdd: document.querySelector('#budget_add'), tripFilesStatus: document.querySelector('#trip_files_status'), tripFilesList: document.querySelector('#trip_files_list'), tripFilesDay: document.querySelector('#trip_files_day'), tripFilesInput: document.querySelector('#trip_files_input'),
+  tripFileViewer: document.querySelector('#trip_file_viewer'), tripFileViewerTitle: document.querySelector('#trip_file_viewer_title'), tripFileViewerMedia: document.querySelector('#trip_file_viewer_media'), tripFileViewerStatus: document.querySelector('#trip_file_viewer_status'), tripFileViewerDelete: document.querySelector('#delete_trip_file_viewer'), tripFileViewerPosition: document.querySelector('#trip_file_viewer_position'), tripFileViewerPrevious: document.querySelector('#previous_trip_file_viewer'), tripFileViewerNext: document.querySelector('#next_trip_file_viewer'), closeTripFileViewer: document.querySelector('#close_trip_file_viewer'),
   dayPage: document.querySelector('#day_page'), closeDayPage: document.querySelector('#close_day_page'), addDayPageActivity: document.querySelector('#add_day_page_activity'), dayAgendaStickyMarker: document.querySelector('#day_agenda_sticky_marker'), dayPageHero: document.querySelector('#day_page_hero'), dayPageBadge: document.querySelector('#day_page_badge'), dayPageTitle: document.querySelector('#day_page_title'), dayPageDate: document.querySelector('#day_page_date'), dayPageSaveStatus: document.querySelector('#day_page_save_status'), dayPagePhotoInput: document.querySelector('#day_page_photo_input'), dayPageCamera: document.querySelector('#day_page_camera'), dayPageAgenda: document.querySelector('#day_page_agenda'), dayPageEmpty: document.querySelector('#day_page_empty'), dayPageMap: document.querySelector('#day_page_map'), dayPageDirections: document.querySelector('#day_page_directions'),
   dayAttachmentsButton: document.querySelector('#day_attachments_button'), dayAttachmentsCount: document.querySelector('#day_attachments_count'), dayAttachmentsScrim: document.querySelector('#day_attachments_scrim'), dayAttachmentsSheet: document.querySelector('#day_attachments_sheet'), closeDayAttachments: document.querySelector('#close_day_attachments'), dayAttachmentsInput: document.querySelector('#day_attachments_input'), dayAttachmentsStatus: document.querySelector('#day_attachments_status'), dayAttachmentsList: document.querySelector('#day_attachments_list'),
   newTripSheet: document.querySelector('#home_new_trip'), newTripForm: document.querySelector('#new_trip_form'), newTripTitle: document.querySelector('#new-trip-title'), closeNewTrip: document.querySelector('#close_new_trip'), saveNewTrip: document.querySelector('#save_new_trip'), newTripMessage: document.querySelector('#new_trip_message'), coverInput: document.querySelector('#cover-image'), coverPreview: document.querySelector('#cover_preview_image'), tripColorValue: document.querySelector('#trip-color-value'), tripColorPalette: document.querySelector('#trip_color_palette'), tripColorCustom: document.querySelector('#trip-color-custom'), savedTripPassengers: document.querySelector('#saved_trip_passengers'), savedTripPassengerList: document.querySelector('#saved_trip_passenger_list'), newTripPassengerList: document.querySelector('#new_trip_passenger_list'), addTripPassenger: document.querySelector('#add_trip_passenger'), tripSharingSection: document.querySelector('#trip_sharing_section'), tripMemberList: document.querySelector('#trip_member_list'), tripShareEmail: document.querySelector('#trip_share_email'), tripShareButton: document.querySelector('#trip_share_button'), tripShareMessage: document.querySelector('#trip_share_message'),
@@ -2027,6 +2028,11 @@ function renderDayAttachments(dayId) {
   for (const attachment of items) {
     const row = document.createElement('li');
     row.className = 'day-attachment';
+    const open = document.createElement('button');
+    open.type = 'button';
+    open.className = 'day-attachment-open';
+    open.setAttribute('aria-label', `Visualizar ${attachment.file_name}`);
+    open.addEventListener('click', () => openTripFileViewer(attachment, items));
     const preview = document.createElement('span');
     preview.className = 'day-attachment-preview';
     if (attachment.mime_type.startsWith('image/') && attachment.signedUrl) {
@@ -2038,23 +2044,14 @@ function renderDayAttachments(dayId) {
     } else {
       preview.textContent = attachment.mime_type === 'application/pdf' ? 'PDF' : 'DOC';
     }
-    const link = document.createElement('a');
-    link.textContent = attachment.file_name;
-    if (attachment.signedUrl) {
-      link.href = attachment.signedUrl;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-    }
+    const name = document.createElement('span');
+    name.className = 'day-attachment-name';
+    name.textContent = attachment.file_name;
     const size = document.createElement('small');
     size.textContent = (attachment.size_bytes / 1024 / 1024).toFixed(1) + ' MB';
-    link.append(size);
-    const remove = document.createElement('button');
-    remove.type = 'button';
-    remove.className = 'day-attachment-remove';
-    remove.textContent = '×';
-    remove.setAttribute('aria-label', 'Excluir ' + attachment.file_name);
-    remove.addEventListener('click', () => removeDayAttachment(attachment));
-    row.append(preview, link, remove);
+    name.append(size);
+    open.append(preview, name);
+    row.append(open);
     dom.dayAttachmentsList.append(row);
   }
   if (!items.length && document.body.dataset.dayAttachments === 'open') {
@@ -2122,14 +2119,15 @@ async function uploadDayAttachments(files) {
 }
 
 async function removeDayAttachment(attachment) {
-  if (!canEditActiveTrip() || !window.confirm(attachment.day_id ? 'Excluir este arquivo do dia?' : 'Excluir este arquivo da viagem?')) return;
+  if (!canEditActiveTrip()) return false;
+  if (!window.confirm(attachment.day_id ? 'Excluir este arquivo do dia?' : 'Excluir este arquivo da viagem?')) return null;
   const client = await trySupabase(5000);
   const setStatus = document.body.dataset.dayAttachments === 'open'
     ? setDayAttachmentStatus
     : (message, kind) => setTripPanelStatus(dom.tripFilesStatus, message, kind);
-  if (!client) { setStatus('É preciso estar conectado para excluir.', 'error'); return; }
+  if (!client) { setStatus('É preciso estar conectado para excluir.', 'error'); return false; }
   const removed = await client.from('day_attachments').delete().eq('id', attachment.id);
-  if (removed.error) { setStatus(removed.error.message, 'error'); return; }
+  if (removed.error) { setStatus(removed.error.message, 'error'); return false; }
   const file = await client.storage.from(DAY_ATTACHMENT_BUCKET).remove([attachment.storage_path]);
   if (file.error) console.warn('Arquivo removido da lista; limpeza do armazenamento pendente', file.error);
   if (attachment.day_id) await loadDayAttachments(attachment.day_id).catch(error => setDayAttachmentStatus(error.message, 'error'));
@@ -2137,6 +2135,7 @@ async function removeDayAttachment(attachment) {
     await loadTripFiles(String(state.activeTripId)).catch(error => setTripPanelStatus(dom.tripFilesStatus, error.message, 'error'));
   }
   setStatus('Arquivo excluído.');
+  return true;
 }
 
 function openDayPage(dayId, { pushHistory = true } = {}) {
@@ -4194,24 +4193,187 @@ function tripFileSize(file) {
     : (kilobytes / 1024).toFixed(1) + ' MB';
 }
 
-function tripFileLink(file) {
-  const link = document.createElement('a');
-  if (file.signedUrl) {
-    link.href = file.signedUrl;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
-  } else link.title = 'Conecte-se para abrir este arquivo';
-  return link;
+let tripFileViewerState = null;
+let tripFileViewerBlobUrl = null;
+let tripFileViewerLoad = 0;
+let tripFileViewerCloseTimer = null;
+let tripFileViewerLeavingView = null;
+
+function clearTripFileViewerMedia() {
+  tripFileViewerLoad += 1;
+  dom.tripFileViewerMedia.replaceChildren();
+  if (tripFileViewerBlobUrl) URL.revokeObjectURL(tripFileViewerBlobUrl);
+  tripFileViewerBlobUrl = null;
 }
 
-function tripFileRemoveButton(file) {
-  const remove = document.createElement('button');
-  remove.type = 'button';
-  remove.className = 'trip-file-remove';
-  remove.textContent = '×';
-  remove.setAttribute('aria-label', `Excluir ${file.file_name}`);
-  remove.addEventListener('click', () => removeDayAttachment(file));
-  return remove;
+async function fetchTripFileBlob(file) {
+  if (!file.signedUrl) throw new Error('Conecte-se para visualizar este arquivo.');
+  const response = await fetch(file.signedUrl);
+  if (!response.ok) throw new Error('Não foi possível carregar o arquivo. Tente novamente.');
+  return response.blob();
+}
+
+function showTripFileViewerFallback(file) {
+  const fallback = document.createElement('div');
+  fallback.className = 'trip-file-viewer-fallback';
+  const symbol = document.createElement('strong');
+  symbol.textContent = 'DOC';
+  const message = document.createElement('p');
+  message.textContent = 'Documentos Word não têm prévia no navegador. Você pode salvá-los para abrir em outro aplicativo.';
+  fallback.append(symbol, message);
+  if (file.signedUrl) {
+    const download = document.createElement('button');
+    download.type = 'button';
+    download.textContent = 'Salvar documento';
+    download.addEventListener('click', async () => {
+      download.disabled = true;
+      try {
+        const blob = await fetchTripFileBlob(file);
+        if (!dom.tripFileViewer.open || tripFileViewerState?.entries[tripFileViewerState.index]?.id !== file.id) return;
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url; link.download = file.file_name;
+        dom.tripFileViewerMedia.append(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+      } catch (error) { dom.tripFileViewerStatus.textContent = error.message; }
+      finally { download.disabled = false; }
+    });
+    fallback.append(download);
+  }
+  dom.tripFileViewerMedia.append(fallback);
+}
+
+function showTripFileViewerIndex(index, { syncHistory = true } = {}) {
+  if (!tripFileViewerState) return;
+  const { entries } = tripFileViewerState;
+  tripFileViewerState.index = Math.max(0, Math.min(index, entries.length - 1));
+  const file = entries[tripFileViewerState.index];
+  clearTripFileViewerMedia();
+  dom.tripFileViewerTitle.textContent = file.file_name;
+  dom.tripFileViewerStatus.textContent = tripFileSize(file);
+  dom.tripFileViewerDelete.hidden = !canEditActiveTrip();
+  dom.tripFileViewerDelete.disabled = false;
+  dom.tripFileViewerPosition.textContent = `${tripFileViewerState.index + 1} de ${entries.length}`;
+  dom.tripFileViewerPrevious.parentElement.hidden = entries.length < 2;
+  dom.tripFileViewerPrevious.disabled = tripFileViewerState.index === 0;
+  dom.tripFileViewerNext.disabled = tripFileViewerState.index === entries.length - 1;
+  if (syncHistory && window.history.state?.view === 'trip-file') {
+    window.history.replaceState({ ...window.history.state, fileId: file.id }, '', `#file-${file.id}`);
+  }
+  if (!file.signedUrl) {
+    dom.tripFileViewerStatus.textContent = 'Conecte-se para visualizar este arquivo.';
+    return;
+  }
+  if (file.mime_type?.startsWith('image/')) {
+    const image = document.createElement('img');
+    image.alt = file.file_name;
+    image.onerror = () => { dom.tripFileViewerStatus.textContent = 'Não foi possível carregar a imagem.'; };
+    image.src = file.signedUrl;
+    dom.tripFileViewerMedia.append(image);
+  } else if (file.mime_type === 'application/pdf') {
+    dom.tripFileViewerStatus.textContent = 'Carregando PDF…';
+    const loading = document.createElement('div');
+    loading.className = 'trip-file-viewer-fallback';
+    loading.textContent = 'Abrindo PDF…';
+    dom.tripFileViewerMedia.append(loading);
+    const load = tripFileViewerLoad;
+    fetchTripFileBlob(file).then(blob => {
+      if (load !== tripFileViewerLoad || !dom.tripFileViewer.open) return;
+      tripFileViewerBlobUrl = URL.createObjectURL(blob);
+      const frame = document.createElement('iframe');
+      frame.title = file.file_name;
+      frame.src = tripFileViewerBlobUrl;
+      dom.tripFileViewerMedia.replaceChildren(frame);
+      dom.tripFileViewerStatus.textContent = tripFileSize(file);
+    }).catch(error => {
+      if (load === tripFileViewerLoad) dom.tripFileViewerStatus.textContent = error.message;
+    });
+  } else showTripFileViewerFallback(file);
+}
+
+function openTripFileViewer(file, entries = [file], { pushHistory = true } = {}) {
+  if (!file || !entries.length) return;
+  window.clearTimeout(tripFileViewerCloseTimer);
+  const focus = dom.tripFileViewer.open ? tripFileViewerState?.focus : document.activeElement;
+  const originView = state.activeDayId && document.body.dataset.dayPage === 'open' ? 'day' : 'trip';
+  tripFileViewerLeavingView = null;
+  tripFileViewerState = {
+    entries: [...entries], index: Math.max(0, entries.findIndex(item => String(item.id) === String(file.id))), focus, originView
+  };
+  if (pushHistory) {
+    window.history.pushState({ view: 'trip-file', tripId: String(state.activeTripId), dayId: file.day_id || null, fileId: file.id, originView }, '', `#file-${file.id}`);
+  }
+  if (!dom.tripFileViewer.open) dom.tripFileViewer.showModal();
+  showTripFileViewerIndex(tripFileViewerState.index, { syncHistory: false });
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (dom.tripFileViewer.open && tripFileViewerState) dom.tripFileViewer.dataset.visible = 'true';
+  }));
+  dom.closeTripFileViewer.focus({ preventScroll: true });
+}
+
+function closeTripFileViewer({ immediate = false } = {}) {
+  if (!dom.tripFileViewer.open) return;
+  if (!tripFileViewerState && !immediate) return;
+  window.clearTimeout(tripFileViewerCloseTimer);
+  const focus = tripFileViewerState?.focus;
+  tripFileViewerLeavingView = tripFileViewerState?.originView || tripFileViewerLeavingView;
+  tripFileViewerState = null;
+  tripFileViewerLoad += 1;
+  dom.tripFileViewer.dataset.visible = 'false';
+  const finish = () => {
+    if (tripFileViewerState) return;
+    dom.tripFileViewer.close();
+    clearTripFileViewerMedia();
+    tripFileViewerLeavingView = null;
+    if (focus?.isConnected) focus.focus({ preventScroll: true });
+  };
+  if (immediate || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) finish();
+  else tripFileViewerCloseTimer = window.setTimeout(finish, 260);
+}
+
+function navigateBackFromTripFileViewer() {
+  const hasHistory = window.history.state?.view === 'trip-file';
+  closeTripFileViewer();
+  if (hasHistory) window.history.back();
+}
+
+async function restoreTripFileViewer(entry) {
+  const tripId = String(entry.tripId);
+  if (state.activeTripId !== tripId) {
+    closeTripFileViewer({ immediate: true });
+    await openTrip(tripId, { pushHistory: false });
+  }
+  if (state.activeTripId !== tripId) return;
+  if (entry.originView === 'day' && entry.dayId) {
+    if (state.activeDayId !== String(entry.dayId)) openDayPage(entry.dayId, { pushHistory: false });
+    if (!state.dayAttachments.has(String(entry.dayId))) await loadDayAttachments(entry.dayId);
+  } else {
+    if (state.activeDayId) closeDayPage();
+    if (state.activeTripTab !== 'arquivos') selectTripTab('arquivos');
+    if (!state.tripFilesByTrip.has(tripId)) await loadTripFiles(tripId);
+  }
+  if (window.history.state?.view !== 'trip-file' || String(window.history.state.fileId) !== String(entry.fileId)) return;
+  const rows = entry.originView === 'day' && entry.dayId
+    ? state.dayAttachments.get(String(entry.dayId)) || [] : state.tripFilesByTrip.get(tripId) || [];
+  const entries = rows.filter(item => entry.dayId
+    ? String(item.day_id) === String(entry.dayId) : !item.day_id);
+  const file = entries.find(item => String(item.id) === String(entry.fileId));
+  if (file) openTripFileViewer(file, entries, { pushHistory: false });
+  else window.history.back();
+}
+
+async function deleteTripFileViewer() {
+  const file = tripFileViewerState?.entries[tripFileViewerState.index];
+  if (!file || !canEditActiveTrip()) return;
+  dom.tripFileViewerDelete.disabled = true;
+  try {
+    const result = await removeDayAttachment(file);
+    if (result === true) navigateBackFromTripFileViewer();
+    else if (result === false) dom.tripFileViewerStatus.textContent = 'Não foi possível excluir este arquivo.';
+  } catch (error) { dom.tripFileViewerStatus.textContent = error.message || 'Não foi possível excluir este arquivo.'; }
+  finally { dom.tripFileViewerDelete.disabled = false; }
 }
 
 function renderTripFileDeck(tripId, day, entries) {
@@ -4241,9 +4403,11 @@ function renderTripFileDeck(tripId, day, entries) {
     const card = document.createElement('article');
     card.className = 'trip-file-card';
     card.dataset.kind = file.mime_type?.startsWith('image/') ? 'image' : 'document';
-    const link = tripFileLink(file);
+    const link = document.createElement('button');
+    link.type = 'button';
     link.className = 'trip-file-card-link';
-    link.setAttribute('aria-label', `Abrir ${file.file_name}`);
+    link.setAttribute('aria-label', `Visualizar ${file.file_name}`);
+    link.addEventListener('click', () => openTripFileViewer(file, entries));
     const visual = document.createElement('span');
     visual.className = 'trip-file-card-visual';
     let image = null;
@@ -4265,7 +4429,6 @@ function renderTripFileDeck(tripId, day, entries) {
     caption.append(name, size);
     link.append(visual, caption);
     card.append(link);
-    if (canEditActiveTrip()) card.append(tripFileRemoveButton(file));
     deck.append(card);
     return card;
   });
@@ -4496,6 +4659,7 @@ async function openTrip(tripId, { pushHistory = true, forceRefresh = false } = {
 }
 
 function closeTripPage() {
+  closeTripFileViewer({ immediate: true });
   if (tripColorSaveTimer) savePendingTripColor();
   closeBudgetPage();
   dom.tripTabs.inert = true;
@@ -5990,6 +6154,33 @@ for (const tab of dom.tripTabs.querySelectorAll('[role="tab"]')) {
 dom.budgetAdd.addEventListener('click', () => openBudgetEditor());
 dom.closeBudgetPage.addEventListener('click', navigateBackFromBudget);
 dom.tripFilesInput.addEventListener('change', () => uploadTripFiles([...dom.tripFilesInput.files]).catch(error => setTripPanelStatus(dom.tripFilesStatus, error.message, 'error')));
+dom.closeTripFileViewer.addEventListener('click', navigateBackFromTripFileViewer);
+dom.tripFileViewerDelete.addEventListener('click', deleteTripFileViewer);
+dom.tripFileViewerPrevious.addEventListener('click', () => { if (tripFileViewerState) showTripFileViewerIndex(tripFileViewerState.index - 1); });
+dom.tripFileViewerNext.addEventListener('click', () => { if (tripFileViewerState) showTripFileViewerIndex(tripFileViewerState.index + 1); });
+dom.tripFileViewer.addEventListener('cancel', event => { event.preventDefault(); navigateBackFromTripFileViewer(); });
+dom.tripFileViewer.addEventListener('keydown', event => {
+  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+  if (!tripFileViewerState) return;
+  event.preventDefault();
+  showTripFileViewerIndex(tripFileViewerState.index + (event.key === 'ArrowRight' ? 1 : -1));
+});
+let tripFileViewerGesture = null;
+dom.tripFileViewerMedia.addEventListener('pointerdown', event => {
+  if (!event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0)) return;
+  tripFileViewerGesture = { id: event.pointerId, x: event.clientX, y: event.clientY };
+});
+dom.tripFileViewerMedia.addEventListener('pointerup', event => {
+  if (!tripFileViewerGesture || tripFileViewerGesture.id !== event.pointerId) return;
+  const dx = event.clientX - tripFileViewerGesture.x;
+  const dy = event.clientY - tripFileViewerGesture.y;
+  tripFileViewerGesture = null;
+  if (Math.abs(dx) < 55 || Math.abs(dx) < Math.abs(dy) * 1.3) return;
+  if (!tripFileViewerState) return;
+  event.preventDefault();
+  showTripFileViewerIndex(tripFileViewerState.index + (dx < 0 ? 1 : -1));
+});
+dom.tripFileViewerMedia.addEventListener('pointercancel', () => { tripFileViewerGesture = null; });
 dom.tripPageShare.addEventListener('click', openTripShare);
 dom.closeTripShare.addEventListener('click', () => setActiveSheet('none'));
 dom.tripShareScrim.addEventListener('click', () => setActiveSheet('none'));
@@ -6065,6 +6256,21 @@ dom.dayPagePhotoInput.addEventListener('change', async () => {
   }
 });
 window.addEventListener('popstate', event => {
+  if (event.state?.view === 'trip-file') {
+    restoreTripFileViewer(event.state).catch(error => console.warn('Não foi possível reabrir o arquivo', error));
+    return;
+  }
+  if (dom.tripFileViewer.open) {
+    const originView = tripFileViewerState?.originView || tripFileViewerLeavingView;
+    const sameTrip = String(state.activeTripId) === String(event.state?.tripId);
+    const sameDay = String(state.activeDayId) === String(event.state?.dayId);
+    if (sameTrip && ((event.state?.view === 'trip' && originView === 'trip')
+      || (event.state?.view === 'day' && originView === 'day' && sameDay))) {
+      closeTripFileViewer();
+      return;
+    }
+    closeTripFileViewer({ immediate: true });
+  }
   if (event.state?.view === 'budget-item' && event.state.tripId) {
     const reopen = () => {
       const item = event.state.itemId == null ? null : (state.budgetByTrip.get(String(event.state.tripId)) || []).find(row => String(row.id) === String(event.state.itemId));
