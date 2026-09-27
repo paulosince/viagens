@@ -104,7 +104,7 @@ const dom = {
   dayMapSection: document.querySelector('#day_map_section'),
   dayMapToggle: document.querySelector('#day_map_toggle'),
   tripPageDuration: document.querySelector('#trip_page_duration'),
-  tripPageShare: document.querySelector('#trip_page_share'), tripShareSheet: document.querySelector('#trip_share_sheet'), tripShareScrim: document.querySelector('#trip_share_scrim'), closeTripShare: document.querySelector('#close_trip_share'), tripShareForm: document.querySelector('#trip_share_form'), tripShareRecipient: document.querySelector('#trip_share_recipient'), sendTripShare: document.querySelector('#send_trip_share'), tripShareStatus: document.querySelector('#trip_share_status'), tripShareList: document.querySelector('#trip_share_list'),
+  tripPageShare: document.querySelector('#trip_page_share'), tripPagePdf: document.querySelector('#trip_page_pdf'), tripPdfDialog: document.querySelector('#trip_pdf_dialog'), tripPdfStatus: document.querySelector('#trip_pdf_status'), tripPdfActions: document.querySelector('#trip_pdf_actions'), tripPdfShare: document.querySelector('#share_trip_pdf'), tripPdfDownload: document.querySelector('#download_trip_pdf'), tripPdfClose: document.querySelector('#close_trip_pdf'), tripShareSheet: document.querySelector('#trip_share_sheet'), tripShareScrim: document.querySelector('#trip_share_scrim'), closeTripShare: document.querySelector('#close_trip_share'), tripShareForm: document.querySelector('#trip_share_form'), tripShareRecipient: document.querySelector('#trip_share_recipient'), sendTripShare: document.querySelector('#send_trip_share'), tripShareStatus: document.querySelector('#trip_share_status'), tripShareList: document.querySelector('#trip_share_list'),
   tripCreateMessage: document.querySelector('#trip_create_message'),
   splashStatus: document.querySelector('#splash_status'),
   authView: document.querySelector('#auth_view'), authForm: document.querySelector('#auth_form'), authMessage: document.querySelector('#auth_message'), authIntro: document.querySelector('#auth_intro'), authCard: document.querySelector('.auth-card'), signupForm: document.querySelector('#signup_form'), signupMessage: document.querySelector('#signup_message'), signupPhotoInput: document.querySelector('#signup_photo'), signupPhotoPreview: document.querySelector('#signup_photo_preview'), signupPhotoPlaceholder: document.querySelector('#signup_photo_placeholder'), showSignup: document.querySelector('#show_signup'), showLogin: document.querySelector('#show_login'),
@@ -4625,6 +4625,80 @@ async function uploadTripFiles(files) {
   } finally { button.dataset.busy = 'false'; dom.tripFilesInput.value = ''; }
 }
 
+let tripPdfFile = null;
+let tripPdfRequest = 0;
+
+function itinerarySnapshot(trip, data) {
+  const days = data.days.filter(day => !dayDeletedAt(day) && !dayIsHidden(day) && dayPosition(day) < tripDayCount(trip))
+    .sort((a, b) => dayPosition(a) - dayPosition(b))
+    .map(day => {
+      const activities = data.activitiesByDay.get(String(day.id)) || [];
+      const locations = data.locationsByDay.get(String(day.id)) || [];
+      return {
+        number: dayNumber(day), title: dayTitle(day, activities, locations),
+        date: derivedDayDate(day, trip), summary: day.summary || '',
+        activities: orderedDayActivities(activities).map(activity => {
+          const place = activityLocation(activity, locations);
+          return {
+            time: activityTime(activity), title: activity.title || '',
+            place: activity.place_name || place?.name || '',
+            address: place?.formatted_address || activity.address || '',
+            description: activity.description || ''
+          };
+        })
+      };
+    });
+  return {
+    trip: { name: trip.name, startDate: trip.start_date, endDate: tripEndDate(trip), dayCount: tripDayCount(trip), accent: trip.secondary_color },
+    days
+  };
+}
+
+async function openTripPdf() {
+  const tripId = state.activeTripId;
+  const trip = state.trips.find(item => String(item.id) === tripId);
+  if (!trip || dom.tripPdfDialog.open) return;
+  const request = ++tripPdfRequest;
+  tripPdfFile = null;
+  dom.tripPdfStatus.textContent = 'Preparando roteiro…';
+  dom.tripPdfActions.hidden = true;
+  dom.tripPdfDialog.showModal();
+  try {
+    let data = state.tripDataCache.get(tripId);
+    if (!data?.days?.length) data = await fetchTripData(tripId, { preferLocal: true }) || await fetchTripData(tripId);
+    if (!data?.days?.length) throw new Error('Os dias ainda não carregaram. Tente novamente em instantes.');
+    const snapshot = itinerarySnapshot(trip, data);
+    const { createItineraryPdf } = await import('./itinerary-pdf.mjs?v=20260927-56');
+    const bytes = await createItineraryPdf(snapshot);
+    if (request !== tripPdfRequest || !dom.tripPdfDialog.open || state.activeTripId !== tripId) return;
+    const slug = String(trip.name || 'viagem').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'viagem';
+    tripPdfFile = new File([bytes], `roteiro-${slug}.pdf`, { type: 'application/pdf' });
+    dom.tripPdfStatus.textContent = `${snapshot.days.length} ${snapshot.days.length === 1 ? 'dia incluído' : 'dias incluídos'}. PDF pronto para salvar ou compartilhar.`;
+    dom.tripPdfShare.hidden = !(navigator.canShare?.({ files: [tripPdfFile] }) && navigator.share);
+    dom.tripPdfActions.hidden = false;
+  } catch (error) {
+    if (request === tripPdfRequest && dom.tripPdfDialog.open) dom.tripPdfStatus.textContent = error.message || 'Não foi possível gerar o PDF. Tente novamente.';
+  }
+}
+
+async function shareTripPdf() {
+  if (!tripPdfFile) return;
+  try { await navigator.share({ files: [tripPdfFile], title: 'Roteiro de viagem' }); }
+  catch (error) { if (error.name !== 'AbortError') dom.tripPdfStatus.textContent = 'Não foi possível compartilhar. Você ainda pode salvar o PDF.'; }
+}
+
+function downloadTripPdf() {
+  if (!tripPdfFile) return;
+  const url = URL.createObjectURL(tripPdfFile);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = tripPdfFile.name;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
 async function openTrip(tripId, { pushHistory = true, forceRefresh = false } = {}) {
   const trip = state.trips.find(item => String(item.id) === String(tripId));
   if (!trip) return;
@@ -4697,6 +4771,7 @@ async function openTrip(tripId, { pushHistory = true, forceRefresh = false } = {
 }
 
 function closeTripPage() {
+  if (dom.tripPdfDialog.open) dom.tripPdfDialog.close();
   closeTripFileViewer({ immediate: true });
   if (tripColorSaveTimer) savePendingTripColor();
   closeBudgetPage();
@@ -6222,6 +6297,11 @@ if (dom.tripFileViewer) {
   dom.tripFileViewerMedia.addEventListener('pointercancel', () => { tripFileViewerGesture = null; });
 }
 dom.tripPageShare.addEventListener('click', openTripShare);
+dom.tripPagePdf.addEventListener('click', openTripPdf);
+dom.tripPdfClose.addEventListener('click', () => dom.tripPdfDialog.close());
+dom.tripPdfDialog.addEventListener('close', () => { tripPdfRequest++; tripPdfFile = null; });
+dom.tripPdfShare.addEventListener('click', shareTripPdf);
+dom.tripPdfDownload.addEventListener('click', downloadTripPdf);
 dom.closeTripShare.addEventListener('click', () => setActiveSheet('none'));
 dom.tripShareScrim.addEventListener('click', () => setActiveSheet('none'));
 dom.tripShareForm.addEventListener('submit', submitTripShare);

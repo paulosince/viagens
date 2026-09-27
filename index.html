@@ -47,9 +47,9 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20260927-55" as="style">
-  <link rel="stylesheet" href="style.css?v=20260927-55" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20260927-55"></noscript>
+  <link rel="preload" href="style.css?v=20260927-56" as="style">
+  <link rel="stylesheet" href="style.css?v=20260927-56" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20260927-56"></noscript>
   <script>
     function showViaggioStartupError(detail) {
       if (!document.body || document.body.dataset.session !== 'loading') return;
@@ -292,7 +292,10 @@
     <section id="trip_page" class="trip-page" aria-hidden="true">
       <nav class="trip-page-nav" aria-label="Navegação da viagem">
         <button id="close_trip_page" class="trip-page-control trip-page-back" type="button" aria-label="Voltar"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 4 7 12l8 8"/></svg></button>
-        <button id="trip_page_share" class="trip-page-control trip-page-share" type="button" aria-label="Compartilhar viagem"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3m0 0L8 7m4-4 4 4M5 11v9h14v-9"/></svg></button>
+        <div class="trip-page-nav-actions">
+          <button id="trip_page_pdf" class="trip-page-control trip-page-pdf" type="button" aria-label="Exportar roteiro em PDF" title="Exportar roteiro em PDF"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l4 4v5M14 3v5h4M7 3H5v18h14v-2M12 11v8m0 0-3-3m3 3 3-3"/></svg></button>
+          <button id="trip_page_share" class="trip-page-control trip-page-share" type="button" aria-label="Compartilhar viagem"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3m0 0L8 7m4-4 4 4M5 11v9h14v-9"/></svg></button>
+        </div>
       </nav>
       <header id="trip_page_hero" class="trip-page-hero">
         <div class="trip-page-hero-copy">
@@ -500,11 +503,20 @@
       </form>
     </section>
 
+    <dialog id="trip_pdf_dialog" class="trip-pdf-dialog" aria-labelledby="trip_pdf_title">
+      <div class="trip-pdf-dialog-header"><h2 id="trip_pdf_title">Roteiro em PDF</h2><button id="close_trip_pdf" type="button" aria-label="Fechar">×</button></div>
+      <p id="trip_pdf_status" role="status" aria-live="polite">Preparando roteiro…</p>
+      <div id="trip_pdf_actions" class="trip-pdf-actions" hidden>
+        <button id="share_trip_pdf" type="button" hidden>Compartilhar PDF</button>
+        <button id="download_trip_pdf" type="button">Salvar PDF</button>
+      </div>
+    </dialog>
+
     <footer id="trip_edit_footer" class="trip-edit-footer" aria-hidden="true">
       <button id="delete_selected_trips" type="button" disabled>Excluir selecionadas</button>
     </footer>
   </main>
-  <script type="module" src="src/main.js?v=20260927-55"></script>
-  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260927-55', { updateViaCache: 'none' }).catch(function () {});</script>
+  <script type="module" src="src/main.js?v=20260927-56"></script>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260927-56', { updateViaCache: 'none' }).catch(function () {});</script>
 </body>
 </html>

@@ -1,13 +1,14 @@
-const CACHE_NAME = 'viaggio-home-v102-circular-file-decks';
+const CACHE_NAME = 'viaggio-home-v103-itinerary-pdf';
 const SUPABASE_CLIENT = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const LEAFLET_CSS = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css';
 const LEAFLET_JS = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js';
 const EXTERNAL_ASSETS = [SUPABASE_CLIENT, LEAFLET_CSS, LEAFLET_JS];
+const OPTIONAL_ASSETS = ['./src/itinerary-pdf.mjs?v=20260927-56', './vendor/pdf-lib.min.mjs'];
 const APP_SHELL = [
   './',
   './index.html',
-  './style.css?v=20260927-55',
-  './src/main.js?v=20260927-55',
+  './style.css?v=20260927-56',
+  './src/main.js?v=20260927-56',
   './src/offline-store.js?v=20260927-44',
   './manifest.webmanifest',
   './assets/app-icon.svg',
@@ -22,7 +23,8 @@ self.addEventListener('install', event => {
     caches.open(CACHE_NAME)
       .then(cache => Promise.all([
         cache.addAll(APP_SHELL),
-        ...EXTERNAL_ASSETS.map(url => cache.add(url).catch(() => undefined))
+        ...EXTERNAL_ASSETS.map(url => cache.add(url).catch(() => undefined)),
+        ...OPTIONAL_ASSETS.map(url => cache.add(url).catch(() => undefined))
       ]))
       .then(() => self.skipWaiting())
   );
