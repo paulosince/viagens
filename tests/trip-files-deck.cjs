@@ -62,8 +62,14 @@ const generalDeck = general.children[1];
 assert.equal(generalDeck.children.length, 2, 'files without a day form a swipeable stack');
 assert.equal(generalDeck.children[0].dataset.kind, 'document');
 assert.equal(generalDeck.children[1].dataset.kind, 'image');
+assert.equal(generalDeck.children[0].children.length, 1, 'the card has no visible delete control');
+assert.equal(generalDeck.children[0].children[0].tagName, 'button', 'a card opens inside the app');
+assert.equal(generalDeck.children[0].children[0].href, undefined, 'no storage link opens in a new tab');
 assert.equal(generalDeck.children[0].children[0].children[1].children[0].textContent, 'passagem.pdf');
 assert.equal(generalDeck.children[0].children[0].children[1].children[1].textContent, '2 KB');
+assert.equal(generalDeck.children[1].children[0].children.length, 1,
+  'photo cards show the image without an opaque filename or size overlay');
+assert.equal(generalDeck.children[1].children[0].getAttribute('aria-label'), 'Visualizar foto 2 de 2');
 const [generalPrevious, generalPosition, generalNext] = general.children[2].children;
 assert.equal(generalPosition.textContent, '1 de 2');
 assert.equal(generalPrevious.disabled, true);

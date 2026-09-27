@@ -47,9 +47,9 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20260927-53" as="style">
-  <link rel="stylesheet" href="style.css?v=20260927-53" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20260927-53"></noscript>
+  <link rel="preload" href="style.css?v=20260927-54" as="style">
+  <link rel="stylesheet" href="style.css?v=20260927-54" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20260927-54"></noscript>
   <script>
     function showViaggioStartupError(detail) {
       if (!document.body || document.body.dataset.session !== 'loading') return;
@@ -348,6 +348,25 @@
       <p id="budget_item_message" class="budget-item-message" role="status" aria-live="polite"></p>
     </section>
 
+    <dialog id="trip_file_viewer" class="trip-file-viewer" aria-labelledby="trip_file_viewer_title">
+      <div class="trip-file-viewer-shell">
+        <header class="trip-file-viewer-header">
+          <button id="close_trip_file_viewer" type="button" aria-label="Voltar aos arquivos">‹</button>
+          <h2 id="trip_file_viewer_title"></h2>
+          <button id="delete_trip_file_viewer" class="trip-file-viewer-delete" type="button" aria-label="Excluir arquivo" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v6m4-6v6"/></svg></button>
+        </header>
+        <div id="trip_file_viewer_media" class="trip-file-viewer-media"></div>
+        <footer class="trip-file-viewer-footer">
+          <p id="trip_file_viewer_status" role="status" aria-live="polite"></p>
+          <div class="trip-file-viewer-navigation">
+            <button id="previous_trip_file_viewer" type="button" aria-label="Arquivo anterior">‹</button>
+            <span id="trip_file_viewer_position"></span>
+            <button id="next_trip_file_viewer" type="button" aria-label="Próximo arquivo">›</button>
+          </div>
+        </footer>
+      </div>
+    </dialog>
+
     <button id="trip_share_scrim" class="trip-share-scrim" type="button" aria-label="Fechar compartilhamento"></button>
     <section id="trip_share_sheet" class="new-trip-sheet trip-share-sheet" aria-hidden="true" aria-labelledby="trip_share_title">
       <header class="sheet-header"><button id="close_trip_share" class="sheet-control" type="button" aria-label="Fechar">×</button><h2 id="trip_share_title">Compartilhar viagem</h2><span class="sheet-header-spacer" aria-hidden="true"></span></header>
@@ -485,7 +504,7 @@
       <button id="delete_selected_trips" type="button" disabled>Excluir selecionadas</button>
     </footer>
   </main>
-  <script type="module" src="src/main.js?v=20260927-53"></script>
-  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260927-53', { updateViaCache: 'none' }).catch(function () {});</script>
+  <script type="module" src="src/main.js?v=20260927-54"></script>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260927-54', { updateViaCache: 'none' }).catch(function () {});</script>
 </body>
 </html>
