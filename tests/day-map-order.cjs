@@ -13,7 +13,7 @@ function extract(name) {
 
 const context = vm.createContext({});
 vm.runInContext(
-  ['activityTime', 'activityLocation', 'numericCoordinate', 'primaryActivityPlace',
+  ['activityTime', 'activityLocation', 'googleMapsAddressUrl', 'numericCoordinate', 'primaryActivityPlace',
     'activityLooksGeocodable', 'orderedDayActivities', 'dayMapPoints', 'dayMapGroups']
     .map(extract).join('\n'),
   context
@@ -65,5 +65,12 @@ assert.equal(unscheduled[0].name, 'Passeio');
 assert.equal(context.activityLooksGeocodable({title: 'Manhã'}), false);
 assert.equal(context.activityLooksGeocodable({title: 'Tarde livre'}), false);
 assert.equal(context.activityLooksGeocodable({title: 'Parque dos Príncipes'}), true);
+
+assert.equal(
+  context.googleMapsAddressUrl({address: 'Endereço antigo'}, {formatted_address: 'Praça do Comércio, Lisboa'}),
+  'https://www.google.com/maps/search/?api=1&query=Pra%C3%A7a%20do%20Com%C3%A9rcio%2C%20Lisboa'
+);
+assert.equal(context.googleMapsAddressUrl({address: '  Rua Augusta  '}, null), 'https://www.google.com/maps/search/?api=1&query=Rua%20Augusta');
+assert.equal(context.googleMapsAddressUrl({address: ''}, {formatted_address: null}), null);
 
 console.log('PASS: day map follows agenda order and keeps geocoded places');

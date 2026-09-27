@@ -926,6 +926,11 @@ function activityLocation(activity, locations = []) {
     || null;
 }
 
+function googleMapsAddressUrl(activity, location) {
+  const address = String(location?.formatted_address || activity?.address || '').trim();
+  return address ? 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(address) : null;
+}
+
 function numericCoordinate(value) {
   if (value === null || value === undefined || value === '') return null;
   const coordinate = Number(value);
@@ -2829,6 +2834,25 @@ function renderDayPageAgenda(day, activities, locations) {
     pin.setAttribute('aria-label', location?.name ? 'Editar local: ' + location.name : 'Definir local');
     pin.addEventListener('click', () => openInlinePlaceSearch(day, activity, location));
 
+    const googleMapsUrl = googleMapsAddressUrl(activity, location);
+    item.dataset.hasGoogleMaps = String(Boolean(googleMapsUrl));
+    let googleMapsLink = null;
+    if (googleMapsUrl) {
+      googleMapsLink = document.createElement('a');
+      googleMapsLink.className = 'day-inline-google-maps';
+      googleMapsLink.href = googleMapsUrl;
+      googleMapsLink.target = '_blank';
+      googleMapsLink.rel = 'noopener noreferrer';
+      googleMapsLink.setAttribute('aria-label', 'Abrir no Google Maps: ' + (location?.name || activity.place_name || activity.title || 'endereço'));
+      googleMapsLink.title = 'Abrir no Google Maps';
+      const mapsIcon = document.createElement('img');
+      mapsIcon.src = 'https://www.gstatic.com/images/branding/product/1x/maps_48dp.png';
+      mapsIcon.alt = '';
+      mapsIcon.width = 28;
+      mapsIcon.height = 28;
+      googleMapsLink.append(mapsIcon);
+    }
+
     const saveStatus = document.createElement('span');
     saveStatus.className = 'day-inline-save-status';
     saveStatus.dataset.state = state.agendaSaveStates.get(String(activity.id)) || 'idle';
@@ -2864,7 +2888,9 @@ function renderDayPageAgenda(day, activities, locations) {
 
     const photoUrl = activity.photo_url || location?.photo_url || '';
     item.dataset.hasPhoto = String(Boolean(photoUrl));
-    item.append(time, pin, saveStatus, copy);
+    item.append(time, pin);
+    if (googleMapsLink) item.append(googleMapsLink);
+    item.append(saveStatus, copy);
 
     const file = document.createElement('input');
     file.type = 'file';
