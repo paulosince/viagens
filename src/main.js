@@ -2102,6 +2102,8 @@ async function removeDayAttachment(attachment) {
 function openDayPage(dayId, { pushHistory = true } = {}) {
   const day = state.tripDays.find(item => String(item.id) === String(dayId));
   if (!day) return;
+  if (state.activeDayId && state.activeDayId !== String(day.id) && dom.dayMapSection.dataset.expanded === 'true') setDayMapExpanded(false);
+  dom.dayPage.inert = false;
   if (pushHistory) window.history.pushState({ view: 'day', tripId: String(state.activeTripId), dayId: String(day.id) }, '', `#day-${day.id}`);
   state.activeDayId = String(day.id);
   const renderKey = `${state.activeTripId}:${day.id}:${state.activeTripDataVersion}`;
@@ -3192,6 +3194,7 @@ function renderDayPageMap(day, locations, activities = []) {
 function closeDayPage() {
   closeDayAttachments();
   setDayMapExpanded(false);
+  dom.dayPage.inert = true;
   state.activeDayId = null;
   state.dayMapRenderToken += 1;
   if (state.dayMap) {

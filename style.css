@@ -970,6 +970,7 @@ body[data-trip-page="open"] .trip-page {
   position: fixed;
   z-index: 70;
   inset: 0;
+  pointer-events: none;
   overflow-x: hidden;
   overflow-y: auto;
   color: var(--text);
@@ -983,6 +984,7 @@ body[data-trip-page="open"] .trip-page {
 body[data-day-page="open"] { overflow: hidden; }
 body[data-day-page="open"] .day-page {
   visibility: visible;
+  pointer-events: auto;
   transform: translateX(0);
   transition-delay: 0s;
 }
