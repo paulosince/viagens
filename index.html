@@ -47,9 +47,9 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20260927-45" as="style">
-  <link rel="stylesheet" href="style.css?v=20260927-45" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20260927-45"></noscript>
+  <link rel="preload" href="style.css?v=20260927-46" as="style">
+  <link rel="stylesheet" href="style.css?v=20260927-46" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20260927-46"></noscript>
   <script>
     function showViaggioStartupError(detail) {
       if (!document.body || document.body.dataset.session !== 'loading') return;
@@ -314,11 +314,6 @@
           <span id="trip_page_save_status" class="trip-page-save-status" role="status" aria-live="polite"></span>
         </div>
       </header>
-      <nav class="trip-tabs" role="tablist" aria-label="Seções da viagem">
-        <button id="trip_tab_roteiro" class="trip-tab" role="tab" type="button" aria-controls="trip_panel_roteiro" aria-selected="true" tabindex="0">Roteiro</button>
-        <button id="trip_tab_orcamento" class="trip-tab" role="tab" type="button" aria-controls="trip_panel_orcamento" aria-selected="false" tabindex="-1">Orçamento</button>
-        <button id="trip_tab_arquivos" class="trip-tab" role="tab" type="button" aria-controls="trip_panel_arquivos" aria-selected="false" tabindex="-1">Arquivos</button>
-      </nav>
       <div id="trip_panel_roteiro" class="trip-page-content" role="tabpanel" aria-labelledby="trip_tab_roteiro">
         <ol id="trip_day_list" class="trip-day-list"></ol>
         <p id="trip_day_message" class="trip-day-message" role="status"></p>
@@ -337,6 +332,13 @@
         <div id="trip_files_list" class="trip-files-list"></div>
       </section>
     </section>
+
+    <nav class="trip-tabs" role="tablist" aria-label="Seções da viagem" aria-hidden="true" inert style="--active-index: 0">
+      <span class="trip-tab-indicator" aria-hidden="true"></span>
+      <button id="trip_tab_roteiro" class="trip-tab" role="tab" type="button" aria-controls="trip_panel_roteiro" aria-selected="true" tabindex="0"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V8l5-3 6 3 5-3v12l-5 3-6-3-5 3Z"/><path d="M9 5v12m6-9v12"/></svg><span>Roteiro</span></button>
+      <button id="trip_tab_orcamento" class="trip-tab" role="tab" type="button" aria-controls="trip_panel_orcamento" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 10h18m-5 5h2M6 6V4h12"/></svg><span>Orçamento</span></button>
+      <button id="trip_tab_arquivos" class="trip-tab" role="tab" type="button" aria-controls="trip_panel_arquivos" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/><path d="M3 11h18"/></svg><span>Arquivos</span></button>
+    </nav>
 
     <button id="trip_share_scrim" class="trip-share-scrim" type="button" aria-label="Fechar compartilhamento"></button>
     <section id="trip_share_sheet" class="new-trip-sheet trip-share-sheet" aria-hidden="true" aria-labelledby="trip_share_title">
@@ -475,7 +477,7 @@
       <button id="delete_selected_trips" type="button" disabled>Excluir selecionadas</button>
     </footer>
   </main>
-  <script type="module" src="src/main.js?v=20260927-45"></script>
-  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260927-45');</script>
+  <script type="module" src="src/main.js?v=20260927-46"></script>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20260927-46');</script>
 </body>
 </html>

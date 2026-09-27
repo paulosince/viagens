@@ -2136,6 +2136,8 @@ async function removeDayAttachment(attachment) {
 function openDayPage(dayId, { pushHistory = true } = {}) {
   const day = state.tripDays.find(item => String(item.id) === String(dayId));
   if (!day) return;
+  dom.tripTabs.inert = true;
+  dom.tripTabs.setAttribute('aria-hidden', 'true');
   if (state.activeDayId && state.activeDayId !== String(day.id) && dom.dayMapSection.dataset.expanded === 'true') setDayMapExpanded(false);
   dom.dayPage.inert = false;
   if (pushHistory) window.history.pushState({ view: 'day', tripId: String(state.activeTripId), dayId: String(day.id) }, '', `#day-${day.id}`);
@@ -3237,6 +3239,10 @@ function closeDayPage() {
   }
   document.body.dataset.dayPage = 'closed';
   dom.dayPage.setAttribute('aria-hidden', 'true');
+  if (state.activeTripId && document.body.dataset.tripPage === 'open') {
+    dom.tripTabs.inert = false;
+    dom.tripTabs.setAttribute('aria-hidden', 'false');
+  }
 }
 
 function navigateBackFromDay() {
@@ -3819,17 +3825,22 @@ function selectTripTab(name, { reset = false } = {}) {
   if (!dom.tripPanels[name] || !state.activeTripId) return;
   const key = String(state.activeTripId);
   if (!reset && name === state.activeTripTab) return;
+  const order = ['roteiro', 'orcamento', 'arquivos'];
+  const previous = order.indexOf(state.activeTripTab);
+  const next = order.indexOf(name);
   if (!reset) state.tripTabScroll.set(`${key}:${state.activeTripTab}`, dom.tripPage.scrollTop);
   state.activeTripTab = name;
+  dom.tripTabs.style.setProperty('--active-index', String(next));
   for (const [tab, panel] of Object.entries(dom.tripPanels)) {
     panel.hidden = tab !== name;
+    panel.dataset.enter = reset || tab !== name ? '' : next > previous ? 'next' : 'previous';
     const button = document.querySelector(`#trip_tab_${tab}`);
     button.setAttribute('aria-selected', String(tab === name));
     button.tabIndex = tab === name ? 0 : -1;
   }
   requestAnimationFrame(() => {
     if (state.activeTripId !== key || state.activeTripTab !== name) return;
-    dom.tripPage.scrollTop = reset ? 0 : state.tripTabScroll.get(`${key}:${name}`) ?? dom.tripTabs.offsetTop;
+    dom.tripPage.scrollTop = reset ? 0 : state.tripTabScroll.get(`${key}:${name}`) ?? dom.tripPageHero.offsetHeight;
   });
   if (name === 'orcamento') loadTripBudget(key).catch(error => setTripPanelStatus(dom.budgetStatus, error.message, 'error'));
   if (name === 'arquivos') loadTripFiles(key).catch(error => setTripPanelStatus(dom.tripFilesStatus, error.message, 'error'));
@@ -4139,6 +4150,8 @@ async function openTrip(tripId, { pushHistory = true, forceRefresh = false } = {
     dom.tripFilesDay.disabled = true; dom.tripFilesInput.closest('.trip-files-pick').hidden = true;
     selectTripTab('roteiro', { reset: true });
   }
+  dom.tripTabs.inert = false;
+  dom.tripTabs.setAttribute('aria-hidden', 'false');
   if (canEditTrip(trip)) ensureTripBaselineSnapshot(trip.id).catch(error => console.warn('Ponto de segurança inicial indisponível', error));
   syncTripHero(trip);
   dom.tripPage.setAttribute('aria-hidden', 'false');
@@ -4184,6 +4197,8 @@ async function openTrip(tripId, { pushHistory = true, forceRefresh = false } = {
 
 function closeTripPage() {
   if (tripColorSaveTimer) savePendingTripColor();
+  dom.tripTabs.inert = true;
+  dom.tripTabs.setAttribute('aria-hidden', 'true');
   document.body.dataset.tripPermission = '';
   state.activeTripId = null;
   dom.budgetEditor.hidden = true;
