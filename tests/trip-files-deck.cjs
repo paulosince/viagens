@@ -36,6 +36,13 @@ const daySelect = element('select');
 const filesInput = { closest() { return pick; } };
 let editing = true;
 let openedDay = null;
+let nextTimer = 0;
+const timers = new Map();
+const finishTransitions = () => {
+  const pending = [...timers.values()];
+  timers.clear();
+  pending.forEach(callback => callback());
+};
 const context = {
   state: { activeTripId: 'trip', tripFilesByTrip: new Map([['trip', files]]), tripFileDeckIndexes: new Map() },
   dom: { tripFilesDay: daySelect, tripFilesList: element('div'), tripFilesInput: filesInput },
@@ -45,6 +52,8 @@ const context = {
   derivedDayDate: () => '2026-11-18',
   displayDate: date => date,
   openDayPage: id => { openedDay = id; },
+  setTimeout: callback => { const id = ++nextTimer; timers.set(id, callback); return id; },
+  clearTimeout: id => timers.delete(id),
   removeDayAttachment() {}
 };
 vm.createContext(context);
@@ -72,10 +81,19 @@ assert.equal(generalDeck.children[1].children[0].children.length, 1,
 assert.equal(generalDeck.children[1].children[0].getAttribute('aria-label'), 'Visualizar foto 2 de 2');
 const [generalPrevious, generalPosition, generalNext] = general.children[2].children;
 assert.equal(generalPosition.textContent, '1 de 2');
-assert.equal(generalPrevious.disabled, true);
+assert.equal(generalPrevious.disabled, false, 'a circular stack allows returning from the first card');
 generalNext.fire('click');
 assert.equal(generalPosition.textContent, '2 de 2');
 assert.equal(generalDeck.children[1].dataset.position, 'current');
+assert.equal(generalDeck.children[0].dataset.position, 'discarding', 'the previous card leaves sideways');
+finishTransitions();
+assert.equal(generalDeck.children[0].dataset.position, 'queued', 'the departing card rejoins the back of a two-card stack');
+generalNext.fire('click');
+assert.equal(generalPosition.textContent, '1 de 2', 'next wraps back to the first card');
+finishTransitions();
+generalPrevious.fire('click');
+assert.equal(generalPosition.textContent, '2 de 2', 'previous wraps back to the last card');
+finishTransitions();
 assert.equal(firstDay.children[0].children[1].textContent, '3 arquivos');
 const deck = firstDay.children[1];
 const [previous, position, next] = firstDay.children[2].children;
@@ -84,17 +102,29 @@ assert.equal(deck.children[0].dataset.position, 'current');
 assert.equal(deck.children[1].dataset.position, 'queued');
 assert.equal(deck.children[1].inert, true, 'only the front card can be opened');
 assert.equal(position.textContent, '1 de 3');
-assert.equal(previous.disabled, true);
+assert.equal(previous.disabled, false);
 next.fire('click');
 assert.equal(position.textContent, '2 de 3');
 assert.equal(deck.children[1].dataset.position, 'current');
+finishTransitions();
 
 deck.fire('pointerdown', { isPrimary: true, pointerType: 'touch', pointerId: 1, clientX: 230, clientY: 90 });
 deck.fire('pointerup', { pointerId: 1, clientX: 90, clientY: 92, preventDefault() {} });
 assert.equal(position.textContent, '3 de 3', 'swiping left reveals the next card');
-assert.equal(next.disabled, true);
+assert.equal(next.disabled, false, 'the last card still allows advancing');
+finishTransitions();
+deck.fire('pointerdown', { isPrimary: true, pointerType: 'touch', pointerId: 2, clientX: 230, clientY: 90 });
+deck.fire('pointerup', { pointerId: 2, clientX: 90, clientY: 92, preventDefault() {} });
+assert.equal(position.textContent, '1 de 3', 'swiping past the last card loops to the beginning');
+assert.equal(deck.children[2].dataset.position, 'discarding');
+finishTransitions();
+assert.equal(deck.children[2].dataset.position, 'queued', 'the last card returns to the back');
+previous.fire('click');
+assert.equal(position.textContent, '3 de 3', 'the reverse direction also loops');
+finishTransitions();
 deck.fire('keydown', { key: 'ArrowLeft', preventDefault() {} });
 assert.equal(position.textContent, '2 de 3', 'keyboard navigation also works');
+finishTransitions();
 
 context.renderTripFiles('trip', days);
 assert.equal(context.dom.tripFilesList.children[0].children[2].children[1].textContent, '2 de 2',
@@ -111,6 +141,26 @@ assert.equal(context.dom.tripFilesList.children[0].children[1].children[1].child
   'a viewer cannot delete trip-wide files');
 assert.equal(context.dom.tripFilesList.children[1].children[1].children[0].children.length, 1,
   'a viewer cannot delete files in the deck');
+assert.equal(context.dom.tripFilesList.children[2].children[2].hidden, true,
+  'a single file does not show navigation controls');
+
+files.push(attachment('foto4', 'one'));
+context.state.tripFileDeckIndexes.set('trip:one', 0);
+context.renderTripFiles('trip', days);
+const longGroup = context.dom.tripFilesList.children[1];
+const longDeck = longGroup.children[1];
+const longNext = longGroup.children[2].children[2];
+for (let i = 0; i < 4; i++) {
+  longNext.fire('click');
+  finishTransitions();
+}
+assert.equal(longGroup.children[2].children[1].textContent, '1 de 4');
+assert.equal(longDeck.children[3].dataset.position, 'hidden', 'the fourth card waits at the back after wrapping');
+longNext.fire('click');
+assert.equal(longDeck.children[3].dataset.position, 'queued', 'the hidden card returns as the stack rotates');
+longNext.fire('click');
+assert.equal(longGroup.children[2].children[1].textContent, '3 de 4', 'fast consecutive taps keep the index in sync');
+finishTransitions();
 
 const uploadStart = source.indexOf('async function uploadTripFiles(files)');
 const uploadEnd = source.indexOf('\nasync function openTrip(', uploadStart);

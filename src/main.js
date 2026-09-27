@@ -4455,27 +4455,57 @@ function renderTripFileDeck(tripId, day, entries) {
   controls.hidden = entries.length < 2;
   const deckKey = `${tripId}:${day?.id || 'general'}`;
   let active = Math.min(state.tripFileDeckIndexes.get(deckKey) || 0, entries.length - 1);
+  let departing = null;
+  let departureTimer = null;
+  const placeCard = cardIndex => {
+    const card = cards[cardIndex];
+    const distance = (cardIndex - active + entries.length) % entries.length;
+    card.dataset.position = distance === 0 ? 'current'
+      : distance <= 2 ? 'queued' : 'hidden';
+    const depth = Math.min(distance, 2);
+    card.style.setProperty('--stack-x', `${depth * 13}px`);
+    card.style.setProperty('--stack-y', `${depth * 6}px`);
+    card.style.setProperty('--stack-scale', String(1 - depth * .04));
+    card.style.zIndex = String(entries.length - distance);
+    card.inert = distance !== 0;
+    card.setAttribute('aria-hidden', String(distance !== 0));
+    const preview = previews[cardIndex];
+    if (distance <= 2 && preview.image && !preview.image.getAttribute('src')) {
+      preview.image.src = preview.url;
+    }
+  };
+  const finishDeparture = () => {
+    if (!departing) return;
+    clearTimeout(departureTimer);
+    const card = departing;
+    departing = null;
+    departureTimer = null;
+    card.style.transition = 'none';
+    placeCard(cards.indexOf(card));
+    void card.offsetWidth;
+    card.style.transition = '';
+  };
   const show = index => {
-    active = Math.max(0, Math.min(index, entries.length - 1));
+    finishDeparture();
+    const current = active;
+    active = ((index % entries.length) + entries.length) % entries.length;
     state.tripFileDeckIndexes.set(deckKey, active);
     cards.forEach((card, cardIndex) => {
-      const distance = cardIndex - active;
-      card.dataset.position = distance === 0 ? 'current'
-        : distance < 0 ? 'previous' : distance <= 2 ? 'queued' : 'hidden';
-      const depth = Math.min(Math.max(distance, 0), 2);
-      card.style.setProperty('--stack-x', `${depth * 13}px`);
-      card.style.setProperty('--stack-y', `${depth * 6}px`);
-      card.style.setProperty('--stack-scale', String(1 - depth * .04));
-      card.style.zIndex = String(entries.length - cardIndex);
-      card.inert = distance !== 0;
-      card.setAttribute('aria-hidden', String(distance !== 0));
-      const preview = previews[cardIndex];
-      if (distance >= 0 && distance <= 2 && preview.image && !preview.image.getAttribute('src')) {
-        preview.image.src = preview.url;
-      }
+      if (active !== current && cardIndex === current) return;
+      placeCard(cardIndex);
     });
-    previous.disabled = active === 0;
-    next.disabled = active === entries.length - 1;
+    if (active !== current) {
+      departing = cards[current];
+      departing.style.setProperty('--discard-x', index > current ? '-88%' : '88%');
+      departing.style.setProperty('--discard-angle', index > current ? '-9deg' : '9deg');
+      departing.dataset.position = 'discarding';
+      departing.style.zIndex = String(entries.length + 1);
+      departing.inert = true;
+      departing.setAttribute('aria-hidden', 'true');
+      departureTimer = setTimeout(finishDeparture, 360);
+    }
+    previous.disabled = entries.length < 2;
+    next.disabled = entries.length < 2;
     position.textContent = `${active + 1} de ${entries.length}`;
   };
   previous.addEventListener('click', () => show(active - 1));
