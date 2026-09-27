@@ -1,4 +1,4 @@
-import { offlineStore } from './offline-store.js?v=20260927-42';
+import { offlineStore } from './offline-store.js?v=20260927-44';
 
 const SUPABASE_URL = 'https://siabldasqinpfmxslwji.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_UgbBIOq1TnInuPRrQpAFag_JLIzYuFf';
@@ -3456,6 +3456,12 @@ async function flushOutbox() {
       return false;
     }
 
+    const droppedColorLogs = await offlineStore.compactPendingColorHistory();
+    if (droppedColorLogs.length) {
+      const droppedIds = new Set(droppedColorLogs);
+      state.changeLog = state.changeLog.filter(entry => !droppedIds.has(entry.id));
+      if (document.body.dataset.activeSheet === 'change-log') renderChangeLog(state.changeLog);
+    }
     const syncedDays = new Map();
     outboxSyncing = true;
     await refreshSyncStatus();
@@ -3784,7 +3790,9 @@ function syncTripHero(trip) {
   dom.tripPageDates.disabled = !editable;
   dom.tripPageColor.disabled = !editable;
   dom.tripPageCoverInput.disabled = !editable;
-  const accent = /^#[0-9a-f]{6}$/i.test(trip.secondary_color || '') ? trip.secondary_color : '#4775d1';
+  const accent = tripColorDraft?.tripId === String(trip.id)
+    ? tripColorDraft.color
+    : /^#[0-9a-f]{6}$/i.test(trip.secondary_color || '') ? trip.secondary_color : '#4775d1';
   dom.tripPage.style.setProperty('--trip-page-color', accent);
   dom.tripPageHero.style.backgroundImage = trip.cover_url ? `url("${trip.cover_url.replaceAll('"', '%22')}")` : '';
   dom.tripPageTitle.textContent = trip.name;
@@ -3799,6 +3807,7 @@ function syncTripHero(trip) {
 async function openTrip(tripId, { pushHistory = true, forceRefresh = false } = {}) {
   const trip = state.trips.find(item => String(item.id) === String(tripId));
   if (!trip) return;
+  if (tripColorDraft && tripColorDraft.tripId !== String(tripId)) savePendingTripColor();
   document.body.dataset.tripPermission = tripRole(trip);
   dom.tripPageShare.hidden = tripRole(trip) !== 'owner';
   dom.tripPagePassengers.setAttribute('aria-label', canEditTrip(trip) ? 'Editar passageiros da viagem' : 'Ver passageiros da viagem');
@@ -3858,6 +3867,7 @@ async function openTrip(tripId, { pushHistory = true, forceRefresh = false } = {
 }
 
 function closeTripPage() {
+  if (tripColorSaveTimer) savePendingTripColor();
   document.body.dataset.tripPermission = '';
   state.activeTripId = null;
   state.tripDays = [];
@@ -5023,13 +5033,54 @@ async function closeTripPassengers() {
 }
 
 let tripFieldSaveTask = Promise.resolve();
+let tripColorSaveTimer = null;
+let tripColorDraft = null;
 
-async function saveTripFields(changes, { syncDays = false, summary = 'Dados da viagem alterados' } = {}) {
-  if (!canEditActiveTrip()) throw new Error('Você só pode visualizar esta viagem.');
+function savePendingTripColor() {
+  clearTimeout(tripColorSaveTimer);
+  tripColorSaveTimer = null;
+  const draft = tripColorDraft;
+  if (!draft) return;
+  const trip = state.trips.find(item => String(item.id) === draft.tripId);
+  if (!trip || !canEditTrip(trip)) return;
+  if (trip.secondary_color?.toLowerCase() === draft.color.toLowerCase()) {
+    if (tripColorDraft === draft) tripColorDraft = null;
+    return;
+  }
+  saveTripFields({ secondary_color: draft.color }, { summary: 'Cor da viagem alterada', tripId: draft.tripId })
+    .catch(() => {})
+    .finally(() => {
+      if (tripColorDraft === draft) {
+        tripColorDraft = null;
+        if (state.activeTripId === draft.tripId) {
+          const current = state.trips.find(item => String(item.id) === draft.tripId);
+          if (current) syncTripHero(current);
+        }
+      }
+    });
+}
+
+function scheduleTripColorSave() {
   const tripId = String(state.activeTripId || '');
+  if (!tripId || !canEditActiveTrip()) return;
+  const color = dom.tripPageColor.value;
+  if (!/^#[0-9a-f]{6}$/i.test(color)) return;
+  if (tripColorDraft?.tripId !== tripId || tripColorDraft.color !== color) {
+    tripColorDraft = { tripId, color };
+  }
+  dom.tripPage.style.setProperty('--trip-page-color', color);
+  dom.tripPageColor.parentElement.style.setProperty('--trip-control-color', color);
+  clearTimeout(tripColorSaveTimer);
+  tripColorSaveTimer = setTimeout(savePendingTripColor, 850);
+}
+
+async function saveTripFields(changes, { syncDays = false, summary = 'Dados da viagem alterados', tripId: requestedTripId = state.activeTripId } = {}) {
+  const tripId = String(requestedTripId || '');
   const task = tripFieldSaveTask.catch(() => {}).then(async () => {
     const trip = state.trips.find(item => String(item.id) === tripId);
     if (!trip) throw new Error('Viagem indisponível.');
+    if (!canEditTrip(trip)) throw new Error('Você só pode visualizar esta viagem.');
+    if (!syncDays && Object.entries(changes).every(([key, value]) => String(trip[key] ?? '') === String(value ?? ''))) return trip;
     const client = await trySupabase();
     if (!client) throw new Error('É necessária uma conexão para salvar a viagem.');
     const before = { name: trip.name, start_date: trip.start_date, day_count: tripDayCount(trip), secondary_color: trip.secondary_color };
@@ -5041,8 +5092,10 @@ async function saveTripFields(changes, { syncDays = false, summary = 'Dados da v
       delete payload.day_count;
       payload.end_date = addDaysToDate(startDate, dayCount - 1);
     }
-    dom.tripPageSaveStatus.dataset.kind = 'info';
-    dom.tripPageSaveStatus.textContent = 'Salvando…';
+    if (state.activeTripId === tripId) {
+      dom.tripPageSaveStatus.dataset.kind = 'info';
+      dom.tripPageSaveStatus.textContent = 'Salvando…';
+    }
     const saved = await client.from('trips').update(payload).eq('id', tripId).select('id').single();
     if (saved.error) throw saved.error;
     if (syncDays) {
@@ -5065,13 +5118,15 @@ async function saveTripFields(changes, { syncDays = false, summary = 'Dados da v
     }
     const after = { name: trip.name, start_date: trip.start_date, day_count: tripDayCount(trip), secondary_color: trip.secondary_color };
     recordChange({ tripId, entityType: 'trip', entityId: tripId, action: 'update', summary, beforeState: before, afterState: after }).catch(console.warn);
-    dom.tripPageSaveStatus.textContent = 'Salvo';
+    if (state.activeTripId === tripId) dom.tripPageSaveStatus.textContent = 'Salvo';
     return trip;
   });
   tripFieldSaveTask = task;
   return task.catch(error => {
-    dom.tripPageSaveStatus.dataset.kind = 'error';
-    dom.tripPageSaveStatus.textContent = error.message || 'Não foi possível salvar.';
+    if (state.activeTripId === tripId) {
+      dom.tripPageSaveStatus.dataset.kind = 'error';
+      dom.tripPageSaveStatus.textContent = error.message || 'Não foi possível salvar.';
+    }
     throw error;
   });
 }
@@ -5323,12 +5378,8 @@ dom.tripDateDone.addEventListener('click', async () => {
   dom.tripPageDuration.setAttribute('aria-expanded', 'false');
   dom.tripPageDates.setAttribute('aria-expanded', 'false');
 });
-dom.tripPageColor.addEventListener('input', () => {
-  dom.tripPageColor.parentElement.style.setProperty('--trip-control-color', dom.tripPageColor.value);
-});
-dom.tripPageColor.addEventListener('change', () => {
-  saveTripFields({ secondary_color: dom.tripPageColor.value }, { summary: 'Cor da viagem alterada' }).catch(() => {});
-});
+dom.tripPageColor.addEventListener('input', scheduleTripColorSave);
+dom.tripPageColor.addEventListener('change', scheduleTripColorSave);
 dom.tripPageCoverInput.addEventListener('change', async () => {
   const file = dom.tripPageCoverInput.files?.[0];
   if (!file) return;
@@ -5699,6 +5750,7 @@ async function boot() {
 
 window.addEventListener('offline', () => { refreshSyncStatus().catch(console.warn); });
 document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && tripColorSaveTimer) savePendingTripColor();
   if (document.visibilityState === 'visible' && state.user) {
     if (navigator.onLine) loadTrips().catch(error => console.warn('Viagens compartilhadas aguardando atualização', error));
     if (navigator.onLine && document.body.dataset.activeSheet !== 'profile') loadProfile().catch(error => console.warn('Foto do perfil aguardando atualização', error));

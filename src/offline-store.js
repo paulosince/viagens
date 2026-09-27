@@ -282,6 +282,39 @@ async function listOutbox() {
   });
 }
 
+// Only consecutive, unsent color changes to the same trip can be combined:
+// an intervening edit must retain its place in the history and sync order.
+function redundantColorHistory(records) {
+  const removed = [];
+  let group = [];
+  for (const record of records) {
+    if (record.type === 'record-change' && record.entry?.summary === 'Cor da viagem alterada'
+      && record.tripId && (!group.length || String(group[0].tripId) === String(record.tripId))) {
+      group.push(record);
+    } else {
+      removed.push(...group.slice(0, -1));
+      group = record.type === 'record-change' && record.entry?.summary === 'Cor da viagem alterada' && record.tripId
+        ? [record] : [];
+    }
+  }
+  removed.push(...group.slice(0, -1));
+  return removed;
+}
+
+async function compactPendingColorHistory() {
+  const records = await listOutbox();
+  const removed = redundantColorHistory(records);
+  if (!removed.length) return [];
+  const db = await openDb();
+  const tx = db.transaction(['outbox', 'change_log'], 'readwrite');
+  for (const record of removed) {
+    tx.objectStore('outbox').delete(record.id);
+    if (record.entry?.id) tx.objectStore('change_log').delete(record.entry.id);
+  }
+  await transactionDone(tx);
+  return removed.map(record => record.entry?.id).filter(Boolean);
+}
+
 async function removeMutation(id) {
   const db = await openDb();
   const tx = db.transaction('outbox', 'readwrite');
@@ -355,6 +388,7 @@ export const offlineStore = {
   loadTripData,
   saveDayBundle,
   enqueueMutation,
+  compactPendingColorHistory,
   listOutbox,
   removeMutation,
   hasPendingForTrip,
