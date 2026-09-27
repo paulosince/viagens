@@ -2559,13 +2559,13 @@ function beginInlineTimeEdit(button, day, activity) {
     if (committed) return;
     committed = true;
 
+    const previousTime = activityTime(activity) || '—';
     const value = input.value;
-    if (!value) {
-      openDayPage(day.id, { pushHistory: false });
+    if (!value || value === previousTime) {
+      input.replaceWith(button);
       return;
     }
 
-    const previousTime = activityTime(activity) || '—';
     setAgendaSaveState(activity.id, 'saving');
     const records = cloneDayRecords(day);
     const target = records.activities.find(item => String(item.id) === String(activity.id));
@@ -2588,7 +2588,7 @@ function beginInlineTimeEdit(button, day, activity) {
   };
 
   button.replaceWith(input);
-  input.addEventListener('change', commit, { once: true });
+  // iOS fires change as the time wheels move; Done dismisses the picker and blurs the input.
   input.addEventListener('blur', commit, { once: true });
   input.focus({ preventScroll: true });
   if (input.showPicker) input.showPicker();
