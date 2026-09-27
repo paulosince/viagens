@@ -16,6 +16,11 @@ assert.match(css, /backdrop-filter: blur\(30px\) saturate\(185%\)/);
 assert.match(css, /\.trip-tab-indicator \{[^}]+transition: transform/);
 assert.match(css, /body\[data-trip-permission="viewer"\] #budget_add/);
 assert.match(css, /body\[data-trip-permission="viewer"\] \.trip-files-upload/);
+assert.match(html, /id="budget_item_page"[^>]+aria-hidden="true"[^>]+inert/);
+assert.match(html, /id="close_budget_item_page"[^>]+aria-label="Voltar ao orçamento"/);
+assert.match(css, /\.budget-group-list \{[^}]+overflow: hidden; border-radius: 22px/);
+assert.match(css, /\.budget-item:not\(:last-child\) \{ border-bottom: 1px solid/);
+assert.match(css, /body\[data-budget-page="open"\] \.budget-item-page \{[^}]+transform: translateX\(0\)/);
 
 const source = fs.readFileSync('src/main.js', 'utf8');
 const start = source.indexOf('function tripMoney(');
@@ -37,6 +42,82 @@ assert.equal(totals.get('EUR').paid, 43);
 assert.equal(context.amountFromInput('22,50'), 22.5);
 assert.equal(context.amountFromInput(''), null);
 assert.throws(() => context.amountFromInput('99,999'), /duas casas/);
+
+function element(tagName) {
+  return {
+    tagName, children: [], dataset: {}, listeners: {}, attributes: {}, textContent: '',
+    append(...children) { this.children.push(...children); },
+    replaceChildren(...children) { this.children = children; },
+    addEventListener(type, callback) { this.listeners[type] = callback; },
+    setAttribute(name, value) { this.attributes[name] = value; }
+  };
+}
+let opened;
+context.document = { createElement: element };
+context.dom = { budgetSummary: element('div'), budgetList: element('div') };
+context.state = {
+  activeTripId: 'trip', budgetByTrip: new Map([['trip', [
+    { id: 1, category: 'Passeios', label: 'Disneyland', currency: 'BRL', planned_amount: 3334.86, actual_amount: 2908.21, purchase_status: 'purchased' },
+    { id: 2, category: 'Passeios', label: 'Torre Eiffel', currency: 'BRL', planned_amount: 849.70, actual_amount: null, purchase_status: 'pending' },
+    { id: 3, category: 'Transporte', label: 'Bilhetes', currency: 'EUR', planned_amount: 28, actual_amount: null, purchase_status: 'pending' }
+  ]]])
+};
+context.canEditActiveTrip = () => true;
+context.openBudgetEditor = item => { opened = item; };
+const renderStart = source.indexOf('function renderTripBudget(');
+const renderEnd = source.indexOf('\nasync function loadTripBudget(', renderStart);
+vm.runInContext(source.slice(renderStart, renderEnd), context);
+context.renderTripBudget('trip');
+assert.equal(context.dom.budgetList.children.length, 2, 'one container per category');
+const group = context.dom.budgetList.children[0];
+assert.equal(group.children[1].className, 'budget-group-list');
+assert.equal(group.children[1].children.length, 2, 'items are rows inside a shared container');
+const paid = group.children[1].children[0];
+assert.equal(paid.children[1].children[0].textContent, 'R$ 2.908,21', 'right side shows paid amount');
+assert.equal(paid.children[1].children[1].className, 'budget-item-chevron');
+paid.listeners.click();
+assert.equal(opened.id, 1, 'tapping a row opens the correct editor');
+context.canEditActiveTrip = () => false;
+context.renderTripBudget('trip');
+const viewerRow = context.dom.budgetList.children[0].children[1].children[0];
+assert.equal(viewerRow.tagName, 'div', 'viewer cannot open editor');
+assert.equal(viewerRow.children[1].children.length, 1, 'viewer has no edit chevron');
+
+const editorStart = source.indexOf('let budgetPageBackPending =');
+const editorEnd = source.indexOf('\nasync function saveBudgetEditor(', editorStart);
+let backCalls = 0;
+const history = { state: { view: 'trip' }, pushState(state) { this.state = state; }, back() { backCalls++; } };
+const fields = Object.fromEntries(['label', 'category', 'currency', 'purchase_status', 'planned_amount', 'actual_amount'].map(name => [name, { value: '' }]));
+const editorForm = { elements: { namedItem(name) { return fields[name]; } }, addEventListener() {}, querySelector() { return { addEventListener() {} }; } };
+const attrs = () => ({ inert: false, attributes: {}, setAttribute(name, value) { this.attributes[name] = value; } });
+const page = attrs();
+const tabs = attrs();
+const tripPage = attrs();
+let focusCalls = 0;
+const editorContext = {
+  document: { body: { dataset: { tripPage: 'open', dayPage: 'closed', budgetPage: 'closed' } }, createElement() { return editorForm; } },
+  window: { history },
+  state: { activeTripId: 'trip' },
+  canEditActiveTrip: () => true,
+  dom: { budgetPage: page, tripTabs: tabs, tripPage, budgetPageTitle: {}, budgetPageMessage: {},
+    budgetEditor: element('div'), closeBudgetPage: { focus() { focusCalls++; } } }
+};
+vm.createContext(editorContext);
+vm.runInContext(source.slice(editorStart, editorEnd), editorContext);
+editorContext.openBudgetEditor({ id: 1, label: 'Disneyland', currency: 'BRL' });
+assert.equal(editorContext.document.body.dataset.budgetPage, 'open');
+assert.equal(tripPage.inert, true, 'trip cannot receive taps while editor is visible');
+assert.equal(tabs.inert, true, 'bottom tabs cannot receive taps while editor is visible');
+assert.equal(fields.label.value, 'Disneyland');
+assert.equal(history.state.view, 'budget-item');
+assert.equal(focusCalls, 1, 'focus moves to the editor navigation');
+editorContext.navigateBackFromBudget();
+editorContext.navigateBackFromBudget();
+assert.equal(backCalls, 1, 'repeated taps cannot navigate past the trip');
+editorContext.closeBudgetPage();
+assert.equal(editorContext.document.body.dataset.budgetPage, 'closed');
+assert.equal(tripPage.inert, false);
+assert.equal(tabs.inert, false);
 
 const tabStart = source.indexOf('function selectTripTab(');
 const tabEnd = source.indexOf('\nfunction setTripPanelStatus(', tabStart);
