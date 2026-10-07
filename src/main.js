@@ -903,7 +903,11 @@ function profileSavedPassengerDraft(person = {}) {
     persistedId,
     name: person.name || '',
     birthDate: person.birth_date || person.birthDate || '',
-    photoUrl: person.photo_url || person.photoUrl || ''
+    photoUrl: person.photo_url || person.photoUrl || '',
+    photoPath: person.photo_path || person.photoPath || null,
+    photoHash: person.photo_hash || person.photoHash || null,
+    photoUpdatedAt: person.photo_updated_at || person.photoUpdatedAt || null,
+    photoBlob: null
   };
 }
 
@@ -939,7 +943,10 @@ function createProfileSavedPassengerRow(passenger) {
     const file = photoInput.files?.[0];
     if (!file) return;
     try {
-      passenger.photoUrl = await compressPassengerPhoto(file);
+      const blob = await compressPassengerPhoto(file);
+      if (String(passenger.photoUrl || '').startsWith('blob:')) URL.revokeObjectURL(passenger.photoUrl);
+      passenger.photoBlob = blob;
+      passenger.photoUrl = URL.createObjectURL(blob);
       image.src = passenger.photoUrl;
       image.hidden = false;
       initial.hidden = true;
@@ -1045,11 +1052,32 @@ async function saveProfileSavedPassengers(client) {
 
   const savedPassengers = [];
   for (const passenger of drafts) {
+    const passengerId = passenger.persistedId || passenger.localId || crypto.randomUUID();
+    let photoFields = {
+      photo_url: passenger.photoPath ? null : (passenger.photoUrl || null),
+      photo_path: passenger.photoPath || null,
+      photo_hash: passenger.photoHash || null,
+      photo_updated_at: passenger.photoUpdatedAt || null
+    };
+
+    if (passenger.photoBlob) {
+      const path = `${state.user.id}/saved-passengers/${passengerId}.${extensionForBlob(passenger.photoBlob)}`;
+      const prepared = await prepareMediaBlob(PROFILE_IMAGE_BUCKET, path, passenger.photoBlob);
+      await uploadCachedMedia(client, prepared.bucket, prepared.path, prepared.hash, prepared.contentType);
+      photoFields = {
+        photo_url: null,
+        photo_path: prepared.path,
+        photo_hash: prepared.hash,
+        photo_updated_at: new Date().toISOString()
+      };
+    }
+
     const payload = {
+      id: passengerId,
       owner_id: state.user.id,
       name: passenger.name.trim(),
       birth_date: passenger.birthDate || null,
-      photo_url: passenger.photoUrl || null,
+      ...photoFields,
       updated_at: new Date().toISOString()
     };
     const result = passenger.persistedId
@@ -1059,7 +1087,9 @@ async function saveProfileSavedPassengers(client) {
     if (result.error) throw new Error('Passageiros salvos: ' + result.error.message);
     passenger.persistedId = result.data.id;
     passenger.localId = result.data.id;
-    savedPassengers.push(result.data);
+    const hydrated = result.data;
+    await hydrateManagedMedia(hydrated, { bucket: PROFILE_IMAGE_BUCKET }, client);
+    savedPassengers.push(hydrated);
   }
 
   state.savedPassengers = savedPassengers.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
@@ -2036,7 +2066,10 @@ function renderDayLocationsEditor(focusLast = false) {
       const selected = file.files?.[0];
       if (!selected) return;
       try {
-        location.photoUrl = await compressImage(selected);
+        const blob = await compressImage(selected);
+        if (String(location.photoUrl || '').startsWith('blob:')) URL.revokeObjectURL(location.photoUrl);
+        location.photoBlob = blob;
+        location.photoUrl = URL.createObjectURL(blob);
         location.photoProvider = '';
         location.photoAuthor = '';
         location.photoAuthorUrl = '';
@@ -2581,9 +2614,16 @@ async function saveDayHeroPhoto(file) {
 
   setDaySaveState(day.id, 'saving');
   try {
-    const photoUrl = await compressImage(file);
+    const blob = await compressImage(file);
+    const tripId = String(day.trip_id || state.activeTripId);
+    const prepared = await prepareTripMedia(blob, tripId, 'day', day.id);
+    const mediaFields = await enqueuePreparedMedia(prepared, {
+      tripId,
+      table: 'trip_days',
+      entityId: day.id
+    });
     const currentDay = state.tripDays.find(item => String(item.id) === String(day.id)) || day;
-    await persistDayHeroChange(currentDay, { photo_url: photoUrl });
+    await persistDayHeroChange(currentDay, mediaFields);
     await recordChange({
       tripId: day.trip_id || state.activeTripId,
       entityType: 'trip_day',
@@ -2986,14 +3026,21 @@ async function saveInlinePlaceSelection(context, draft) {
 
 async function saveInlinePhoto(day, activity, location, file) {
   setAgendaSaveState(activity.id, 'saving');
-  const photoUrl = await compressImage(file);
+  const blob = await compressImage(file);
+  const tripId = String(day.trip_id || state.activeTripId);
+  const prepared = await prepareTripMedia(blob, tripId, 'activity', activity.id);
+  const mediaFields = await enqueuePreparedMedia(prepared, {
+    tripId,
+    table: 'activities',
+    entityId: activity.id
+  });
   const records = cloneDayRecords(day);
   const targetActivity = records.activities.find(item => String(item.id) === String(activity.id));
   if (!targetActivity) return;
 
   // Photos belong to agenda items. A shared place may provide a fallback image,
   // but changing one agenda item's photo must never mutate the place or siblings.
-  targetActivity.photo_url = photoUrl;
+  Object.assign(targetActivity, mediaFields);
 
   await persistInlineDayChange(day, records.activities, records.locations, {}, { activityId: activity.id });
   await recordChange({
@@ -5910,16 +5957,23 @@ function closeSheets() {
   }
   if (state.saving) return;
   if (state.avatarPreview) URL.revokeObjectURL(state.avatarPreview);
-  state.avatarFile = null; state.avatarPreview = ''; state.imageData = '';
+  if (String(state.imageData || '').startsWith('blob:')) URL.revokeObjectURL(state.imageData);
+  state.avatarFile = null; state.avatarPreview = ''; state.imageData = ''; state.imageBlob = null;
   state.editingTripId = null;
   setActiveSheet('none');
+}
+
+function canvasBlob(canvas, type, quality) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Falha ao preparar imagem.')), type, quality);
+  });
 }
 
 async function compressImage(file) {
   const bitmap = await createImageBitmap(file), maxWidth = 1600, scale = Math.min(1, maxWidth / bitmap.width);
   const canvas = document.createElement('canvas'); canvas.width = Math.round(bitmap.width * scale); canvas.height = Math.round(bitmap.height * scale);
   canvas.getContext('2d', { alpha: false }).drawImage(bitmap, 0, 0, canvas.width, canvas.height); bitmap.close();
-  return canvas.toDataURL('image/webp', .78);
+  return canvasBlob(canvas, 'image/webp', .78);
 }
 
 async function compressPassengerPhoto(file) {
@@ -5930,7 +5984,7 @@ async function compressPassengerPhoto(file) {
   canvas.height = 320;
   canvas.getContext('2d', { alpha: false }).drawImage(bitmap, (bitmap.width - size) / 2, (bitmap.height - size) / 2, size, size, 0, 0, 320, 320);
   bitmap.close();
-  return canvas.toDataURL('image/jpeg', .82);
+  return canvasBlob(canvas, 'image/jpeg', .82);
 }
 
 async function prepareAvatar(file) {
