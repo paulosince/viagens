@@ -2131,7 +2131,11 @@ function renderDayLocationsEditor(focusLast = false) {
 }
 
 function addDayLocation() {
-  state.dayEditor.locations.push({ id: crypto.randomUUID(), name: '', photoUrl: '', provider: '', providerPlaceId: '', formattedAddress: '', latitude: null, longitude: null, category: '', placeType: '' });
+  state.dayEditor.locations.push({
+    id: crypto.randomUUID(), name: '', photoUrl: '', photoPath: null, photoHash: null,
+    photoUpdatedAt: null, photoBlob: null, provider: '', providerPlaceId: '',
+    formattedAddress: '', latitude: null, longitude: null, category: '', placeType: ''
+  });
   renderDayLocationsEditor(true);
   syncDayActivityLocationSelects();
 }
@@ -2941,6 +2945,10 @@ function locationDraft(location, activity) {
     name: location?.name || activity.place_name || (activity.title === NEW_AGENDA_TITLE ? '' : primaryActivityPlace(activity)),
     selectedName: location?.name || activity.place_name || '',
     photoUrl: location?.photo_url || '',
+    photoPath: location?.photo_path || null,
+    photoHash: location?.photo_hash || null,
+    photoUpdatedAt: location?.photo_updated_at || null,
+    photoBlob: null,
     provider: location?.provider || '',
     providerPlaceId: location?.provider_place_id || '',
     formattedAddress: location?.formatted_address || activity.address || '',
@@ -2995,7 +3003,10 @@ async function saveInlinePlaceSelection(context, draft) {
     photo_author: draft.photoAuthor || null,
     photo_author_url: draft.photoAuthorUrl || null,
     photo_source_url: draft.photoSourceUrl || null,
-    photo_url: draft.photoUrl || location?.photo_url || null
+    photo_url: draft.photoPath ? null : (draft.photoUrl || location?.photo_url || null),
+    photo_path: draft.photoPath || location?.photo_path || null,
+    photo_hash: draft.photoHash || location?.photo_hash || null,
+    photo_updated_at: draft.photoUpdatedAt || location?.photo_updated_at || null
   };
 
   if (location) Object.assign(location, record);
@@ -3515,7 +3526,30 @@ function openDayEditor(day) {
     day,
     title: day.title || '',
     notes: day.summary || '',
-    locations: locations.length ? locations.map(location => ({ id: location.id || crypto.randomUUID(), name: location.name || '', photoUrl: location.photo_url || '', provider: location.provider || '', providerPlaceId: location.provider_place_id || '', formattedAddress: location.formatted_address || '', latitude: numericCoordinate(location.latitude), longitude: numericCoordinate(location.longitude), category: location.category || '', placeType: location.place_type || '', photoProvider: location.photo_provider || '', photoAuthor: location.photo_author || '', photoAuthorUrl: location.photo_author_url || '', photoSourceUrl: location.photo_source_url || '' })) : [{ id: crypto.randomUUID(), name: '', photoUrl: '', provider: '', providerPlaceId: '', formattedAddress: '', latitude: null, longitude: null, category: '', placeType: '' }],
+    locations: locations.length ? locations.map(location => ({
+      id: location.id || crypto.randomUUID(),
+      name: location.name || '',
+      photoUrl: location.photo_url || '',
+      photoPath: location.photo_path || null,
+      photoHash: location.photo_hash || null,
+      photoUpdatedAt: location.photo_updated_at || null,
+      photoBlob: null,
+      provider: location.provider || '',
+      providerPlaceId: location.provider_place_id || '',
+      formattedAddress: location.formatted_address || '',
+      latitude: numericCoordinate(location.latitude),
+      longitude: numericCoordinate(location.longitude),
+      category: location.category || '',
+      placeType: location.place_type || '',
+      photoProvider: location.photo_provider || '',
+      photoAuthor: location.photo_author || '',
+      photoAuthorUrl: location.photo_author_url || '',
+      photoSourceUrl: location.photo_source_url || ''
+    })) : [{
+      id: crypto.randomUUID(), name: '', photoUrl: '', photoPath: null, photoHash: null,
+      photoUpdatedAt: null, photoBlob: null, provider: '', providerPlaceId: '',
+      formattedAddress: '', latitude: null, longitude: null, category: '', placeType: ''
+    }],
     activities: activities.length ? activities.map(activity => ({ id: activity.id || crypto.randomUUID(), time: activityTime(activity) || '09:00', text: activity.title || '', locationId: activity.place_id || '' })) : [{ id: crypto.randomUUID(), time: '09:00', text: '', locationId: '' }]
   };
   const trip = state.trips.find(item => String(item.id) === String(state.activeTripId));
@@ -3837,6 +3871,22 @@ async function saveDayEditor() {
   const previousLocationById = new Map(previousLocations.map(item => [String(item.id), item]));
   const previousActivityById = new Map(previousActivities.map(item => [String(item.id), item]));
 
+  const tripId = String(editor.day.trip_id || state.activeTripId);
+  for (const location of editor.locations) {
+    if (!location.photoBlob) continue;
+    const prepared = await prepareTripMedia(location.photoBlob, tripId, 'location', location.id);
+    const mediaFields = await enqueuePreparedMedia(prepared, {
+      tripId,
+      table: 'day_locations',
+      entityId: location.id
+    });
+    location.photoPath = mediaFields.photo_path;
+    location.photoHash = mediaFields.photo_hash;
+    location.photoUpdatedAt = mediaFields.photo_updated_at;
+    location.photoUrl = mediaFields.photo_url;
+    location.photoBlob = null;
+  }
+
   const locations = editor.locations
     .filter(location => location.name.trim())
     .map((location, position) => ({
@@ -3856,7 +3906,10 @@ async function saveDayEditor() {
       photo_author: location.photoAuthor || null,
       photo_author_url: location.photoAuthorUrl || null,
       photo_source_url: location.photoSourceUrl || null,
-      photo_url: location.photoUrl || null
+      photo_url: location.photoPath ? null : (location.photoUrl || null),
+      photo_path: location.photoPath || null,
+      photo_hash: location.photoHash || null,
+      photo_updated_at: location.photoUpdatedAt || null
     }));
 
   const activities = editor.activities
