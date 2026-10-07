@@ -1,9 +1,20 @@
-import { offlineStore } from './offline-store.js?v=20261007-57';
+import { offlineStore } from './offline-store.js?v=20261007-59';
+import {
+  adoptLegacyDataUrl,
+  dataUrlToBlob,
+  ensureMediaBlob,
+  extensionForBlob,
+  mediaObjectUrl,
+  prepareMediaBlob,
+  uploadCachedMedia
+} from './media-cache.js?v=20261007-59';
 
 const SUPABASE_URL = 'https://siabldasqinpfmxslwji.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_UgbBIOq1TnInuPRrQpAFag_JLIzYuFf';
 const VIAGGIO_MCP_URL = 'https://siabldasqinpfmxslwji.supabase.co/functions/v1/viaggio-mcp';
 const CHATGPT_PLUGIN_URL = '';
+const TRIP_IMAGE_BUCKET = 'trip-images';
+const PROFILE_IMAGE_BUCKET = 'profile-photos';
 const NEW_AGENDA_TITLE = 'Nova atividade';
 const NEW_AGENDA_DESCRIPTION = 'Adicione uma descrição';
 const HISTORY_RESET_AT = '2026-09-27T01:32:01.347Z';
@@ -41,6 +52,184 @@ async function trySupabase(timeoutMs = 1800) {
     return null;
   }
 }
+
+function stripManagedMedia(record, pathField = 'photo_path', urlField = 'photo_url') {
+  if (!record) return record;
+  const copy = { ...record };
+  if (copy[pathField] || String(copy[urlField] || '').startsWith('blob:')) copy[urlField] = null;
+  return copy;
+}
+
+async function hydrateManagedMedia(record, {
+  bucket = TRIP_IMAGE_BUCKET,
+  pathField = 'photo_path',
+  hashField = 'photo_hash',
+  urlField = 'photo_url'
+} = {}, client = null) {
+  if (!record?.[pathField] || !record?.[hashField]) return record;
+  try {
+    const url = await mediaObjectUrl(client, bucket, record[pathField], record[hashField]);
+    record[urlField] = url || null;
+  } catch (error) {
+    console.warn('Imagem local/remota indisponível', record[pathField], error);
+    record[urlField] = null;
+  }
+  return record;
+}
+
+async function adoptLegacyManagedMedia(remoteRecord, localRecord, {
+  bucket = TRIP_IMAGE_BUCKET,
+  pathField = 'photo_path',
+  hashField = 'photo_hash',
+  urlField = 'photo_url'
+} = {}) {
+  const path = remoteRecord?.[pathField];
+  const hash = remoteRecord?.[hashField];
+  const legacy = localRecord?.[urlField];
+  if (!path || !hash || typeof legacy !== 'string' || !legacy.startsWith('data:image/')) return false;
+  return adoptLegacyDataUrl(bucket, path, hash, legacy).catch(() => false);
+}
+
+async function hydrateWorkspaceMedia(trips, passengers, savedPassengers, client = null) {
+  for (const trip of trips || []) {
+    await hydrateManagedMedia(trip, {
+      pathField: 'cover_path',
+      hashField: 'cover_hash',
+      urlField: 'cover_url'
+    }, client);
+  }
+  for (const passenger of passengers || []) await hydrateManagedMedia(passenger, {}, client);
+  for (const passenger of savedPassengers || []) {
+    await hydrateManagedMedia(passenger, { bucket: PROFILE_IMAGE_BUCKET }, client);
+  }
+}
+
+async function adoptLegacyWorkspaceMedia(trips, passengers, localWorkspace) {
+  const localTrips = new Map((localWorkspace?.trips || []).map(item => [String(item.id), item]));
+  const localPassengers = new Map((localWorkspace?.passengers || []).map(item => [String(item.id), item]));
+  for (const trip of trips || []) {
+    await adoptLegacyManagedMedia(trip, localTrips.get(String(trip.id)), {
+      pathField: 'cover_path',
+      hashField: 'cover_hash',
+      urlField: 'cover_url'
+    });
+  }
+  for (const passenger of passengers || []) {
+    await adoptLegacyManagedMedia(passenger, localPassengers.get(String(passenger.id)));
+  }
+}
+
+async function adoptLegacyTripMedia(days, activities, locations, localData) {
+  const localDays = new Map((localData?.days || []).map(item => [String(item.id), item]));
+  const localActivities = new Map((localData?.activities || []).map(item => [String(item.id), item]));
+  const localLocations = new Map((localData?.locations || []).map(item => [String(item.id), item]));
+  for (const day of days || []) await adoptLegacyManagedMedia(day, localDays.get(String(day.id)));
+  for (const activity of activities || []) await adoptLegacyManagedMedia(activity, localActivities.get(String(activity.id)));
+  for (const location of locations || []) await adoptLegacyManagedMedia(location, localLocations.get(String(location.id)));
+}
+
+async function hydrateTripMedia(days, activities, locations, client = null) {
+  for (const day of days || []) await hydrateManagedMedia(day, {}, client);
+  for (const activity of activities || []) await hydrateManagedMedia(activity, {}, client);
+  for (const location of locations || []) await hydrateManagedMedia(location, {}, client);
+}
+
+async function prepareTripMedia(blob, tripId, kind, entityId) {
+  const path = `${tripId}/${kind}/${entityId}.${extensionForBlob(blob)}`;
+  return prepareMediaBlob(TRIP_IMAGE_BUCKET, path, blob);
+}
+
+async function enqueuePreparedMedia(prepared, {
+  tripId,
+  table,
+  entityId,
+  pathField = 'photo_path',
+  hashField = 'photo_hash',
+  updatedField = 'photo_updated_at',
+  urlField = 'photo_url'
+}) {
+  const updatedAt = new Date().toISOString();
+  await offlineStore.enqueueMutation({
+    type: 'upload-image',
+    tripId: String(tripId),
+    bucket: prepared.bucket,
+    path: prepared.path,
+    hash: prepared.hash,
+    contentType: prepared.contentType,
+    table,
+    entityId,
+    pathField,
+    hashField,
+    updatedField,
+    urlField,
+    updatedAt
+  });
+  return {
+    [pathField]: prepared.path,
+    [hashField]: prepared.hash,
+    [updatedField]: updatedAt,
+    [urlField]: prepared.url
+  };
+}
+
+async function migrateLegacyRecordMedia(client, record, {
+  tripId,
+  kind,
+  entityId,
+  pathField = 'photo_path',
+  hashField = 'photo_hash',
+  updatedField = 'photo_updated_at',
+  urlField = 'photo_url'
+}) {
+  const value = record?.[urlField];
+  if (typeof value !== 'string' || !value.startsWith('data:image/')) return false;
+  const blob = await dataUrlToBlob(value);
+  if (!blob) return false;
+  const prepared = await prepareTripMedia(blob, tripId, kind, entityId);
+  await uploadCachedMedia(client, prepared.bucket, prepared.path, prepared.hash, prepared.contentType);
+  record[pathField] = prepared.path;
+  record[hashField] = prepared.hash;
+  record[updatedField] = new Date().toISOString();
+  record[urlField] = null;
+  return true;
+}
+
+async function normalizeLegacyMutationMedia(client, mutation) {
+  let changed = false;
+  const tripId = String(mutation.tripId || '');
+  if (!tripId) return mutation;
+
+  if (mutation.dayPatch && mutation.dayId) {
+    changed = await migrateLegacyRecordMedia(client, mutation.dayPatch, {
+      tripId, kind: 'day', entityId: mutation.dayId
+    }) || changed;
+  }
+  if (mutation.activity?.id) {
+    changed = await migrateLegacyRecordMedia(client, mutation.activity, {
+      tripId, kind: 'activity', entityId: mutation.activity.id
+    }) || changed;
+  }
+  if (mutation.location?.id) {
+    changed = await migrateLegacyRecordMedia(client, mutation.location, {
+      tripId, kind: 'location', entityId: mutation.location.id
+    }) || changed;
+  }
+  for (const activity of mutation.activities || []) {
+    if (!activity?.id) continue;
+    changed = await migrateLegacyRecordMedia(client, activity, {
+      tripId, kind: 'activity', entityId: activity.id
+    }) || changed;
+  }
+  for (const location of mutation.locations || []) {
+    if (!location?.id) continue;
+    changed = await migrateLegacyRecordMedia(client, location, {
+      tripId, kind: 'location', entityId: location.id
+    }) || changed;
+  }
+
+  if (changed) await offlineStore.updateMutation(mutation);
+  return mutation;
+}
 const profilePlaceholder = 'assets/avatar-placeholder.svg';
 const placeSearchCache = new Map();
 const TRIP_CACHE_FRESH_MS = 60_000;
@@ -57,6 +246,7 @@ const state = {
   selectedTripIds: new Set(),
   collapsedTripSections: new Set(),
   imageData: '',
+  imageBlob: null,
   avatarFile: null,
   avatarPreview: '',
   selectedYear: null,
