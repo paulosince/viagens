@@ -7188,10 +7188,12 @@ dom.syncStatus.addEventListener('click', () => {
 window.addEventListener('online', () => {
   refreshSyncStatus().catch(console.warn);
   flushOutbox().then(synced => {
-    if (synced && state.activeTripId) {
+    if (!synced) return;
+    if (state.activeTripId) {
       state.tripDataCache.delete(String(state.activeTripId));
       openTrip(state.activeTripId, { pushHistory: false, forceRefresh: true }).catch(console.warn);
     }
+    cacheCompleteWorkspace().catch(error => console.warn('Cache offline de imagens aguardando atualização', error));
   }).catch(console.warn);
 });
 
