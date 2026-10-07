@@ -5614,7 +5614,10 @@ function createTripPassengerRow(passenger) {
     const file = photoInput.files?.[0];
     if (!file) return;
     try {
-      passenger.photoUrl = await compressPassengerPhoto(file);
+      const blob = await compressPassengerPhoto(file);
+      if (String(passenger.photoUrl || '').startsWith('blob:')) URL.revokeObjectURL(passenger.photoUrl);
+      passenger.photoBlob = blob;
+      passenger.photoUrl = URL.createObjectURL(blob);
       passenger.photoEdited = true;
       image.src = passenger.photoUrl;
       image.hidden = false;
@@ -5874,6 +5877,10 @@ function openTripPassengers() {
     name: passenger.name || '',
     birthDate: passenger.birth_date || '',
     photoUrl: passenger.photo_url || '',
+    photoPath: passenger.photo_path || null,
+    photoHash: passenger.photo_hash || null,
+    photoUpdatedAt: passenger.photo_updated_at || null,
+    photoBlob: null,
     saveForLater: true,
     savedPassengerId: state.savedPassengers.find(person => savedPassengerKey(person) === savedPassengerKey(passenger))?.id || null,
     sourcePassengerId: passenger.id
@@ -6116,11 +6123,13 @@ function tripPayloadFromForm(values, orderedSchema, includeOwner = false) {
     start_date: values.start_date,
     arrival_method: values.arrival_method,
     location_label: values.location_label.trim() || null,
-    cover_url: state.imageData,
     secondary_color: state.tripColor
   };
 
-  if (includeOwner) payload.user_id = state.user.id;
+  if (includeOwner) {
+    payload.user_id = state.user.id;
+    payload.cover_url = null;
+  }
 
   if (orderedSchema) {
     payload.day_count = dayCount;
@@ -6209,26 +6218,71 @@ async function saveTripPassengers(client, tripId) {
   }
 
   for (const passenger of editedPassengers) {
+    const passengerId = passenger.id || crypto.randomUUID();
+    passenger.id = passengerId;
+
+    let sourceBlob = passenger.photoBlob || null;
+    if (!sourceBlob && passenger.savedPassengerId) {
+      const saved = state.savedPassengers.find(item => String(item.id) === String(passenger.savedPassengerId));
+      if (saved?.photo_path && saved?.photo_hash) {
+        sourceBlob = await ensureMediaBlob(client, PROFILE_IMAGE_BUCKET, saved.photo_path, saved.photo_hash);
+      }
+    }
+    if (!sourceBlob && passenger.sourcePassengerId) {
+      const source = [...state.passengers.values()].flat()
+        .find(item => String(item.id) === String(passenger.sourcePassengerId));
+      if (source?.photo_path && source?.photo_hash) {
+        sourceBlob = await ensureMediaBlob(client, TRIP_IMAGE_BUCKET, source.photo_path, source.photo_hash);
+      }
+    }
+
+    let media = {
+      photo_url: passenger.photoPath ? null : (
+        String(passenger.photoUrl || '').startsWith('blob:') ? null : (passenger.photoUrl || null)
+      ),
+      photo_path: passenger.photoPath || null,
+      photo_hash: passenger.photoHash || null,
+      photo_updated_at: passenger.photoUpdatedAt || null
+    };
+
+    if (sourceBlob && !passenger.session) {
+      const prepared = await prepareTripMedia(sourceBlob, tripId, 'passenger', passengerId);
+      await uploadCachedMedia(client, prepared.bucket, prepared.path, prepared.hash, prepared.contentType);
+      media = {
+        photo_url: null,
+        photo_path: prepared.path,
+        photo_hash: prepared.hash,
+        photo_updated_at: new Date().toISOString()
+      };
+      passenger.photoPath = media.photo_path;
+      passenger.photoHash = media.photo_hash;
+      passenger.photoUpdatedAt = media.photo_updated_at;
+      passenger.photoUrl = prepared.url;
+      passenger.photoBlob = null;
+    }
+
     const passengerPayload = {
+      id: passengerId,
       user_id: passenger.session ? state.user.id : passenger.userId || null,
       name: passenger.name.trim(),
       birth_date: passenger.birthDate || null,
-      photo_url: passenger.photoUrl || null,
+      ...media,
       age: ageFromBirthDate(passenger.birthDate)
     };
 
-    const alreadySaved = existingIds.has(String(passenger.id));
+    const alreadySaved = existingIds.has(String(passengerId));
     const result = alreadySaved
-      ? await client.from('passengers').update(passengerPayload).eq('id', passenger.id).eq('trip_id', tripId)
+      ? await client.from('passengers').update(passengerPayload).eq('id', passengerId).eq('trip_id', tripId)
       : await client.from('passengers').insert({ ...passengerPayload, trip_id: tripId }).select('id').single();
 
     if (result.error) return result.error;
-    if (!alreadySaved && result.data?.id) passenger.id = result.data.id;
   }
 
   const current = await client.from('passengers').select('*').eq('trip_id', tripId).order('created_at');
   if (current.error) return current.error;
-  state.passengers.set(tripId, current.data || []);
+  const records = current.data || [];
+  for (const passenger of records) await hydrateManagedMedia(passenger, {}, client);
+  state.passengers.set(tripId, records);
 
   return null;
 }
@@ -6451,7 +6505,7 @@ async function saveTrip() {
     dom.newTripMessage.textContent = 'Informe uma quantidade de dias entre 1 e 365.';
     return;
   }
-  if (!state.imageData) {
+  if (!state.editingTripId && !state.imageBlob) {
     dom.newTripMessage.textContent = 'Escolha a imagem da viagem.';
     return;
   }
@@ -6466,6 +6520,16 @@ async function saveTrip() {
     if (state.editingTripId) {
       const tripId = state.editingTripId;
       const previousTrip = state.trips.find(trip => String(trip.id) === String(tripId)) || null;
+      if (state.imageBlob) {
+        const preparedCover = await prepareTripMedia(state.imageBlob, tripId, 'trip', tripId);
+        await uploadCachedMedia(client, preparedCover.bucket, preparedCover.path, preparedCover.hash, preparedCover.contentType);
+        Object.assign(payload, {
+          cover_url: null,
+          cover_path: preparedCover.path,
+          cover_hash: preparedCover.hash,
+          cover_updated_at: new Date().toISOString()
+        });
+      }
       const updated = await client.from('trips').update(payload).eq('id', tripId);
       if (updated.error) throw updated.error;
 
@@ -6518,20 +6582,25 @@ async function saveTrip() {
     });
     failure = member.error;
 
-    if (!failure) {
-      const passengerPayload = state.newTripPassengers.map(passenger => ({
-        trip_id: trip.id,
-        user_id: passenger.session ? state.user.id : null,
-        name: passenger.name.trim(),
-        birth_date: passenger.birthDate || null,
-        photo_url: passenger.photoUrl || null,
-        age: ageFromBirthDate(passenger.birthDate)
-      })).filter(passenger => passenger.name);
-
-      if (passengerPayload.length) {
-        const passengers = await client.from('passengers').insert(passengerPayload);
-        failure = passengers.error;
+    if (!failure && state.imageBlob) {
+      try {
+        const preparedCover = await prepareTripMedia(state.imageBlob, trip.id, 'trip', trip.id);
+        await uploadCachedMedia(client, preparedCover.bucket, preparedCover.path, preparedCover.hash, preparedCover.contentType);
+        const coverUpdate = await client.from('trips').update({
+          cover_url: null,
+          cover_path: preparedCover.path,
+          cover_hash: preparedCover.hash,
+          cover_updated_at: new Date().toISOString()
+        }).eq('id', trip.id);
+        failure = coverUpdate.error;
+      } catch (error) {
+        failure = error;
       }
+    }
+
+    if (!failure) {
+      const passengerError = await saveTripPassengers(client, trip.id);
+      failure = passengerError;
     }
 
     if (!failure) {
@@ -6694,8 +6763,21 @@ dom.tripPageCoverInput.addEventListener('change', async () => {
   const file = dom.tripPageCoverInput.files?.[0];
   if (!file) return;
   try {
-    const cover = await compressImage(file);
-    await saveTripFields({ cover_url: cover }, { summary: 'Foto da viagem alterada' });
+    const tripId = String(state.activeTripId || '');
+    const blob = await compressImage(file);
+    const prepared = await prepareTripMedia(blob, tripId, 'trip', tripId);
+    const client = await trySupabase();
+    if (!client) throw new Error('É necessária uma conexão para salvar a foto.');
+    await uploadCachedMedia(client, prepared.bucket, prepared.path, prepared.hash, prepared.contentType);
+    const trip = await saveTripFields({
+      cover_url: null,
+      cover_path: prepared.path,
+      cover_hash: prepared.hash,
+      cover_updated_at: new Date().toISOString()
+    }, { summary: 'Foto da viagem alterada' });
+    trip.cover_url = prepared.url;
+    syncTripList();
+    if (state.activeTripId === tripId) syncTripHero(trip);
   } catch (error) { console.warn('Foto da viagem não salva', error); }
   finally { dom.tripPageCoverInput.value = ''; }
 });
@@ -6806,8 +6888,14 @@ dom.addProfileSavedPassenger.addEventListener('click', addProfileSavedPassenger)
 
 dom.coverInput.addEventListener('change', async () => {
   const file = dom.coverInput.files?.[0]; if (!file) return;
-  try { state.imageData = await compressImage(file); dom.coverPreview.src = state.imageData; dom.coverPreview.parentElement.dataset.hasImage = 'true'; }
-  catch { dom.newTripMessage.textContent = 'Não foi possível ler essa imagem. Escolha outra.'; }
+  try {
+    const blob = await compressImage(file);
+    if (String(state.imageData || '').startsWith('blob:')) URL.revokeObjectURL(state.imageData);
+    state.imageBlob = blob;
+    state.imageData = URL.createObjectURL(blob);
+    dom.coverPreview.src = state.imageData;
+    dom.coverPreview.parentElement.dataset.hasImage = 'true';
+  } catch { dom.newTripMessage.textContent = 'Não foi possível ler essa imagem. Escolha outra.'; }
 });
 
 dom.profilePhotoInput.addEventListener('change', async () => {
