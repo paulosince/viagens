@@ -3479,9 +3479,10 @@ function closeDayEditor() {
 }
 
 function dayPatchForRemote(dayPatch, orderedSchema) {
-  if (orderedSchema) return { ...dayPatch };
+  const source = stripManagedMedia(dayPatch);
+  if (orderedSchema) return source;
 
-  const patch = { ...dayPatch };
+  const patch = { ...source };
   if ('is_hidden' in patch) {
     patch.status = patch.is_hidden ? 'hidden' : (patch.status === 'hidden' ? 'planned' : patch.status);
     delete patch.is_hidden;
@@ -3495,7 +3496,7 @@ function dayPatchForRemote(dayPatch, orderedSchema) {
 }
 
 function activityForRemote(activity, orderedSchema, day = null) {
-  const record = { ...activity };
+  const record = stripManagedMedia(activity);
   if (orderedSchema) {
     delete record.starts_at;
     if (!record.start_time && activityTime(activity)) record.start_time = activityTime(activity) + ':00';
@@ -3511,7 +3512,7 @@ function activityForRemote(activity, orderedSchema, day = null) {
 
 function locationForRemote(location) {
   return {
-    ...location,
+    ...stripManagedMedia(location),
     created_at: location?.created_at || new Date().toISOString()
   };
 }
@@ -3519,6 +3520,27 @@ function locationForRemote(location) {
 async function syncMutation(mutation, previousDay = null) {
   const client = await trySupabase();
   if (!client) throw new Error('Backend indisponível.');
+
+  mutation = await normalizeLegacyMutationMedia(client, mutation);
+
+  if (mutation.type === 'upload-image') {
+    await uploadCachedMedia(
+      client,
+      mutation.bucket || TRIP_IMAGE_BUCKET,
+      mutation.path,
+      mutation.hash,
+      mutation.contentType
+    );
+    const patch = {
+      [mutation.pathField || 'photo_path']: mutation.path,
+      [mutation.hashField || 'photo_hash']: mutation.hash,
+      [mutation.updatedField || 'photo_updated_at']: mutation.updatedAt || new Date().toISOString(),
+      [mutation.urlField || 'photo_url']: null
+    };
+    const saved = await client.from(mutation.table).update(patch).eq('id', mutation.entityId);
+    if (saved.error) throw saved.error;
+    return;
+  }
 
   if (mutation.type === 'record-change') {
     if (mutation.snapshotId && mutation.tripId) {
