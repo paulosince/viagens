@@ -1,5 +1,5 @@
 const DB_NAME = 'viaggio-local';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 let dbPromise;
 let lastQueueSequence = 0;
@@ -35,9 +35,36 @@ function openDb() {
         const store = db.createObjectStore('activities', { keyPath: 'id' });
         store.createIndex('day_id', 'day_id', { unique: false });
       }
+      let outboxStore;
       if (!db.objectStoreNames.contains('outbox')) {
-        const store = db.createObjectStore('outbox', { keyPath: 'id' });
-        store.createIndex('created_at', 'created_at', { unique: false });
+        outboxStore = db.createObjectStore('outbox', { keyPath: 'id' });
+        outboxStore.createIndex('created_at', 'created_at', { unique: false });
+        outboxStore.createIndex('sequence', 'sequence', { unique: false });
+      } else {
+        outboxStore = request.transaction.objectStore('outbox');
+        if (!outboxStore.indexNames.contains('sequence')) {
+          outboxStore.createIndex('sequence', 'sequence', { unique: false });
+        }
+
+        let migratedSequence = 0;
+        const cursorRequest = outboxStore.openCursor();
+        cursorRequest.onsuccess = () => {
+          const cursor = cursorRequest.result;
+          if (!cursor) return;
+          const record = cursor.value;
+          const existing = Number(record.sequence);
+          if (Number.isFinite(existing) && existing > 0) {
+            migratedSequence = Math.max(migratedSequence, existing);
+          } else {
+            const timeBase = Date.parse(record.created_at || 0) * 1000;
+            migratedSequence = Math.max(
+              migratedSequence + 1,
+              Number.isFinite(timeBase) && timeBase > 0 ? timeBase : Date.now() * 1000
+            );
+            cursor.update({ ...record, sequence: migratedSequence });
+          }
+          cursor.continue();
+        };
       }
       if (!db.objectStoreNames.contains('change_log')) {
         const store = db.createObjectStore('change_log', { keyPath: 'id' });
@@ -282,6 +309,24 @@ async function listOutbox() {
   });
 }
 
+async function countOutbox() {
+  const db = await openDb();
+  const tx = db.transaction('outbox', 'readonly');
+  return requestResult(tx.objectStore('outbox').count());
+}
+
+async function peekOutbox() {
+  const db = await openDb();
+  const tx = db.transaction('outbox', 'readonly');
+  const store = tx.objectStore('outbox');
+  const source = store.indexNames.contains('sequence') ? store.index('sequence') : store;
+  return new Promise((resolve, reject) => {
+    const request = source.openCursor();
+    request.onsuccess = () => resolve(request.result?.value || null);
+    request.onerror = () => reject(request.error);
+  });
+}
+
 // Only consecutive, unsent color changes to the same trip can be combined:
 // an intervening edit must retain its place in the history and sync order.
 function redundantColorHistory(records) {
@@ -302,17 +347,52 @@ function redundantColorHistory(records) {
 }
 
 async function compactPendingColorHistory() {
-  const records = await listOutbox();
-  const removed = redundantColorHistory(records);
-  if (!removed.length) return [];
   const db = await openDb();
   const tx = db.transaction(['outbox', 'change_log'], 'readwrite');
-  for (const record of removed) {
-    tx.objectStore('outbox').delete(record.id);
-    if (record.entry?.id) tx.objectStore('change_log').delete(record.entry.id);
-  }
+  const outbox = tx.objectStore('outbox');
+  const source = outbox.indexNames.contains('sequence') ? outbox.index('sequence') : outbox;
+  const changeLog = tx.objectStore('change_log');
+  const removedIds = [];
+  let group = [];
+
+  await new Promise((resolve, reject) => {
+    const request = source.openCursor();
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) {
+        for (const item of group.slice(0, -1)) {
+          outbox.delete(item.id);
+          if (item.entryId) changeLog.delete(item.entryId);
+          if (item.entryId) removedIds.push(item.entryId);
+        }
+        resolve();
+        return;
+      }
+
+      const record = cursor.value;
+      const isColor = record.type === 'record-change'
+        && record.entry?.summary === 'Cor da viagem alterada'
+        && record.tripId;
+
+      if (isColor && (!group.length || String(group[0].tripId) === String(record.tripId))) {
+        group.push({ id: record.id, tripId: record.tripId, entryId: record.entry?.id || null });
+      } else {
+        for (const item of group.slice(0, -1)) {
+          outbox.delete(item.id);
+          if (item.entryId) changeLog.delete(item.entryId);
+          if (item.entryId) removedIds.push(item.entryId);
+        }
+        group = isColor
+          ? [{ id: record.id, tripId: record.tripId, entryId: record.entry?.id || null }]
+          : [];
+      }
+      cursor.continue();
+    };
+  });
+
   await transactionDone(tx);
-  return removed.map(record => record.entry?.id).filter(Boolean);
+  return removedIds;
 }
 
 async function removeMutation(id) {
@@ -324,7 +404,26 @@ async function removeMutation(id) {
 
 async function hasPendingForTrip(tripId) {
   const id = String(tripId);
-  return (await listOutbox()).some(item => item.type !== 'change-log' && String(item.tripId || '') === id);
+  const db = await openDb();
+  const tx = db.transaction('outbox', 'readonly');
+  const store = tx.objectStore('outbox');
+  return new Promise((resolve, reject) => {
+    const request = store.openCursor();
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) {
+        resolve(false);
+        return;
+      }
+      const item = cursor.value;
+      if (item.type !== 'change-log' && String(item.tripId || '') === id) {
+        resolve(true);
+        return;
+      }
+      cursor.continue();
+    };
+  });
 }
 
 async function saveChangeLog(entry) {
@@ -357,17 +456,26 @@ async function discardHistoryBefore(cutoff) {
   const tx = db.transaction(['change_log', 'outbox'], 'readwrite');
   const logs = tx.objectStore('change_log');
   const outbox = tx.objectStore('outbox');
-  const [oldLogs, mutations] = await Promise.all([
-    requestResult(logs.getAll()),
-    requestResult(outbox.getAll())
+
+  const prune = (store, shouldDelete) => new Promise((resolve, reject) => {
+    const request = store.openCursor();
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) {
+        resolve();
+        return;
+      }
+      if (shouldDelete(cursor.value)) cursor.delete();
+      cursor.continue();
+    };
+  });
+
+  await Promise.all([
+    prune(logs, entry => String(entry.created_at || '') < cutoff),
+    prune(outbox, mutation => ['record-change', 'change-log'].includes(mutation.type)
+      && String(mutation.created_at || '') < cutoff)
   ]);
-  for (const entry of oldLogs) {
-    if (String(entry.created_at || '') < cutoff) logs.delete(entry.id);
-  }
-  for (const mutation of mutations) {
-    if (['record-change', 'change-log'].includes(mutation.type)
-      && String(mutation.created_at || '') < cutoff) outbox.delete(mutation.id);
-  }
   await transactionDone(tx);
 }
 
@@ -390,6 +498,8 @@ export const offlineStore = {
   enqueueMutation,
   compactPendingColorHistory,
   listOutbox,
+  countOutbox,
+  peekOutbox,
   removeMutation,
   hasPendingForTrip,
   hasWorkspace,
