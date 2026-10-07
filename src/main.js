@@ -1,4 +1,4 @@
-import { offlineStore } from './offline-store.js?v=20260927-44';
+import { offlineStore } from './offline-store.js?v=20261007-57';
 
 const SUPABASE_URL = 'https://siabldasqinpfmxslwji.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_UgbBIOq1TnInuPRrQpAFag_JLIzYuFf';
@@ -337,7 +337,7 @@ function setActiveSheet(name = 'none') {
 async function refreshSyncStatus() {
   if (!dom.syncStatus || !state.user) return;
   const [pending, snapshotAt] = await Promise.all([
-    offlineStore.listOutbox().then(items => items.length).catch(() => 0),
+    offlineStore.countOutbox().catch(() => 0),
     offlineStore.getMeta(`complete_snapshot:${state.user.id}`).catch(() => null)
   ]);
 
@@ -3489,7 +3489,7 @@ async function flushOutbox() {
     await refreshSyncStatus();
     try {
       while (true) {
-        const [mutation] = await offlineStore.listOutbox();
+        const mutation = await offlineStore.peekOutbox();
         if (!mutation) return true;
         try {
           await syncMutation(mutation, syncedDays.get(String(mutation.dayId)));
@@ -5109,7 +5109,7 @@ function availableSavedPassengers() {
 
 async function cacheCompleteWorkspace() {
   if (!state.user?.id || !state.trips.length || !navigator.onLine) return;
-  if ((await offlineStore.listOutbox()).length) return;
+  if (await offlineStore.countOutbox()) return;
   const client = await trySupabase();
   if (!client) return;
   const lastSnapshot = await offlineStore.getMeta(`complete_snapshot:${state.user.id}`);
