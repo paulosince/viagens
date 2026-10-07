@@ -1,4 +1,4 @@
-const CACHE_NAME = 'viaggio-home-v105-media-cache';
+const CACHE_NAME = 'viaggio-home-v106-media-cache';
 const MEDIA_CACHE_NAME = 'viaggio-media-v1';
 const SUPABASE_CLIENT = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const LEAFLET_CSS = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css';
@@ -54,7 +54,7 @@ self.addEventListener('fetch', event => {
         if (cached) return cached;
         return fetch(event.request).then(response => {
           if (response.ok || response.type === 'opaque') {
-            caches.open(CACHE_NAME).then(cache => cache.put(event.request, response.clone()));
+            caches.open(MEDIA_CACHE_NAME).then(cache => cache.put(event.request, response.clone()));
           }
           return response;
         });
