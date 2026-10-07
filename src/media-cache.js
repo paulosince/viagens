@@ -17,6 +17,26 @@ export async function hashBlob(blob) {
   return Array.from(digest, value => value.toString(16).padStart(2, '0')).join('');
 }
 
+export async function dataUrlToBlob(value) {
+  if (typeof value !== 'string' || !value.startsWith('data:image/')) return null;
+  const response = await fetch(value);
+  return response.blob();
+}
+
+export async function adoptLegacyDataUrl(bucket, path, hash, value) {
+  if (!bucket || !path || !hash) return false;
+  const existing = await getMediaBlob(bucket, path, hash);
+  if (existing) return true;
+
+  const blob = await dataUrlToBlob(value);
+  if (!blob) return false;
+  const actualHash = await hashBlob(blob);
+  if (actualHash !== hash) return false;
+
+  await putMediaBlob(bucket, path, hash, blob);
+  return true;
+}
+
 export function extensionForBlob(blob) {
   if (blob?.type === 'image/jpeg') return 'jpg';
   if (blob?.type === 'image/png') return 'png';
