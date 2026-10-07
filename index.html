@@ -60,7 +60,7 @@
     }
     window.addEventListener('error', function (event) {
       var file = event.filename && event.filename.split('/').pop().split('?')[0];
-      if (file === 'main.js' || file === 'offline-store.js') {
+      if (file === 'main.js' || file === 'offline-store.js' || file === 'media-cache.js') {
         window.__viaggioStartupError = file + ':' + event.lineno + ':' + event.colno + ' ' + event.message;
         showViaggioStartupError(window.__viaggioStartupError);
       }
@@ -516,7 +516,7 @@
       <button id="delete_selected_trips" type="button" disabled>Excluir selecionadas</button>
     </footer>
   </main>
-  <script type="module" src="src/main.js?v=20261007-57"></script>
-  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20261007-57', { updateViaCache: 'none' }).catch(function () {});</script>
+  <script type="module" src="src/main.js?v=20261007-60"></script>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20261007-60', { updateViaCache: 'none' }).catch(function () {});</script>
 </body>
 </html>
