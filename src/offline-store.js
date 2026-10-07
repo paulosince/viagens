@@ -88,6 +88,19 @@ function requestResult(request) {
   });
 }
 
+function sanitizeMediaForPersistence(value) {
+  if (Array.isArray(value)) return value.map(sanitizeMediaForPersistence);
+  if (!value || typeof value !== 'object' || value instanceof Blob || value instanceof Date) return value;
+
+  const copy = {};
+  for (const [key, item] of Object.entries(value)) {
+    copy[key] = sanitizeMediaForPersistence(item);
+  }
+  if (copy.photo_path) copy.photo_url = null;
+  if (copy.cover_path) copy.cover_url = null;
+  return copy;
+}
+
 function transactionDone(transaction) {
   return new Promise((resolve, reject) => {
     transaction.oncomplete = () => resolve();
@@ -183,8 +196,8 @@ async function replaceWorkspace(cacheUserId, trips, passengers) {
 
   for (const trip of oldTrips) tripStore.delete(trip.id);
   for (const key of oldPassengerKeys) passengerStore.delete(key);
-  for (const trip of trips || []) tripStore.put({ ...trip, __cache_user_id: cacheUserId });
-  for (const passenger of passengers || []) passengerStore.put(passenger);
+  for (const trip of trips || []) tripStore.put({ ...sanitizeMediaForPersistence(trip), __cache_user_id: cacheUserId });
+  for (const passenger of passengers || []) passengerStore.put(sanitizeMediaForPersistence(passenger));
 
   await transactionDone(tx);
   await setMeta('workspace_updated_at', new Date().toISOString());
@@ -225,9 +238,9 @@ async function replaceTripData(tripId, days, activities, locations) {
   for (const day of oldDays) dayStore.delete(day.id);
   for (const key of oldActivityKeys) activityStore.delete(key);
   for (const key of oldLocationKeys) locationStore.delete(key);
-  for (const day of days || []) dayStore.put(day);
-  for (const activity of activities || []) activityStore.put(activity);
-  for (const location of locations || []) locationStore.put(location);
+  for (const day of days || []) dayStore.put(sanitizeMediaForPersistence(day));
+  for (const activity of activities || []) activityStore.put(sanitizeMediaForPersistence(activity));
+  for (const location of locations || []) locationStore.put(sanitizeMediaForPersistence(location));
 
   await transactionDone(tx);
   await setMeta(`trip:${tripId}:updated_at`, new Date().toISOString());
@@ -268,11 +281,11 @@ async function saveDayBundle(day, activities, locations) {
   const activityStore = tx.objectStore('activities');
   const locationStore = tx.objectStore('day_locations');
 
-  dayStore.put(day);
+  dayStore.put(sanitizeMediaForPersistence(day));
   for (const key of oldActivityKeys) activityStore.delete(key);
   for (const key of oldLocationKeys) locationStore.delete(key);
-  for (const activity of activities || []) activityStore.put(activity);
-  for (const location of locations || []) locationStore.put(location);
+  for (const activity of activities || []) activityStore.put(sanitizeMediaForPersistence(activity));
+  for (const location of locations || []) locationStore.put(sanitizeMediaForPersistence(location));
 
   await transactionDone(tx);
   await setMeta(`trip:${day.trip_id}:updated_at`, new Date().toISOString());
@@ -286,12 +299,12 @@ async function enqueueMutation(mutation) {
   const sequence = mutation.sequence || Math.max(timeBase, lastQueueSequence + 1);
   lastQueueSequence = Math.max(lastQueueSequence, sequence);
 
-  const record = {
+  const record = sanitizeMediaForPersistence({
     id: mutation.id || crypto.randomUUID(),
     created_at: createdAt,
     sequence,
     ...mutation
-  };
+  });
   tx.objectStore('outbox').put(record);
   await transactionDone(tx);
   return record;
@@ -393,6 +406,14 @@ async function compactPendingColorHistory() {
 
   await transactionDone(tx);
   return removedIds;
+}
+
+async function updateMutation(mutation) {
+  if (!mutation?.id) return;
+  const db = await openDb();
+  const tx = db.transaction('outbox', 'readwrite');
+  tx.objectStore('outbox').put(sanitizeMediaForPersistence(mutation));
+  await transactionDone(tx);
 }
 
 async function removeMutation(id) {
@@ -500,6 +521,7 @@ export const offlineStore = {
   listOutbox,
   countOutbox,
   peekOutbox,
+  updateMutation,
   removeMutation,
   hasPendingForTrip,
   hasWorkspace,
