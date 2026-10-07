@@ -1,4 +1,5 @@
-const CACHE_NAME = 'viaggio-home-v104-sync-queue';
+const CACHE_NAME = 'viaggio-home-v105-media-cache';
+const MEDIA_CACHE_NAME = 'viaggio-media-v1';
 const SUPABASE_CLIENT = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const LEAFLET_CSS = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css';
 const LEAFLET_JS = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js';
@@ -8,8 +9,9 @@ const APP_SHELL = [
   './',
   './index.html',
   './style.css?v=20260927-56',
-  './src/main.js?v=20261007-57',
-  './src/offline-store.js?v=20261007-57',
+  './src/main.js?v=20261007-60',
+  './src/offline-store.js?v=20261007-59',
+  './src/media-cache.js?v=20261007-59',
   './manifest.webmanifest',
   './assets/app-icon.svg',
   './assets/avatar-placeholder.svg',
@@ -33,7 +35,7 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))))
+      .then(keys => Promise.all(keys.filter(key => key !== CACHE_NAME && key !== MEDIA_CACHE_NAME).map(key => caches.delete(key))))
       .then(() => self.clients.claim())
   );
 });
@@ -49,15 +51,13 @@ self.addEventListener('fetch', event => {
   if (isImage && url.origin !== self.location.origin) {
     event.respondWith(
       caches.match(event.request).then(cached => {
-        const refreshed = fetch(event.request)
-          .then(response => {
-            if (response.ok || response.type === 'opaque') {
-              caches.open(CACHE_NAME).then(cache => cache.put(event.request, response.clone()));
-            }
-            return response;
-          })
-          .catch(() => cached);
-        return cached || refreshed;
+        if (cached) return cached;
+        return fetch(event.request).then(response => {
+          if (response.ok || response.type === 'opaque') {
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, response.clone()));
+          }
+          return response;
+        });
       })
     );
     return;
