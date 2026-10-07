@@ -134,6 +134,21 @@ async function hydrateTripMedia(days, activities, locations, client = null) {
   for (const location of locations || []) await hydrateManagedMedia(location, {}, client);
 }
 
+async function cacheManagedMedia(record, {
+  bucket = TRIP_IMAGE_BUCKET,
+  pathField = 'photo_path',
+  hashField = 'photo_hash'
+} = {}, client = null) {
+  if (!record?.[pathField] || !record?.[hashField] || !client) return;
+  await ensureMediaBlob(client, bucket, record[pathField], record[hashField]);
+}
+
+async function cacheTripMedia(days, activities, locations, client) {
+  for (const day of days || []) await cacheManagedMedia(day, {}, client);
+  for (const activity of activities || []) await cacheManagedMedia(activity, {}, client);
+  for (const location of locations || []) await cacheManagedMedia(location, {}, client);
+}
+
 async function prepareTripMedia(blob, tripId, kind, entityId) {
   const path = `${tripId}/${kind}/${entityId}.${extensionForBlob(blob)}`;
   return prepareMediaBlob(TRIP_IMAGE_BUCKET, path, blob);
@@ -3928,6 +3943,7 @@ async function fetchTripData(tripId, { preferLocal = false } = {}) {
   if (preferLocal) {
     const local = await offlineStore.loadTripData(key);
     if (local.days.length) {
+      await hydrateTripMedia(local.days, local.activities, local.locations, null);
       return {
         days: local.days,
         activitiesByDay: groupByDay(local.activities),
@@ -3946,6 +3962,7 @@ async function fetchTripData(tripId, { preferLocal = false } = {}) {
     if (pendingLocalChanges) {
       const local = await offlineStore.loadTripData(key);
       if (local.days.length) {
+        await hydrateTripMedia(local.days, local.activities, local.locations, null);
         const data = {
           days: local.days,
           activitiesByDay: groupByDay(local.activities),
@@ -3960,7 +3977,8 @@ async function fetchTripData(tripId, { preferLocal = false } = {}) {
     }
     try {
       const client = await trySupabase();
-    if (!client) throw new Error('Backend indisponível.');
+      if (!client) throw new Error('Backend indisponível.');
+      const localBefore = await offlineStore.loadTripData(key).catch(() => ({ days: [], activities: [], locations: [] }));
       const orderedSchema = await supportsOrderedDaySchema(client);
       const result = await client.from('trip_days').select('*').eq('trip_id', tripId).order(orderedSchema ? 'position' : 'day_number');
       if (result.error) throw result.error;
@@ -3969,7 +3987,9 @@ async function fetchTripData(tripId, { preferLocal = false } = {}) {
       if (days.length) {
         ({ activities, locations } = await loadDayRecords(client, days.map(day => day.id)));
       }
+      await adoptLegacyTripMedia(days, activities, locations, localBefore);
       await offlineStore.replaceTripData(key, days, activities, locations);
+      await hydrateTripMedia(days, activities, locations, client);
       const data = {
         days,
         activitiesByDay: groupByDay(activities),
@@ -3982,6 +4002,7 @@ async function fetchTripData(tripId, { preferLocal = false } = {}) {
     } catch (remoteError) {
       const local = await offlineStore.loadTripData(key);
       if (!local.days.length) throw remoteError;
+      await hydrateTripMedia(local.days, local.activities, local.locations, null);
       const data = {
         days: local.days,
         activitiesByDay: groupByDay(local.activities),
@@ -5346,7 +5367,10 @@ async function cacheCompleteWorkspace() {
     const ids = new Set(days.map(day => String(day.id)));
     const activities = allActivities.filter(activity => ids.has(String(activity.day_id)));
     const locations = allLocations.filter(location => ids.has(String(location.day_id)));
+    const localBefore = await offlineStore.loadTripData(String(trip.id)).catch(() => ({ days: [], activities: [], locations: [] }));
+    await adoptLegacyTripMedia(days, activities, locations, localBefore);
     await offlineStore.replaceTripData(String(trip.id), days, activities, locations);
+    await cacheTripMedia(days, activities, locations, client);
 
     state.tripDataCache.set(String(trip.id), {
       days,
@@ -5386,6 +5410,9 @@ async function loadTrips({ allowLocalFallback = true } = {}) {
   try {
     const client = await trySupabase();
     if (!client) throw new Error('Backend indisponível.');
+    const localBefore = state.user?.id
+      ? await offlineStore.loadWorkspace(state.user.id).catch(() => ({ trips: [], passengers: [] }))
+      : { trips: [], passengers: [] };
     const claimed = await client.rpc('claim_trip_invitations');
     if (claimed.error) console.warn('Convites aguardando atualização:', claimed.error);
     const result = await client.from('trips').select('*').is('deleted_at', null).order('start_date', { ascending: true });
@@ -5402,16 +5429,21 @@ async function loadTrips({ allowLocalFallback = true } = {}) {
       if (passengers.error) throw passengers.error;
       passengerRecords = passengers.data || [];
     }
-    applyPassengers(passengerRecords);
     const saved = await client.from('saved_passengers').select('*').eq('owner_id', state.user.id).order('name');
+    const savedRecords = saved.error ? [] : (saved.data || []);
     if (saved.error) console.warn('Passageiros salvos indisponíveis:', saved.error);
-    else state.savedPassengers = saved.data || [];
+
+    await adoptLegacyWorkspaceMedia(state.trips, passengerRecords, localBefore);
     if (state.user?.id) await offlineStore.replaceWorkspace(state.user.id, state.trips, passengerRecords);
+    await hydrateWorkspaceMedia(state.trips, passengerRecords, savedRecords, client);
+    applyPassengers(passengerRecords);
+    if (!saved.error) state.savedPassengers = savedRecords;
   } catch (remoteError) {
     if (!allowLocalFallback || !state.user?.id) throw remoteError;
     const local = await offlineStore.loadWorkspace(state.user.id);
     if (!local.trips.length) throw remoteError;
     state.trips = local.trips.map(normalizeTripRecord);
+    await hydrateWorkspaceMedia(state.trips, local.passengers, [], null);
     applyPassengers(local.passengers);
   }
   syncYearList();
