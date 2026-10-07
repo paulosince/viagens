@@ -36,11 +36,14 @@ jobs:
                curl -fsSL --max-time 15 "$base$main_asset" -o /tmp/viaggio-smoke/main.js &&
                curl -fsSL --max-time 15 "$base$style_asset" -o /tmp/viaggio-smoke/style.css &&
                curl -fsSL --max-time 15 "${base}src/offline-store.js" -o /tmp/viaggio-smoke/offline-store.js &&
+               curl -fsSL --max-time 15 "${base}src/media-cache.js" -o /tmp/viaggio-smoke/media-cache.js &&
                cmp -s src/main.js /tmp/viaggio-smoke/main.js &&
                cmp -s style.css /tmp/viaggio-smoke/style.css &&
-               cmp -s src/offline-store.js /tmp/viaggio-smoke/offline-store.js; then
+               cmp -s src/offline-store.js /tmp/viaggio-smoke/offline-store.js &&
+               cmp -s src/media-cache.js /tmp/viaggio-smoke/media-cache.js; then
               node --input-type=module --check < /tmp/viaggio-smoke/main.js
               node --input-type=module --check < /tmp/viaggio-smoke/offline-store.js
+              node --input-type=module --check < /tmp/viaggio-smoke/media-cache.js
               echo "Published app matches this commit and parses as browser modules."
               exit 0
             fi
