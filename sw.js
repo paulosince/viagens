@@ -1,4 +1,4 @@
-const CACHE_NAME = 'viaggio-home-v103-itinerary-pdf';
+const CACHE_NAME = 'viaggio-home-v104-sync-queue';
 const SUPABASE_CLIENT = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const LEAFLET_CSS = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css';
 const LEAFLET_JS = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js';
@@ -8,8 +8,8 @@ const APP_SHELL = [
   './',
   './index.html',
   './style.css?v=20260927-56',
-  './src/main.js?v=20260927-56',
-  './src/offline-store.js?v=20260927-44',
+  './src/main.js?v=20261007-57',
+  './src/offline-store.js?v=20261007-57',
   './manifest.webmanifest',
   './assets/app-icon.svg',
   './assets/avatar-placeholder.svg',
