@@ -1,4 +1,4 @@
-const CACHE_NAME = 'viaggio-home-v106-media-cache';
+const CACHE_NAME = 'viaggio-home-v107-media-cache';
 const MEDIA_CACHE_NAME = 'viaggio-media-v1';
 const SUPABASE_CLIENT = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const LEAFLET_CSS = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css';
@@ -9,9 +9,9 @@ const APP_SHELL = [
   './',
   './index.html',
   './style.css?v=20260927-56',
-  './src/main.js?v=20261007-60',
+  './src/main.js?v=20261007-62',
   './src/offline-store.js?v=20261007-59',
-  './src/media-cache.js?v=20261007-59',
+  './src/media-cache.js?v=20261007-62',
   './manifest.webmanifest',
   './assets/app-icon.svg',
   './assets/avatar-placeholder.svg',
