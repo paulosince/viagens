@@ -7,7 +7,7 @@ import {
   mediaObjectUrl,
   prepareMediaBlob,
   uploadCachedMedia
-} from './media-cache.js?v=20261007-59';
+} from './media-cache.js?v=20261007-62';
 
 const SUPABASE_URL = 'https://siabldasqinpfmxslwji.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_UgbBIOq1TnInuPRrQpAFag_JLIzYuFf';
@@ -6527,7 +6527,7 @@ async function saveTrip() {
       const previousTrip = state.trips.find(trip => String(trip.id) === String(tripId)) || null;
       if (state.imageBlob) {
         const preparedCover = await prepareTripMedia(state.imageBlob, tripId, 'trip', tripId);
-        await uploadCachedMedia(client, preparedCover.bucket, preparedCover.path, preparedCover.hash, preparedCover.contentType);
+        await uploadCachedMedia(client, preparedCover.bucket, preparedCover.path, preparedCover.hash, preparedCover.contentType, preparedCover.blob);
         Object.assign(payload, {
           cover_url: null,
           cover_path: preparedCover.path,
