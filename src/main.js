@@ -177,7 +177,8 @@ async function enqueuePreparedMedia(prepared, {
     hashField,
     updatedField,
     urlField,
-    updatedAt
+    updatedAt,
+    blob: prepared.blob || null
   });
   return {
     [pathField]: prepared.path,
@@ -201,7 +202,7 @@ async function migrateLegacyRecordMedia(client, record, {
   const blob = await dataUrlToBlob(value);
   if (!blob) return false;
   const prepared = await prepareTripMedia(blob, tripId, kind, entityId);
-  await uploadCachedMedia(client, prepared.bucket, prepared.path, prepared.hash, prepared.contentType);
+  await uploadCachedMedia(client, prepared.bucket, prepared.path, prepared.hash, prepared.contentType, prepared.blob);
   record[pathField] = prepared.path;
   record[hashField] = prepared.hash;
   record[updatedField] = new Date().toISOString();
@@ -559,10 +560,13 @@ async function refreshSyncStatus() {
   if (pending) {
     dom.syncStatus.dataset.kind = 'pending';
     const count = `${pending} ${pending === 1 ? 'alteração pendente' : 'alterações pendentes'}`;
+    const errorMessage = String(lastOutboxError?.message || lastOutboxError || '')
+      .replace(/\s+/g, ' ')
+      .slice(0, 120);
     dom.syncStatus.textContent = outboxSyncing
       ? `Sincronizando · ${count}`
-      : `Salvo neste iPhone · ${count}${lastOutboxError ? ` · ${lastOutboxError.code === '57014' ? 'servidor demorou a responder' : 'falha na sincronização'} · tocar para tentar novamente` : ''}`;
-    dom.syncStatus.title = lastOutboxError ? `Última falha: ${lastOutboxError.message || lastOutboxError}` : '';
+      : `Salvo neste iPhone · ${count}${lastOutboxError ? ` · ${lastOutboxError.code === '57014' ? 'servidor demorou a responder' : (errorMessage || 'falha na sincronização')} · tocar para tentar novamente` : ''}`;
+    dom.syncStatus.title = lastOutboxError ? `Última falha: ${errorMessage || lastOutboxError}` : '';
     return;
   }
 
@@ -1063,7 +1067,7 @@ async function saveProfileSavedPassengers(client) {
     if (passenger.photoBlob) {
       const path = `${state.user.id}/saved-passengers/${passengerId}.${extensionForBlob(passenger.photoBlob)}`;
       const prepared = await prepareMediaBlob(PROFILE_IMAGE_BUCKET, path, passenger.photoBlob);
-      await uploadCachedMedia(client, prepared.bucket, prepared.path, prepared.hash, prepared.contentType);
+      await uploadCachedMedia(client, prepared.bucket, prepared.path, prepared.hash, prepared.contentType, prepared.blob);
       photoFields = {
         photo_url: null,
         photo_path: prepared.path,
@@ -3625,7 +3629,8 @@ async function syncMutation(mutation, previousDay = null) {
       mutation.bucket || TRIP_IMAGE_BUCKET,
       mutation.path,
       mutation.hash,
-      mutation.contentType
+      mutation.contentType,
+      mutation.blob || null
     );
     const patch = {
       [mutation.pathField || 'photo_path']: mutation.path,
@@ -6247,7 +6252,7 @@ async function saveTripPassengers(client, tripId) {
 
     if (sourceBlob && !passenger.session) {
       const prepared = await prepareTripMedia(sourceBlob, tripId, 'passenger', passengerId);
-      await uploadCachedMedia(client, prepared.bucket, prepared.path, prepared.hash, prepared.contentType);
+      await uploadCachedMedia(client, prepared.bucket, prepared.path, prepared.hash, prepared.contentType, prepared.blob);
       media = {
         photo_url: null,
         photo_path: prepared.path,
@@ -6768,7 +6773,7 @@ dom.tripPageCoverInput.addEventListener('change', async () => {
     const prepared = await prepareTripMedia(blob, tripId, 'trip', tripId);
     const client = await trySupabase();
     if (!client) throw new Error('É necessária uma conexão para salvar a foto.');
-    await uploadCachedMedia(client, prepared.bucket, prepared.path, prepared.hash, prepared.contentType);
+    await uploadCachedMedia(client, prepared.bucket, prepared.path, prepared.hash, prepared.contentType, prepared.blob);
     const trip = await saveTripFields({
       cover_url: null,
       cover_path: prepared.path,
