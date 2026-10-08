@@ -1,10 +1,39 @@
 const MEDIA_CACHE_NAME = 'viaggio-media-v1';
 const objectUrls = new Map();
 
-function cacheRequest(bucket, path, hash) {
-  const url = new URL('/__viaggio_media_cache__/' + encodeURIComponent(bucket) + '/' + encodeURIComponent(path), window.location.origin);
-  url.searchParams.set('hash', hash);
+function cacheRequest(bucket, hash) {
+  const url = new URL('/__viaggio_media_cache__/' + encodeURIComponent(bucket) + '/' + encodeURIComponent(hash), window.location.origin);
   return new Request(url.href, { method: 'GET' });
+}
+
+async function findLegacyHashResponse(cache, bucket, hash) {
+  const keys = await cache.keys();
+  for (const key of keys) {
+    const url = new URL(key.url);
+    if (!url.pathname.includes('/__viaggio_media_cache__/')) continue;
+    if (url.searchParams.get('hash') !== hash) continue;
+    if (!url.pathname.includes('/' + encodeURIComponent(bucket) + '/')) continue;
+    const response = await cache.match(key);
+    if (response) return response;
+  }
+  return null;
+}
+
+export async function compactMediaCache() {
+  const cache = await caches.open(MEDIA_CACHE_NAME);
+  const keys = await cache.keys();
+  const seen = new Set();
+
+  for (const key of keys) {
+    const url = new URL(key.url);
+    const hash = url.searchParams.get('hash');
+    if (!hash) continue;
+    if (seen.has(hash)) {
+      await cache.delete(key);
+      continue;
+    }
+    seen.add(hash);
+  }
 }
 
 function mediaKey(bucket, path, hash) {
@@ -44,18 +73,28 @@ export function extensionForBlob(blob) {
 }
 
 export async function putMediaBlob(bucket, path, hash, blob) {
-  if (!bucket || !path || !hash || !blob) return;
+  if (!bucket || !path || !hash || !blob) return false;
   const cache = await caches.open(MEDIA_CACHE_NAME);
-  const request = cacheRequest(bucket, path, hash);
-  await cache.put(request, new Response(blob, {
-    headers: { 'Content-Type': blob.type || 'application/octet-stream' }
-  }));
+  const request = cacheRequest(bucket, hash);
 
-  const prefix = window.location.origin + '/__viaggio_media_cache__/' + encodeURIComponent(bucket) + '/' + encodeURIComponent(path);
-  const keys = await cache.keys();
-  await Promise.all(keys
-    .filter(key => key.url.startsWith(prefix) && key.url !== request.url)
-    .map(key => cache.delete(key)));
+  const existing = await cache.match(request) || await findLegacyHashResponse(cache, bucket, hash);
+  if (existing) return true;
+
+  const response = () => new Response(blob, {
+    headers: { 'Content-Type': blob.type || 'application/octet-stream' }
+  });
+
+  try {
+    await cache.put(request, response());
+  } catch (error) {
+    await compactMediaCache().catch(() => {});
+    try {
+      await cache.put(request, response());
+    } catch {
+      console.warn('Cache local de mídia sem espaço; sincronização continuará sem bloquear.', error);
+      return false;
+    }
+  }
 
   for (const [key, url] of objectUrls) {
     if (key.startsWith(bucket + ':' + path + ':') && key !== mediaKey(bucket, path, hash)) {
@@ -63,12 +102,14 @@ export async function putMediaBlob(bucket, path, hash, blob) {
       objectUrls.delete(key);
     }
   }
+  return true;
 }
 
 export async function getMediaBlob(bucket, path, hash) {
   if (!bucket || !path || !hash) return null;
   const cache = await caches.open(MEDIA_CACHE_NAME);
-  const response = await cache.match(cacheRequest(bucket, path, hash));
+  const response = await cache.match(cacheRequest(bucket, hash))
+    || await findLegacyHashResponse(cache, bucket, hash);
   return response ? response.blob() : null;
 }
 
@@ -107,20 +148,22 @@ export async function mediaObjectUrl(client, bucket, path, hash) {
 export async function prepareMediaBlob(bucket, path, blob) {
   if (!bucket || !path || !blob) throw new Error('Imagem incompleta.');
   const hash = await hashBlob(blob);
-  await putMediaBlob(bucket, path, hash, blob);
-  const url = await mediaObjectUrl(null, bucket, path, hash);
+  const cached = await putMediaBlob(bucket, path, hash, blob);
+  const url = cached ? await mediaObjectUrl(null, bucket, path, hash) : URL.createObjectURL(blob);
   return {
     bucket,
     path,
     hash,
     url,
+    blob,
+    cached,
     contentType: blob.type || 'image/webp'
   };
 }
 
-export async function uploadCachedMedia(client, bucket, path, hash, contentType = 'image/webp') {
+export async function uploadCachedMedia(client, bucket, path, hash, contentType = 'image/webp', sourceBlob = null) {
   if (!client) throw new Error('Backend indisponível.');
-  const blob = await getMediaBlob(bucket, path, hash);
+  const blob = sourceBlob || await getMediaBlob(bucket, path, hash);
   if (!blob) throw new Error('A cópia local da imagem não está disponível.');
 
   const actualHash = await hashBlob(blob);
