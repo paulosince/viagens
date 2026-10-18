@@ -50,6 +50,7 @@
   <link rel="preload" href="style.css?v=20260927-56" as="style">
   <link rel="stylesheet" href="style.css?v=20260927-56" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
   <noscript><link rel="stylesheet" href="style.css?v=20260927-56"></noscript>
+  <link rel="stylesheet" href="src/update-manager.css?v=20261018-63">
   <script>
     function showViaggioStartupError(detail) {
       if (!document.body || document.body.dataset.session !== 'loading') return;
@@ -517,6 +518,6 @@
     </footer>
   </main>
   <script type="module" src="src/main.js?v=20261007-62"></script>
-  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=20261007-62', { updateViaCache: 'none' }).catch(function () {});</script>
+  <script type="module" src="src/update-manager.js?v=20261018-63"></script>
 </body>
 </html>

@@ -1,0 +1,30 @@
+name: Safe PWA update tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'sw.js'
+      - 'src/update-manager.js'
+      - 'src/update-manager.css'
+      - 'tests/safe-update.cjs'
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'sw.js'
+      - 'src/update-manager.js'
+      - 'src/update-manager.css'
+      - 'tests/safe-update.cjs'
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify safe update behavior
+        run: node tests/safe-update.cjs
