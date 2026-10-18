@@ -82,3 +82,33 @@ Referências adicionais:
 - Nenhum cadastro de usuário, login, compartilhamento ou transição do Supabase de produção foi alterado.
 
 **Status de produção:** DESATIVADO. Somente laboratório Neon testado. Não anunciar franquias garantidas antes de uma camada de servidor autenticado controlar a escrita de bytes reais e a sincronização multiusuário.
+
+## Laboratório navegável e colaboração (18/10/2026)
+
+Página experimental: `/viagens/experiments/neon-pilot/`.
+
+- Página HTML/JS separada, sem alterações no `index.html` ou app-shell oficial.
+- Reaproveita apenas a sessão do Supabase Auth existente no mesmo domínio do Viaggio. Não solicita senhas nem armazena tokens adicionais.
+- O Neon Data API dos ambientes A e B foi habilitado com **JWKS externo do Supabase**, audiência `authenticated`, sem grants automáticos, CORS restrito à origem do GitHub Pages e expondo apenas `public` e `viaggio_collab`.
+- O esquema `viaggio_collab` tem regras de leitura por proprietário/convidado, papéis `viewer/editor`, revogação e edição de título com revisão otimista. A autenticação é validada no Data API, não no cliente.
+- A tabela `viaggio_collab.project_owner` só pode ser preenchida pelo administrador. Cadastro autenticado de viagem exige `owner_id` igual ao usuário validado **e** igual ao proprietário fixado para o projeto.
+- O ambiente A foi vinculado à conta de teste existente do proprietário do Viaggio, sem importar dados de viagens. O B continua vinculado a uma identidade **fictícia** para evitar convidar um usuário real sem consentimento.
+- Foi verificado que: `anonymous` não tem acesso ao esquema; `authenticated` sem JWT válido vê zero viagens e tem escrita negada; ambas as Data APIs estão `active`.
+- Não foi possível executar fluxo positivo com token real de usuário no ambiente da ferramenta: **login, edição real e convite de segundo usuário só serão considerados aprovados após teste no iPhone**.
+
+### Controle de arquivos v2
+
+- A revisão `storage-quota-v2.sql` foi aplicada a ambos os ambientes, com reserva fail-closed; não libera espaço automaticamente após expiração.
+- Teste em ambiente A com teto temporário de 30 MB e duas reservas simultâneas de 20 MB: uma passou, outra recebeu `STORAGE_QUOTA_EXCEEDED`.
+- A reserva fictícia foi reclamada depois de verificada a inexistência física do objeto; a franquia original de 4 GB foi restaurada e o contador ficou em zero.
+- **Ainda não há transporte/validação física de bytes em Object Storage**, limpeza de objetos órfãos ou API autenticada para upload. Não ativar uploads na UI até validar essas operações.
+
+### Critérios restantes antes do beta
+
+1. Sessão Supabase real validada pelo Data API do Neon; proprietário vê/escreve somente seu projeto.
+2. Segundo usuário autenticado recebe permissão `viewer`, depois `editor`, edita a viagem de A e perde acesso após revogação.
+3. Upload/HEAD/DELETE reais em bucket privado, contagem de bytes e proteção de uploads concorrentes no servidor.
+4. Provisionamento automático e idempotente, com teto de **20 usuários**, sem cartões/cobrança, mantendo a capacidade agregada de banco abaixo de 20 GB.
+5. Sincronização offline e restauração de dados da aplicação existentes, com plano de rollback e backups.
+
+**Produção:** login, roteiros e mídia reais permanecem no Supabase atual, sem migração. O aplicativo principal não consulta Neon.
