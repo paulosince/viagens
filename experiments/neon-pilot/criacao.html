@@ -1,0 +1,64 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Viaggio — Teste Neon</title>
+<style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f3f6fb;color:#123;padding:env(safe-area-inset-top) 18px 30px;margin:0}main{max-width:570px;margin:35px auto}section{background:#fff;border-radius:20px;padding:21px;margin:18px 0;border:1px solid #e1e7f0}h1{font-size:29px}p{font-size:14px;color:#66778c;line-height:1.5}input{display:block;box-sizing:border-box;width:100%;margin:12px 0;padding:14px;border-radius:12px;border:1px solid #dce5f1;font-size:16px}button{background:#137ce0;color:white;border:0;border-radius:12px;padding:13px 16px;font-size:14px;font-weight:650;margin:4px 8px 8px 0}button:disabled{opacity:.4}pre{white-space:pre-wrap;word-break:break-word;font-size:13px;line-height:1.5;background:#eef4fc;border-radius:12px;padding:15px}a{color:#136dcc}</style></head>
+<body><main><a href="./">← Voltar ao laboratório</a><h1>Teste de gravação Neon</h1>
+<p>Cria apenas uma viagem fictícia no ambiente A. Não altera o Viaggio atual.</p>
+<section><strong>Sessão</strong><p id="session">Verificando...</p><button id="verify">Verificar login</button></section>
+<section><strong>Criar viagem fictícia</strong><input id="title" value="Teste de criação Neon" maxlength="150"><button id="create" disabled>Criar viagem</button><button id="list" disabled>Consultar viagens</button></section>
+<section><strong>Resultado</strong><pre id="result">Aguardando...</pre><div id="trips"></div></section></main>
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+const $=id=>document.getElementById(id);
+const api='https://ep-floral-sea-b829egtf.apirest.c-14.us-east-1.aws.neon.tech/viaggio_lab/rest/v1';
+let client;
+function feedback(v){$('result').textContent=String(v);}
+async function init(){
+ try{
+ const src=await fetch('../../src/main.js').then(r=>r.ok?r.text():Promise.reject(Error('Configuração indisponível')));
+ const get=n=>src.match(new RegExp("^const "+n+" = '([^']+)'","m"))?.[1];
+ const url=get('SUPABASE_URL'),key=get('SUPABASE_KEY');
+ if(!url?.startsWith('https://')||!key?.startsWith('sb_publishable_'))throw Error('Configuração pública inválida');
+ client=createClient(url,key);
+ await verify();
+ }catch(e){feedback(e.message||e);}
+}
+async function verify(){
+ if(!client)return;
+ const {data,error}=await client.auth.getUser();
+ if(error||!data?.user){$('session').textContent='Sem sessão neste navegador. Faça login no Viaggio pelo Safari.';feedback('Entre no Viaggio e retorne.');return;}
+ $('session').textContent=data.user.email||'Sessão válida';
+ $('create').disabled=false;$('list').disabled=false;
+ feedback('Sessão autenticada. Pronto para testar.');
+}
+async function request(method,path,body){
+ const {data,error}=await client.auth.getSession();
+ if(error||!data?.session?.access_token)throw Error('Sessão expirada');
+ const res=await fetch(api+path,{method,headers:{Authorization:'Bearer '+data.session.access_token,'Content-Type':'application/json','Accept-Profile':'viaggio_collab','Content-Profile':'viaggio_collab',Prefer:'return=representation'},body:body===undefined?undefined:JSON.stringify(body),credentials:'omit',cache:'no-store'});
+ const raw=await res.text();
+ let obj;try{obj=raw?JSON.parse(raw):null}catch{obj=raw}
+ if(!res.ok)throw Error('HTTP '+res.status+': '+(obj?.message||String(obj)));
+ return obj;
+}
+async function list(silent=false){
+ try{
+ const trips=await request('GET','/trips?select=title,revision&order=created_at.desc');
+ const ul=document.createElement('ul');
+ for(const t of trips){const li=document.createElement('li');li.textContent=t.title+' (versão '+t.revision+')';ul.append(li)}
+ $('trips').replaceChildren(ul);
+ if(!silent)feedback('Viagens acessíveis: '+trips.length);
+ }catch(e){feedback(e.message||e);}
+}
+$('verify').onclick=verify;
+$('list').onclick=()=>list();
+$('create').onclick=async()=>{
+ const title=$('title').value.trim();if(!title){feedback('Digite um título');return}
+ $('create').disabled=true;
+ try{
+ const created=await request('POST','/rpc/create_trip',{p_title:title});
+ const row=Array.isArray(created)?created[0]:created;
+ feedback('Criada com sucesso: '+(row?.title||title));
+ await list(true);
+ }catch(e){feedback(e.message||e)}
+ finally{$('create').disabled=false}
+};
+init();
+</script></body></html>
