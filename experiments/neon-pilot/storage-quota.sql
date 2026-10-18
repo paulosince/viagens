@@ -45,10 +45,10 @@ begin
 
   select * into strict b from viaggio_lab.storage_budget where singleton = 1 for update;
   with expired as (
-    update viaggio_lab.upload_ledger
+    update viaggio_lab.upload_ledger AS expired_upload
       set state='expired'
-      where state='reserved' and expires_at <= clock_timestamp()
-      returning declared_bytes
+      where expired_upload.state='reserved' and expired_upload.expires_at <= clock_timestamp()
+      returning expired_upload.declared_bytes
   )
   select coalesce(sum(declared_bytes), 0) into released from expired;
 
