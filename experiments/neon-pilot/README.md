@@ -47,7 +47,7 @@ Status em 18/10/2026:
 - Não habilitar plano pago. Em qualquer dúvida, interromper o provisionamento.
 
 ## Próximo passo
-Usar a conexão Neon do ChatGPT para criar os dois ambientes e aplicar este esquema. Só depois criar a tela navegável de teste, alimentada por dados reais e identificada como experimento.
+**Não migrar o Viaggio de produção.** Implementar um backend autenticado que vincule cada conta do Viaggio a exatamente um projeto Neon, provisione projetos com API key somente no servidor, limite a 20 adesões e recuse novos cadastros ao atingir os tetos. Integrar reservas de upload com presign do Neon e comprovação física do tamanho (HEAD), exclusão de objetos e reconciliação de uploads expirados. Testar partilha e sincronização entre dois projetos antes de expor qualquer interface de produção.
 
 ## Resultados verificáveis (18/10/2026)
 
@@ -67,3 +67,18 @@ Referências adicionais:
 - https://neon.com/docs/introduction/plans (limite agregado 20 GB)
 - https://neon.com/docs/workflows/claimable-database-integration (transferência em private preview)
 - https://neon.com/docs/reference/claimable-neon (projetos temporários não suportam Object Storage antes da reivindicação)
+
+## Teste de limites: 18/10/2026 (laboratórios Neon reais)
+
+- `settings.quota.logical_size_bytes=400000000` foi **configurado** nos dois projetos; leitura da API confirmou o valor. **Não foi feito teste de preenchimento até 400 MB para provar o bloqueio físico.**
+- Instalada a implementação experimental de `storage-quota.sql` em ambos os bancos. Cada projeto inicia com `allowance_bytes=4000000000` (4 GB decimais).
+- Reserva de 100 MB no projeto 01 e 200 MB no 02: retornaram saldo correto de 3,9 GB e 3,8 GB; os registros ficaram isolados.
+- Reserva idempotente: chamada repetida com mesmo `upload_id`, chave e tamanho não contabilizou novamente.
+- Tentativas de reservar 3,95 GB (com 3,9 GB livres no projeto 01) e 3,9 GB (com 3,8 GB livres no 02) retornaram `STORAGE_QUOTA_EXCEEDED`.
+- Teste de concorrência: duas reservas de 2,4 GB feitas em paralelo no projeto 01; **uma aceita, outra recusada** porque as duas somadas excederiam 4 GB.
+- Todos os testes reservaram bytes **fictícios**, sem criar objetos S3. Reservas de teste foram canceladas. Medição final em cada projeto: `reserved_bytes=0`, `committed_bytes=0`.
+- Controle do banco via Neon e controle de reservas no SQL **não garantem sozinhos** o limite real de arquivos: falta servidor verificador de tamanho, emissão controlada de URLs, remoção de uploads órfãos e conciliação com Neon Object Storage. Também não testamos alta concorrência ou erros de rede no PWA.
+- A documentação oficial do plano Free fixa **20 GB agregados de armazenamento PostgreSQL na organização**; 20 × 400 MB = 8 GB são comportados em tese, mas deve haver reserva para o catálogo do Viaggio e overhead.
+- Nenhum cadastro de usuário, login, compartilhamento ou transição do Supabase de produção foi alterado.
+
+**Status de produção:** DESATIVADO. Somente laboratório Neon testado. Não anunciar franquias garantidas antes de uma camada de servidor autenticado controlar a escrita de bytes reais e a sincronização multiusuário.
