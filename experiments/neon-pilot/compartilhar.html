@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="pt-BR"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f4f6fa"><title>Viaggio · Compartilhamento Neon</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;color:#102037;background:#f3f6fb;font-synthesis:none}
+*{box-sizing:border-box}body{margin:0;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);min-height:100vh}
+main{max-width:680px;margin:auto;padding:28px 18px 60px}a{text-decoration:none;color:#1876c9;font-weight:600;font-size:14px}
+h1{font-size:32px;letter-spacing:-1.1px;margin:28px 0 12px}h2{font-size:17px;letter-spacing:-.3px;margin:0 0 14px}
+p{font-size:14px;line-height:1.5;color:#64758c;margin:8px 0}
+.card{background:white;border:1px solid #e3e9f2;border-radius:21px;padding:21px;margin:15px 0;box-shadow:0 9px 32px #19334b08}
+.row{display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap}
+.tag{background:#eaf4ff;color:#1871b4;border-radius:30px;padding:6px 10px;font-weight:750;font-size:11px}
+.tag.warn{background:#fff3df;color:#966100}
+label{font-size:13px;font-weight:700;color:#52657d;display:block;margin:16px 0 7px}
+input,select{font-family:inherit;font-size:16px;background:#f7fafd;border:1px solid #dbe4f0;border-radius:12px;padding:13px;width:100%;color:#203651;outline:0}
+input:focus,select:focus{border-color:#1582e8;box-shadow:0 0 0 3px #1582e821}
+input[readonly]{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+button{font:inherit;font-size:14px;font-weight:700;background:#187ee6;border:0;color:white;border-radius:12px;padding:13px 16px;cursor:pointer;margin:7px 6px 0 0;transition:transform .18s}
+button:active{transform:scale(.98)}button:disabled{opacity:.45;cursor:default}
+button.sub{color:#284c75;background:#edf2f9}
+.buttons{display:flex;flex-wrap:wrap;gap:2px}
+.envs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
+.env{display:block;text-align:left;background:#f6f9fe;border:1px solid #dbe4ef;color:#243f60;padding:16px}
+.env[aria-pressed=true]{background:#e9f4ff;outline:2px solid #1984ed}
+.env span{display:block;font-size:12px;color:#708399;font-weight:500;margin-top:5px}
+.trip{border:1px solid #e3e8f0;background:#fbfdff;border-radius:13px;padding:14px;margin:10px 0}
+.trip strong{display:block;font-size:15px}.trip small{display:block;color:#698098;font-size:11px;overflow-wrap:anywhere;margin:6px 0}
+.trip button{font-size:12px;padding:10px 12px}
+.feedback{position:sticky;bottom:env(safe-area-inset-bottom);box-shadow:0 6px 40px #1f37572a;background:#eaf4ff;color:#17518a;border-radius:15px;padding:14px;font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere;margin-top:14px;display:none}
+.feedback[data-show=true]{display:block}.feedback[data-error=true]{background:#ffeeea;color:#a13c2e}
+.separator{height:1px;background:#e8edf5;margin:20px 0}.help{font-size:12px;color:#738195;line-height:1.5}
+@media(prefers-reduced-motion:reduce){button{transition:none}}
+</style>
+</head>
+<body><main>
+<a href="./">← Voltar ao laboratório</a>
+<h1>Viagens compartilhadas</h1>
+<p>Experimento isolado: uma viagem fica no banco de quem a criou, e o convidado acessa apenas o que foi autorizado. Nenhuma viagem real é utilizada.</p>
+<section class="card">
+<div class="row"><h2>Conta do Viaggio</h2><span class="tag warn" id="sessionTag">Verificando</span></div>
+<p id="email">Validando sessão…</p>
+<label for="myId">Meu identificador de teste</label><input id="myId" readonly value="Aguardando login">
+<div class="buttons"><button id="copy" class="sub" disabled>Copiar meu ID</button><button id="verify" class="sub">Verificar login</button></div>
+<p class="help">A outra conta precisa estar autenticada em outro navegador, dispositivo ou janela privativa. Nunca compartilhe tokens de sessão.</p>
+</section>
+<section class="card">
+<h2>Onde está a viagem?</h2>
+<div class="envs"><button class="env" id="envA" aria-pressed="true">Projeto A<span>Proprietário do primeiro teste</span></button><button class="env" id="envB" aria-pressed="false">Projeto B<span>Reservado à segunda conta</span></button></div>
+<p class="help">A viagem compartilhada continua no projeto do proprietário. Para acessá-la como convidado, selecione o mesmo projeto.</p>
+<button id="load" disabled>Consultar minhas viagens</button>
+<div id="trips" aria-live="polite"></div>
+</section>
+<section class="card">
+<h2>Convidar e revogar</h2><p>Apenas o proprietário pode conceder ou revogar acesso.</p>
+<label for="tripId">ID da viagem selecionada</label><input id="tripId" placeholder="Selecione uma viagem acima" readonly>
+<label for="guestId">ID do convidado (copiado da segunda conta)</label><input id="guestId" placeholder="Cole o identificador do outro usuário" autocomplete="off" autocapitalize="off">
+<label for="access">Permissão</label><select id="access"><option value="viewer">Somente leitura</option><option value="editor">Pode editar</option></select>
+<div class="buttons"><button class="sub" id="grant" disabled>Conceder acesso</button><button class="sub" id="revoke" disabled>Revogar acesso</button></div>
+</section>
+<section class="card">
+<h2>Editar e testar conflito de versão</h2>
+<p>O proprietário ou um convidado com permissão de edição pode alterar o título de uma viagem fictícia.</p>
+<label for="title">Novo título</label><input id="title" placeholder="Novo título fictício" maxlength="150">
+<label for="revision">Versão esperada</label><input id="revision" type="number" min="1" value="1">
+<button class="sub" id="save" disabled>Salvar alteração</button>
+<div class="separator"></div>
+<p class="help">Para testar proteção contra edições antigas, tente salvar duas alterações usando a mesma versão. A segunda deve falhar com REVISION_CONFLICT.</p>
+</section>
+<section class="card">
+<h2>O que ainda não está em produção?</h2>
+<p>O compartilhamento aqui usa apenas títulos fictícios, identidades autenticadas e regras PostgreSQL. Fotos, arquivos, sincronização offline, onboarding automático e a aplicação principal continuam fora deste laboratório.</p>
+</section>
+<div id="feedback" class="feedback" role="status" aria-live="polite"></div>
+</main>
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+const $=id=>document.getElementById(id);
+const urls={
+ A:'https://ep-floral-sea-b829egtf.apirest.c-14.us-east-1.aws.neon.tech/viaggio_lab/rest/v1',
+ B:'https://ep-aged-pine-b8pd3upm.apirest.c-14.us-east-1.aws.neon.tech/viaggio_lab/rest/v1'
+};
+let client=null, user=null, selected='A',busy=false;
+const buttons=['copy','load','grant','revoke','save'];
+function notice(s,isError=false){$('feedback').textContent=String(s);$('feedback').dataset.show='true';$('feedback').dataset.error=String(isError);}
+function enable(flag){for(const id of buttons)$(id).disabled=!flag;}
+async function initialize(){
+ try{
+ const src=await fetch('../../src/main.js',{cache:'no-store'}).then(r=>r.ok?r.text():Promise.reject(Error('Não foi possível ler a configuração pública do Viaggio.')));
+ const conf=name=>src.match(new RegExp("^const "+name+" = '([^']+)'","m"))?.[1];
+ const url=conf('SUPABASE_URL'),key=conf('SUPABASE_KEY');
+ if(!url?.startsWith('https://')||!key?.startsWith('sb_publishable_'))throw Error('Configuração pública indisponível.');
+ client=createClient(url,key);
+ await verify();
+ }catch(e){notice(e.message||e,true)}
+}
+async function verify(){
+ if(!client){notice('Conexão com o Viaggio indisponível.',true);return}
+ const result=await client.auth.getUser();
+ const s=await client.auth.getSession();
+ user=result.error?null:result.data?.user||null;
+ if(!user||!s.data?.session?.access_token){
+ $('email').textContent='Sem sessão neste navegador. Entre no Viaggio e volte ao laboratório.';
+ $('sessionTag').textContent='Sem sessão';$('sessionTag').classList.add('warn');$('myId').value='';
+ enable(false);notice('Entre no Viaggio no mesmo navegador para testar.',true);return;
+ }
+ $('email').textContent=user.email||'Usuário autenticado';
+ $('sessionTag').textContent='Conectado';$('sessionTag').classList.remove('warn');
+ $('myId').value=user.id;enable(true);
+ notice('Sessão validada. Consulte as viagens autorizadas no projeto A.');
+}
+async function request(method,path,data){
+ const session=await client.auth.getSession();
+ const token=session.data?.session?.access_token;
+ if(!token)throw Error('Sessão expirada. Faça login novamente.');
+ const headers={Authorization:'Bearer '+token,'Content-Type':'application/json','Accept-Profile':'viaggio_collab','Content-Profile':'viaggio_collab'};
+ if(method==='POST')headers.Prefer='return=representation';
+ const response=await fetch(urls[selected]+path,{method,headers,body:data===undefined?undefined:JSON.stringify(data),cache:'no-store',credentials:'omit'});
+ const raw=await response.text();
+ let json;try{json=raw?JSON.parse(raw):null}catch{json=raw}
+ if(!response.ok)throw Error('HTTP '+response.status+': '+(json?.message||json?.details||String(json)));
+ return json;
+}
+async function action(fn){
+ if(busy||!user)return;
+ busy=true;
+ try{await fn()}catch(e){notice(e.message||String(e),true)}
+ finally{busy=false}
+}
+function choose(env){
+ selected=env;for(const x of ['A','B'])$('env'+x).setAttribute('aria-pressed',String(x===env));
+ $('trips').replaceChildren();$('tripId').value='';
+ notice('Projeto '+env+' selecionado. Consulte as viagens autorizadas.');
+}
+async function loadTrips(){
+ const data=await request('GET','/trips?select=id,title,owner_id,revision,created_at&order=created_at.desc');
+ const root=$('trips');root.replaceChildren();
+ if(!Array.isArray(data)||data.length===0){const p=document.createElement('p');p.textContent='Nenhuma viagem autorizada neste projeto.';root.append(p);notice('Nenhuma viagem autorizada neste projeto.');return;}
+ for(const trip of data){
+  const card=document.createElement('div');card.className='trip';
+  const name=document.createElement('strong');name.textContent=trip.title;
+  const tag=document.createElement('small');tag.textContent=(trip.owner_id===user.id?'Proprietário':'Convidado')+' · revisão '+trip.revision;
+  const key=document.createElement('small');key.textContent=trip.id;
+  const btn=document.createElement('button');btn.className='sub';btn.textContent='Selecionar';
+  btn.addEventListener('click',()=>{
+   $('tripId').value=trip.id;$('revision').value=trip.revision;$('title').value=trip.title;
+   notice('Viagem selecionada. Permissão de edição validada pelo Neon no momento de salvar.');
+  });
+  card.append(name,tag,key,btn);root.append(card);
+ }
+ notice(data.length+' viagem(ns) autorizada(s) no projeto '+selected+'.');
+}
+$('envA').addEventListener('click',()=>choose('A'));
+$('envB').addEventListener('click',()=>choose('B'));
+$('verify').addEventListener('click',()=>verify());
+$('copy').addEventListener('click',()=>action(async()=>{await navigator.clipboard.writeText(user.id);notice('ID copiado. Compartilhe apenas este identificador, nunca seu token.');}));
+$('load').addEventListener('click',()=>action(loadTrips));
+$('grant').addEventListener('click',()=>action(async()=>{
+ const p_trip=$('tripId').value,p_member=$('guestId').value.trim(),p_access=$('access').value;
+ if(!p_trip||!p_member)throw Error('Selecione uma viagem e informe o ID do convidado.');
+ await request('POST','/rpc/grant_access',{p_trip,p_member,p_access});
+ notice('Acesso '+p_access+' concedido à outra conta. Ela já pode consultar o projeto '+selected+'.');
+}));
+$('revoke').addEventListener('click',()=>action(async()=>{
+ const p_trip=$('tripId').value,p_member=$('guestId').value.trim();
+ if(!p_trip||!p_member)throw Error('Selecione uma viagem e informe o ID do convidado.');
+ const result=await request('POST','/rpc/revoke_access',{p_trip,p_member});
+ notice(result===true?'Acesso revogado. A outra conta não verá mais a viagem.':'Não havia acesso ativo para revogar.');
+}));
+$('save').addEventListener('click',()=>action(async()=>{
+ const p_trip=$('tripId').value,p_title=$('title').value.trim(),p_expected_revision=Number($('revision').value);
+ if(!p_trip||!p_title||!Number.isSafeInteger(p_expected_revision)||p_expected_revision<1)throw Error('Selecione uma viagem, título e versão válidos.');
+ const value=await request('POST','/rpc/update_title',{p_trip,p_title,p_expected_revision});
+ const revision=Array.isArray(value)?value[0]:value;
+ $('revision').value=revision;
+ await loadTrips();
+ notice('Título atualizado com sucesso. Nova versão: '+revision);
+}));
+initialize();
+</script>
+</body></html>
