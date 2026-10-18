@@ -1,0 +1,40 @@
+.viaggio-update-banner {
+  position: fixed;
+  z-index: 150;
+  right: 16px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 18px);
+  left: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  max-width: 440px;
+  margin: 0 auto;
+  padding: 12px 12px 12px 16px;
+  border: 1px solid rgba(40, 65, 100, .1);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, .96);
+  box-shadow: 0 10px 36px rgba(20, 44, 75, .2);
+  color: #193046;
+  font: 600 13px/1.35 -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+  animation: viaggio-update-enter .24s ease-out both;
+}
+.viaggio-update-banner[hidden] { display: none; }
+.viaggio-update-banner button {
+  flex: none;
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 14px;
+  color: #fff;
+  background: #087fea;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+@keyframes viaggio-update-enter {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .viaggio-update-banner { animation: none; }
+}

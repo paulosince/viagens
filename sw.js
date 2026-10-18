@@ -1,4 +1,4 @@
-const CACHE_NAME = 'viaggio-home-v107-media-cache';
+const CACHE_NAME = 'viaggio-home-v108-media-cache';
 const MEDIA_CACHE_NAME = 'viaggio-media-v1';
 const SUPABASE_CLIENT = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const LEAFLET_CSS = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css';
@@ -12,6 +12,8 @@ const APP_SHELL = [
   './src/main.js?v=20261007-62',
   './src/offline-store.js?v=20261007-59',
   './src/media-cache.js?v=20261007-62',
+  './src/update-manager.js?v=20261018-63',
+  './src/update-manager.css?v=20261018-63',
   './manifest.webmanifest',
   './assets/app-icon.svg',
   './assets/avatar-placeholder.svg',
@@ -28,8 +30,13 @@ self.addEventListener('install', event => {
         ...EXTERNAL_ASSETS.map(url => cache.add(url).catch(() => undefined)),
         ...OPTIONAL_ASSETS.map(url => cache.add(url).catch(() => undefined))
       ]))
-      .then(() => self.skipWaiting())
   );
+});
+
+self.addEventListener('message', event => {
+  if (event.data?.type === 'VIAGGIO_ACTIVATE_UPDATE') {
+    event.waitUntil(self.skipWaiting());
+  }
 });
 
 self.addEventListener('activate', event => {

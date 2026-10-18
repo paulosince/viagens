@@ -33,6 +33,7 @@ jobs:
           node --input-type=module --check < src/main.js
           node --input-type=module --check < src/offline-store.js
           node --check sw.js
+          node --input-type=module --check < src/update-manager.js
       - name: Verify offline sync and independent agenda photos
         run: |
           node tests/offline-sync.cjs
@@ -49,6 +50,8 @@ jobs:
           test -f style.css
           test -f src/main.js
           test -f src/offline-store.js
+          test -f src/update-manager.js
+          test -f src/update-manager.css
           test -f manifest.webmanifest
           test -f assets/app-icon.svg
           test -f assets/cintia.png
