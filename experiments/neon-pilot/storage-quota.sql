@@ -1,3 +1,5 @@
+-- DEPRECATED / NAO USAR PARA UPLOAD REAL. A v1 pode liberar reserva expirada sem verificar remocao fisica de arquivo.
+-- UTILIZAR APENAS storage-quota-v2.sql E UM BACKEND QUE FAZ PUT/HEAD/DELETE/RECONCILIACAO.
 
 -- Controlador de cota para um único projeto Neon por viajante (laboratório).
 -- Somente um servidor autenticado deve invocar estas funções; nunca conceder a roles do navegador.
