@@ -54,6 +54,7 @@ const context = {
   flushOutbox() { return Promise.resolve(true); },
   async trySupabase() { return database; },
   async supportsOrderedDaySchema() { return true; },
+  async normalizeLegacyMutationMedia(_client, mutation) { return mutation; },
   dayPatchForRemote(patch) { return patch; },
   locationForRemote(location) { return location; },
   activityForRemote(activity) { return activity; },
