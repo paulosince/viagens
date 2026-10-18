@@ -1,0 +1,45 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Viaggio · G3 automático</title>
+<style>:root{font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:#14243b;background:#f4f7fb}body{margin:0;padding:env(safe-area-inset-top) 18px 40px}main{max-width:600px;margin:30px auto}section{background:#fff;border:1px solid #dfe7f0;border-radius:20px;padding:21px;margin:16px 0}h1{font-size:30px}p{color:#63758b;line-height:1.5;font-size:14px}button{background:#157ce1;color:#fff;border:0;border-radius:13px;padding:14px 18px;font:inherit;font-weight:700}button:disabled{opacity:.45}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#edf5ff;border-radius:13px;padding:15px}a{color:#126fc8;text-decoration:none}</style></head><body><main>
+<a href="./">‹ Laboratório Neon</a><h1>Teste G3: arquivos</h1><p>Uma imagem sintética será enviada ao bucket privado, conferida e excluída pelo backend. Nenhuma foto pessoal será utilizada.</p>
+<section><h2>Conta do Viaggio</h2><p id="identity">Verificando…</p><button id="verify">Verificar sessão</button></section>
+<section><h2>Teste automático</h2><p>O navegador envia apenas seu token de login ao backend; nenhuma credencial de armazenamento é exposta.</p><button id="test" disabled>Testar upload</button></section>
+<section><h2>Resultado</h2><pre id="status">Aguardando sessão.</pre></section></main>
+<script type="module">
+import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+const $=id=>document.getElementById(id);
+const api='https://br-dawn-bread-b83r0ztn-g3auto.compute.c-14.us-east-1.aws.neon.tech/';
+let client=null,valid=false;
+function status(s){$('status').textContent=String(s);}
+async function verify(){
+ const {data,error}=await client.auth.getUser();
+ const s=await client.auth.getSession();
+ valid=!error&&!!data.user&&!!s.data?.session?.access_token;
+ $('identity').textContent=valid?(data.user.email||'Autenticado'):'Entre no Viaggio no mesmo navegador e retorne.';
+ $('test').disabled=!valid;
+ status(valid?'Sessão autenticada. Pronto para o teste.':'Sessão não encontrada.');
+}
+$('verify').onclick=verify;
+$('test').onclick=async()=>{
+ $('test').disabled=true;status('Verificando bucket privado…');
+ try{
+  const {data}=await client.auth.getSession();
+  const token=data?.session?.access_token;
+  if(!token)throw Error('Sessão expirada');
+  const r=await fetch(api,{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:'{}',cache:'no-store'});
+  let result;try{result=await r.json()}catch{throw Error('Backend ainda não está disponível')}
+  if(!r.ok||!result.ok)throw Error(result.error||'Resposta HTTP '+r.status);
+  status('Transferência confirmada: '+result.bytes+' bytes; etapas: '+result.checks.join(', '));
+ }catch(e){status('Teste não concluído: '+(e.message||e))}
+ finally{$('test').disabled=!valid}
+};
+async function init(){
+ try{
+  const s=await fetch('../../src/main.js',{cache:'no-store'}).then(r=>r.ok?r.text():Promise.reject(Error('Configuração indisponível')));
+  const get=k=>s.match(new RegExp("^const "+k+" = '([^']+)'","m"))?.[1];
+  const url=get('SUPABASE_URL'),key=get('SUPABASE_KEY');
+  if(!url?.startsWith('https://')||!key?.startsWith('sb_publishable_'))throw Error('Credencial pública indisponível');
+  client=createClient(url,key);await verify();
+ }catch(e){status(e.message||e)}
+}
+init();
+</script></body></html>
