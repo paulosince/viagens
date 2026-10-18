@@ -47,9 +47,9 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20260927-56" as="style">
-  <link rel="stylesheet" href="style.css?v=20260927-56" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20260927-56"></noscript>
+  <link rel="preload" href="style.css?v=20261018-64" as="style">
+  <link rel="stylesheet" href="style.css?v=20261018-64" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20261018-64"></noscript>
   <link rel="stylesheet" href="src/update-manager.css?v=20261018-63">
   <script>
     function showViaggioStartupError(detail) {
@@ -134,11 +134,23 @@
               <img id="header_profile_image" alt="" hidden>
               <span id="header_profile_fallback" class="profile-fallback" aria-hidden="true">?</span>
             </button>
-            <button id="home_chatgpt_button" class="glass-button chatgpt-header-button" type="button" aria-label="Conectar o Viaggio ao ChatGPT"><img src="assets/chatgpt-mark.svg" alt="" aria-hidden="true"><span>ChatGPT</span></button>
+            <button id="home_chatgpt_button" class="glass-button chatgpt-header-button" hidden type="button" aria-label="Conectar o Viaggio ao ChatGPT"><img src="assets/chatgpt-mark.svg" alt="" aria-hidden="true"><span>ChatGPT</span></button>
           </div>
           <div class="header-buttons">
+            <div class="home-usage-container">
+              <button id="home_usage_button" class="home-usage-summary" type="button" aria-expanded="false" aria-controls="home_usage_details" aria-label="Ver uso da conta">
+                <span class="home-usage-row"><span>Banco</span><strong id="home_database_usage">—</strong></span>
+                <span class="home-usage-row"><span>Arquivos</span><strong id="home_storage_usage">—</strong></span>
+              </button>
+              <section id="home_usage_details" class="home-usage-popover" hidden aria-label="Detalhes do uso">
+                <strong>Meu espaço utilizado</strong>
+                <p>Banco <b id="home_database_detail">—</b></p>
+                <p>Imagens <b id="home_images_detail">—</b></p>
+                <p>Anexos <b id="home_attachments_detail">—</b></p>
+                <small id="home_usage_note">Suas viagens próprias, seu perfil e passageiros salvos. Banco aproximado; arquivos medidos pelo Storage. Sem limite individual definido para o beta.</small>
+              </section>
+            </div>
             <button id="edit_trips_button" class="glass-button" type="button">Editar</button>
-            <button id="new_trip_button" class="circle-button" type="button" aria-label="Nova viagem">＋</button>
           </div>
         </div>
         <div id="trip_heading" class="trip-heading">
@@ -157,6 +169,7 @@
         <button id="empty_new_trip_button" class="glass-button" type="button">Criar viagem</button>
       </section>
       <p id="trip_create_message" class="trip-create-message" role="alert"></p>
+      <button id="new_trip_button" class="circle-button home-create-fab" type="button" aria-label="Criar nova viagem">＋</button>
 
       <button id="sheet_scrim" class="scrim" type="button" aria-label="Fechar formulário"></button>
 
@@ -234,7 +247,7 @@
             </div>
             <p class="form-note">Família e pessoas frequentes ficam disponíveis em todas as viagens. Passageiros ocasionais são adicionados somente na viagem.</p>
           </section>
-          <section class="form-section"><h3>Integrações</h3>
+          <section class="form-section legacy-chatgpt-profile" hidden><h3>Integrações</h3>
             <div class="form-group account-actions">
               <button id="chatgpt_button" class="account-row account-row-detail integration-row" type="button">
                 <span><strong>ChatGPT</strong><small>Crie e altere viagens conversando</small></span>
@@ -517,7 +530,7 @@
       <button id="delete_selected_trips" type="button" disabled>Excluir selecionadas</button>
     </footer>
   </main>
-  <script type="module" src="src/main.js?v=20261007-62"></script>
+  <script type="module" src="src/main.js?v=20261018-64"></script>
   <script type="module" src="src/update-manager.js?v=20261018-63"></script>
 </body>
 </html>
