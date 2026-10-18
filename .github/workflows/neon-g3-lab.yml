@@ -1,0 +1,57 @@
+name: Neon G3 - lab A only
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: "Digite G3-LAB para confirmar implantacao apenas no laboratorio"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-g3-lab
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: inputs.confirmation == 'G3-LAB'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validate secret presence
+        run: |
+          if [ -z "$NEON_API_KEY" ]; then
+            echo "::error::NEON_API_KEY ausente nos segredos do repositorio."
+            exit 1
+          fi
+      - name: Install only lab dependencies
+        working-directory: experiments/neon-pilot/functions/g3automatic
+        run: npm install --no-audit --no-fund
+      - name: Check JavaScript syntax
+        working-directory: experiments/neon-pilot/functions/g3automatic
+        run: npm run check
+      - name: Deploy restricted test function in lab A
+        working-directory: experiments/neon-pilot/functions/g3automatic
+        run: |
+          npx --yes neon@latest functions deploy g3auto \
+            --src index.mjs \
+            --project-id fragrant-credit-68065034 \
+            --branch br-dawn-bread-b83r0ztn \
+            --wait
+      - name: Check deployment metadata
+        working-directory: experiments/neon-pilot/functions/g3automatic
+        run: |
+          npx --yes neon@latest functions get g3auto \
+            --project-id fragrant-credit-68065034 \
+            --branch br-dawn-bread-b83r0ztn
