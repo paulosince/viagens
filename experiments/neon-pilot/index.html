@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b1730">
+<title>Viaggio · Laboratório Neon</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;font-synthesis:none;color:#0d1b30;background:#f4f7fb}
+*{box-sizing:border-box}body{margin:0;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);min-height:100vh}
+main{max-width:670px;margin:auto;padding:26px 18px 60px}.top{display:flex;align-items:center;justify-content:space-between;gap:14px}
+a{color:#096ac8;text-decoration:none}.back{font-size:14px;font-weight:600}.brand{font-size:12px;letter-spacing:2px;font-weight:800;color:#5374a0;text-transform:uppercase}
+h1{font-size:31px;letter-spacing:-1.3px;line-height:1.1;margin:26px 0 9px}h2{font-size:16px;margin:0 0 12px;letter-spacing:-.35px}
+.lead{color:#65758a;font-size:14px;line-height:1.5;max-width:510px;margin:0 0 20px}
+.panel{background:#fff;border:1px solid #e8edf5;border-radius:20px;padding:19px;margin:14px 0;box-shadow:0 10px 30px #1636600c}
+.row{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.tag{font-size:11px;letter-spacing:.3px;font-weight:800;text-transform:uppercase;border-radius:99px;padding:5px 9px;background:#eaf4ff;color:#1257a3}
+.tag.warning{background:#fff2dc;color:#9a6100}
+.meta{font-size:12px;color:#728095;line-height:1.5;margin:5px 0}
+.identity{font-size:15px;font-weight:700;margin:5px 0;overflow-wrap:anywhere}
+.id{font-size:11px;font-family:ui-monospace,Menlo,monospace;overflow-wrap:anywhere;color:#7d8796}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.choice{border:1px solid #e1e7f0;background:#f7faff;border-radius:13px;padding:15px;text-align:left;cursor:pointer;color:#264364;transition:transform .22s,border-color .22s,box-shadow .22s}
+.choice:active,button:active{transform:scale(.98)}.choice[aria-pressed=true]{border-color:#2787ed;box-shadow:0 0 0 2px #2787ed18;background:#edf6ff}
+.choice strong{display:block;font-size:15px}.choice span{font-size:12px;color:#667992}
+.field{display:block;font-size:12px;font-weight:700;color:#5f6f83;margin:12px 0 5px}
+input,select{width:100%;font:inherit;font-size:15px;border:1px solid #dae4f1;border-radius:12px;padding:13px;background:#f8fafd;color:#21334b;outline:none}
+input:focus,select:focus{border-color:#0f7fe8;box-shadow:0 0 0 3px #0f7fe822}
+button{font:inherit;border:none;cursor:pointer;transition:opacity .2s,transform .2s,background .2s}
+button:disabled{opacity:.48;cursor:default}
+.action{display:inline-flex;justify-content:center;align-items:center;gap:7px;background:#147de4;color:white;border-radius:13px;padding:12px 16px;font-weight:700;font-size:13px}
+.action.muted{background:#edf2f8;color:#2b4d78}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.small{font-size:12px}.empty{color:#6b7b8e;font-size:13px;line-height:1.5;padding:12px 0}
+.trip{border:1px solid #e8edf5;border-radius:14px;padding:12px;margin:9px 0;background:#fbfcff}
+.trip h3{font-size:15px;margin:3px 0 5px}.trip .id{display:block;margin-bottom:4px}
+.divider{height:1px;background:#eef1f6;margin:16px 0}
+.notice{font-size:13px;line-height:1.55;color:#57687e}.feedback{font-size:12px;padding:12px;border-radius:12px;background:#eaf4ff;color:#174d80;white-space:pre-wrap;overflow-wrap:anywhere;display:none}
+.feedback[data-error]{background:#fff0ed;color:#a03726}.feedback[data-visible]{display:block}
+.footer{color:#78869a;text-align:center;font-size:11px;line-height:1.5;margin-top:22px}
+@media (prefers-reduced-motion:reduce){button,.choice{transition:none}}
+</style>
+</head>
+<body><main>
+<div class="top"><a class="back" href="../../">‹ Voltar ao Viaggio</a><span class="brand">VIAGGIO / EXPERIMENTAL</span></div>
+<h1>Seu espaço Neon</h1>
+<p class="lead">Laboratório isolado para validar bancos individuais e viagens compartilhadas. Nenhuma viagem atual será movida ou alterada.</p>
+<section class="panel"><div class="row"><h2>Sessão do Viaggio</h2><span class="tag warning" id="sessionState">Verificando</span></div>
+<div class="identity" id="email">Verificando acesso...</div><div class="id" id="userid"></div>
+<p class="meta" id="identityNote">Use a sessão já aberta no aplicativo principal.</p>
+<div class="actions"><button class="action muted" id="copyId" disabled>Copiar ID de teste</button><button class="action muted" id="refreshSession">Verificar sessão</button></div>
+</section>
+<section class="panel"><div class="row"><h2>Escolher ambiente</h2><span class="tag">Isolados</span></div>
+<div class="grid">
+<button class="choice" id="chooseA" aria-pressed="true"><strong>Ambiente A</strong><span>Projeto de laboratório 01</span></button>
+<button class="choice" id="chooseB" aria-pressed="false"><strong>Ambiente B</strong><span>Projeto de laboratório 02</span></button>
+</div>
+<p class="meta">Cada ambiente possui banco e arquivos privados próprios. Um acesso concedido no A não libera os dados do B.</p>
+<div class="actions"><button class="action" id="listTrips" disabled>Consultar viagens autorizadas</button></div>
+<div id="tripList" aria-live="polite"></div>
+</section>
+<section class="panel">
+<h2>Viagem fictícia</h2><p class="notice">Criar ou editar uma viagem só funciona depois de vincular a conta ao projeto correspondente. A propriedade não pode ser reivindicada pela interface.</p>
+<label class="field" for="tripTitle">Título da viagem de teste</label><input id="tripTitle" maxlength="140" value="Viagem de teste Neon">
+<div class="actions"><button class="action muted" id="createTrip" disabled>Criar viagem de teste</button></div>
+<div class="divider"></div>
+<h2>Compartilhamento</h2><p class="notice">Convidar alguém pelo UUID da conta, sem conceder acesso ao restante do projeto. O convidado deverá usar seu login Viaggio no ambiente proprietário.</p>
+<label class="field" for="tripId">ID da viagem</label><input id="tripId" autocomplete="off" placeholder="Selecione uma viagem acima">
+<label class="field" for="guestId">ID do convidado</label><input id="guestId" autocomplete="off" placeholder="UUID da segunda conta">
+<label class="field" for="accessRole">Permissão</label><select id="accessRole"><option value="viewer">Somente leitura</option><option value="editor" selected>Pode editar</option></select>
+<div class="actions"><button class="action muted" id="invite" disabled>Convidar</button><button class="action muted" id="revoke" disabled>Revogar acesso</button></div>
+<div class="divider"></div>
+<h2>Testar edição com controle de versão</h2>
+<label class="field" for="revision">Versão esperada</label><input id="revision" type="number" min="1" value="1">
+<label class="field" for="newTitle">Novo título</label><input id="newTitle" maxlength="140" placeholder="Novo título de teste">
+<div class="actions"><button class="action muted" id="edit" disabled>Salvar alteração</button></div>
+</section>
+<section class="panel"><h2>Arquivos e cotas</h2>
+<p class="notice"><strong>400 MB de banco</strong> e <strong>4 GB de arquivos</strong> são as cotas configuradas nos dois laboratórios. O bloqueio de reservas já foi testado, mas uploads reais e apuração física ainda não foram validados. Por segurança, não disponibilizamos envio de arquivos nesta tela.</p>
+</section>
+<div class="feedback" id="feedback" role="status" aria-live="polite"></div>
+<p class="footer">Ambiente de desenvolvimento · Sem acesso aos arquivos ou dados das viagens existentes · Não utilizar para viagens reais.</p>
+</main>
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+const supabase = createClient('https://siabldasqinpfmxslwji.supabase.co', 'sb_publishable_UgbBIOq1TnInuPRrQpAFag_JLIzYuFf');
+const api={
+ A:'https://ep-floral-sea-b829egtf.apirest.c-14.us-east-1.aws.neon.tech/viaggio_lab/rest/v1',
+ B:'https://ep-aged-pine-b8pd3upm.apirest.c-14.us-east-1.aws.neon.tech/viaggio_lab/rest/v1'
+};
+const $=id=>document.getElementById(id);
+let selected='A',user=null,session=null;
+function status(message,error=false){$('feedback').textContent=message;$('feedback').dataset.visible='yes';if(error)$('feedback').dataset.error='true';else delete $('feedback').dataset.error;}
+async function checkSession(){
+ try{
+ const auth=await supabase.auth.getUser();
+ if(auth.error||!auth.data?.user)throw new Error('Abra o Viaggio, entre na sua conta e retorne ao laboratório.');
+ const info=await supabase.auth.getSession();
+ if(info.error||!info.data?.session?.access_token)throw new Error('Sessão indisponível; entre novamente no Viaggio.');
+ user=auth.data.user;session=info.data.session;
+ $('sessionState').textContent='Conectado';$('sessionState').classList.remove('warning');
+ $('email').textContent=user.email||'Usuário autenticado';$('userid').textContent='ID: '+user.id;
+ $('identityNote').textContent='Este identificador público de usuário serve apenas para vincular o laboratório e cadastrar convidados. Nunca compartilhe seu token de sessão.';
+ for(const key of ['copyId','listTrips','createTrip','invite','revoke','edit'])$(key).disabled=false;
+ }catch(e){
+ user=null;session=null;$('sessionState').textContent='Sem sessão';$('sessionState').classList.add('warning');$('email').textContent='É necessário entrar no Viaggio';$('userid').textContent='';
+ for(const key of ['copyId','listTrips','createTrip','invite','revoke','edit'])$(key).disabled=true;
+ status(String(e.message||e),true);
+ }
+}
+async function call(method,path,body){
+ const info=await supabase.auth.getSession();
+ const token=info.data?.session?.access_token;
+ if(!token)throw new Error('Sessão expirada. Volte ao Viaggio e entre novamente.');
+ const profile='viaggio_collab';
+ const headers={'Authorization':'Bearer '+token,'Content-Type':'application/json','Accept-Profile':profile,'Content-Profile':profile};
+ if(method==='POST')headers.Prefer='return=representation';
+ const result=await fetch(api[selected]+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body),cache:'no-store',credentials:'omit'});
+ const raw=await result.text();
+ let data;try{data=raw?JSON.parse(raw):null;}catch{data=raw;}
+ if(!result.ok){const msg=data?.message||data?.details||String(data||result.status);throw new Error('HTTP '+result.status+': '+msg);}
+ return data;
+}
+function choose(v){
+ selected=v;for(const x of ['A','B'])$('choose'+x).setAttribute('aria-pressed',String(v===x));
+ $('tripList').replaceChildren();$('tripId').value='';
+ status('Ambiente '+v+' selecionado. Consulte as viagens autorizadas.');
+}
+async function run(work){try{await work()}catch(e){status(e.message||String(e),true)}}
+async function listTrips(){
+ const data=await call('GET','/trips?select=id,title,owner_id,revision,updated_at&order=updated_at.desc');
+ const root=$('tripList');root.replaceChildren();
+ if(!Array.isArray(data)||!data.length){const d=document.createElement('p');d.className='empty';d.textContent='Nenhuma viagem autorizada neste ambiente. O projeto pode ainda não estar vinculado à sua conta.';root.append(d);return;}
+ for(const trip of data){
+ const card=document.createElement('div');card.className='trip';
+ const h=document.createElement('h3');h.textContent=trip.title;
+ const m=document.createElement('div');m.className='meta';m.textContent=(trip.owner_id===user?.id?'Proprietário':'Convidado')+' · versão '+trip.revision;
+ const key=document.createElement('span');key.className='id';key.textContent=trip.id;
+ const action=document.createElement('button');action.className='action muted small';action.textContent='Selecionar';action.addEventListener('click',()=>{$('tripId').value=trip.id;$('revision').value=trip.revision;$('newTitle').value=trip.title;status('Viagem selecionada.');});
+ card.append(h,m,key,action);root.append(card);
+ }
+}
+$('chooseA').addEventListener('click',()=>choose('A'));
+$('chooseB').addEventListener('click',()=>choose('B'));
+$('refreshSession').addEventListener('click',checkSession);
+$('copyId').addEventListener('click',()=>run(async()=>{if(!user)return;await navigator.clipboard.writeText(user.id);status('ID de teste copiado. Não copie tokens de sessão.');}));
+$('listTrips').addEventListener('click',()=>run(async()=>{await listTrips();status('Consulta concluída usando seu token de sessão.');}));
+$('createTrip').addEventListener('click',()=>run(async()=>{
+ const title=$('tripTitle').value.trim();if(!title)throw new Error('Preencha o título.');
+ const res=await call('POST','/trips',{owner_id:user.id,title});status('Viagem fictícia criada: '+(res?.[0]?.id||'confira a lista'));await listTrips();
+}));
+$('invite').addEventListener('click',()=>run(async()=>{
+ const p_trip=$('tripId').value.trim(),p_member=$('guestId').value.trim(),p_access=$('accessRole').value;
+ if(!p_trip||!p_member)throw new Error('Selecione uma viagem e informe o identificador do convidado.');
+ await call('POST','/rpc/grant_access',{p_trip,p_member,p_access});
+ status('Convite registrado no projeto proprietário. O convidado deve selecionar este mesmo ambiente no laboratório.');
+}));
+$('revoke').addEventListener('click',()=>run(async()=>{
+ const p_trip=$('tripId').value.trim(),p_member=$('guestId').value.trim();
+ if(!p_trip||!p_member)throw new Error('Selecione a viagem e informe o convidado.');
+ await call('POST','/rpc/revoke_access',{p_trip,p_member});status('Acesso revogado.');}));
+$('edit').addEventListener('click',()=>run(async()=>{
+ const p_trip=$('tripId').value.trim(),p_title=$('newTitle').value.trim(),p_expected_revision=Number($('revision').value);
+ if(!p_trip||!p_title||!Number.isInteger(p_expected_revision)||p_expected_revision<1)throw new Error('Selecione uma viagem, título e versão válidos.');
+ const rev=await call('POST','/rpc/update_title',{p_trip,p_title,p_expected_revision});
+ $('revision').value=Array.isArray(rev)?rev[0]:rev;status('Alteração realizada com controle de versão.');await listTrips();
+}));
+checkSession();
+</script>
+</body></html>
