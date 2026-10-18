@@ -112,3 +112,6 @@ Página experimental: `/viagens/experiments/neon-pilot/`.
 5. Sincronização offline e restauração de dados da aplicação existentes, com plano de rollback e backups.
 
 **Produção:** login, roteiros e mídia reais permanecem no Supabase atual, sem migração. O aplicativo principal não consulta Neon.
+
+## Correção de criação
+A criação usa agora a função `viaggio_collab.create_trip` para validar o proprietário no banco. A interface será ajustada para chamar `/rpc/create_trip`.
