@@ -20,7 +20,23 @@ const outbox = new Map([
 ]);
 const store = records => ({
   getAll: () => [...records.values()],
-  delete: key => records.delete(key)
+  delete: key => records.delete(key),
+  openCursor() {
+    const keys = [...records.keys()];
+    const request = { result: null, onsuccess: null, onerror: null, error: null };
+    let position = 0;
+    const next = () => {
+      const key = keys[position++];
+      request.result = key === undefined ? null : {
+        value: records.get(key),
+        delete: () => records.delete(key),
+        continue: () => queueMicrotask(next)
+      };
+      request.onsuccess?.();
+    };
+    queueMicrotask(next);
+    return request;
+  }
 });
 const context = {
   openDb: async () => ({transaction: () => ({objectStore: name => store(name === 'outbox' ? outbox : logs)})}),
