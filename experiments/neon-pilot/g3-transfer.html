@@ -1,0 +1,57 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#f5f8fc">
+<title>Viaggio · G3 Upload de Teste</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:#0f233b;background:#f4f7fb;font-synthesis:none}
+*{box-sizing:border-box}body{margin:0;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);min-height:100vh}
+main{max-width:600px;margin:auto;padding:30px 17px 60px}h1{font-size:30px;letter-spacing:-1.1px;margin:24px 0 10px}
+p{font-size:14px;color:#65778d;line-height:1.5}a{font-size:14px;color:#1375cb;font-weight:650;text-decoration:none}
+.panel{background:#fff;border-radius:21px;padding:21px;margin:16px 0;border:1px solid #e2e9f2}
+h2{font-size:17px;margin:0 0 12px}.eyebrow{letter-spacing:1px;color:#6e829d;font-size:11px;font-weight:800}
+label{display:block;font-weight:700;font-size:13px;color:#587089;margin:12px 0 7px}
+input{width:100%;border:1px solid #dae3ed;padding:13px;border-radius:12px;font:inherit;font-size:13px;color:#21374e;background:#f9fbff}
+button{background:#1682e3;border:0;padding:14px 17px;color:white;font:inherit;font-size:14px;font-weight:700;border-radius:12px;cursor:pointer;margin:9px 6px 0 0}
+button:disabled{opacity:.5}button.secondary{background:#eaf1f8;color:#285173}
+#result{font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6;background:#e8f4ff;color:#20527e;border-radius:13px;padding:15px}
+#result[data-error=true]{background:#ffeee9;color:#a53e2d}
+.small{font-size:12px;color:#73849a}
+</style></head>
+<body><main><a href="./">‹ Laboratório Neon</a><h1>Teste G3 · Arquivos</h1>
+<p>Esta página transfere exclusivamente uma imagem sintética de 1 × 1 pixel para o bucket privado do laboratório Neon. Não recebe fotos pessoais nem modifica viagens.</p>
+<section class="panel">
+<div class="eyebrow">TESTE CONTROLADO</div><h2>Permissão temporária de upload</h2>
+<p>Uma URL assinada autoriza apenas o objeto fictício específico. Ela expira e não é uma senha da sua conta. Não utilize aqui URLs de outras contas ou serviços.</p>
+<label for="url">URL assinada do laboratório</label>
+<input id="url" type="password" placeholder="Cole a URL temporária do Neon" autocomplete="off" autocapitalize="off" spellcheck="false">
+<button id="paste" class="secondary">Colar da área de transferência</button>
+<button id="send">Enviar PNG fictício (69 bytes)</button>
+<p class="small">A URL não é salva nem enviada ao Viaggio: o navegador a utiliza somente para enviar esses 69 bytes ao Neon. Nenhuma credencial permanente é solicitada.</p>
+</section>
+<section class="panel"><h2>Resultado da transferência</h2><div id="result" role="status" aria-live="polite">Aguardando teste.</div></section>
+</main>
+<script type="module">
+const $=id=>document.getElementById(id);
+const png64='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNQaboDAAJQAYOVX1CjAAAAAElFTkSuQmCC';
+const bytes=Uint8Array.from(atob(png64),c=>c.charCodeAt(0));
+const expectedHost='br-dawn-bread-b83r0ztn.storage.c-14.us-east-1.aws.neon.tech';
+const expectedPath='/viaggio-lab-media/g3-manual/';
+const result=(message,error=false)=>{$('result').textContent=message;$('result').dataset.error=String(error)};
+$('paste').addEventListener('click',async()=>{try{const value=await navigator.clipboard.readText();$('url').value=value;result('URL colada. Pronto para tentar a transferência.')}catch{result('O Safari não permitiu ler a área de transferência. Cole manualmente no campo acima.',true)}});
+$('send').addEventListener('click',async()=>{
+ const value=$('url').value.trim();
+ let u;try{u=new URL(value)}catch{return result('Cole uma URL assinada válida.',true)}
+ if(u.protocol!=='https:'||u.hostname!==expectedHost||!u.pathname.startsWith(expectedPath)||
+    !u.searchParams.has('X-Amz-Signature')||!u.searchParams.has('X-Amz-Expires')){
+  return result('URL rejeitada: não corresponde ao bucket privado e ao diretório específico deste laboratório.',true)
+ }
+ $('send').disabled=true;
+ result('Enviando PNG fictício ao Neon…');
+ try{
+  const response=await fetch(u.toString(),{method:'PUT',headers:{'Content-Type':'image/png'},body:bytes,cache:'no-store',credentials:'omit'});
+  $('url').value='';
+  if(!response.ok){result('Neon respondeu HTTP '+response.status+'. O upload não foi confirmado.\nSe aparecer “Failed to fetch”, pode ser uma configuração CORS pendente.',true);return}
+  result('Upload respondido pelo Neon: HTTP '+response.status+'.\nForam enviados '+bytes.length+' bytes fictícios.\nAinda é necessário confirmar o objeto pela API do Neon; não considere o G3 aprovado apenas por esta mensagem.');
+ }catch(e){result('Falha na transferência: '+(e?.message||'erro de rede')+'.\nPode ser CORS ou URL expirada. Não tente subir arquivos reais.',true)}
+ finally{$('send').disabled=false}
+});
+</script>
+</body></html>
