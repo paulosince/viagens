@@ -41,6 +41,9 @@ jobs:
       - name: Check JavaScript syntax
         working-directory: experiments/neon-pilot/functions/g3automatic
         run: npm run check
+      - name: Run G3 failure and quota tests
+        working-directory: experiments/neon-pilot/functions/g3automatic
+        run: npm test
       - name: Deploy restricted test function in lab A
         working-directory: experiments/neon-pilot/functions/g3automatic
         run: |
