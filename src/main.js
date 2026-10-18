@@ -315,6 +315,10 @@ const dom = {
   splashStatus: document.querySelector('#splash_status'),
   authView: document.querySelector('#auth_view'), authForm: document.querySelector('#auth_form'), authMessage: document.querySelector('#auth_message'), authIntro: document.querySelector('#auth_intro'), authCard: document.querySelector('.auth-card'), signupForm: document.querySelector('#signup_form'), signupMessage: document.querySelector('#signup_message'), signupPhotoInput: document.querySelector('#signup_photo'), signupPhotoPreview: document.querySelector('#signup_photo_preview'), signupPhotoPlaceholder: document.querySelector('#signup_photo_placeholder'), showSignup: document.querySelector('#show_signup'), showLogin: document.querySelector('#show_login'),
   home: document.querySelector('#user_home'), profileButton: document.querySelector('#profile_button'), headerProfileImage: document.querySelector('#header_profile_image'), headerProfileFallback: document.querySelector('#header_profile_fallback'), homeChatgptButton: document.querySelector('#home_chatgpt_button'),
+  usageButton: document.querySelector('#home_usage_button'), usageDetails: document.querySelector('#home_usage_details'),
+  databaseUsage: document.querySelector('#home_database_usage'), storageUsage: document.querySelector('#home_storage_usage'),
+  databaseDetail: document.querySelector('#home_database_detail'), imagesDetail: document.querySelector('#home_images_detail'),
+  attachmentsDetail: document.querySelector('#home_attachments_detail'), usageNote: document.querySelector('#home_usage_note'),
   editTripsButton: document.querySelector('#edit_trips_button'), newTripButton: document.querySelector('#new_trip_button'), emptyNewTripButton: document.querySelector('#empty_new_trip_button'), sessionEmail: document.querySelector('#session_email'), syncStatus: document.querySelector('#sync_status'), tripHeading: document.querySelector('#trip_heading'), yearButton: document.querySelector('#year_selector_button'), currentYear: document.querySelector('#current_year'), yearMenu: document.querySelector('#year_menu'), yearList: document.querySelector('#year_list'),
   tripList: document.querySelector('#trip_list'), homeEmpty: document.querySelector('#home_empty'), scrim: document.querySelector('#sheet_scrim'), tripEditFooter: document.querySelector('#trip_edit_footer'), deleteSelectedTrips: document.querySelector('#delete_selected_trips'), tripPage: document.querySelector('#trip_page'), closeTripPage: document.querySelector('#close_trip_page'), tripPageHero: document.querySelector('#trip_page_hero'), tripPageTitle: document.querySelector('#trip_page_title'), tripPageTitleInput: document.querySelector('#trip_page_title_input'), tripPageDates: document.querySelector('#trip_page_dates'), tripDateEditor: document.querySelector('#trip_page_date_editor'), tripStartDate: document.querySelector('#trip_page_start_date'), tripDayCount: document.querySelector('#trip_page_day_count'), tripDateDone: document.querySelector('#trip_page_date_done'), tripPageColor: document.querySelector('#trip_page_color'), tripPageCoverInput: document.querySelector('#trip_page_cover_input'), tripPageSaveStatus: document.querySelector('#trip_page_save_status'), tripPagePassengers: document.querySelector('#trip_page_passengers'), tripPagePassengerCount: document.querySelector('#trip_page_passenger_count'), tripPassengerSheet: document.querySelector('#trip_passenger_sheet'), tripPassengerSheetBody: document.querySelector('#trip_passenger_sheet_body'), tripPassengerSelf: document.querySelector('#trip_passenger_self'), tripPassengerSelfImage: document.querySelector('#trip_passenger_self_image'), tripPassengerSelfName: document.querySelector('#trip_passenger_self_name'), tripPassengerClose: document.querySelector('#close_trip_passengers'), tripPassengerMessage: document.querySelector('#trip_passenger_message'), tripDayList: document.querySelector('#trip_day_list'), tripDayMessage: document.querySelector('#trip_day_message'),
   tripTabs: document.querySelector('.trip-tabs'), tripPanels: { roteiro: document.querySelector('#trip_panel_roteiro'), orcamento: document.querySelector('#trip_panel_orcamento'), arquivos: document.querySelector('#trip_panel_arquivos') }, budgetSummary: document.querySelector('#budget_summary'), budgetStatus: document.querySelector('#budget_status'), budgetList: document.querySelector('#budget_list'), budgetPage: document.querySelector('#budget_item_page'), budgetPageTitle: document.querySelector('#budget_item_page_title'), closeBudgetPage: document.querySelector('#close_budget_item_page'), budgetEditor: document.querySelector('#budget_editor'), budgetPageMessage: document.querySelector('#budget_item_message'), budgetAdd: document.querySelector('#budget_add'), tripFilesStatus: document.querySelector('#trip_files_status'), tripFilesList: document.querySelector('#trip_files_list'), tripFilesDay: document.querySelector('#trip_files_day'), tripFilesInput: document.querySelector('#trip_files_input'),
@@ -513,6 +517,59 @@ async function refreshWorkspaceInBackground() {
   }, 0);
 }
 
+// Usage is attributed to the owner of a trip, never duplicated across members.
+let usageRequest = null, usageLastUpdatedAt = 0, usageLastUserId = '';
+const usageNoteBase = 'Viagens próprias, perfil e passageiros salvos. Banco aproximado; arquivos medidos pelo Storage. Ainda não existe limite individual no beta.';
+
+function formatUsageBytes(value) {
+  const bytes = Number(value);
+  if (!Number.isFinite(bytes) || bytes < 0) return '—';
+  if (!bytes) return '0 MB';
+  if (bytes < 1048576) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(bytes / 1048576)} MB`;
+}
+function renderUsage(data, cached = false) {
+  if (!data || !dom.databaseUsage) return;
+  dom.databaseUsage.textContent = formatUsageBytes(data.database_bytes);
+  dom.storageUsage.textContent = formatUsageBytes(data.storage_bytes);
+  dom.databaseDetail.textContent = formatUsageBytes(data.database_bytes);
+  dom.imagesDetail.textContent = formatUsageBytes(data.image_bytes);
+  dom.attachmentsDetail.textContent = formatUsageBytes(data.attachment_bytes);
+  dom.usageNote.textContent = (cached ? 'Última medição salva no aparelho. ' : '') + usageNoteBase;
+}
+async function restoreCachedUsage() {
+  const id = state.user?.id;
+  if (!id) return;
+  const data = await offlineStore.getMeta(`home_usage:${id}`).catch(() => null);
+  if (state.user?.id === id && data && usageLastUpdatedAt === 0) renderUsage(data, true);
+}
+function refreshUsage({ force = false } = {}) {
+  const id = state.user?.id;
+  if (!id) return Promise.resolve();
+  if (usageLastUserId !== id) { usageLastUserId = id; usageLastUpdatedAt = 0; }
+  if (usageRequest?.userId === id) return usageRequest.promise;
+  if (!force && Date.now() - usageLastUpdatedAt < 45000) return Promise.resolve();
+  const promise = (async () => {
+    const client = await trySupabase(3500);
+    if (!client) return;
+    const { data, error } = await client.rpc('viaggio_my_usage');
+    if (error) throw error;
+    if (state.user?.id !== id || !Array.isArray(data) || !data[0]) return;
+    usageLastUpdatedAt = Date.now();
+    renderUsage(data[0]);
+    await offlineStore.setMeta(`home_usage:${id}`, data[0]).catch(() => {});
+  })().catch(error => console.warn('Uso do armazenamento indisponível:', error)).finally(() => {
+    if (usageRequest?.promise === promise) usageRequest = null;
+  });
+  usageRequest = { userId: id, promise };
+  return promise;
+}
+function setUsageOpen(open) {
+  if (!dom.usageDetails) return;
+  dom.usageDetails.hidden = !open;
+  dom.usageButton.setAttribute('aria-expanded', String(open));
+}
+
 function setSessionView(session) {
   if (window.__viaggioBootGuard) {
     clearTimeout(window.__viaggioBootGuard);
@@ -522,8 +579,15 @@ function setSessionView(session) {
   dom.authView.setAttribute('aria-hidden', String(session !== 'anonymous'));
   dom.home.setAttribute('aria-hidden', String(session !== 'authenticated'));
   document.body.dataset.appReady = 'true';
-  if (session === 'authenticated') refreshChatgptConnection().catch(console.warn);
-  else {
+  if (session === 'authenticated') {
+    restoreCachedUsage().then(() => refreshUsage({ force: true })).catch(console.warn);
+  } else {
+    setUsageOpen(false);
+    dom.databaseUsage.textContent = '—';
+    dom.storageUsage.textContent = '—';
+    usageLastUpdatedAt = 0;
+    usageLastUserId = '';
+
     state.chatgptConnected = false;
     state.collapsedTripSections.clear();
     dom.home.dataset.chatgptConnected = 'false';
@@ -5553,6 +5617,7 @@ async function loadTrips({ allowLocalFallback = true } = {}) {
   }
   syncYearList();
   syncTripList();
+  refreshUsage({ force: true }).catch(console.warn);
   if (state.activeTripId) {
     const active = state.trips.find(trip => String(trip.id) === String(state.activeTripId));
     if (!active) closeTripPage();
@@ -6848,6 +6913,17 @@ window.addEventListener('popstate', event => {
   } else closeTripPage();
 });
 dom.profileButton.addEventListener('click', openProfile);
+dom.usageButton.addEventListener('click', () => {
+  const open = dom.usageDetails.hidden;
+  setUsageOpen(open);
+  if (open) refreshUsage({ force: true }).catch(console.warn);
+});
+document.addEventListener('click', event => {
+  if (!event.target.closest('.home-usage-container')) setUsageOpen(false);
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') setUsageOpen(false);
+});
 dom.newTripButton.addEventListener('click', createTripInstantly);
 dom.emptyNewTripButton.addEventListener('click', createTripInstantly);
 dom.closeNewTrip.addEventListener('click', closeSheets);
