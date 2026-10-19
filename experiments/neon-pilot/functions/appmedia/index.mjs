@@ -5,14 +5,16 @@ import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { makeHandler } from './service.mjs';
 
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 3, connectionTimeoutMillis: 8000 });
+const databaseUrl = new URL(process.env.DATABASE_URL);
+databaseUrl.pathname = '/viaggio_lab';
+const pool = new pg.Pool({ connectionString: databaseUrl.href, max: 3, connectionTimeoutMillis: 8000 });
 attachDatabasePool(pool);
 const s3 = new S3Client({ forcePathStyle: true, region: process.env.AWS_REGION,
   endpoint: process.env.AWS_ENDPOINT_URL_S3, maxAttempts: 2,
   credentials: { accessKeyId: process.env.AWS_ACCESS_KEY_ID, secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
     ...(process.env.AWS_SESSION_TOKEN ? { sessionToken: process.env.AWS_SESSION_TOKEN } : {}) } });
 const bucket = 'viaggio-lab-media';
-const dataApi = 'https://ep-floral-sea-b829egtf.apirest.c-14.us-east-1.aws.neon.tech/viaggio_lab/rest/v1';
+const dataApi = process.env.VIAGGIO_MEDIA_PROJECT === 'b' ? 'https://ep-aged-pine-b8pd3upm.apirest.c-14.us-east-1.aws.neon.tech/viaggio_lab/rest/v1' : 'https://ep-floral-sea-b829egtf.apirest.c-14.us-east-1.aws.neon.tech/viaggio_lab/rest/v1';
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 
 async function authorize(token, sourceBucket, path, write) {
