@@ -1,4 +1,4 @@
-const MEDIA_CACHE_NAME = 'viaggio-neon-preview-media-v1';
+const MEDIA_CACHE_NAME = 'viaggio-neon-preview-media-v2';
 const objectUrls = new Map();
 
 function cacheRequest(bucket, hash) {
