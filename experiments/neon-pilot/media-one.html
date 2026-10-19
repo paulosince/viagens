@@ -1,0 +1,56 @@
+<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Viaggio · Um arquivo por vez</title>
+<style>body{font:15px -apple-system,sans-serif;background:#f5f7fb;color:#172d46;margin:0;padding:35px 18px}main{max-width:530px;margin:auto}h1{font-size:28px}section{background:white;border:1px solid #e0e8f1;padding:20px;border-radius:18px;margin:15px 0}p{color:#607488;line-height:1.55}button{background:#1682dc;color:white;border:0;padding:14px 18px;border-radius:12px;font-weight:bold}button:disabled{opacity:.4}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#eef6ff;padding:14px;border-radius:12px;font:13px -apple-system,sans-serif}</style>
+<main><h1>Copiar um arquivo</h1><p>Somente um arquivo privado por vez. Nada será apagado do Supabase.</p>
+<section><h3>Conta</h3><p id="account">Verificando login…</p></section>
+<section><h3>Arquivo</h3><p id="file">Consultando inventário…</p><button id="copy" disabled>Copiar este arquivo</button></section>
+<section><h3>Resultado</h3><pre id="status">Aguardando.</pre></section></main>
+<script type="module">
+import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+const $=id=>document.getElementById(id);
+const neon='https://br-dawn-bread-b83r0ztn-g3media.compute.c-14.us-east-1.aws.neon.tech/';
+const say=text=>$('status').textContent=String(text);
+let client,item;
+async function session(){
+ const user=await client.auth.getUser();
+ if(user.error||!user.data.user)throw Error('Abra o Viaggio no mesmo Safari e faça login.');
+ $('account').textContent=user.data.user.email||'Autenticado';
+ const {data}=await client.auth.getSession();
+ if(!data.session?.access_token)throw Error('Sessão expirada');
+ return data.session.access_token;
+}
+async function init(){
+ try{
+  const s=await fetch('../../src/main.js',{cache:'no-store'}).then(r=>r.text());
+  const take=k=>s.match(new RegExp("^const "+k+" = '([^']+)'","m"))?.[1];
+  client=createClient(take('SUPABASE_URL'),take('SUPABASE_KEY'));
+  const token=await session();
+  const r=await fetch(neon,{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:'{}'});
+  const result=await r.json();
+  if(!r.ok||!result.ok)throw Error(result.error||'Sem inventário');
+  item=result.item;
+  if(!item){say('Nenhum arquivo de viagem disponível. Ainda pendentes no total: '+result.remaining);return}
+  $('file').textContent='Próximo arquivo: '+Number(item.expected_size).toLocaleString('pt-BR')+' bytes. Pendentes totais: '+result.remaining;
+  $('copy').disabled=false;say('Pronto para copiar um arquivo de teste.');
+ }catch(e){say(e.message||e)}
+}
+$('copy').onclick=async()=>{
+ $('copy').disabled=true;
+ try{
+  const token=await session();
+  say('Baixando original privado do Supabase…');
+  const {data,error}=await client.storage.from(item.bucket_id).download(item.object_key);
+  if(error||!data)throw Error('Download recusado: '+(error?.message||'erro'));
+  const buffer=await data.arrayBuffer();
+  if(buffer.byteLength!==Number(item.expected_size))throw Error('Tamanho diferente do inventário.');
+  const digest=await crypto.subtle.digest('SHA-256',buffer);
+  const hash=[...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,'0')).join('');
+  say('Copiando e validando os bytes no Neon…');
+  const r=await fetch(neon,{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/octet-stream','x-viaggio-bucket':item.bucket_id,'x-viaggio-path':encodeURIComponent(item.object_key),'x-viaggio-sha256':hash},body:buffer});
+  const result=await r.json();
+  if(!r.ok||!result.ok)throw Error(result.error||'Erro de cópia');
+  say('Cópia concluída: '+result.bytes+' bytes.\nSHA-256: '+hash+'\nO original continua no Supabase.\nAguarde a conferência antes do próximo arquivo.');
+  $('file').textContent='Arquivo enviado. Aguardando conferência independente.';
+ }catch(e){say('Ainda não copiado: '+(e.message||e));$('copy').disabled=false}
+};
+init();
+</script>

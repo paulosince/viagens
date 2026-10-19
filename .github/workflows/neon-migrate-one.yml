@@ -1,0 +1,57 @@
+name: Neon one-file migration (lab A)
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: "Digite MIGRAR-UM para publicar somente a funcao de copia no laboratorio"
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: viaggio-neon-media-copy
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: inputs.confirmation == 'MIGRAR-UM'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify project-scoped key configured
+        run: |
+          test -n "$NEON_API_KEY" || { echo "::error::NEON_API_KEY nao configurado"; exit 1; }
+      - name: Install dependencies and run migration unit tests
+        working-directory: experiments/neon-pilot/functions/g3automatic
+        run: |
+          npm install --no-audit --no-fund
+          node --check media-core.mjs
+          node --check media-entry.mjs
+          node --test media-core.test.mjs
+      - name: Deploy private file importer to lab A
+        shell: bash
+        working-directory: experiments/neon-pilot/functions/g3automatic
+        run: |
+          set -euo pipefail
+          DB_CONNECTION="$(npx --yes neon@latest connection-string br-dawn-bread-b83r0ztn \
+            --project-id fragrant-credit-68065034 --database-name viaggio_lab \
+            --role-name viaggio_lab_owner --pooled)"
+          if [[ "$DB_CONNECTION" != postgresql://* && "$DB_CONNECTION" != postgres://* ]]; then
+            echo "::error::Nao foi possivel resolver conexao Neon"; exit 1
+          fi
+          echo "::add-mask::$DB_CONNECTION"
+          npx --yes neon@latest functions deploy g3media --src media-entry.mjs \
+            --project-id fragrant-credit-68065034 \
+            --branch br-dawn-bread-b83r0ztn \
+            --env "DATABASE_URL=$DB_CONNECTION" --wait
+          unset DB_CONNECTION
+      - name: Verify deployment status
+        working-directory: experiments/neon-pilot/functions/g3automatic
+        run: |
+          npx --yes neon@latest functions get g3media \
+            --project-id fragrant-credit-68065034 --branch br-dawn-bread-b83r0ztn
