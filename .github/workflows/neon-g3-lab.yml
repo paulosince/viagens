@@ -46,12 +46,28 @@ jobs:
         run: npm test
       - name: Deploy restricted test function in lab A
         working-directory: experiments/neon-pilot/functions/g3automatic
+        shell: bash
         run: |
+          set -euo pipefail
+          # Inject an authenticated URL at deployment time; never commit it.
+          # This overrides a Neon runtime URL without a usable password.
+          DB_CONNECTION="$(npx --yes neon@latest connection-string br-dawn-bread-b83r0ztn \
+            --project-id fragrant-credit-68065034 \
+            --database-name viaggio_lab \
+            --role-name viaggio_lab_owner \
+            --pooled)"
+          if [[ "$DB_CONNECTION" != postgresql://* && "$DB_CONNECTION" != postgres://* ]]; then
+            echo "::error::Neon did not return a PostgreSQL URL."
+            exit 1
+          fi
+          echo "::add-mask::$DB_CONNECTION"
           npx --yes neon@latest functions deploy g3auto \
             --src index.mjs \
             --project-id fragrant-credit-68065034 \
             --branch br-dawn-bread-b83r0ztn \
+            --env "DATABASE_URL=$DB_CONNECTION" \
             --wait
+          unset DB_CONNECTION
       - name: Check deployment metadata
         working-directory: experiments/neon-pilot/functions/g3automatic
         run: |
