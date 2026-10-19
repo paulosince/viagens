@@ -25,7 +25,7 @@ progress{display:block;width:100%;height:12px;accent-color:#1484d7;margin:18px 0
 <div class="row"><div><div class="metric" id="count">—</div><div class="sub">arquivos verificados / total</div></div><div><div class="metric" id="size">—</div><div class="sub">volume inventariado</div></div></div>
 <progress id="progress" max="100" value="0"></progress>
 <p id="details">Aguardando inventário.</p>
-<button id="start" disabled>Copiar arquivos pendentes</button><button id="stop" class="subtle" disabled>Parar após este arquivo</button>
+<button id="start" disabled>Copiar arquivos pendentes</button><button id="verify" class="subtle" disabled>Verificar cópias no Neon</button><button id="stop" class="subtle" disabled>Parar após este arquivo</button>
 <p class="sub">Mantenha esta aba aberta durante a cópia. O processo só inclui arquivos que sua conta consegue ler no Supabase.</p>
 </article>
 <article><h2>Execução</h2><div id="status" role="status" aria-live="polite">Nenhuma transferência iniciada.</div><div id="errors"></div></article>
@@ -45,6 +45,7 @@ function paint(){
  $('details').textContent=inventory.length?(good===inventory.length?'Inventário completamente copiado.':'Restam '+(inventory.length-good)+' arquivos.'): 'Nenhum arquivo retornado.';
  $('start').disabled=!client||running||!inventory.length||good===inventory.length;
  $('stop').disabled=!running;
+ $('verify').disabled=running||!inventory.some(x=>x.copied);
  $('errors').textContent=failures.length?'Falhas nesta execução:\n'+failures.map(x=>'• '+x).join('\n'):'';
 }
 async function token(){
@@ -74,6 +75,21 @@ async function refresh(){
 }
 $('refresh').onclick=async()=>{try{await refresh()}catch(e){message('Não foi possível atualizar: '+e.message)}};
 $('stop').onclick=()=>{stopping=true;$('stop').disabled=true;message('Interrompendo após o arquivo atual…')};
+$('verify').onclick=async()=>{
+ if(running)return;
+ running=true;stopping=false;failures=[];paint();
+ try{
+  let total=0,correct=0;
+  for(const item of inventory.filter(x=>x.copied)){
+   if(stopping)break;
+   total++;message('Conferindo conteúdo no Neon: '+total+' arquivo(s)…');
+   try{await call('verify',{bucket:item.bucket,path:item.path});correct++}
+   catch(e){failures.push(item.bucket+' · '+item.path.slice(-60)+': '+e.message)}
+  }
+  message('Verificação física concluída: '+correct+'/'+total+' arquivos íntegros. Falhas: '+failures.length+'.');
+ }catch(e){message('Falha na verificação: '+e.message)}
+ finally{running=false;paint()}
+};
 $('start').onclick=async()=>{
  if(running)return;
  running=true;stopping=false;failures=[];paint();
