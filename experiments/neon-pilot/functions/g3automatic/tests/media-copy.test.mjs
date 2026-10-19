@@ -17,6 +17,7 @@ function setup({missing=false,failPut=false}={}){
    if(sql.includes('pg_advisory_unlock'))return {rows:[],rowCount:0};
    if(sql.includes('select bucket_id,object_key,expected_size,content_type'))return {rows:missing?[]:[{...catalog,copied:!!catalog.source_metadata.neon_key}],rowCount:missing?0:1};
    if(sql.includes('select expected_size,content_type,source_metadata'))return {rows:missing?[]:[catalog],rowCount:missing?0:1};
+   if(sql.includes('select expected_size,source_metadata from viaggio_shadow.media_inventory'))return {rows:missing?[]:[catalog],rowCount:missing?0:1};
    if(sql.includes('v2_reserve_upload')){
     const [id,size]=args;reserved+=size;ledger.set(id,{size,state:'reserved'});
     return {rows:[{object_key:'uploads/'+id}],rowCount:1};
