@@ -10,7 +10,11 @@ const bucket='viaggio-lab-media';
 const image=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNg6HhnDAADrAGq+UOxXAAAAABJRU5ErkJggg==','base64');
 const cors={'access-control-allow-origin':origin,'access-control-allow-headers':'authorization,content-type','access-control-allow-methods':'POST,OPTIONS','cache-control':'no-store',vary:'origin'};
 const reply=(o,s=200)=>new Response(JSON.stringify(o),{status:s,headers:{...cors,'content-type':'application/json'}});
-const pool=new Pool({connectionString:process.env.DATABASE_URL,max:2,connectionTimeoutMillis:8000});
+// Use the designated lab DB, irrespective of the branch's injected default database.
+const connectionUrl=new URL(process.env.DATABASE_URL);
+connectionUrl.pathname='/viaggio_lab';
+connectionUrl.searchParams.set('sslmode','verify-full');
+const pool=new Pool({connectionString:connectionUrl.toString(),max:2,connectionTimeoutMillis:8000});
 attachDatabasePool(pool);
 const storage=new S3Client({region:process.env.AWS_REGION,endpoint:process.env.AWS_ENDPOINT_URL_S3,forcePathStyle:true,maxAttempts:2,credentials:{accessKeyId:process.env.AWS_ACCESS_KEY_ID,secretAccessKey:process.env.AWS_SECRET_ACCESS_KEY,...(process.env.AWS_SESSION_TOKEN?{sessionToken:process.env.AWS_SESSION_TOKEN}:{})}});
 const one=async(q,v=[])=>(await pool.query(q,v)).rows[0];
@@ -41,10 +45,16 @@ export default {async fetch(req){
  try{authenticated=await owner(req)}catch{return reply({ok:false,error:'AUTH_UNAVAILABLE'},503)}
  if(!authenticated)return reply({ok:false,error:'NOT_OWNER'},403);
  if(!process.env.DATABASE_URL||!process.env.AWS_ENDPOINT_URL_S3||!process.env.AWS_ACCESS_KEY_ID||!process.env.AWS_SECRET_ACCESS_KEY)return reply({ok:false,error:'BACKEND_UNCONFIGURED'},503);
+ let phase='DATABASE';
  try{
   const dbname=await one('select current_database() as db');
   if(dbname.db!=='viaggio_lab')return reply({ok:false,error:'WRONG_DATABASE'},503);
+  phase='PROBE';
   const result=await runStorageProbe({id:randomUUID(),image,...db,...objects});
   return reply(result,result.ok?200:result.error==='STORAGE_QUOTA_EXCEEDED'?413:502);
- }catch{return reply({ok:false,error:'BACKEND_ERROR'},502)}
+ }catch(e){
+  // No connection strings, SQL parameters, bearer tokens, or storage secrets in logs.
+  console.error('G3_LAB_FAILURE',phase,String(e?.code||e?.name||'UNKNOWN').slice(0,40),String(e?.message||'').slice(0,160));
+  return reply({ok:false,error:'BACKEND_ERROR',phase,diagnostic:String(e?.code||e?.name||'UNKNOWN').slice(0,40)},502);
+ }
 }};
