@@ -89,7 +89,7 @@ export default {async fetch(req){
   }
  }catch(e){
   // No connection strings, SQL parameters, bearer tokens, or storage secrets in logs.
-  console.error('G3_LAB_FAILURE',phase,String(e?.code||e?.name||'UNKNOWN').slice(0,40),String(e?.message||'').slice(0,160));
+  console.error('G3_LAB_FAILURE',phase,String(e?.code||e?.name||'UNKNOWN').slice(0,40));
   return reply({ok:false,error:'BACKEND_ERROR',phase,diagnostic:String(e?.code||e?.name||'UNKNOWN').slice(0,40)},502);
  }
 }};
