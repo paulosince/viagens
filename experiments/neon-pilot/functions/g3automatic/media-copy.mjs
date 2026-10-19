@@ -17,7 +17,7 @@ async function absent(store,bucket,key){
 }
 export async function handleMediaMigration(request,{pool,store,bucket}){
  const u=new URL(request.url),action=u.searchParams.get('migration');
- if(!['list','upload'].includes(action))return safeError('INVALID_MIGRATION_ACTION',400);
+ if(!['list','upload','verify'].includes(action))return safeError('INVALID_MIGRATION_ACTION',400);
  const client=await pool.connect();
  try{
   if(action==='list'){
@@ -26,6 +26,13 @@ export async function handleMediaMigration(request,{pool,store,bucket}){
   }
   const sourceBucket=u.searchParams.get('bucket')||'',path=u.searchParams.get('path')||'';
   if(!['trip-images','profile-photos','day-attachments'].includes(sourceBucket)||!path||path.length>1000||path.includes('\0'))return safeError('INVALID_SOURCE',400);
+  if(action==='verify'){
+   const stored=await client.query('select expected_size,source_metadata from viaggio_shadow.media_inventory where bucket_id=$1 and object_key=$2',[sourceBucket,path]);
+   const record=stored.rows[0];
+   if(!record?.source_metadata?.neon_key)return safeError('NO_VERIFIED_COPY',404);
+   const valid=await verified(store,bucket,record.source_metadata.neon_key,Number(record.expected_size),record.source_metadata.neon_sha256);
+   return valid?{status:200,body:{ok:true,bytes:Number(record.expected_size),sha256:record.source_metadata.neon_sha256}}:safeError('PHYSICAL_COPY_INVALID',409);
+  }
   const hash=request.headers.get('x-content-sha256')||'';
   if(!/^[a-f0-9]{64}$/.test(hash))return safeError('INVALID_CHECKSUM',400);
   const keyLock=sourceBucket+'/'+path;
