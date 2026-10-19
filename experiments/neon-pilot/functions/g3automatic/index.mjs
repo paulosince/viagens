@@ -50,8 +50,43 @@ export default {async fetch(req){
   const dbname=await one('select current_database() as db');
   if(dbname.db!=='viaggio_lab')return reply({ok:false,error:'WRONG_DATABASE'},503);
   phase='PROBE';
-  const result=await runStorageProbe({id:randomUUID(),image,...db,...objects});
-  return reply(result,result.ok?200:result.error==='STORAGE_QUOTA_EXCEEDED'?413:502);
+  const body=await req.text();
+  if(body.length>512)return reply({ok:false,error:'REQUEST_TOO_LARGE'},413);
+  let payload;try{payload=JSON.parse(body||'{}')}catch{return reply({ok:false,error:'BAD_JSON'},400)}
+  const mode=payload?.mode||'single';
+  if(!['single','parallel','interrupted-read','object-cap'].includes(mode))return reply({ok:false,error:'INVALID_MODE'},400);
+  if(mode==='single'){
+   const result=await runStorageProbe({id:randomUUID(),image,...db,...objects});
+   return reply(result,result.ok?200:result.error==='STORAGE_QUOTA_EXCEEDED'?413:502);
+  }
+  // All stress modes use fixed synthetic bytes, unique server-generated keys,
+  // and verified deletion. No caller-defined byte sizes or object keys.
+  const before=await db.budget();
+  if(mode==='parallel'){
+   const outcomes=await Promise.all(Array.from({length:6},()=>runStorageProbe({id:randomUUID(),image,...db,...objects})));
+   const after=await db.budget();
+   const balanced=['reserved_bytes','committed_bytes'].every(k=>String(before[k])===String(after[k]));
+   const passed=outcomes.every(x=>x.ok===true)&&balanced;
+   return reply({ok:passed,scenario:mode,attempts:outcomes.length,passed:outcomes.filter(x=>x.ok).length,balanced,bytesEach:image.length,budget:after},passed?200:502);
+  }
+  if(mode==='interrupted-read'){
+   let reachedRead=false;
+   const brokenGet=async key=>{await objects.get(key);reachedRead=true;throw new Error('INJECTED_READ_INTERRUPTION')};
+   const outcome=await runStorageProbe({id:randomUUID(),image,...db,...objects,get:brokenGet});
+   const after=await db.budget();
+   const balanced=['reserved_bytes','committed_bytes'].every(k=>String(before[k])===String(after[k]));
+   const passed=reachedRead&&outcome.error==='TRANSFER_FAILED'&&balanced;
+   return reply({ok:passed,scenario:mode,readInterrupted:reachedRead,cleanupVerified:passed,balanced,budget:after},passed?200:502);
+  }
+  if(mode==='object-cap'){
+   // Database must reject >25 MB per-file reservation before any PUT.
+   let denied=false;
+   try{await db.reserve(randomUUID(),25000001)}catch(e){denied=String(e?.message||'').includes('INVALID_UPLOAD_REQUEST')}
+   const after=await db.budget();
+   const balanced=['reserved_bytes','committed_bytes'].every(k=>String(before[k])===String(after[k]));
+   const passed=denied&&balanced;
+   return reply({ok:passed,scenario:mode,oversizedReservationDenied:denied,balanced,budget:after},passed?200:502);
+  }
  }catch(e){
   // No connection strings, SQL parameters, bearer tokens, or storage secrets in logs.
   console.error('G3_LAB_FAILURE',phase,String(e?.code||e?.name||'UNKNOWN').slice(0,40),String(e?.message||'').slice(0,160));
