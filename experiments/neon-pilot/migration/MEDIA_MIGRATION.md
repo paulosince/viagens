@@ -1,0 +1,3 @@
+# Neon private media migration (laboratory)
+
+This migration moves no live data by itself. Supabase remains the sole production source and rollback path. A separate authenticated page will request each private object using the owner's existing Supabase session, verify its SHA-256 locally, then upload a copy to Neon. A Neon Function must confirm the server-side SHA-256 and HEAD/GET before recording a completed object. Never publish original files or bearer tokens to GitHub. No deletion at source. The owner should not switch the app until all 76 media objects are verified and the complete feature set is compatible.

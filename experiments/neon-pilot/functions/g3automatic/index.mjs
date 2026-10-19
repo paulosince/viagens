@@ -4,11 +4,12 @@ import {Pool} from 'pg';
 import {attachDatabasePool} from '@neon/functions';
 import {S3Client,PutObjectCommand,GetObjectCommand,HeadObjectCommand,DeleteObjectCommand} from '@aws-sdk/client-s3';
 import {runStorageProbe} from './probe-core.mjs';
+import {handleMediaMigration} from './media-copy.mjs';
 const origin='https://paulosince.github.io';
 const api='https://ep-floral-sea-b829egtf.apirest.c-14.us-east-1.aws.neon.tech/viaggio_lab/rest/v1';
 const bucket='viaggio-lab-media';
 const image=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNg6HhnDAADrAGq+UOxXAAAAABJRU5ErkJggg==','base64');
-const cors={'access-control-allow-origin':origin,'access-control-allow-headers':'authorization,content-type','access-control-allow-methods':'POST,OPTIONS','cache-control':'no-store',vary:'origin'};
+const cors={'access-control-allow-origin':origin,'access-control-allow-headers':'authorization,content-type,x-content-sha256','access-control-allow-methods':'POST,OPTIONS','cache-control':'no-store',vary:'origin'};
 const reply=(o,s=200)=>new Response(JSON.stringify(o),{status:s,headers:{...cors,'content-type':'application/json'}});
 // Use the designated lab DB, irrespective of the branch's injected default database.
 const connectionUrl=new URL(process.env.DATABASE_URL);
@@ -45,6 +46,10 @@ export default {async fetch(req){
  try{authenticated=await owner(req)}catch{return reply({ok:false,error:'AUTH_UNAVAILABLE'},503)}
  if(!authenticated)return reply({ok:false,error:'NOT_OWNER'},403);
  if(!process.env.DATABASE_URL||!process.env.AWS_ENDPOINT_URL_S3||!process.env.AWS_ACCESS_KEY_ID||!process.env.AWS_SECRET_ACCESS_KEY)return reply({ok:false,error:'BACKEND_UNCONFIGURED'},503);
+ if(new URL(req.url).searchParams.has('migration')){
+  try{const r=await handleMediaMigration(req,{pool,store:storage,bucket});return reply(r.body,r.status)}
+  catch(e){console.error('MEDIA_BACKFILL_ERROR',String(e?.code||e?.name||'UNKNOWN').slice(0,40));return reply({ok:false,error:'MEDIA_BACKFILL_FAILED'},502)}
+ }
  let phase='DATABASE';
  try{
   const dbname=await one('select current_database() as db');

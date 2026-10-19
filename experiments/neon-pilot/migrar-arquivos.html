@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Viaggio · Cópia segura para Neon</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f3f7fb;color:#142b44}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;padding:env(safe-area-inset-top) 16px env(safe-area-inset-bottom)}
+main{max-width:650px;margin:24px auto 72px}
+a{color:#147edb;text-decoration:none;font-weight:600}h1{font-size:31px;letter-spacing:-1px;margin:22px 0 7px}h2{font-size:16px;margin:0 0 12px}
+p{font-size:14px;line-height:1.5;color:#66798c}
+article{background:#fff;border:1px solid #e1e9f2;border-radius:20px;padding:21px;margin:15px 0;box-shadow:0 6px 25px #1b3d5a06}
+strong{color:#243d58}button{font:inherit;font-size:14px;font-weight:700;color:white;background:#157bdb;border:0;border-radius:13px;padding:14px 18px;cursor:pointer;margin:6px 7px 0 0}
+button.subtle{background:#e7eff7;color:#305574}button:disabled{opacity:.42}
+progress{display:block;width:100%;height:12px;accent-color:#1484d7;margin:18px 0 6px}
+#status{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.55;padding:14px;border-radius:13px;background:#eef5fc;color:#265179;max-height:250px;overflow:auto}
+.metric{font-size:28px;font-weight:800;letter-spacing:-1px}.sub{font-size:12px;color:#798ba0}
+#errors{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;color:#af4141;max-height:180px;overflow:auto}
+.row{display:flex;gap:20px;align-items:baseline;flex-wrap:wrap}
+</style></head>
+<body><main>
+<a href="./">‹ Laboratório Neon</a><h1>Cópia protegida</h1>
+<p>Transfere uma cópia dos arquivos privados do Supabase para o Neon. <strong>Nenhum arquivo original é excluído.</strong> É possível interromper e retomar depois.</p>
+<article><h2>Identidade</h2><p id="identity">Verificando sessão…</p><button class="subtle" id="refresh">Atualizar situação</button></article>
+<article>
+<h2>Arquivos do Viaggio</h2>
+<div class="row"><div><div class="metric" id="count">—</div><div class="sub">arquivos verificados / total</div></div><div><div class="metric" id="size">—</div><div class="sub">volume inventariado</div></div></div>
+<progress id="progress" max="100" value="0"></progress>
+<p id="details">Aguardando inventário.</p>
+<button id="start" disabled>Copiar arquivos pendentes</button><button id="verify" class="subtle" disabled>Verificar cópias no Neon</button><button id="stop" class="subtle" disabled>Parar após este arquivo</button>
+<p class="sub">Mantenha esta aba aberta durante a cópia. O processo só inclui arquivos que sua conta consegue ler no Supabase.</p>
+</article>
+<article><h2>Execução</h2><div id="status" role="status" aria-live="polite">Nenhuma transferência iniciada.</div><div id="errors"></div></article>
+</main>
+<script type="module">
+import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+const $=id=>document.getElementById(id);
+const endpoint='https://br-dawn-bread-b83r0ztn-g3auto.compute.c-14.us-east-1.aws.neon.tech/';
+let client=null,inventory=[],running=false,stopping=false,failures=[];
+function message(s){$('status').textContent=String(s)}
+const size=b=>b>=1e6?(b/1e6).toFixed(1)+' MB':(b/1e3).toFixed(0)+' KB';
+function paint(){
+ const good=inventory.filter(x=>x.copied).length;
+ $('count').textContent=good+' / '+inventory.length;
+ $('size').textContent=size(inventory.reduce((s,i)=>s+i.bytes,0));
+ $('progress').value=inventory.length?Math.round(good*100/inventory.length):0;
+ $('details').textContent=inventory.length?(good===inventory.length?'Inventário completamente copiado.':'Restam '+(inventory.length-good)+' arquivos.'): 'Nenhum arquivo retornado.';
+ $('start').disabled=!client||running||!inventory.length||good===inventory.length;
+ $('stop').disabled=!running;
+ $('verify').disabled=running||!inventory.some(x=>x.copied);
+ $('errors').textContent=failures.length?'Falhas nesta execução:\n'+failures.map(x=>'• '+x).join('\n'):'';
+}
+async function token(){
+ const {data}=await client.auth.getSession();
+ if(!data?.session?.access_token)throw Error('Sessão do Viaggio expirada.');
+ return data.session.access_token;
+}
+async function call(action,options={}){
+ const url=new URL(endpoint);url.searchParams.set('migration',action);
+ if(options.bucket)url.searchParams.set('bucket',options.bucket);
+ if(options.path)url.searchParams.set('path',options.path);
+ const t=await token();
+ const r=await fetch(url.toString(),{method:'POST',headers:{authorization:'Bearer '+t,'content-type':options.bytes?'application/octet-stream':'application/json',...(options.sha?{'x-content-sha256':options.sha}:{})},body:options.bytes||'{}',cache:'no-store',credentials:'omit'});
+ const x=await r.json();
+ if(!r.ok||!x?.ok)throw Error(x?.error||'HTTP '+r.status);
+ return x;
+}
+async function refresh(){
+ if(running)return;
+ const {data,error}=await client.auth.getUser();
+ if(error||!data?.user)throw Error('Abra o Viaggio neste Safari, entre na conta e retorne.');
+ $('identity').textContent='Conta conectada: '+(data.user.email||'autenticada');
+ const d=await call('list');
+ inventory=d.items;
+ if(!Array.isArray(inventory)||inventory.length!==76)throw Error('Inventário inesperado: '+inventory.length+' objetos. Nenhuma cópia será iniciada.');
+ paint();message('Inventário carregado. O Supabase continua preservado.');
+}
+$('refresh').onclick=async()=>{try{await refresh()}catch(e){message('Não foi possível atualizar: '+e.message)}};
+$('stop').onclick=()=>{stopping=true;$('stop').disabled=true;message('Interrompendo após o arquivo atual…')};
+$('verify').onclick=async()=>{
+ if(running)return;
+ running=true;stopping=false;failures=[];paint();
+ try{
+  let total=0,correct=0;
+  for(const item of inventory.filter(x=>x.copied)){
+   if(stopping)break;
+   total++;message('Conferindo conteúdo no Neon: '+total+' arquivo(s)…');
+   try{await call('verify',{bucket:item.bucket,path:item.path});correct++}
+   catch(e){failures.push(item.bucket+' · '+item.path.slice(-60)+': '+e.message)}
+  }
+  message('Verificação física concluída: '+correct+'/'+total+' arquivos íntegros. Falhas: '+failures.length+'.');
+ }catch(e){message('Falha na verificação: '+e.message)}
+ finally{running=false;paint()}
+};
+$('start').onclick=async()=>{
+ if(running)return;
+ running=true;stopping=false;failures=[];paint();
+ try{
+  let processed=0;
+  for(const item of inventory){
+   if(stopping)break;
+   if(item.copied)continue;
+   processed++;
+   message('Lendo '+processed+'º arquivo pendente do Supabase…\n'+item.bucket+' · '+size(item.bytes));
+   try{
+    const {data:blob,error}=await client.storage.from(item.bucket).download(item.path);
+    if(error||!blob)throw Error('Leitura privada indisponível: '+(error?.message||'sem arquivo'));
+    const bytes=await blob.arrayBuffer();
+    if(bytes.byteLength!==item.bytes)throw Error('Tamanho diferente do inventário');
+    const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))).map(x=>x.toString(16).padStart(2,'0')).join('');
+    message('Gravando cópia e verificando conteúdo no Neon…\n'+item.bucket+' · '+size(item.bytes));
+    const uploaded=await call('upload',{bucket:item.bucket,path:item.path,bytes,sha:hash});
+    if(!uploaded.ok)throw Error('Destino não confirmou o arquivo');
+    item.copied=true;paint();
+   }catch(e){failures.push(item.bucket+' · '+item.path.slice(-60)+': '+e.message);paint();}
+  }
+  message('Cópia encerrada. Arquivos verificados: '+inventory.filter(x=>x.copied).length+'/'+inventory.length+'.\nFalhas nesta execução: '+failures.length+'.\nOs arquivos originais continuam no Supabase.');
+ }catch(e){message('Transferência interrompida: '+e.message)}
+ finally{running=false;await refresh().catch(e=>message('Confira o status novamente: '+e.message));paint()}
+};
+async function init(){
+ try{
+  const file=await fetch('../../src/main.js',{cache:'no-store'}).then(r=>r.text());
+  const prop=k=>file.match(new RegExp("^const "+k+" = '([^']+)'","m"))?.[1];
+  const url=prop('SUPABASE_URL'),key=prop('SUPABASE_KEY');
+  if(!url?.startsWith('https://')||!key?.startsWith('sb_publishable_'))throw Error('Configuração de login não encontrada.');
+  client=createClient(url,key);
+  await refresh();
+ }catch(e){message('Preparação pendente: '+e.message)}
+}
+init();
+</script></body></html>
