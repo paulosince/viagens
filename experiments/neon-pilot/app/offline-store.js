@@ -1,0 +1,535 @@
+const DB_NAME = 'viaggio-neon-preview-v1';
+const DB_VERSION = 3;
+
+let dbPromise;
+let lastQueueSequence = 0;
+
+function openDb() {
+  if (dbPromise) return dbPromise;
+  dbPromise = new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+
+      if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta', { keyPath: 'key' });
+      if (!db.objectStoreNames.contains('profiles')) db.createObjectStore('profiles', { keyPath: 'user_id' });
+
+      if (!db.objectStoreNames.contains('trips')) {
+        const store = db.createObjectStore('trips', { keyPath: 'id' });
+        store.createIndex('cache_user_id', '__cache_user_id', { unique: false });
+      }
+      if (!db.objectStoreNames.contains('passengers')) {
+        const store = db.createObjectStore('passengers', { keyPath: 'id' });
+        store.createIndex('trip_id', 'trip_id', { unique: false });
+      }
+      if (!db.objectStoreNames.contains('trip_days')) {
+        const store = db.createObjectStore('trip_days', { keyPath: 'id' });
+        store.createIndex('trip_id', 'trip_id', { unique: false });
+      }
+      if (!db.objectStoreNames.contains('day_locations')) {
+        const store = db.createObjectStore('day_locations', { keyPath: 'id' });
+        store.createIndex('day_id', 'day_id', { unique: false });
+      }
+      if (!db.objectStoreNames.contains('activities')) {
+        const store = db.createObjectStore('activities', { keyPath: 'id' });
+        store.createIndex('day_id', 'day_id', { unique: false });
+      }
+      let outboxStore;
+      if (!db.objectStoreNames.contains('outbox')) {
+        outboxStore = db.createObjectStore('outbox', { keyPath: 'id' });
+        outboxStore.createIndex('created_at', 'created_at', { unique: false });
+        outboxStore.createIndex('sequence', 'sequence', { unique: false });
+      } else {
+        outboxStore = request.transaction.objectStore('outbox');
+        if (!outboxStore.indexNames.contains('sequence')) {
+          outboxStore.createIndex('sequence', 'sequence', { unique: false });
+        }
+
+        let migratedSequence = 0;
+        const cursorRequest = outboxStore.openCursor();
+        cursorRequest.onsuccess = () => {
+          const cursor = cursorRequest.result;
+          if (!cursor) return;
+          const record = cursor.value;
+          const existing = Number(record.sequence);
+          if (Number.isFinite(existing) && existing > 0) {
+            migratedSequence = Math.max(migratedSequence, existing);
+          } else {
+            const timeBase = Date.parse(record.created_at || 0) * 1000;
+            migratedSequence = Math.max(
+              migratedSequence + 1,
+              Number.isFinite(timeBase) && timeBase > 0 ? timeBase : Date.now() * 1000
+            );
+            cursor.update({ ...record, sequence: migratedSequence });
+          }
+          cursor.continue();
+        };
+      }
+      if (!db.objectStoreNames.contains('change_log')) {
+        const store = db.createObjectStore('change_log', { keyPath: 'id' });
+        store.createIndex('user_id', 'user_id', { unique: false });
+        store.createIndex('trip_id', 'trip_id', { unique: false });
+        store.createIndex('created_at', 'created_at', { unique: false });
+      }
+    };
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+    request.onblocked = () => reject(new Error('O armazenamento local está bloqueado por outra versão do app.'));
+  });
+  return dbPromise;
+}
+
+function requestResult(request) {
+  return new Promise((resolve, reject) => {
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function sanitizeMediaForPersistence(value) {
+  if (Array.isArray(value)) return value.map(sanitizeMediaForPersistence);
+  if (!value || typeof value !== 'object' || value instanceof Blob || value instanceof Date) return value;
+
+  const copy = {};
+  for (const [key, item] of Object.entries(value)) {
+    copy[key] = sanitizeMediaForPersistence(item);
+  }
+  if (copy.photo_path) copy.photo_url = null;
+  if (copy.cover_path) copy.cover_url = null;
+  return copy;
+}
+
+function transactionDone(transaction) {
+  return new Promise((resolve, reject) => {
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error || new Error('Transação local cancelada.'));
+  });
+}
+
+async function get(storeName, key) {
+  const db = await openDb();
+  const tx = db.transaction(storeName, 'readonly');
+  return requestResult(tx.objectStore(storeName).get(key));
+}
+
+async function getAllByIndex(storeName, indexName, value) {
+  const db = await openDb();
+  const tx = db.transaction(storeName, 'readonly');
+  return requestResult(tx.objectStore(storeName).index(indexName).getAll(value));
+}
+
+async function getAllKeysByIndex(storeName, indexName, value) {
+  const db = await openDb();
+  const tx = db.transaction(storeName, 'readonly');
+  return requestResult(tx.objectStore(storeName).index(indexName).getAllKeys(value));
+}
+
+async function setMeta(key, value) {
+  const db = await openDb();
+  const tx = db.transaction('meta', 'readwrite');
+  tx.objectStore('meta').put({ key, value });
+  await transactionDone(tx);
+}
+
+async function getMeta(key) {
+  return (await get('meta', key))?.value ?? null;
+}
+
+async function deleteMeta(key) {
+  const db = await openDb();
+  const tx = db.transaction('meta', 'readwrite');
+  tx.objectStore('meta').delete(key);
+  await transactionDone(tx);
+}
+
+async function cacheSession(user) {
+  if (!user?.id) return;
+  await setMeta('session_user', {
+    id: user.id,
+    email: user.email || '',
+    created_at: user.created_at || null,
+    user_metadata: user.user_metadata || {}
+  });
+}
+
+async function clearSession() {
+  const db = await openDb();
+  const tx = db.transaction('meta', 'readwrite');
+  tx.objectStore('meta').delete('session_user');
+  await transactionDone(tx);
+}
+
+async function getCachedSession() {
+  return getMeta('session_user');
+}
+
+async function saveProfile(profile) {
+  if (!profile?.user_id) return;
+  const db = await openDb();
+  const tx = db.transaction('profiles', 'readwrite');
+  tx.objectStore('profiles').put(profile);
+  await transactionDone(tx);
+}
+
+async function getProfile(userId) {
+  if (!userId) return null;
+  return (await get('profiles', userId)) || null;
+}
+
+async function replaceWorkspace(cacheUserId, trips, passengers) {
+  if (!cacheUserId) return;
+
+  const oldTrips = await getAllByIndex('trips', 'cache_user_id', cacheUserId);
+  const oldTripIds = oldTrips.map(trip => String(trip.id));
+  const oldPassengerKeys = [];
+  for (const tripId of oldTripIds) {
+    oldPassengerKeys.push(...await getAllKeysByIndex('passengers', 'trip_id', tripId));
+  }
+
+  const db = await openDb();
+  const tx = db.transaction(['trips', 'passengers'], 'readwrite');
+  const tripStore = tx.objectStore('trips');
+  const passengerStore = tx.objectStore('passengers');
+
+  for (const trip of oldTrips) tripStore.delete(trip.id);
+  for (const key of oldPassengerKeys) passengerStore.delete(key);
+  for (const trip of trips || []) tripStore.put({ ...sanitizeMediaForPersistence(trip), __cache_user_id: cacheUserId });
+  for (const passenger of passengers || []) passengerStore.put(sanitizeMediaForPersistence(passenger));
+
+  await transactionDone(tx);
+  await setMeta('workspace_updated_at', new Date().toISOString());
+}
+
+async function loadWorkspace(cacheUserId) {
+  if (!cacheUserId) return { trips: [], passengers: [] };
+  const trips = await getAllByIndex('trips', 'cache_user_id', cacheUserId);
+  const passengers = [];
+  for (const trip of trips) {
+    passengers.push(...await getAllByIndex('passengers', 'trip_id', String(trip.id)));
+  }
+  return {
+    trips: trips.map(({ __cache_user_id, ...trip }) => trip),
+    passengers
+  };
+}
+
+async function replaceTripData(tripId, days, activities, locations) {
+  if (!tripId) return;
+
+  const oldDays = await getAllByIndex('trip_days', 'trip_id', String(tripId));
+  const oldDayIds = oldDays.map(day => String(day.id));
+  const oldActivityKeys = [];
+  const oldLocationKeys = [];
+
+  for (const dayId of oldDayIds) {
+    oldActivityKeys.push(...await getAllKeysByIndex('activities', 'day_id', dayId));
+    oldLocationKeys.push(...await getAllKeysByIndex('day_locations', 'day_id', dayId));
+  }
+
+  const db = await openDb();
+  const tx = db.transaction(['trip_days', 'activities', 'day_locations'], 'readwrite');
+  const dayStore = tx.objectStore('trip_days');
+  const activityStore = tx.objectStore('activities');
+  const locationStore = tx.objectStore('day_locations');
+
+  for (const day of oldDays) dayStore.delete(day.id);
+  for (const key of oldActivityKeys) activityStore.delete(key);
+  for (const key of oldLocationKeys) locationStore.delete(key);
+  for (const day of days || []) dayStore.put(sanitizeMediaForPersistence(day));
+  for (const activity of activities || []) activityStore.put(sanitizeMediaForPersistence(activity));
+  for (const location of locations || []) locationStore.put(sanitizeMediaForPersistence(location));
+
+  await transactionDone(tx);
+  await setMeta(`trip:${tripId}:updated_at`, new Date().toISOString());
+}
+
+async function loadTripData(tripId) {
+  if (!tripId) return { days: [], activities: [], locations: [] };
+  const days = await getAllByIndex('trip_days', 'trip_id', String(tripId));
+  const orderValue = day => {
+    const position = Number(day?.position);
+    if (Number.isInteger(position) && position >= 0) return position;
+    const legacy = Number(day?.day_number);
+    return Number.isInteger(legacy) && legacy > 0 ? legacy - 1 : 0;
+  };
+  days.sort((a, b) => orderValue(a) - orderValue(b));
+
+  const activities = [];
+  const locations = [];
+  for (const day of days) {
+    activities.push(...await getAllByIndex('activities', 'day_id', String(day.id)));
+    locations.push(...await getAllByIndex('day_locations', 'day_id', String(day.id)));
+  }
+
+  activities.sort((a, b) => (a.position || 0) - (b.position || 0));
+  locations.sort((a, b) => (a.position || 0) - (b.position || 0));
+  return { days, activities, locations };
+}
+
+async function saveDayBundle(day, activities, locations) {
+  if (!day?.id) return;
+  const dayId = String(day.id);
+  const oldActivityKeys = await getAllKeysByIndex('activities', 'day_id', dayId);
+  const oldLocationKeys = await getAllKeysByIndex('day_locations', 'day_id', dayId);
+
+  const db = await openDb();
+  const tx = db.transaction(['trip_days', 'activities', 'day_locations'], 'readwrite');
+  const dayStore = tx.objectStore('trip_days');
+  const activityStore = tx.objectStore('activities');
+  const locationStore = tx.objectStore('day_locations');
+
+  dayStore.put(sanitizeMediaForPersistence(day));
+  for (const key of oldActivityKeys) activityStore.delete(key);
+  for (const key of oldLocationKeys) locationStore.delete(key);
+  for (const activity of activities || []) activityStore.put(sanitizeMediaForPersistence(activity));
+  for (const location of locations || []) locationStore.put(sanitizeMediaForPersistence(location));
+
+  await transactionDone(tx);
+  await setMeta(`trip:${day.trip_id}:updated_at`, new Date().toISOString());
+}
+
+async function enqueueMutation(mutation) {
+  const db = await openDb();
+  const tx = db.transaction('outbox', 'readwrite');
+  const createdAt = mutation.created_at || new Date().toISOString();
+  const timeBase = Date.parse(createdAt) * 1000;
+  const sequence = mutation.sequence || Math.max(timeBase, lastQueueSequence + 1);
+  lastQueueSequence = Math.max(lastQueueSequence, sequence);
+
+  const record = sanitizeMediaForPersistence({
+    id: mutation.id || crypto.randomUUID(),
+    created_at: createdAt,
+    sequence,
+    ...mutation
+  });
+  tx.objectStore('outbox').put(record);
+  await transactionDone(tx);
+  return record;
+}
+
+async function listOutbox() {
+  const db = await openDb();
+  const tx = db.transaction('outbox', 'readonly');
+  const records = await requestResult(tx.objectStore('outbox').getAll());
+  return records.sort((a, b) => {
+    const aSequence = Number(a.sequence) || Date.parse(a.created_at || 0) * 1000;
+    const bSequence = Number(b.sequence) || Date.parse(b.created_at || 0) * 1000;
+    if (aSequence !== bSequence) return aSequence - bSequence;
+    return String(a.created_at || '').localeCompare(String(b.created_at || '')) || String(a.id).localeCompare(String(b.id));
+  });
+}
+
+async function countOutbox() {
+  const db = await openDb();
+  const tx = db.transaction('outbox', 'readonly');
+  return requestResult(tx.objectStore('outbox').count());
+}
+
+async function peekOutbox() {
+  const db = await openDb();
+  const tx = db.transaction('outbox', 'readonly');
+  const store = tx.objectStore('outbox');
+  const source = store.indexNames.contains('sequence') ? store.index('sequence') : store;
+  return new Promise((resolve, reject) => {
+    const request = source.openCursor();
+    request.onsuccess = () => resolve(request.result?.value || null);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+// Only consecutive, unsent color changes to the same trip can be combined:
+// an intervening edit must retain its place in the history and sync order.
+function redundantColorHistory(records) {
+  const removed = [];
+  let group = [];
+  for (const record of records) {
+    if (record.type === 'record-change' && record.entry?.summary === 'Cor da viagem alterada'
+      && record.tripId && (!group.length || String(group[0].tripId) === String(record.tripId))) {
+      group.push(record);
+    } else {
+      removed.push(...group.slice(0, -1));
+      group = record.type === 'record-change' && record.entry?.summary === 'Cor da viagem alterada' && record.tripId
+        ? [record] : [];
+    }
+  }
+  removed.push(...group.slice(0, -1));
+  return removed;
+}
+
+async function compactPendingColorHistory() {
+  const db = await openDb();
+  const tx = db.transaction(['outbox', 'change_log'], 'readwrite');
+  const outbox = tx.objectStore('outbox');
+  const source = outbox.indexNames.contains('sequence') ? outbox.index('sequence') : outbox;
+  const changeLog = tx.objectStore('change_log');
+  const removedIds = [];
+  let group = [];
+
+  await new Promise((resolve, reject) => {
+    const request = source.openCursor();
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) {
+        for (const item of group.slice(0, -1)) {
+          outbox.delete(item.id);
+          if (item.entryId) changeLog.delete(item.entryId);
+          if (item.entryId) removedIds.push(item.entryId);
+        }
+        resolve();
+        return;
+      }
+
+      const record = cursor.value;
+      const isColor = record.type === 'record-change'
+        && record.entry?.summary === 'Cor da viagem alterada'
+        && record.tripId;
+
+      if (isColor && (!group.length || String(group[0].tripId) === String(record.tripId))) {
+        group.push({ id: record.id, tripId: record.tripId, entryId: record.entry?.id || null });
+      } else {
+        for (const item of group.slice(0, -1)) {
+          outbox.delete(item.id);
+          if (item.entryId) changeLog.delete(item.entryId);
+          if (item.entryId) removedIds.push(item.entryId);
+        }
+        group = isColor
+          ? [{ id: record.id, tripId: record.tripId, entryId: record.entry?.id || null }]
+          : [];
+      }
+      cursor.continue();
+    };
+  });
+
+  await transactionDone(tx);
+  return removedIds;
+}
+
+async function updateMutation(mutation) {
+  if (!mutation?.id) return;
+  const db = await openDb();
+  const tx = db.transaction('outbox', 'readwrite');
+  tx.objectStore('outbox').put(sanitizeMediaForPersistence(mutation));
+  await transactionDone(tx);
+}
+
+async function removeMutation(id) {
+  const db = await openDb();
+  const tx = db.transaction('outbox', 'readwrite');
+  tx.objectStore('outbox').delete(id);
+  await transactionDone(tx);
+}
+
+async function hasPendingForTrip(tripId) {
+  const id = String(tripId);
+  const db = await openDb();
+  const tx = db.transaction('outbox', 'readonly');
+  const store = tx.objectStore('outbox');
+  return new Promise((resolve, reject) => {
+    const request = store.openCursor();
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) {
+        resolve(false);
+        return;
+      }
+      const item = cursor.value;
+      if (item.type !== 'change-log' && String(item.tripId || '') === id) {
+        resolve(true);
+        return;
+      }
+      cursor.continue();
+    };
+  });
+}
+
+async function saveChangeLog(entry) {
+  if (!entry?.id || !entry?.user_id) return;
+  const db = await openDb();
+  const tx = db.transaction('change_log', 'readwrite');
+  tx.objectStore('change_log').put(entry);
+  await transactionDone(tx);
+}
+
+async function saveChangeLogs(entries = []) {
+  if (!entries.length) return;
+  const db = await openDb();
+  const tx = db.transaction('change_log', 'readwrite');
+  const store = tx.objectStore('change_log');
+  for (const entry of entries) if (entry?.id && entry?.user_id) store.put(entry);
+  await transactionDone(tx);
+}
+
+async function listChangeLogs(userId, limit = 100) {
+  if (!userId) return [];
+  const records = await getAllByIndex('change_log', 'user_id', String(userId));
+  return records
+    .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
+    .slice(0, Math.max(1, Number(limit) || 100));
+}
+
+async function discardHistoryBefore(cutoff) {
+  const db = await openDb();
+  const tx = db.transaction(['change_log', 'outbox'], 'readwrite');
+  const logs = tx.objectStore('change_log');
+  const outbox = tx.objectStore('outbox');
+
+  const prune = (store, shouldDelete) => new Promise((resolve, reject) => {
+    const request = store.openCursor();
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) {
+        resolve();
+        return;
+      }
+      if (shouldDelete(cursor.value)) cursor.delete();
+      cursor.continue();
+    };
+  });
+
+  await Promise.all([
+    prune(logs, entry => String(entry.created_at || '') < cutoff),
+    prune(outbox, mutation => ['record-change', 'change-log'].includes(mutation.type)
+      && String(mutation.created_at || '') < cutoff)
+  ]);
+  await transactionDone(tx);
+}
+
+async function hasWorkspace(userId) {
+  return (await loadWorkspace(userId)).trips.length > 0;
+}
+
+export const offlineStore = {
+  open: openDb,
+  cacheSession,
+  clearSession,
+  getCachedSession,
+  saveProfile,
+  getProfile,
+  replaceWorkspace,
+  loadWorkspace,
+  replaceTripData,
+  loadTripData,
+  saveDayBundle,
+  enqueueMutation,
+  compactPendingColorHistory,
+  listOutbox,
+  countOutbox,
+  peekOutbox,
+  updateMutation,
+  removeMutation,
+  hasPendingForTrip,
+  hasWorkspace,
+  saveChangeLog,
+  saveChangeLogs,
+  listChangeLogs,
+  discardHistoryBefore,
+  getMeta,
+  setMeta,
+  deleteMeta
+};
