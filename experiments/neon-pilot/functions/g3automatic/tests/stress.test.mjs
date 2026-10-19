@@ -3,21 +3,21 @@ import assert from 'node:assert/strict';
 import {runStorageProbe} from '../probe-core.mjs';
 const cap=4000000000;
 function memoryStorage(){
- const blobs=new Map();let reserved=0,committed=0,maxUsed=0,cleared=0;
+ const blobs=new Map(),ledger=new Map();let reserved=0,committed=0,maxUsed=0,cleared=0;
  const checks=[];
  const api={
   reserve:async (id,n)=>{
    if(n>25000000)throw Error('INVALID_UPLOAD_REQUEST');
    if(reserved+committed+n>cap)throw Error('STORAGE_QUOTA_EXCEEDED');
-   reserved+=n;maxUsed=Math.max(maxUsed,reserved+committed);return 'uploads/'+id;
+   reserved+=n;ledger.set(id,{size:n,state:'reserved'});maxUsed=Math.max(maxUsed,reserved+committed);return 'uploads/'+id;
   },
   put:async(k,b)=>{blobs.set(k,Buffer.from(b));checks.push('put')},
   head:async k=>blobs.get(k)?.length,
   get:async k=>blobs.get(k),
-  commit:async(_,n)=>{reserved-=n;committed+=n},
+  commit:async(id,n)=>{reserved-=n;committed+=n;ledger.get(id).state='committed'},
   remove:async k=>{blobs.delete(k);checks.push('delete')},
   absent:async k=>!blobs.has(k),
-  reclaim:async()=>{committed=0;cleared++},
+  reclaim:async(id)=>{const entry=ledger.get(id);if(entry.state==='reserved')reserved-=entry.size;else committed-=entry.size;ledger.delete(id);cleared++},
   budget:async()=>({reserved_bytes:reserved,committed_bytes:committed})
  };
  return {api,stats:()=>({reserved,committed,maxUsed,objects:blobs.size,cleared,checks})};
