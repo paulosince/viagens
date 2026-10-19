@@ -1,0 +1,19 @@
+{
+  "name": "viaggio-neon-private-media",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "3.1153.0",
+    "@aws-sdk/s3-request-presigner": "3.1153.0",
+    "@neon/functions": "0.8.0",
+    "pg": "8.13.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}
