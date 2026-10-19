@@ -1,7 +1,6 @@
 <!doctype html>
 <html lang="pt-BR">
 <head>
-  <base href="../../../">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#159bf0">
@@ -9,9 +8,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Viaggio">
   <title>Viaggio · Prévia Neon</title>
-  <link rel="manifest" href="manifest.webmanifest">
-  <link rel="icon" href="assets/app-icon.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="icon-180.PNG">
+  <link rel="icon" href="../../../assets/app-icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="../../../icon-180.PNG">
   <style id="splash-critical">
     html { width: 100%; min-height: 100%; min-height: 100dvh; margin: 0; background: #b9eff8; }
     body { width: 100%; min-height: 100vh; min-height: 100dvh; margin: 0; background: linear-gradient(180deg, #159bf0 0%, #65d8ef 58%, #b9eff8 100%); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", sans-serif; }
@@ -48,10 +46,10 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20261018-64" as="style">
-  <link rel="stylesheet" href="style.css?v=20261018-64" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20261018-64"></noscript>
-  <link rel="stylesheet" href="src/update-manager.css?v=20261018-63">
+  <link rel="preload" href="../../../style.css?v=20261018-64" as="style">
+  <link rel="stylesheet" href="../../../style.css?v=20261018-64" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="../../../style.css?v=20261018-64"></noscript>
+  <link rel="stylesheet" href="../../../src/update-manager.css?v=20261018-63">
   <script>
     function showViaggioStartupError(detail) {
       if (!document.body || document.body.dataset.session !== 'loading') return;
@@ -78,7 +76,7 @@
     <span class="splash-cloud splash-cloud-two" aria-hidden="true"></span>
     <span class="splash-cloud splash-cloud-three" aria-hidden="true"></span>
     <div class="splash-content">
-      <img class="splash-plane" src="assets/splash-plane.png" alt="">
+      <img class="splash-plane" src="../../../assets/splash-plane.png" alt="">
       <h1>Viaggio</h1>
       <p>Suas viagens começam muito antes do embarque ✈️</p>
       <div class="splash-loading" role="status" aria-live="polite">
@@ -96,7 +94,7 @@
       <span class="splash-cloud splash-cloud-two" aria-hidden="true"></span>
       <span class="splash-cloud splash-cloud-three" aria-hidden="true"></span>
       <div class="auth-card" data-mode="login">
-        <div class="auth-brand"><img src="assets/splash-plane.png" alt="" aria-hidden="true"><h1>Viaggio</h1></div>
+        <div class="auth-brand"><img src="../../../assets/splash-plane.png" alt="" aria-hidden="true"><h1>Viaggio</h1></div>
         <p id="auth_intro" class="auth-intro">Suas viagens começam muito antes do embarque.</p>
         <form id="auth_form" class="auth-form" aria-hidden="false">
           <label class="visually-hidden" for="auth_email">E-mail</label>
@@ -136,7 +134,7 @@
               <img id="header_profile_image" alt="" hidden>
               <span id="header_profile_fallback" class="profile-fallback" aria-hidden="true">?</span>
             </button>
-            <button id="home_chatgpt_button" class="glass-button chatgpt-header-button" hidden type="button" aria-label="Conectar o Viaggio ao ChatGPT"><img src="assets/chatgpt-mark.svg" alt="" aria-hidden="true"><span>ChatGPT</span></button>
+            <button id="home_chatgpt_button" class="glass-button chatgpt-header-button" hidden type="button" aria-label="Conectar o Viaggio ao ChatGPT"><img src="../../../assets/chatgpt-mark.svg" alt="" aria-hidden="true"><span>ChatGPT</span></button>
           </div>
           <div class="header-buttons">
             <div class="home-usage-container">
@@ -234,7 +232,7 @@
           </header>
           <p id="profile_message" class="profile-save-message" role="status"></p>
           <section class="profile-photo-section">
-            <label class="profile-photo-editor" for="profile-photo"><img id="profile_editor_image" src="assets/avatar-placeholder.svg" alt=""><span>Alterar foto</span><input id="profile-photo" type="file" accept="image/*"></label>
+            <label class="profile-photo-editor" for="profile-photo"><img id="profile_editor_image" src="../../../assets/avatar-placeholder.svg" alt=""><span>Alterar foto</span><input id="profile-photo" type="file" accept="image/*"></label>
             <strong id="profile_display_name"></strong><span id="profile_email"></span>
           </section>
           <section class="form-section"><h3>Passageiro</h3><div class="form-group">
@@ -275,7 +273,7 @@
           <span class="sheet-header-spacer" aria-hidden="true"></span>
         </header>
         <section class="chatgpt-integration-card">
-          <div class="chatgpt-integration-mark" aria-hidden="true"><img src="assets/chatgpt-mark.svg" alt=""></div>
+          <div class="chatgpt-integration-mark" aria-hidden="true"><img src="../../../assets/chatgpt-mark.svg" alt=""></div>
           <h3>Dirija o Viaggio conversando</h3>
           <p>Depois de conectar sua conta, o ChatGPT pode criar viagens, organizar dias, editar agenda, passageiros, checklist e orçamento, além de restaurar snapshots quando você pedir.</p>
           <ul>
@@ -532,7 +530,7 @@
       <button id="delete_selected_trips" type="button" disabled>Excluir selecionadas</button>
     </footer>
   </main>
-  <script type="module" src="experiments/neon-pilot/app/main.js?v=20261019-1"></script>
+  <script type="module" src="./main.js?v=20261019-2"></script>
 
 </body>
 </html>
