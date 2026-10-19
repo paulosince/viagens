@@ -27,7 +27,7 @@ $('test').onclick=async()=>{
   if(!token)throw Error('Sessão expirada');
   const r=await fetch(api,{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:'{}',cache:'no-store'});
   let result;try{result=await r.json()}catch{throw Error('Backend ainda não está disponível')}
-  if(!r.ok||!result.ok)throw Error(result.error||'Resposta HTTP '+r.status);
+  if(!r.ok||!result.ok)throw Error([result.error,result.phase,result.diagnostic].filter(Boolean).join(' · ')||'Resposta HTTP '+r.status);
   status('Transferência confirmada: '+result.bytes+' bytes; etapas: '+result.checks.join(', '));
  }catch(e){status('Teste não concluído: '+(e.message||e))}
  finally{$('test').disabled=!valid}
