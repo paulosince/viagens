@@ -2,7 +2,7 @@
 <style>:root{font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:#14243b;background:#f4f7fb}body{margin:0;padding:env(safe-area-inset-top) 18px 40px}main{max-width:600px;margin:30px auto}section{background:#fff;border:1px solid #dfe7f0;border-radius:20px;padding:21px;margin:16px 0}h1{font-size:30px}p{color:#63758b;line-height:1.5;font-size:14px}button{background:#157ce1;color:#fff;border:0;border-radius:13px;padding:14px 18px;font:inherit;font-weight:700}button:disabled{opacity:.45}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#edf5ff;border-radius:13px;padding:15px}a{color:#126fc8;text-decoration:none}</style></head><body><main>
 <a href="./">‹ Laboratório Neon</a><h1>Teste G3: arquivos</h1><p>Uma imagem sintética será enviada ao bucket privado, conferida e excluída pelo backend. Nenhuma foto pessoal será utilizada.</p>
 <section><h2>Conta do Viaggio</h2><p id="identity">Verificando…</p><button id="verify">Verificar sessão</button></section>
-<section><h2>Teste automático</h2><p>O navegador envia apenas seu token de login ao backend; nenhuma credencial de armazenamento é exposta.</p><button id="test" disabled>Testar upload</button></section>
+<section><h2>Teste automático</h2><p>O navegador envia apenas seu token de login ao backend; nenhuma credencial de armazenamento é exposta.</p><button id="test" disabled>Testar upload</button> <button id="stress" disabled>Testar concorrência e falhas</button><p>O segundo teste executa seis transferências simultâneas, simula uma interrupção e verifica a rejeição de arquivos acima do limite. Usa somente imagens fictícias.</p></section>
 <section><h2>Resultado</h2><pre id="status">Aguardando sessão.</pre></section></main>
 <script type="module">
 import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
@@ -16,10 +16,12 @@ async function verify(){
  valid=!error&&!!data.user&&!!s.data?.session?.access_token;
  $('identity').textContent=valid?(data.user.email||'Autenticado'):'Entre no Viaggio no mesmo navegador e retorne.';
  $('test').disabled=!valid;
+ $('stress').disabled=!valid;
  status(valid?'Sessão autenticada. Pronto para o teste.':'Sessão não encontrada.');
 }
 $('verify').onclick=verify;
 $('test').onclick=async()=>{
+ $('stress').disabled=true;
  $('test').disabled=true;status('Verificando bucket privado…');
  try{
   const {data}=await client.auth.getSession();
@@ -30,7 +32,26 @@ $('test').onclick=async()=>{
   if(!r.ok||!result.ok)throw Error([result.error,result.phase,result.diagnostic].filter(Boolean).join(' · ')||'Resposta HTTP '+r.status);
   status('Transferência confirmada: '+result.bytes+' bytes; etapas: '+result.checks.join(', '));
  }catch(e){status('Teste não concluído: '+(e.message||e))}
- finally{$('test').disabled=!valid}
+ finally{$('test').disabled=!valid;$('stress').disabled=!valid}
+};
+$('stress').onclick=async()=>{
+ $('stress').disabled=true;$('test').disabled=true;
+ const cases=[['parallel','6 uploads simultâneos'],['interrupted-read','Interrupção de leitura'],['object-cap','Limite máximo por arquivo']];
+ const findings=[];
+ try{
+  const {data}=await client.auth.getSession();
+  const token=data?.session?.access_token;
+  if(!token)throw Error('Sessão expirada');
+  for(const [mode,label] of cases){
+   status([...findings,label+': executando…'].join('\n'));
+   const response=await fetch(api,{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify({mode}),cache:'no-store'});
+   const body=await response.json();
+   if(!response.ok||!body.ok)throw Error(label+': '+(body?.error||'HTTP '+response.status));
+   findings.push(label+': PASS');
+  }
+  status('Bateria de testes concluída.\n'+findings.join('\n')+'\nVerificar novamente o ledger e o bucket Neon antes de encerrar G3.');
+ }catch(e){status('Bateria interrompida.\n'+findings.join('\n')+'\n'+String(e.message||e));}
+ finally{$('stress').disabled=!valid;$('test').disabled=!valid}
 };
 async function init(){
  try{
