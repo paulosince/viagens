@@ -1,4 +1,4 @@
-import { createPreviewBackend } from './backend.mjs?v=20261019-1';
+import { createPreviewBackend } from './backend.mjs?v=20261019-3';
 import { offlineStore } from './offline-store.js?v=20261007-59';
 import {
   adoptLegacyDataUrl,
@@ -8,7 +8,7 @@ import {
   mediaObjectUrl,
   prepareMediaBlob,
   uploadCachedMedia
-} from './media-cache.js?v=20261007-62';
+} from './media-cache.js?v=20261019-3';
 
 const SUPABASE_URL = 'https://siabldasqinpfmxslwji.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_UgbBIOq1TnInuPRrQpAFag_JLIzYuFf';
