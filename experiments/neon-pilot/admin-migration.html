@@ -1,0 +1,30 @@
+<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Viaggio · Migração administrativa</title>
+<style>body{font:16px system-ui;background:#f3f7fb;color:#18344d;margin:32px auto;padding:20px;max-width:640px}section{background:white;border-radius:18px;padding:24px;margin:18px 0}button{background:#147bd1;color:white;border:0;border-radius:12px;padding:15px;font:inherit}button:disabled{opacity:.45}pre{white-space:pre-wrap;overflow-wrap:anywhere}progress{width:100%}</style>
+<h1>Migração administrativa</h1><p>Cópia dos 23 arquivos pendentes para o Neon. Originais preservados.</p><section><p id="account">Verificando sessão…</p><button id="start" disabled>Copiar e verificar os 23 arquivos</button></section><section><h2 id="count">0 / 23</h2><progress id="bar" max="23" value="0"></progress><pre id="status">Preparando…</pre><pre id="errors"></pre></section>
+<script type="module">
+import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+const $=id=>document.getElementById(id);let client,key,base,total=23,running=false;
+async function invoke(body){
+ const {data}=await client.auth.getSession();if(!data.session)throw Error('Faça login no Viaggio com a conta de Paulo.');
+ const r=await fetch(base+'/functions/v1/viaggio-admin-media-migration',{method:'POST',headers:{authorization:'Bearer '+data.session.access_token,apikey:key,'content-type':'application/json'},body:JSON.stringify(body)});
+ const result=await r.json();if(!r.ok||!result.ok)throw Error(result.error||result.message||'HTTP '+r.status);return result;
+}
+$('start').onclick=async()=>{
+ if(running)return;running=true;$('start').disabled=true;let good=0,fail=[];
+ for(let index=0;index<total;index++){
+  $('status').textContent='Copiando e conferindo arquivo '+(index+1)+' de '+total+'…';
+  try{await invoke({action:'copy',index});good++;$('count').textContent=good+' / '+total;$('bar').value=good}
+  catch(e){fail.push('Arquivo '+(index+1)+': '+e.message);$('errors').textContent=fail.join('\n');if(/ADMIN_REQUIRED|INVALID_SESSION|MIGRATION_CLOSED|Invalid JWT/.test(e.message))break}
+ }
+ $('status').textContent='Concluído: '+good+'/'+total+' copiados e verificados. Falhas: '+fail.length+'. Originais preservados.';
+ running=false;$('start').disabled=false;
+};
+try{
+ const src=await fetch('../../src/main.js',{cache:'no-store'}).then(r=>r.text());
+ const take=k=>src.match(new RegExp("^const "+k+" = '([^']+)'","m"))?.[1];
+ base=take('SUPABASE_URL');key=take('SUPABASE_KEY');client=createClient(base,key);
+ const {data,error}=await client.auth.getUser();if(error||!data.user)throw Error('Faça login no Viaggio com a conta de Paulo.');
+ $('account').textContent='Conta: '+data.user.email;
+ const state=await invoke({action:'status'});total=state.total;$('bar').max=total;$('count').textContent='0 / '+total;$('start').disabled=false;$('status').textContent='Acesso administrativo validado. Pronto para copiar.';
+}catch(e){$('status').textContent=e.message}
+</script></html>
