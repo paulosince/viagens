@@ -94,3 +94,14 @@ test('lists inventoried source file without reading it',async()=>{
  assert.equal(r.status,200);assert.equal(r.body.items.length,1);
  assert.equal(r.body.items[0].copied,false);assert.equal(s.stats().puts,0);
 });
+
+test('independent verification rereads the stored physical bytes',async()=>{
+ const s=setup();await handleMediaMigration(s.request(),s);
+ const r=await handleMediaMigration(s.request(undefined,undefined,'verify'),s);
+ assert.equal(r.status,200);assert.equal(r.body.bytes,s.data.length);
+ assert.equal(r.body.sha256,sha(s.data));
+});
+test('verification rejects a missing physical copy',async()=>{
+ const s=setup();const r=await handleMediaMigration(s.request(undefined,undefined,'verify'),s);
+ assert.equal(r.status,404);assert.equal(r.body.error,'NO_VERIFIED_COPY');
+});
