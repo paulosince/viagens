@@ -1,0 +1,42 @@
+# Viaggio Auth federation — verified staging milestone (2026-10-20)
+
+## Architecture (kept as agreed)
+- Closed beta for up to 20 people, one separate Neon project per user, initial Viaggio allowances of 400 MB database and 4 GB files per user, quota enforcement and registration admission to be implemented.
+- A third dedicated project `viaggio-auth-beta` in the same Free organization is the sole intended login issuer; per-user projects still retain their own application data, files and RLS.
+
+## Executed
+
+### Central Auth
+- Project `dark-union-03886858`, branch `br-square-river-b765bpl4`, database `viaggio_auth`.
+- Created the project, provisioned Managed Better Auth, named the integration `Viaggio`, and allowed trusted origin `https://paulosince.github.io`. Config re-read.
+- Central Auth base URL: `https://ep-small-bread-b7uq0zva.neonauth.c-13.us-east-1.aws.neon.tech/viaggio_auth/auth`.
+- Central signing JWKS: `https://ep-small-bread-b7uq0zva.neonauth.c-13.us-east-1.aws.neon.tech/viaggio_auth/auth/.well-known/jwks.json`.
+- No family account created or credential imported; `neon_auth.user` is empty. Email verification is **not enabled**, default dev SMTP remains configured. No registration promotion yet.
+
+### Per-user validation branches, NOT main
+- Trip-owner project A: `fragrant-credit-68065034`, branch `br-silent-band-b80nklzl`, DB `viaggio_lab`. Staging Data API: `https://ep-empty-pine-b8r7sa8d.apirest.c-14.us-east-1.aws.neon.tech/viaggio_lab/rest/v1`.
+- Paulo project B: `sparkling-field-13794641`, branch `br-falling-leaf-b8xuv1d0`, DB `viaggio_lab`. Staging Data API: `https://ep-spring-moon-b8fi6yxc.apirest.c-14.us-east-1.aws.neon.tech/viaggio_lab/rest/v1`.
+- The staging Data APIs were re-provisioned with the central JWKS as the sole *external* provider. Preserved `viaggio_app` exposed schema, anonymous role, RLS tables, 1000-row response ceiling, CORS origin, OpenAPI disabled. Both were read back as active; signed-token end-to-end verification remains to be performed.
+- Created `viaggio_identity.neon_auth_links`, private mapping of central Auth UUID to existing application UUID. Only administrative dual-session validation may insert a mapping; unverified email alone is never enough. Updated the private `viaggio_identity.uid()` RLS identity helper **on staging only** to return a legacy ID only for a verified mapping.
+- Confirmed: anonymous/authenticated lack direct SELECT on the mapping table, anonymous lacks EXECUTE on helper, authenticated retains EXECUTE, no links persist after controlled tests. Parent main branches have **no** mapping table and their original auth flow was not changed.
+
+## Tests (controlled SQL claims, NOT a real JWT login)
+- B: linked owner resolves home=true and reads one personal profile; unlinked UUID resolves NULL, home=false and zero profiles. PASS.
+- A: linked trip owner resolves home=true and sees four trips; linked separate shared-trip participant home=false and sees exactly one trip; unlinked UUID resolves NULL and sees zero trips. PASS.
+- Synthetic test mappings were deleted within the respective transactions. Both staging tables now have zero rows.
+- Regression suites G2/G3/G4 from earlier checkpoints should not be re-run from zero. Only signed-token / new provider regressions and unfinished end-to-end scenarios remain.
+
+## Before any production switch
+1. Enable **verified email signup** on central Better Auth (shared development SMTP can send OTP; dedicated SMTP strongly recommended for production). Put new registrations behind the Viaggio beta admission gate, not open signup.
+2. Implement a server-side **dual-session proof**: validate a live Supabase JWT identifying the already-linked legacy account, independently validate the new *central* Neon session and email verification, and create the identity mapping administratively on both user databases. Never trust browser-supplied identifiers for role binding.
+3. Obtain a real central Auth session and verify the SAME signed token can query both staging APIs; test denial, refresh, logout, cross-project owner/editor/viewer and media permissions. No real-user mapping has yet been performed.
+4. Switch the isolated GitHub Pages preview only after above, then test offline queues/reconnect, file writes and usage quota before planning production cutover.
+5. Reconcile source deltas and retain a verified rollback. Do not change or delete Supabase production credentials, DB or files.
+
+## Implementation source
+See `auth/federated-identity-stage.sql` (apply only to staging; already applied to both validation branches).
+
+## Documentation
+https://neon.com/docs/auth/migrate/from-supabase
+https://neon.com/docs/auth/production-checklist
+https://neon.com/docs/data-api/manage
