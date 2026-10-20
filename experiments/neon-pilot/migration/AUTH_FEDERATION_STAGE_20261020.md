@@ -40,3 +40,10 @@ See `auth/federated-identity-stage.sql` (apply only to staging; already applied 
 https://neon.com/docs/auth/migrate/from-supabase
 https://neon.com/docs/auth/production-checklist
 https://neon.com/docs/data-api/manage
+
+## Independent-work continuation — 2026-10-20
+- Added `migration/auth/check-federation.mjs` and `migration/auth/check-federation.test.mjs` to the migration branch only; these do not ship with the production PWA.
+- A local Node smoke-check implementation passed 8/8 mocked tests covering no link, valid linked project route, forged JWT rejection, anonymous denial, signed JWT rejection, wrong home, private-trip exposure and missing token. The committed code is an independent runner for the **real-token** step; no real Neon session was available to execute it live. No credentials were copied or committed.
+- Test checker uses a short-lived JWT passed through `VIAGGIO_CENTRAL_NEON_JWT` (local environment or masked CI secret), never in source. Optionally set `VIAGGIO_EXPECTED_HOME=b` for Paulo or `a` for Cíntia after a verified identity link. Do not send tokens through chat.
+- Control-plane blocker: available Neon connector actions can change the Auth name, trusted origins, and OAuth providers, but cannot enable required email verification or configure a custom SMTP server. Central Auth still allows unverified sign-ups; do not treat it as production-safe.
+- Hard stop: no family password migration, newly bound user, or signed-token access test has yet passed. Mapping demands a separately verified legacy session and new verified Neon identity. No irreversible production cutover without direct account-holder verification.
