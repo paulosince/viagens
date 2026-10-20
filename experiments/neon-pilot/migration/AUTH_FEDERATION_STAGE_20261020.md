@@ -47,3 +47,18 @@ https://neon.com/docs/data-api/manage
 - Test checker uses a short-lived JWT passed through `VIAGGIO_CENTRAL_NEON_JWT` (local environment or masked CI secret), never in source. Optionally set `VIAGGIO_EXPECTED_HOME=b` for Paulo or `a` for Cíntia after a verified identity link. Do not send tokens through chat.
 - Control-plane blocker: available Neon connector actions can change the Auth name, trusted origins, and OAuth providers, but cannot enable required email verification or configure a custom SMTP server. Central Auth still allows unverified sign-ups; do not treat it as production-safe.
 - Hard stop: no family password migration, newly bound user, or signed-token access test has yet passed. Mapping demands a separately verified legacy session and new verified Neon identity. No irreversible production cutover without direct account-holder verification.
+
+## Continued authorization implementation — 2026-10-20, later session
+
+Added migration-branch-only, server-side components:
+- `auth/identity-proof-core.mjs` and unit tests: verify both independently authenticated identities, require legacy email confirmation and central database `emailVerified=true`, require consistent email, reject deleted/banned users and mismatched subject IDs; only output the private linkage fields, never a token.
+- `auth/trusted-auth-adapters.mjs` and unit tests: obtain the legacy principal via a server-to-Supabase Auth /user request, verify a central JWT with a pinned JWKS and expected issuer through a supplied `jose` verifier, and read Neon user state via parameterized private SQL; these adapters must run server-side, never in the PWA.
+- `.github/workflows/viaggio-neon-auth-checks.yml`: syntax checks and `node --test experiments/neon-pilot/migration/auth/*.test.mjs` on changes to this branch (also PR/manual triggers).
+
+**Actual local Node.js execution:** 25 tests passed out of 25, zero failures (8 federation simulations + 10 identity-proof + 7 trusted-auth-adapter simulations). The tests mock remote responses; this is not proof of a deployed integration. A GitHub Actions run was not independently confirmed.
+
+**Independent safety reads:** central Better Auth still has zero real users; user-project parent branches have no federated link table and are untouched; A staging had zero persisted mappings. No real account tokens were accessed, transferred or saved. A separate B staging read was blocked by an automated safety check, so do not claim a new independent read of its count; earlier staging checks had zero links.
+
+**Hard integration remaining:** wire the adapters to a private backend with real `jose` JWT verification and a protected admin-only link-write transaction. Obtain and validate a genuine central token and signed cross-project requests. For any legacy account, both identities must be independently proven and the Neon address verified before linking. An external endpoint and account migration are *not* deployed. The required email-verification toggle is still unavailable through the currently exposed Neon connector operations; production-grade SMTP and beta admission controls also remain pending.
+
+No change to production Supabase, its main application, or the two per-user main-branch Neon Data APIs.
