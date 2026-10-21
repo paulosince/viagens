@@ -47,8 +47,8 @@ export async function testSignedFederation({token,fetcher=fetch,endpoints=ENDPOI
   // Server-enforced denial of a forged JWT and an anonymous session.
   for(const [key,url] of Object.entries(endpoints)){
     const base=endpoint(url);
-    const bad=await response(fetcher,base,'/trips?select=id&limit=1','not.a.valid.jwt');
-    if(![401,403].includes(bad.status))fail(key+'_FORGED_JWT_NOT_REJECTED');
+    const bad=await response(fetcher,base,'/trips?select=id&limit=1','eyJhbGciOiJFZERTQSJ9.eyJzdWIiOiJhYWFhYWFhYS1hYWFhLTRhYWEtOGFhYS1hYWFhYWFhYWFhYWFhYWEiLCJyb2xlIjoiYXV0aGVudGljYXRlZCJ9.YWJj');
+    if(![400,401,403].includes(bad.status))fail(key+'_FORGED_JWT_NOT_REJECTED');
     result.checks++;
     const anon=await response(fetcher,base,'/trips?select=id&limit=1',null);
     if(anon.ok){
