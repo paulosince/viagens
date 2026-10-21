@@ -20,11 +20,16 @@ if (configured) {
   const bURL=new URL(process.env.VIAGGIO_B_STAGING_DATABASE_URL);
   // Mandatory operational guard: NEVER write identity links to parent branches
   // while this service is in validation. Prevent accidental main DB secrets.
-  if (!centralURL.hostname.startsWith('ep-small-bread-b7uq0zva.')
-      || !aURL.hostname.startsWith('ep-empty-pine-b8r7sa8d.')
-      || !bURL.hostname.startsWith('ep-spring-moon-b8fi6yxc.')
-      || aURL.pathname!=='/viaggio_lab'
-      || bURL.pathname!=='/viaggio_lab') throw Error('STAGING_PROJECT_BOUNDARY_REQUIRED');
+  const exactHost=(url,ep,region,db)=>{
+    const allowed=[ep+'.'+region,ep+'-pooler.'+region];
+    return ['postgres:','postgresql:'].includes(url.protocol)
+      && allowed.includes(url.hostname)
+      && url.pathname==='/'+db;
+  };
+  if (!exactHost(centralURL,'ep-small-bread-b7uq0zva','c-13.us-east-1.aws.neon.tech','viaggio_auth')
+      || !exactHost(aURL,'ep-empty-pine-b8r7sa8d','c-14.us-east-1.aws.neon.tech','viaggio_lab')
+      || !exactHost(bURL,'ep-spring-moon-b8fi6yxc','c-14.us-east-1.aws.neon.tech','viaggio_lab'))
+    throw Error('STAGING_PROJECT_BOUNDARY_REQUIRED');
   centralURL.pathname='/viaggio_auth';
   const central=new pg.Pool({connectionString:centralURL.href,max:2,connectionTimeoutMillis:8000,
     idleTimeoutMillis:15000});
