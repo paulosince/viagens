@@ -38,8 +38,12 @@ A prévia permite operar sobre **cópias de staging**, mas não é o cutover de 
 - Banner do arquivo `neon-preview.html` atualizado nas branches `main`, `migration/neon-app-20261019` e branch de teste para esclarecer que as imagens privadas estão indisponíveis até validação. Nenhuma operação de foto, metadata ou viagem foi executada.
 - Próxima ação para concluir etapa 05: confirmar persistência de login após atualizar/fechar/abrir URL, logout e reentrada com a senha Neon. Depois testar a Cíntia. Excluir possibilidade de troca de conta/contaminação de cache local.
 
-## Ciclo de sessão — confirmação de Paulo (21/10/2026)
-- Após login real na prévia Neon, Paulo confirmou em conversa que **fechou/reabriu o Safari, executou o logout e voltou a entrar com a nova senha Neon**, respondendo "Tudo certo" à solicitação explícita desses testes. Resultado informado: sem falhas.
-- Isso é evidência de teste manual **da conta de Paulo**, não uma captura técnica de refresh com token expirado e não uma confirmação do teste equivalente da conta Cíntia.
+## Ciclo de sessão — testes reais de Cíntia e Paulo (21/10/2026; atribuição corrigida)
+- **Primeiro teste foi na conta de Cíntia**, não na de Paulo. O usuário confirmou "Tudo certo" após a solicitação de testar recarga/reabertura no Safari, logout e novo login com Neon; o relato anterior identificou erroneamente o titular.
+- **Segundo teste foi na conta de Paulo**, com a mesma sequência confirmada por "Tudo certo também".
+- O usuário esclareceu explicitamente: "na primeira loguei na conta da Cíntia, e agora na minha". **Ambas as contas passaram nos testes manuais** de acesso e ciclo de sessão; a ordem acima é a correta.
+- A alternância entre essas contas foi exercitada no uso da prévia, mas não se deve interpretar o relato como prova independente de expiração real do JWT, sincronização entre múltiplas abas ou recuperação de sessões em diferentes dispositivos.
 - Mantemos a limitação conhecida de **mídia privada bloqueada**, com arquivos presentes no Object Storage, para etapa 07/14.
-- **Pendente para aceite da etapa 05/14:** mesma verificação na conta de Cíntia; confirmar controle de sessão dela ao recarregar/reabrir, logout e novo login, além de testar ou instrumentar o refresh automático com token expirado. Não repetir testes de JWT A/B de 11/11 já aceitos na etapa 04.
+- **Única verificação técnica de sessão ainda pendente para aceite integral da etapa 05/14:** refresh automático após expiração real do token (e, se necessário, verificação instrumental de limpeza entre abas). Não repetir testes de JWT A/B 11/11 aceitos na etapa 04, nem solicitar aos titulares novo login/logout manual já validado.
+
+> **Nota de atualização:** os itens históricos da seção "Restante do aceite" acima antecedem os dois testes reais. A correção desta seção é a autoridade atual: os testes manuais de **ambos** estão concluídos e apenas a validação do refresh automático ainda permanece.
