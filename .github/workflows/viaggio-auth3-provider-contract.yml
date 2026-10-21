@@ -73,6 +73,8 @@ jobs:
             -H 'Authorization: Bearer invalid.jwt.token' \
             -H 'x-legacy-access-token: invalid.jwt.token' -d '{}' "$BRIDGE")
           echo "Neon linkup invalid-identity status: $status"
+          echo 'Non-sensitive error code:'
+          head -c 160 /tmp/rejected; echo
           test "$status" = 401
           grep -q 'UNAUTHORIZED' /tmp/rejected
           status=$(curl -sS -X OPTIONS -o /tmp/preflight -w '%{http_code}' --max-time 20 \
