@@ -30,3 +30,15 @@ Validar um JWT **real e assinado pelo Neon Auth central**, suas sessões e as pe
 
 ## Progresso fixo
 **3/14 aceitas; etapa 04 em andamento; 10 posteriores.** Os dados de produção continuam exclusivamente no Supabase; Neon main branches não sofreram cutover.
+
+## Correção após teste real de Paulo (21/10/2026)
+
+- Captura do navegador mostrou `a_PROFILES_QUERY_FAILED_HTTP_400` na execução da etapa 04. O teste alcançou a consulta do projeto A, mas interrompeu antes das 11 verificações; **não é aceite**.
+- Inspeção direta de `viaggio_app.passenger_profiles` em **A e B** provou que a chave primária é `user_id uuid`, não `id`. Ambos os bancos têm `authenticated` com USAGE no schema e SELECT na tabela.
+- A função de diagnóstico consultava incorretamente `/passenger_profiles?select=id&limit=5`. Corrigido para `/passenger_profiles?select=user_id&limit=5`.
+- Código corrigido em `main` e `migration/neon-app-20261019`. Acrescentada asserção de regressão em `federation-live.test.mjs`.
+- O código real do módulo foi executado com **respostas de APIs simuladas**, em ambiente isolado: caso Paulo/home B (A:1 viagem,0 perfis; B:0 viagens,1 perfil) e caso Cíntia/home A (A:4 viagens,1 perfil; B:0 viagens,0 perfis) retornaram ambos **passed=true** com 11 verificações, e todas as quatro consultas de perfis utilizaram `select=user_id`. **Isso não substitui o teste real assinado.**
+- Página original passou a importar `federation-live.mjs?v=20261021-schemafix1`; publicada também a URL inédita `auth-neon-smoke-v2.html` para evitar cache do Safari. Confirmados os arquivos no GitHub `main`. A propagação HTTP 200 **dessa nova URL** ainda não foi independentemente atestada.
+- Próximo teste: Paulo repetir apenas OTP na página v2 e compartilhar o quadro sem códigos nem tokens. Se passar, testar Cíntia. Sem reabrir cadastro ou vinculação e sem alterar produção.
+
+**Progresso permanece 3/14; etapa 04 não encerrada.**
