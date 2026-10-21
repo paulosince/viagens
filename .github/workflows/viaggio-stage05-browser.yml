@@ -1,0 +1,68 @@
+name: Viaggio Stage 05 browser live smoke
+on:
+  pull_request:
+    branches:
+      - migration/neon-app-20261019
+    paths:
+      - '.github/workflows/viaggio-stage05-browser.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify all published Neon-only static resources
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT='https://paulosince.github.io/viagens/experiments/neon-pilot/app'
+          for file in neon-preview.html main-neon.js backend-neon.mjs neon-identity.mjs offline-store-neon.js media-cache-neon.js; do
+            status=$(curl -sSL --max-time 35 -o /tmp/viaggio -w '%{http_code}' "$ROOT/$file")
+            echo "$file http=$status"
+            test "$status" = 200
+          done
+          for url in \
+            'https://cdn.jsdelivr.net/npm/@neondatabase/neon-js@0.9.0-beta/+esm' \
+            'https://cdn.jsdelivr.net/npm/@neondatabase/postgrest-js@0.2.0-beta/+esm'; do
+            status=$(curl -sSL --max-time 45 -o /tmp/sdk -w '%{http_code}' "$url")
+            echo "SDK CDN http=$status"
+            test "$status" = 200
+            test "$(wc -c < /tmp/sdk)" -gt 100
+          done
+      - name: Verify initial unauthenticated preview in a real browser
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/viaggio-play
+          cd /tmp/viaggio-play
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund playwright >/dev/null
+          node --input-type=module <<'JS'
+          import {chromium} from 'playwright';
+          import assert from 'node:assert/strict';
+          const browser=await chromium.launch({channel:'chrome',headless:true,args:['--no-sandbox']});
+          const page=await browser.newPage({serviceWorkers:'block'});
+          const errors=[];
+          page.on('pageerror',e=>errors.push(e.message));
+          await page.goto('https://paulosince.github.io/viagens/experiments/neon-pilot/app/neon-preview.html',{waitUntil:'domcontentloaded',timeout:40000});
+          await page.waitForFunction(()=>document.body.dataset.appReady==='true',{timeout:35000});
+          const result=await page.evaluate(()=>({
+            status:document.body.dataset.session,
+            appReady:document.body.dataset.appReady,
+            authVisible:document.querySelector('#auth_view')?.getAttribute('aria-hidden'),
+            productionServiceWorker:!!navigator.serviceWorker.controller,
+            banner:document.body.innerText.includes('Prévia Neon Auth')
+          }));
+          console.log('Initial browser state:',JSON.stringify(result));
+          console.log('Browser pageerrors:',JSON.stringify(errors.slice(0,5)));
+          assert.equal(result.status,'anonymous');
+          assert.equal(result.authVisible,'false');
+          assert.equal(result.banner,true);
+          assert.deepEqual(errors,[]);
+          await browser.close();
+          JS
