@@ -8,6 +8,7 @@ on:
       - '.github/workflows/viaggio-auth3-provider-contract.yml'
       - 'experiments/neon-pilot/migration/auth/**'
       - 'experiments/neon-pilot/app/link-session*.mjs'
+      - 'experiments/neon-pilot/app/auth-link-otp.html'
   workflow_dispatch:
 
 permissions:
@@ -24,6 +25,24 @@ jobs:
           node-version: '24'
       - name: Test session bridging without real credentials
         run: node --test experiments/neon-pilot/app/link-session.test.mjs
+      - name: Validate OTP portal syntax and legacy session continuity
+        shell: bash
+        run: |
+          node <<'JS'
+          const fs=require('node:fs');
+          const assert=require('node:assert/strict');
+          const html=fs.readFileSync('experiments/neon-pilot/app/auth-link-otp.html','utf8');
+          assert.match(html,/auth\.auth\.getSession\(\)/);
+          assert.match(html,/type:'sign-in'/);
+          assert.match(html,/sign-in\/email-otp/);
+          assert.match(html,/linkVerifiedSessions\(/);
+          assert.doesNotMatch(html,/name=["']oldpass|id=["']oldpass/);
+          const match=html.match(/<script type="module">([\s\S]*?)<\/script>/);
+          assert.ok(match);
+          fs.writeFileSync('/tmp/viaggio-auth-otp.mjs',match[1]);
+          console.log('OTP source and session contract PASS');
+          JS
+          node --check /tmp/viaggio-auth-otp.mjs
       - name: Validate providers and fail-closed bridge using anonymous HTTP
         shell: bash
         run: |
