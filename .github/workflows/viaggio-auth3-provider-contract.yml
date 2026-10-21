@@ -7,6 +7,7 @@ on:
     paths:
       - '.github/workflows/viaggio-auth3-provider-contract.yml'
       - 'experiments/neon-pilot/migration/auth/**'
+      - 'experiments/neon-pilot/app/link-session*.mjs'
   workflow_dispatch:
 
 permissions:
@@ -17,6 +18,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Test session bridging without real credentials
+        run: node --test experiments/neon-pilot/app/link-session.test.mjs
       - name: Validate providers and fail-closed bridge using anonymous HTTP
         shell: bash
         run: |
