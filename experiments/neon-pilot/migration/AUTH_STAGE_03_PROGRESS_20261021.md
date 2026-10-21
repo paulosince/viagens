@@ -32,3 +32,8 @@ A lista acordada mantém **14 etapas**. A etapa 03 só termina quando o backend 
 - `auth/link-store.mjs` e testes
 - `auth/identity-proof-core.mjs` e `auth/trusted-auth-adapters.mjs`
 - `.github/workflows/viaggio-neon-auth-checks.yml`, `.github/workflows/viaggio-link-build-stage.yml`
+
+### Endpoint provisionado (inativo por segurança)
+`https://br-square-river-b765bpl4-linkup.compute.c-13.us-east-1.aws.neon.tech/`
+
+Neon relatou deployment `completed` da versão limitada que não manipula identidades. Bloqueio por origem e estado `MIGRATION_NOT_ENABLED` permanecem como proteção. **O deploy não equivale à implantação da integração completa** do código `auth/link-service/index.mjs`.
