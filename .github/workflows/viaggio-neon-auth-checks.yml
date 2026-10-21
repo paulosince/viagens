@@ -33,5 +33,11 @@ jobs:
           node --check experiments/neon-pilot/migration/auth/identity-proof-core.test.mjs
           node --check experiments/neon-pilot/migration/auth/trusted-auth-adapters.mjs
           node --check experiments/neon-pilot/migration/auth/trusted-auth-adapters.test.mjs
+          node --check experiments/neon-pilot/migration/auth/link-orchestrator.mjs
+          node --check experiments/neon-pilot/migration/auth/link-orchestrator.test.mjs
+          node --check experiments/neon-pilot/migration/auth/link-store.mjs
+          node --check experiments/neon-pilot/migration/auth/link-store.test.mjs
+          node --check experiments/neon-pilot/migration/auth/link-service/index.mjs
+          node --check experiments/neon-pilot/migration/auth/link-service/build.mjs
       - name: Simulated federation security tests (no secrets)
         run: node --test experiments/neon-pilot/migration/auth/*.test.mjs
