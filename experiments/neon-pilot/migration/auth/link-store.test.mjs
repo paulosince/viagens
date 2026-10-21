@@ -49,3 +49,32 @@ test('rejects inconsistent pre-existing link',async()=>{
  const store=createLinkRepository({central:db.pool,a:mismatch,b:db.pool});
  await assert.rejects(store.prepare('a',record),/MAPPING_CONFLICT/);
 });
+
+test('private directory selects home and shared-host projects per legacy ID',async()=>{
+ const central=mocked().pool;
+ const a={connect:async()=>{throw Error('unused');},query:async()=>({rowCount:1,rows:[{known_user:true,is_owner:true}]})};
+ const b={connect:async()=>{throw Error('unused');},query:async()=>({rowCount:1,rows:[{known_user:false,is_owner:false}]})};
+ const store=createLinkRepository({central,a,b});
+ assert.deepEqual(await store.projectsForLegacy(record),['a']);
+});
+test('a guest is linked in host A and home B',async()=>{
+ const central=mocked().pool;
+ const a={connect:async()=>{throw Error('unused');},query:async()=>({rowCount:1,rows:[{known_user:true,is_owner:false}]})};
+ const b={connect:async()=>{throw Error('unused');},query:async()=>({rowCount:1,rows:[{known_user:true,is_owner:true}]})};
+ const store=createLinkRepository({central,a,b});
+ assert.deepEqual(await store.projectsForLegacy(record),['a','b']);
+});
+test('two homes or absent home must be rejected',async()=>{
+ const central=mocked().pool;
+ const p=(known_user,is_owner)=>({connect:async()=>{throw Error('unused');},query:async()=>({rowCount:1,rows:[{known_user,is_owner}]})});
+ for(const [a,b] of [[p(true,true),p(true,true)],[p(true,false),p(false,false)],[p(false,false),p(false,false)]]){
+  const store=createLinkRepository({central,a,b});
+  await assert.rejects(store.projectsForLegacy(record),/PROJECT_MAPPING_AMBIGUOUS/);
+ }
+});
+test('directory query fails closed without valid boolean metadata',async()=>{
+ const central=mocked().pool;
+ const a={connect:async()=>{},query:async()=>({rowCount:1,rows:[{known_user:1,is_owner:1}]})};
+ const b={connect:async()=>{},query:async()=>({rowCount:1,rows:[{known_user:false,is_owner:false}]})};
+ await assert.rejects(createLinkRepository({central,a,b}).projectsForLegacy(record),/PROJECT_DIRECTORY_UNAVAILABLE/);
+});
