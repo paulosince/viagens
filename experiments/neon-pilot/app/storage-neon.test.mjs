@@ -69,7 +69,7 @@ test('server returns 404: client NEVER guesses another project',async()=>{
  assert.ok(r.error);assert.equal(x.http().length,1);
 });
 test('unknown trip denies without HTTP request',async()=>{
- const x=fixture({trip:'b'});const r=await x.client.from('trip-images').download(A+'/trip/x.webp');
+ const x=fixture({trip:null});const r=await x.client.from('trip-images').download(A+'/trip/x.webp');
  assert.ok(r.error);assert.equal(x.http().length,0);
 });
 test('signed in but missing token fails without remote request',async()=>{
