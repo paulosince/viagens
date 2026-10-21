@@ -1,0 +1,42 @@
+name: Viaggio staging identity-link build (one-time)
+
+on:
+  push:
+    branches:
+      - migration/neon-app-20261019
+    paths:
+      - '.github/workflows/viaggio-link-build-stage.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Execute account-linking tests (mock identities, no secrets)
+        run: node --test experiments/neon-pilot/migration/auth/*.test.mjs
+      - name: Build private Neon Function
+        working-directory: experiments/neon-pilot/migration/auth/link-service
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+          node --check dist/index.mjs
+          cd dist
+          zip -q -j function.zip index.mjs
+          base64 -w0 function.zip > function.zip.b64
+      - name: Stage prebuilt artifact for connected deploy
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add experiments/neon-pilot/migration/auth/link-service/dist/function.zip.b64
+          git commit -m "Stage temporary built Neon Function bundle (no secrets)"
+          git push origin HEAD:migration/neon-app-20261019
