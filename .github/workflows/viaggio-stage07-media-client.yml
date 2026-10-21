@@ -4,6 +4,9 @@ on:
     branches: [migration/neon-app-20261019]
     paths:
       - 'experiments/neon-pilot/app/storage-neon.mjs'
+      - 'experiments/neon-pilot/app/photo-source-neon.mjs'
+      - 'experiments/neon-pilot/app/photo-source-neon.test.mjs'
+      - 'experiments/neon-pilot/app/main-neon.js'
       - 'experiments/neon-pilot/app/storage-neon.test.mjs'
       - 'experiments/neon-pilot/app/backend-neon.mjs'
       - '.github/workflows/viaggio-stage07-media-client.yml'
@@ -23,8 +26,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          node --check experiments/neon-pilot/app/main-neon.js
+          node --check experiments/neon-pilot/app/photo-source-neon.mjs
           node --check experiments/neon-pilot/app/storage-neon.mjs
           node --check experiments/neon-pilot/app/storage-neon.test.mjs
-          node --test experiments/neon-pilot/app/storage-neon.test.mjs
+          node --test experiments/neon-pilot/app/storage-neon.test.mjs experiments/neon-pilot/app/photo-source-neon.test.mjs
+          grep -Fq 'activityPhotoForPreview(activity, location)' experiments/neon-pilot/app/main-neon.js
           test "$(grep -c 'allowMutations=false' experiments/neon-pilot/app/storage-neon.mjs)" -eq 1
           ! grep -q 'for(const p of \[primary,' experiments/neon-pilot/app/storage-neon.mjs
