@@ -1,7 +1,7 @@
 # Viaggio — Supabase → Neon — Etapa 05/14
 
-**STATUS 2026-10-21: IMPLEMENTAÇÃO PUBLICADA EM PRÉVIA ISOLADA; ACEITE REAL PENDENTE.**
-Progresso fixo **4/14**, dez itens restantes incluindo esta etapa. Não criar etapas adicionais.
+**STATUS HISTÓRICO: ESTE CHECKPOINT PRECEDE O ACEITE DA ETAPA 05/14.**
+A etapa 05 foi **CONCLUÍDA em 2026-10-21**, conforme [`AUTH_STAGE_05_ACCEPTANCE_20261021.md`](./AUTH_STAGE_05_ACCEPTANCE_20261021.md). Progresso atualizado: **5/14**, nove restantes. Não criar etapas adicionais.
 
 ## Entregas desta rodada
 - Prévia separada publicada em `https://paulosince.github.io/viagens/experiments/neon-pilot/app/neon-preview.html`.
@@ -47,3 +47,7 @@ A prévia permite operar sobre **cópias de staging**, mas não é o cutover de 
 - **Única verificação técnica de sessão ainda pendente para aceite integral da etapa 05/14:** refresh automático após expiração real do token (e, se necessário, verificação instrumental de limpeza entre abas). Não repetir testes de JWT A/B 11/11 aceitos na etapa 04, nem solicitar aos titulares novo login/logout manual já validado.
 
 > **Nota de atualização:** os itens históricos da seção "Restante do aceite" acima antecedem os dois testes reais. A correção desta seção é a autoridade atual: os testes manuais de **ambos** estão concluídos e apenas a validação do refresh automático ainda permanece.
+
+
+## Encerramento
+As contas de **Cíntia primeiro e Paulo depois** foram testadas manualmente com login persistente, logout e novo login. CI [39669864859](https://github.com/paulosince/viagens/actions/runs/39669864859) aprovou 15/15 testes de token renovado e revogado, utilizando SDK PostgREST real e expiração simulada na camada Auth; o Neon documenta auto-refresh nativo no getSession. A limitação deste tipo de teste está registrada no aceite formal. Etapa 05 aceita sem corte de produção. Próxima **06/14**.
