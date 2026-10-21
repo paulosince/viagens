@@ -63,3 +63,9 @@ Neon relatou deployment `completed` da versão limitada que não manipula identi
 - Além disso, o projeto Neon Free compartilha capacidade entre projetos e o portal não integra ainda o aplicativo em produção.
 
 **Nenhuma alteração do roteamento em produção, nenhuma migração real de conta e nenhuma mudança do Supabase.**
+
+## Confirmação de identidade real — 21/10/2026 (após a publicação do portal)
+- O titular confirmou na interface do portal a mensagem final **E-mail confirmado**.
+- Leitura do diretório central `neon_auth.user`: **1 conta total, 1 com `emailVerified=true`**. Nenhum e-mail, UUID, senha ou OTP foi incluído neste registro.
+- **Etapa 03/14 continua parcial**: o serviço `linkup` permanece desabilitado, e a prova simultânea de sessão Supabase + Neon e os vínculos com os dados ainda não foram executados.
+- Próximo acesso humano: confirmar a identidade de Cíntia no mesmo portal com o e-mail original dela, sem repassar credenciais no chat. Depois completar fluxo privado de dupla sessão e testar antes de ativar mapeamento real.
