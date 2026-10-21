@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Viaggio — Atualizar acesso</title>
+<style>
+:root{color-scheme:light;--blue:#065cbd;--bg:#f4f7fb;--ink:#15253a;--muted:#65778e}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+main{max-width:470px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 36px) 22px calc(env(safe-area-inset-bottom) + 45px)}
+.brand{display:flex;gap:10px;align-items:center;color:var(--blue);font-weight:800;letter-spacing:-.6px}.mark{background:var(--blue);color:white;border-radius:15px;padding:10px}
+h1{font-size:29px;line-height:1.15;letter-spacing:-1px;margin:30px 0 10px}.intro{color:var(--muted);margin:0 0 26px}
+.panel{background:white;border:1px solid #e3eaf2;border-radius:22px;padding:22px;box-shadow:0 8px 32px #2643650a}
+label{font-size:13px;font-weight:650;display:block;margin:18px 0 7px}input{width:100%;padding:14px 15px;font-size:16px;border:1px solid #cbd7e5;border-radius:13px;background:white;color:var(--ink)}
+input:focus{outline:2px solid #7fb4f5;border-color:var(--blue)}button{font:650 16px -apple-system,BlinkMacSystemFont,sans-serif;background:var(--blue);color:white;border:none;border-radius:13px;padding:15px 18px;width:100%;margin-top:23px;cursor:pointer}
+button:disabled{opacity:.52;cursor:wait}button.secondary{background:#eaf2fc;color:#104e8b;margin-top:12px}
+.small{font-size:13px;color:var(--muted)}.status{margin-top:16px;padding:12px;border-radius:12px;background:#edf5ff;color:#104e8b;white-space:pre-wrap}
+.status.error{background:#fff1f1;color:#9d2929}.hidden{display:none!important}.steps{display:flex;gap:6px;margin:22px 0}.steps span{height:5px;flex:1;background:#d9e4f0;border-radius:8px}.steps span.on{background:var(--blue)}
+footer{font-size:12px;color:var(--muted);margin:24px 0;line-height:1.5}
+</style>
+</head>
+<body>
+<main>
+<div class="brand"><span class="mark">V</span> VIAGGIO <span class="small">· Migração Neon</span></div>
+<h1>Atualize sua conta</h1>
+<p class="intro">Crie a nova credencial de acesso usando <strong>o mesmo e-mail</strong> do Viaggio atual. Suas viagens não serão apagadas nem transferidas nesta tela.</p>
+<div class="steps" aria-label="Etapas"><span class="on" id="bar1"></span><span id="bar2"></span><span id="bar3"></span></div>
+<section class="panel" id="signup-step">
+<h2 style="margin:0;font-size:19px">1. Nova senha do Viaggio</h2>
+<p class="small">Esta é uma credencial nova, gerenciada pelo Neon Auth. Não use sua senha anterior.</p>
+<form id="signup">
+<label for="name">Nome</label><input id="name" autocomplete="name" required maxlength="120" placeholder="Seu nome">
+<label for="email">E-mail atual do Viaggio</label><input id="email" type="email" autocomplete="email" required maxlength="254" placeholder="voce@exemplo.com">
+<label for="password">Nova senha</label><input id="password" type="password" autocomplete="new-password" minlength="12" required placeholder="No mínimo 12 caracteres">
+<button type="submit" id="signup-button">Criar nova credencial</button>
+</form>
+</section>
+<section class="panel hidden" id="verify-step">
+<h2 style="margin:0;font-size:19px">2. Confirme seu e-mail</h2>
+<p class="small">Digite o código recebido em <strong id="email-confirmed"></strong>. Se não recebeu o código, use a opção de reenvio.</p>
+<form id="verify">
+<label for="otp">Código de verificação</label><input id="otp" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{4,10}" maxlength="10" required placeholder="Código enviado por e-mail">
+<button type="submit" id="verify-button">Confirmar e-mail</button>
+</form>
+<button class="secondary" id="resend" type="button">Enviar / reenviar código</button>
+</section>
+<section class="panel hidden" id="success-step">
+<h2 style="margin:0;font-size:19px">3. E-mail confirmado</h2>
+<p>Sua nova identidade Neon está confirmada. <strong>A vinculação das viagens ainda será executada separadamente.</strong></p>
+<p class="small">Avise no ChatGPT somente que concluiu a confirmação, sem enviar senha, código ou token.</p>
+</section>
+<div id="status" role="status" aria-live="polite" class="status hidden"></div>
+<footer>Ambiente de migração isolado. Seus dados atuais permanecem no Supabase até o corte autorizado. Este formulário envia suas credenciais diretamente ao Neon Auth; o ChatGPT não as recebe. A confirmação pelo código depende da entrega de e-mail do provedor Neon.</footer>
+</main>
+<script type="module">
+const base='https://ep-small-bread-b7uq0zva.neonauth.c-13.us-east-1.aws.neon.tech/viaggio_auth/auth';
+const $=id=>document.getElementById(id);
+let verifiedEmail='';
+let busy=false;
+function status(message,error=false){const el=$('status');el.textContent=message;el.className='status'+(error?' error':'');}
+function show(step){for(const id of ['signup','verify','success'])$(id+'-step').classList.toggle('hidden',id!==step);['bar1','bar2','bar3'].forEach((b,i)=>$(b).classList.toggle('on',i<=({signup:0,verify:1,success:2}[step])));$('status').classList.add('hidden');}
+async function request(endpoint,body){
+ const r=await fetch(base+endpoint,{method:'POST',credentials:'include',mode:'cors',cache:'no-store',
+ headers:{'content-type':'application/json'},body:JSON.stringify(body),redirect:'error'});
+ const out=await r.json().catch(()=>({}));
+ if(!r.ok||out?.error)throw Error(out?.message||out?.error?.message||'O Neon não concluiu a operação. Verifique os dados e tente novamente.');
+ return out;
+}
+async function run(button,action){if(busy)return;busy=true;button.disabled=true;try{await action()}catch(e){status(e.message||'Erro de comunicação. Tente novamente.',true)}finally{busy=false;button.disabled=false}}
+$('signup').addEventListener('submit',e=>{e.preventDefault();run($('signup-button'),async()=>{
+ const email=$('email').value.trim().toLowerCase(),name=$('name').value.trim(),pass=$('password').value;
+ if(pass.length<12)throw Error('A nova senha deve ter pelo menos 12 caracteres.');
+ const result=await request('/sign-up/email',{email,password:pass,name});
+ $('password').value='';
+ if(!result?.user && !result?.token && !result?.session)throw Error('O Neon não confirmou a criação da conta.');
+ verifiedEmail=email;$('email-confirmed').textContent=email;show('verify');
+ status('Credencial criada. Confira o e-mail. Se o código não chegar, toque em Enviar / reenviar código.');
+ })});
+$('resend').addEventListener('click',()=>run($('resend'),async()=>{
+ await request('/email-otp/send-verification-otp',{email:verifiedEmail,type:'email-verification'});
+ status('Solicitação enviada. Confira sua caixa de entrada e spam; o código expira em aproximadamente 15 minutos.');
+}));
+$('verify').addEventListener('submit',e=>{e.preventDefault();run($('verify-button'),async()=>{
+ const otp=$('otp').value.trim();
+ await request('/email-otp/verify-email',{email:verifiedEmail,otp});
+ $('otp').value='';show('success');
+ })});
+</script>
+</body>
+</html>
