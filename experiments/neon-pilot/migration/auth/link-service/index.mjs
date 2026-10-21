@@ -14,6 +14,8 @@ const required=['DATABASE_URL','VIAGGIO_A_STAGING_DATABASE_URL',
 const configured=required.every(k=>Boolean(process.env[k]));
 const enabled=configured&&process.env.VIAGGIO_LINK_ENABLED==='true';
 let handler;
+try {
+if (!configured) throw Error('REQUIRED_ENV_MISSING');
 if (configured) {
   const centralURL=new URL(process.env.DATABASE_URL);
   const aURL=new URL(process.env.VIAGGIO_A_STAGING_DATABASE_URL);
@@ -66,5 +68,24 @@ if (configured) {
     enabled:false,prove:async()=>{throw Error('NOT_CONFIGURED');},
     link:async()=>{throw Error('NOT_CONFIGURED');}
   });
+}
+ } catch (error) {
+  // Never crash the module or expose environment values. This service remains
+  // deliberately disabled until a real signed-token integration test passes.
+  const reason=error?.message==='STAGING_PROJECT_BOUNDARY_REQUIRED'?'BOUNDARY_MISMATCH'
+    :error?.message==='INVALID_NEON_AUTH_ISSUER'?'ISSUER_MISMATCH'
+    :error?.message==='REQUIRED_ENV_MISSING'?'REQUIRED_ENV_MISSING':'STARTUP_EXCEPTION';
+  console.error('VIAGGIO_LINKUP_STARTUP',reason);
+  handler=async request=>{
+    if(request.headers.get('origin')!=='https://paulosince.github.io')
+      return Response.json({error:'ORIGIN_NOT_ALLOWED'},{status:403,headers:{'Cache-Control':'no-store'}});
+    if(request.method==='OPTIONS')return new Response(null,{status:204,headers:{
+      'Access-Control-Allow-Origin':'https://paulosince.github.io',
+      'Access-Control-Allow-Headers':'authorization, x-legacy-access-token',
+      'Access-Control-Allow-Methods':'POST, OPTIONS'
+    }});
+    return Response.json({error:'MIGRATION_CONFIG_INVALID',code:reason},
+      {status:503,headers:{'Cache-Control':'no-store'}});
+  };
 }
 export default {fetch:handler};
