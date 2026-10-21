@@ -1,7 +1,7 @@
 // Neon-only preview backend. No Supabase project or Supabase Auth calls.
 // Transport: official @neondatabase/postgrest-js, JWTs: Managed Neon Auth.
 // IMPORTANT: these are staging APIs. Never substitute project main URLs.
-import {createMediaClient} from './storage.mjs';
+import {createNeonMediaClient} from './storage-neon.mjs';
 import {createRouter} from './router-neon.mjs';
 import {createNeonIdentity} from './neon-identity.mjs';
 export const API_ROOTS=Object.freeze({
@@ -10,19 +10,12 @@ export const API_ROOTS=Object.freeze({
 });
 export const NEON_AUTH_URL='https://ep-small-bread-b7uq0zva.neonauth.c-13.us-east-1.aws.neon.tech/viaggio_auth/auth';
 const MEDIA=Object.freeze({
- a:'https://br-dawn-bread-b83r0ztn-appmedia.compute.c-14.us-east-1.aws.neon.tech/',
- b:'https://br-proud-paper-b83l1z7d-appmedia.compute.c-14.us-east-1.aws.neon.tech/'
+ a:'https://br-silent-band-b80nklzl-appmedia.compute.c-14.us-east-1.aws.neon.tech/',
+ b:'https://br-falling-leaf-b8xuv1d0-appmedia.compute.c-14.us-east-1.aws.neon.tech/'
 });
-// Media Functions have not yet been confirmed with Neon Auth JWT in the new
-// preview. Media mutating operations MUST remain blocked until Step 7/14.
-const mediaBlocked={
- from(){return {
-  async download(){return {data:null,error:Error('Mídia aguardando validação com Neon Auth.')};},
-  async createSignedUrl(){return {data:null,error:Error('Mídia aguardando validação com Neon Auth.')};},
-  async upload(){return {data:null,error:Error('Upload de mídia bloqueado até validação.')};},
-  async remove(){return {data:null,error:Error('Exclusão de mídia bloqueada até validação.')};}
- }}
-};
+// The Neon Functions have rejected missing and forged JWTs (401/403).
+// Enable READ ONLY pending a positive real-user JWT authorization test.
+// Never enable mutations until their separate positive and negative tests pass.
 export function createNeonPreview({authSdk,NeonPostgrestClient,fetchWithToken}){
  if(!authSdk?.auth||!NeonPostgrestClient||!fetchWithToken)throw Error('Neon SDK não inicializado.');
  // Token-provider calls the official Neon Auth adapter, which manages
@@ -48,7 +41,8 @@ export function createNeonPreview({authSdk,NeonPostgrestClient,fetchWithToken}){
  // Keep the existing preview's generic RPC router, but never silently send
  // old Supabase Edge Functions (Unsplash, deletion etc.) to Supabase.
  const functions={async invoke(){return {data:null,error:new Error('Serviço ainda não disponível na prévia Neon.')};}};
- const router=createRouter({projects,auth:facade.auth,functions,storage:mediaBlocked});
+ const storage=createNeonMediaClient({projects,accessToken:getToken,allowMutations:false});
+ const router=createRouter({projects,auth:facade.auth,functions,storage});
  // No user data operation succeeds unless Neon JWT is presented.
  return {...router,accessToken:facade.accessToken,provider:'neon-auth-central'};
 }
