@@ -1,6 +1,6 @@
 # Viaggio — Supabase → Neon — Etapa 04/14
 
-**STATUS: EM ANDAMENTO (NÃO concluída).** 21/10/2026.
+**STATUS HISTÓRICO: EM ANDAMENTO à época deste checkpoint. Etapa 04/14 posteriormente CONCLUÍDA (21/10/2026), conforme [`AUTH_STAGE_04_ACCEPTANCE_20261021.md`](./AUTH_STAGE_04_ACCEPTANCE_20261021.md).**
 
 ## Objetivo desta etapa da lista fixa
 Validar um JWT **real e assinado pelo Neon Auth central**, suas sessões e as permissões RLS nos **dois projetos de dados**. Sem alterar viagens ou o Supabase de produção.
@@ -50,3 +50,7 @@ Validar um JWT **real e assinado pelo Neon Auth central**, suas sessões e as pe
 - Evidência é a captura do navegador, não um log de JWT ou sessão armazenado; **não** imprimir ou persistir token.
 - Próximo: Cíntia executar `https://paulosince.github.io/viagens/experiments/neon-pilot/app/auth-neon-smoke-v2.html` com o **e-mail dela**; esperado projeto A, 4 viagens em A, 0 em B, 1 perfil em A, 0 em B e 11/11.
 - Testes de refresh/reabertura/logout da sessão ainda não foram comprovados. **Etapa 04/14 permanece EM ANDAMENTO; progresso 3/14.**
+
+## Encerramento deste checkpoint
+
+A captura de Cíntia confirmou 11/11 com JWT real Neon Auth, projeto pessoal A, 4 viagens em A, 0 em B, 1 perfil pessoal em A e 0 em B. Juntamente com Paulo (11/11, projeto B), o objetivo de JWT real/RLS/sessões criadas foi atingido. Consulta ao Auth central encontrou 2 usuários verificados e sessões não expiradas em ambas as identidades. O **aceite definitivo** da etapa 04/14 está em [`AUTH_STAGE_04_ACCEPTANCE_20261021.md`](./AUTH_STAGE_04_ACCEPTANCE_20261021.md). A renovação de sessão e logout dentro da PWA ainda não foram testados: obrigação da etapa **05/14**, que é justamente a integração do novo cliente Auth. Progresso: **4/14**.
