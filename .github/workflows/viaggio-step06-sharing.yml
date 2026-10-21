@@ -1,0 +1,26 @@
+name: Viaggio step 06 shared trips routing
+on:
+  pull_request:
+    branches:
+      - migration/neon-app-20261019
+    paths:
+      - 'experiments/neon-pilot/app/router.mjs'
+      - 'experiments/neon-pilot/app/router-stage6.test.mjs'
+      - '.github/workflows/viaggio-step06-sharing.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  sharing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Safe sharing, invitation and revocation routing tests
+        run: |
+          node --check experiments/neon-pilot/app/router.mjs
+          node --check experiments/neon-pilot/app/router-stage6.test.mjs
+          node --test experiments/neon-pilot/app/router-stage6.test.mjs
