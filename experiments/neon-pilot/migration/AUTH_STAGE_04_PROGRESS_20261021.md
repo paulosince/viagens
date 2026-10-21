@@ -42,3 +42,11 @@ Validar um JWT **real e assinado pelo Neon Auth central**, suas sessões e as pe
 - Próximo teste: Paulo repetir apenas OTP na página v2 e compartilhar o quadro sem códigos nem tokens. Se passar, testar Cíntia. Sem reabrir cadastro ou vinculação e sem alterar produção.
 
 **Progresso permanece 3/14; etapa 04 não encerrada.**
+
+## Sessão real de Paulo — APROVADA (21/10/2026, 16:23 BRT)
+- O titular enviou captura do teste pelo Safari após a correção de `passenger_profiles?select=user_id`.
+- A interface exibiu **"APROVADO — JWT real aceito e permissões conferidas"**, emissor `Neon Auth central`, projeto pessoal **B (Paulo)** e **11/11 verificações**.
+- Contagens apresentadas pelo cliente com JWT real: Projeto **A** = 1 viagem compartilhada / 0 perfis pessoais; Projeto **B** = 0 viagens próprias / 1 perfil pessoal. Testes negativos de acesso anônimo e token falso foram relatados como aprovados.
+- Evidência é a captura do navegador, não um log de JWT ou sessão armazenado; **não** imprimir ou persistir token.
+- Próximo: Cíntia executar `https://paulosince.github.io/viagens/experiments/neon-pilot/app/auth-neon-smoke-v2.html` com o **e-mail dela**; esperado projeto A, 4 viagens em A, 0 em B, 1 perfil em A, 0 em B e 11/11.
+- Testes de refresh/reabertura/logout da sessão ainda não foram comprovados. **Etapa 04/14 permanece EM ANDAMENTO; progresso 3/14.**
