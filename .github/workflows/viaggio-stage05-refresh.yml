@@ -1,0 +1,40 @@
+name: Viaggio step 05 token renewal integration
+on:
+  pull_request:
+    branches:
+      - migration/neon-app-20261019
+    paths:
+      - 'experiments/neon-pilot/app/neon-refresh-integration.test.mjs'
+      - 'experiments/neon-pilot/app/neon-identity.mjs'
+      - 'experiments/neon-pilot/app/backend-neon.mjs'
+      - '.github/workflows/viaggio-stage05-refresh.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main-source
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Real Neon PostgREST transport and controlled Auth refresh
+        shell: bash
+        run: |
+          set -euo pipefail
+          DIR=/tmp/viaggio-step5-refresh
+          mkdir -p "$DIR"
+          cp experiments/neon-pilot/app/{neon-refresh-integration.test.mjs,neon-identity.mjs,backend-neon.mjs} "$DIR/"
+          cp main-source/experiments/neon-pilot/app/{router.mjs,storage.mjs} "$DIR/"
+          cd "$DIR"
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund @neondatabase/postgrest-js@0.2.0-beta
+          node --test neon-refresh-integration.test.mjs
+      - name: Existing identity unit suite
+        run: node --test experiments/neon-pilot/app/neon-identity.test.mjs
