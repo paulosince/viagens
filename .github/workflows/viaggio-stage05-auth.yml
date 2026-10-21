@@ -1,0 +1,69 @@
+name: Viaggio Stage 05 Neon Auth preview
+on:
+  pull_request:
+    branches:
+      - migration/neon-app-20261019
+    paths:
+      - 'experiments/neon-pilot/app/main-neon.js'
+      - 'experiments/neon-pilot/app/neon-preview.html'
+      - 'experiments/neon-pilot/app/backend-neon.mjs'
+      - 'experiments/neon-pilot/app/neon-identity*'
+      - '.github/workflows/viaggio-stage05-auth.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Unit tests and source parsing
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check experiments/neon-pilot/app/backend-neon.mjs
+          node --check experiments/neon-pilot/app/neon-identity.mjs
+          node --check experiments/neon-pilot/app/main-neon.js
+          node --test experiments/neon-pilot/app/neon-identity.test.mjs
+      - name: Verify strict source isolation and legacy-ID mapping
+        run: |
+          node <<'JS'
+          const fs=require('node:fs'), assert=require('node:assert/strict');
+          const a=fs.readFileSync('experiments/neon-pilot/app/main-neon.js','utf8');
+          const b=fs.readFileSync('experiments/neon-pilot/app/backend-neon.mjs','utf8');
+          const h=fs.readFileSync('experiments/neon-pilot/app/neon-preview.html','utf8');
+          assert.doesNotMatch(a,/siabldasqinpfmxslwji|@supabase\/supabase-js/);
+          assert.doesNotMatch(b,/siabldasqinpfmxslwji|@supabase\/supabase-js/);
+          assert.match(a,/@neondatabase\/neon-js/);
+          assert.match(a,/@neondatabase\/postgrest-js/);
+          assert.match(a,/SupabaseAuthAdapter\(\)/);
+          assert.match(b,/pg\.schema\('viaggio_app'\)/);
+          assert.match(h,/main-neon\.js/);
+          assert.doesNotMatch(h,/src="\.\/main\.js/);
+          console.log('PASS: staging-only Auth, PostgREST and isolated preview');
+          JS
+      - name: Verify actual SDK package exports and generic data transport
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/viaggio-auth5-sdk
+          cd /tmp/viaggio-auth5-sdk
+          npm init -y >/dev/null
+          echo "neon_js_version=$(npm view @neondatabase/neon-js version)"
+          echo "postgrest_version=$(npm view @neondatabase/postgrest-js version)"
+          npm install --no-audit --no-fund @neondatabase/neon-js @neondatabase/postgrest-js >/dev/null
+          node --input-type=module <<'JS'
+          import {createClient,SupabaseAuthAdapter} from '@neondatabase/neon-js';
+          import {NeonPostgrestClient,fetchWithToken} from '@neondatabase/postgrest-js';
+          import assert from 'node:assert/strict';
+          assert.equal(typeof createClient,'function');
+          assert.equal(typeof SupabaseAuthAdapter,'function');
+          const pg=new NeonPostgrestClient({dataApiUrl:'https://invalid.example/rest/v1',options:{global:{fetch:fetchWithToken(async()=>'a.b.c')}}});
+          assert.equal(typeof pg.schema,'function');
+          assert.equal(typeof pg.schema('viaggio_app').rpc,'function');
+          console.log('PASS: installed Neon SDK, Supabase-compatible Auth adapter and schema-aware PostgREST client');
+          JS
