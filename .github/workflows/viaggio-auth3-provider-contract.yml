@@ -59,6 +59,14 @@ jobs:
           echo "Neon email sign-in preflight: $status"
           test "$status" = 200 -o "$status" = 204
           grep -iq 'access-control-allow-origin: https://paulosince.github.io' /tmp/neon_headers
+          for path in email-otp/send-verification-otp sign-in/email-otp; do
+            otp_status=$(curl -sS -X OPTIONS -o /tmp/neon_otp -D /tmp/neon_otp_headers -w '%{http_code}' --max-time 20 \
+              -H "Origin: $ORIGIN" -H 'Access-Control-Request-Method: POST' \
+              -H 'Access-Control-Request-Headers: content-type' "$NEON/$path")
+            echo "Neon OTP $path preflight: $otp_status"
+            test "$otp_status" = 200 -o "$otp_status" = 204
+            grep -iq 'access-control-allow-origin: https://paulosince.github.io' /tmp/neon_otp_headers
+          done
           status=$(curl -sS -o /tmp/anon_token -w '%{http_code}' --max-time 20 -H "Origin: $ORIGIN" "$NEON/token")
           echo "Neon anonymous JWT request: $status (must reject)"
           test "$status" != 200
