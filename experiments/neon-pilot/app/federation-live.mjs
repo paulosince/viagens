@@ -58,7 +58,7 @@ export async function testSignedFederation({token,fetcher=fetch,endpoints=ENDPOI
     // Exact same, real signed central Auth JWT is sent independently to both.
     const ctx=await response(fetcher,base,'/rpc/project_context',token,'POST');
     const trips=await response(fetcher,base,'/trips?select=id&limit=20',token);
-    const profiles=await response(fetcher,base,'/passenger_profiles?select=id&limit=5',token);
+    const profiles=await response(fetcher,base,'/passenger_profiles?select=user_id&limit=5',token);
     result.projects[key]={home:context(ctx,key),trips:count(trips,key+'_TRIPS'),profiles:count(profiles,key+'_PROFILES')};
     result.checks+=3;
   }
