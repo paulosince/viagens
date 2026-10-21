@@ -6,7 +6,7 @@ const B='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const C='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const signed='eyJhbGciOiJFZERTQSJ9.eyJzdWIiOiJ0ZXN0In0.YWJj';
 const payload=new Blob(['verified media'],{type:'image/webp'});
-function fixture({home='b',trip='a',status=200,jwt=signed,sharedAvatar=false,allowMutations=false,mutationsStatus=200}={}){
+function fixture({home='b',trip='a',status=200,jwt=signed,sharedAvatar=false,allowMutations=false,mutationsStatus=200,emptyBlob=false}={}){
  const calls=[];
  const projects=['a','b'].map(id=>({
    id,media:'https://'+id+'.media.example.invalid/',
@@ -38,7 +38,7 @@ function fixture({home='b',trip='a',status=200,jwt=signed,sharedAvatar=false,all
     return new Response(JSON.stringify({data:{path:'ok'}}),{status:mutationsStatus,headers:{'content-type':'application/json'}});
   }
   if(status!==200)return new Response(JSON.stringify({error:'denied'}),{status,headers:{'content-type':'application/json'}});
-  if(url.includes('/download'))return new Response(payload,{status:200});
+  if(url.includes('/download'))return new Response(emptyBlob?new Blob([]):payload,{status:200});
   return new Response(JSON.stringify({data:{signedUrl:'https://storage.example.invalid/presigned'}}),{status:200,headers:{'content-type':'application/json'}});
  };
  return {
@@ -118,7 +118,9 @@ test('enabled deletion with one authorized trip sends exact paths',async()=>{
  assert.deepEqual(JSON.parse(x.http()[0].options.body),{paths:[A+'/day/document.pdf']});
 });
 test('HTTP download 200 but empty object fails closed',async()=>{
- const x=fixture();
+ const x=fixture({emptyBlob:true});
  const r=await x.client.from('trip-images').download(A+'/trip/x.webp');
- assert.equal(r.error,null);
+ assert.ok(r.error);
+ assert.match(r.error.message,/vazio/);
+ assert.equal(x.http().length,1);
 });
