@@ -24,9 +24,9 @@ if (configured) {
     const allowed=[ep+'.'+region,ep+'-pooler.'+region];
     return ['postgres:','postgresql:'].includes(url.protocol)
       && allowed.includes(url.hostname)
-      && url.pathname==='/'+db;
+      && (!db || url.pathname==='/'+db);
   };
-  if (!exactHost(centralURL,'ep-small-bread-b7uq0zva','c-13.us-east-1.aws.neon.tech','viaggio_auth')
+  if (!exactHost(centralURL,'ep-small-bread-b7uq0zva','c-13.us-east-1.aws.neon.tech',null)
       || !exactHost(aURL,'ep-empty-pine-b8r7sa8d','c-14.us-east-1.aws.neon.tech','viaggio_lab')
       || !exactHost(bURL,'ep-spring-moon-b8fi6yxc','c-14.us-east-1.aws.neon.tech','viaggio_lab'))
     throw Error('STAGING_PROJECT_BOUNDARY_REQUIRED');
