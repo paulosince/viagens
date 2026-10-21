@@ -50,6 +50,7 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           mkdir -p experiments/neon-pilot/migration/.build
+          if test -f experiments/neon-pilot/migration/.build/linkup-function.zip.b64; then echo 'Bundle already staged'; exit 0; fi
           base64 -w0 experiments/neon-pilot/migration/auth/link-service/dist/function.zip > experiments/neon-pilot/migration/.build/linkup-function.zip.b64
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
