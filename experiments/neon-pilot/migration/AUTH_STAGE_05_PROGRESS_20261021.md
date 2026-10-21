@@ -29,3 +29,11 @@ Progresso fixo **4/14**, dez itens restantes incluindo esta etapa. Não criar et
 
 ## Limites
 A prévia permite operar sobre **cópias de staging**, mas não é o cutover de produção. O Supabase permanece intacto e autoritativo até reconciliar deltas. A etapa de quotas também não está concluída.
+
+## Primeiro uso real: tela navegável, mídia privada indisponível (21/10/2026)
+- Paulo informou após acessar a nova prévia: "Aparentemente funcionou tudo. Mas várias imagens não carregaram." Isso corrobora a inicialização e navegação, **não** comprova ainda reabertura após expiração de JWT nem logout/relogin. Manter etapa 05/14 em andamento até a validação do ciclo de sessão.
+- O comportamento é explicado pelo bloqueio **intencional de download, assinatura, upload e exclusão** em `backend-neon.mjs -> mediaBlocked`; a interface `main-neon.js` consulta mídia por `storage.from().download`, e `media-cache-neon.js` utiliza o blob/hashes. Fotos externas ou locais podem aparecer, arquivos privados não.
+- Verificação independentemente do Neon Object Storage em branches A/B de **staging**: projeto A possui bucket privado `viaggio-lab-media` com **76 objetos**; projeto B possui bucket privado `viaggio-lab-media` com **1 objeto**. Em A, 4 viagens, das quais 3 com `cover_path`; B, 0 viagens. Isso não autoriza declarar inexistente qualquer delta de mídia posterior ao snapshot nem que todas as referências do frontend foram servidas.
+- A Neon Function `appmedia` existe e foi implantada em staging A e B, mas **não foi validada com JWT real Neon para operações privadas de mídia**. Não habilitar leitura via URL pública, não reintroduzir fallback Supabase, não expor presigned URLs sem verificação de autorização por objeto. Esse trabalho está programado na **etapa 7 da lista fixa**, não é etapa adicional.
+- Banner do arquivo `neon-preview.html` atualizado nas branches `main`, `migration/neon-app-20261019` e branch de teste para esclarecer que as imagens privadas estão indisponíveis até validação. Nenhuma operação de foto, metadata ou viagem foi executada.
+- Próxima ação para concluir etapa 05: confirmar persistência de login após atualizar/fechar/abrir URL, logout e reentrada com a senha Neon. Depois testar a Cíntia. Excluir possibilidade de troca de conta/contaminação de cache local.
