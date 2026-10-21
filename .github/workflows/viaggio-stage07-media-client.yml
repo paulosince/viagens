@@ -1,0 +1,30 @@
+name: Viaggio stage07 private media client
+on:
+  pull_request:
+    branches: [migration/neon-app-20261019]
+    paths:
+      - 'experiments/neon-pilot/app/storage-neon.mjs'
+      - 'experiments/neon-pilot/app/storage-neon.test.mjs'
+      - 'experiments/neon-pilot/app/backend-neon.mjs'
+      - '.github/workflows/viaggio-stage07-media-client.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validate secure media adapter and regression tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check experiments/neon-pilot/app/storage-neon.mjs
+          node --check experiments/neon-pilot/app/storage-neon.test.mjs
+          node --test experiments/neon-pilot/app/storage-neon.test.mjs
+          test "$(grep -c 'allowMutations=false' experiments/neon-pilot/app/storage-neon.mjs)" -eq 1
+          ! grep -q 'for(const p of \[primary,' experiments/neon-pilot/app/storage-neon.mjs
