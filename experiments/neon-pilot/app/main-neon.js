@@ -30,13 +30,13 @@ async function ensureSupabase() {
   if (supabase) return supabase;
   if (supabaseLoad) return supabaseLoad;
   supabaseLoad = Promise.all([
-    import('https://cdn.jsdelivr.net/npm/@neondatabase/neon-js/+esm'),
-    import('https://cdn.jsdelivr.net/npm/@neondatabase/postgrest-js/+esm')
+    import('https://cdn.jsdelivr.net/npm/@neondatabase/neon-js@0.9.0-beta/+esm'),
+    import('https://cdn.jsdelivr.net/npm/@neondatabase/postgrest-js@0.2.0-beta/+esm')
   ]).then(([{createClient,SupabaseAuthAdapter},{NeonPostgrestClient,fetchWithToken}]) => {
       const authSdk=createClient({
-        auth:{url:NEON_AUTH_URL},
+        auth:{url:NEON_AUTH_URL,adapter:SupabaseAuthAdapter()},
         dataApi:{url:API_ROOTS.a}
-      },{auth:{adapter:SupabaseAuthAdapter()}});
+      });
       supabase=createNeonPreview({authSdk,NeonPostgrestClient,fetchWithToken});
       return supabase;
     })
