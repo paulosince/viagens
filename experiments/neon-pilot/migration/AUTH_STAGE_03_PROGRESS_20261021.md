@@ -37,3 +37,29 @@ A lista acordada mantém **14 etapas**. A etapa 03 só termina quando o backend 
 `https://br-square-river-b765bpl4-linkup.compute.c-13.us-east-1.aws.neon.tech/`
 
 Neon relatou deployment `completed` da versão limitada que não manipula identidades. Bloqueio por origem e estado `MIGRATION_NOT_ENABLED` permanecem como proteção. **O deploy não equivale à implantação da integração completa** do código `auth/link-service/index.mjs`.
+
+## Atualização comprovada — 21/10/2026, 14:19 UTC
+
+**3/14 permanece EM ANDAMENTO** até que Paulo e Cíntia criem novas credenciais verificadas e ambos os vínculos administrativos com as identidades antigas estejam confirmados. Não mudar a contagem de 14.
+
+1. Branch de validação `migration/linkup-stage3-check-20261021` criou PR draft #15, executando testes em GitHub Actions. O CI identificou e corrigiu formato inválido do regex UUID em `auth/link-store.mjs`. Os testes subiram para **40/40 aprovados** e o bundle completo com dependências `pg`/`jose` foi gerado. O fix foi levado de volta para a branch principal da migração.
+2. Neon Function `linkup`, projeto central `dark-union-03886858` e branch `br-square-river-b765bpl4`, tem deployment **8**, status `completed`, com código **completo** e variáveis privadas das duas branches de staging e do Supabase. O flag `VIAGGIO_LINK_ENABLED=false` permanece desligado.
+3. O endpoint foi comprovado em testes HTTPS reais via GitHub Actions, execução https://github.com/paulosince/viagens/actions/runs/39615622502:
+   - origem não autorizada → HTTP **403**;
+   - preflight da origem autorizada → HTTP **204**;
+   - POST com a origem autorizada enquanto a migração está desabilitada → HTTP **503** / `MIGRATION_NOT_ENABLED`.
+   Logs e status do backend comprovaram a resposta, não apenas implantação.
+4. A prévia de atualização de identidade foi publicada em um arquivo isolado no GitHub Pages (`main`, sem modificar `index.html` ou `src/main.js`):
+   `https://paulosince.github.io/viagens/experiments/neon-pilot/app/auth-upgrade.html`.
+   Verificação real HTTP 200 no GitHub Actions, execução https://github.com/paulosince/viagens/actions/runs/39615761463. A página possui cadastro Neon por e-mail com nova senha, código OTP e confirmação; não solicita senha do Supabase, não expõe tokens e **não** faz vinculação das viagens.
+5. Foi necessário corrigir inicialização de Neon Functions para aceitar endereços `-pooler` e banco injetado distinto de `viaggio_auth`, mais tratamento de startup que falha de maneira segura em vez de falhar sem diagnóstico. Código final também replicado em `migration/neon-app-20261019`.
+6. Temporário ZIP codificado em base64 foi removido do GitHub depois do deploy. No staging, os dois bancos têm **0 registros** em `viaggio_identity.neon_auth_links`; Auth central tem **0 contas reais**, sem nenhuma ativação. Os bancos principais e Supabase permanecem intocados.
+7. CI de smoke HTTP manual `viaggio-linkup-smoke.yml` registrado na branch de migração; é intencionalmente um teste de modo **desabilitado** — adaptar ao habilitar a migração.
+
+### Próxima ação necessária dentro da etapa 03/14
+- Os próprios titulares (primeiro Paulo, depois Cíntia) devem acessar o portal isolado, usar o **mesmo e-mail** da conta Supabase e uma **senha nova**, confirmar o OTP. Não enviar senhas/códigos/tokens ao ChatGPT.
+- Consultar `neon_auth.user` e confirmar `emailVerified=true`, sem imprimir os e-mails desnecessariamente.
+- Falta criar uma interface segura de **prova simultânea da sessão Supabase antiga e da sessão Neon nova** que chama `linkup` com dois JWTs já verificados, habilitar a Function em staging e validar o fluxo ponta a ponta, incluindo recuperação em caso de falha de qualquer banco. **O serviço ainda não vinculou ninguém.**
+- Além disso, o projeto Neon Free compartilha capacidade entre projetos e o portal não integra ainda o aplicativo em produção.
+
+**Nenhuma alteração do roteamento em produção, nenhuma migração real de conta e nenhuma mudança do Supabase.**
