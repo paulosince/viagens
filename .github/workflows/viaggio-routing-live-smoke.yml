@@ -1,0 +1,36 @@
+name: Viaggio stage3 routing live smoke
+on:
+  pull_request:
+    branches:
+      - migration/neon-app-20261019
+    paths:
+      - '.github/workflows/viaggio-routing-live-smoke.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  negative-http:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Verify deployed linkup fails closed without valid dual sessions
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT='https://br-square-river-b765bpl4-linkup.compute.c-13.us-east-1.aws.neon.tech/link'
+          status=$(curl -sS --max-time 20 -o /tmp/foreign -w '%{http_code}' -X POST -H 'Origin: https://untrusted.invalid' -d '{}' "$ROOT")
+          echo "foreign_origin=$status"
+          test "$status" = 403
+          status=$(curl -sS --max-time 20 -o /tmp/invalid -w '%{http_code}' -X POST \
+            -H 'Origin: https://paulosince.github.io' \
+            -H 'Authorization: Bearer invalid.jwt.signature' \
+            -H 'x-legacy-access-token: invalid.jwt.signature' -d '{}' "$ROOT")
+          echo "invalid_sessions=$status"
+          test "$status" = 401
+          grep -q 'UNAUTHORIZED' /tmp/invalid
+          status=$(curl -sS --max-time 20 -o /tmp/preflight -w '%{http_code}' -X OPTIONS \
+            -H 'Origin: https://paulosince.github.io' -H 'Access-Control-Request-Method: POST' \
+            -H 'Access-Control-Request-Headers: authorization, x-legacy-access-token' "$ROOT")
+          echo "authorized_preflight=$status"
+          test "$status" = 204
+          echo 'PASS: deployed linkup rejects invalid sessions and untrusted origin'
