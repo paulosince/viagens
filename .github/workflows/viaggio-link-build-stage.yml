@@ -7,6 +7,12 @@ on:
     paths:
       - 'experiments/neon-pilot/migration/auth/**'
       - '.github/workflows/viaggio-link-build-stage.yml'
+  pull_request:
+    branches:
+      - migration/neon-app-20261019
+    paths:
+      - 'experiments/neon-pilot/migration/auth/**'
+      - '.github/workflows/viaggio-link-build-stage.yml'
   workflow_dispatch:
 
 permissions:
