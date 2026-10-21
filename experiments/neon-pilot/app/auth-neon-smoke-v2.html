@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Viaggio — Validar acesso Neon (4/14)</title>
+<style>
+:root{color-scheme:light;--blue:#0565be;--ink:#183047;--muted:#61768b;--bg:#f4f7fb}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+main{max-width:490px;margin:auto;padding:calc(env(safe-area-inset-top) + 30px) 22px calc(env(safe-area-inset-bottom) + 60px)}
+.brand{color:var(--blue);font-size:16px;font-weight:800;letter-spacing:-.2px}
+h1{font-size:29px;line-height:1.14;letter-spacing:-.9px;margin:29px 0 12px}
+p{margin:0 0 20px}.muted{color:var(--muted)}.small{font-size:13px}
+.card{background:#fff;border:1px solid #e1eaf3;border-radius:23px;padding:22px;box-shadow:0 7px 27px #19345309;margin:18px 0}
+.card h2{font-size:18px;margin:0 0 9px}
+label{font-weight:650;font-size:13px;display:block;margin:17px 0 7px}
+input{width:100%;border:1px solid #c9d7e5;border-radius:13px;font:16px -apple-system,BlinkMacSystemFont,sans-serif;padding:14px;background:white}
+button{width:100%;background:var(--blue);color:white;border:0;border-radius:13px;padding:15px;margin-top:20px;font:650 16px -apple-system,BlinkMacSystemFont,sans-serif;cursor:pointer}
+button:disabled{opacity:.5;cursor:wait}.subtle{background:#e9f2fc;color:#195587}
+[hidden]{display:none!important}.status{padding:12px;border-radius:12px;background:#eaf3ff;color:#18588b;margin-top:16px;white-space:pre-wrap}
+.status.error{background:#fff0f0;color:#a52b36}.pass{color:#167848;font-weight:700}.fail{color:#a52b36;font-weight:700}
+table{width:100%;border-collapse:collapse;font-size:14px;margin:8px 0}td{border-bottom:1px solid #e8edf2;padding:9px 2px}td:last-child{text-align:right;font-weight:600}
+.tag{font-size:12px;color:#60758b}.foot{color:var(--muted);font-size:12px;line-height:1.55;margin-top:18px}
+</style>
+</head>
+<body><main>
+<div class="brand">V · VIAGGIO <span class="tag">Migração Neon · Etapa 4/14</span></div>
+<h1>Testar seu acesso no Neon</h1>
+<p class="muted">Verificaremos seu acesso real às viagens e aos perfis nos dois bancos de teste. É uma operação <strong>somente de leitura</strong>: não modifica o aplicativo atual.</p>
+<section class="card" id="auth-panel">
+<h2>1. Entrar com código Neon</h2>
+<label for="email">Seu e-mail no Viaggio</label>
+<input type="email" id="email" autocomplete="email" required maxlength="254" placeholder="seu@email.com">
+<button id="send" type="button">Enviar código</button>
+<div id="otp-panel" hidden>
+<label for="otp">Código recebido por e-mail</label>
+<input type="text" id="otp" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{4,10}" maxlength="10">
+<button id="verify" type="button">Confirmar e executar 11 verificações</button>
+</div>
+</section>
+<section class="card" id="result-panel" hidden>
+<h2>2. Resultado da autenticação e permissões</h2>
+<p id="headline"></p>
+<table>
+<tbody>
+<tr><td>Emissor da sessão</td><td id="issuer">—</td></tr>
+<tr><td>Projeto pessoal identificado</td><td id="project">—</td></tr>
+<tr><td>Viagens visíveis no projeto A</td><td id="trips-a">—</td></tr>
+<tr><td>Viagens visíveis no projeto B</td><td id="trips-b">—</td></tr>
+<tr><td>Perfis pessoais visíveis em A</td><td id="profiles-a">—</td></tr>
+<tr><td>Perfis pessoais visíveis em B</td><td id="profiles-b">—</td></tr>
+<tr><td>Testes de acesso anônimo e token falso</td><td id="negative">—</td></tr>
+<tr><td>Total de verificações</td><td id="checks">—</td></tr>
+</tbody></table>
+<p class="small muted">Se aparecer aprovado, envie ao ChatGPT apenas a captura desta tabela. Nunca compartilhe o código recebido ou o JWT.</p>
+<button id="again" class="subtle" type="button">Testar outra conta</button>
+</section>
+<div id="status" class="status" role="status" aria-live="polite" hidden></div>
+<p class="foot">O código é enviado diretamente ao Neon Auth. O token temporário é usado somente nas duas APIs oficiais do Neon e descartado após o teste. Nenhuma senha é solicitada; nenhum token é gravado no GitHub, no navegador ou enviado ao ChatGPT. Os resultados são contagens de registros autorizados, não o conteúdo das viagens.</p>
+</main>
+<script type="module">
+import {testSignedFederation} from './federation-live.mjs?v=20261021-schemafix1';
+const NEON='https://ep-small-bread-b7uq0zva.neonauth.c-13.us-east-1.aws.neon.tech/viaggio_auth/auth';
+const $=id=>document.getElementById(id);
+let busy=false;
+function status(text,error=false){const el=$('status');el.textContent=text;el.classList.toggle('error',error);el.hidden=false;}
+async function call(url,body) {
+ const r=await fetch(NEON+url,{method:'POST',mode:'cors',cache:'no-store',credentials:'include',
+  redirect:'error',referrerPolicy:'no-referrer',
+  headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+ const data=await r.json().catch(()=>null);
+ if(!r.ok||data?.error)throw Error('Neon recusou a autenticação. Confira o código e o e-mail e tente novamente.');
+ return {data,response:r};
+}
+async function execute(button,fn) {
+ if(busy)return;busy=true;button.disabled=true;
+ try{await fn()}catch(e){status(e?.message||'Não foi possível completar a verificação.',true);}
+ finally{busy=false;button.disabled=false;}
+}
+$('send').addEventListener('click',()=>execute($('send'),async()=>{
+ const email=$('email').value.trim().toLowerCase();
+ if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))throw Error('Informe seu e-mail.');
+ await call('/email-otp/send-verification-otp',{email,type:'sign-in'});
+ $('otp-panel').hidden=false;status('Código solicitado. Confira o e-mail e digite-o abaixo.');
+}));
+$('verify').addEventListener('click',()=>execute($('verify'),async()=>{
+ const email=$('email').value.trim().toLowerCase();
+ const otp=$('otp').value.trim();
+ if(!/^[0-9]{4,10}$/.test(otp))throw Error('Digite o código recebido por e-mail.');
+ const {data,response}=await call('/sign-in/email-otp',{email,otp});
+ $('otp').value='';
+ if(data?.user?.emailVerified!==true)throw Error('O Neon não confirmou este e-mail.');
+ let token=data?.session?.access_token||data?.access_token||response.headers.get('set-auth-jwt')||'';
+ if(!token){
+  const r=await fetch(NEON+'/token',{method:'GET',credentials:'include',mode:'cors',
+   redirect:'error',cache:'no-store',referrerPolicy:'no-referrer'});
+  const d=await r.json().catch(()=>null);
+  if(r.ok)token=d?.token||d?.data?.token||'';
+ }
+ if(!token)throw Error('Neon autenticou, mas não forneceu JWT para a Data API neste Safari.');
+ status('Sessão confirmada. Verificando acesso nos dois projetos…');
+ let result;
+ try{result=await testSignedFederation({token});}
+ finally{token='';}
+ $('result-panel').hidden=false;
+ $('auth-panel').hidden=true;
+ $('headline').textContent='APROVADO — JWT real aceito e permissões conferidas.';
+ $('headline').className='pass';
+ $('issuer').textContent='Neon Auth central';
+ $('project').textContent=result.projects.a.home?'Projeto A (Cíntia)':'Projeto B (Paulo)';
+ $('trips-a').textContent=String(result.projects.a.trips);
+ $('trips-b').textContent=String(result.projects.b.trips);
+ $('profiles-a').textContent=String(result.projects.a.profiles);
+ $('profiles-b').textContent=String(result.projects.b.profiles);
+ $('negative').textContent='Aprovados';
+ $('checks').textContent=result.checks+' / '+result.checks;
+ $('status').hidden=true;
+}));
+$('again').addEventListener('click',()=>{
+ $('otp-panel').hidden=true;$('result-panel').hidden=true;$('auth-panel').hidden=false;
+ $('email').value='';$('otp').value='';$('status').hidden=true;
+});
+</script>
+</body></html>
