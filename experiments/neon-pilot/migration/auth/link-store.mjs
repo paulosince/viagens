@@ -1,6 +1,6 @@
 // Privileged service-side SQL repository. Never import this in the PWA.
 // pools: {central, a, b}; all Pg.Pool instances must use staging-only URLs.
-const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function check(record) {
  if(!record||!UUID.test(record.neon_subject)||!UUID.test(record.legacy_user_id)
     ||record.proof_kind!=='dual_session')throw Error('UNVERIFIED_IDENTITY');
