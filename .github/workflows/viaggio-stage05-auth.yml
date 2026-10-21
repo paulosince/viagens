@@ -8,6 +8,8 @@ on:
       - 'experiments/neon-pilot/app/neon-preview.html'
       - 'experiments/neon-pilot/app/backend-neon.mjs'
       - 'experiments/neon-pilot/app/neon-identity*'
+      - 'experiments/neon-pilot/app/offline-store-neon.js'
+      - 'experiments/neon-pilot/app/media-cache-neon.js'
       - '.github/workflows/viaggio-stage05-auth.yml'
   workflow_dispatch:
 permissions:
@@ -28,6 +30,8 @@ jobs:
           node --check experiments/neon-pilot/app/backend-neon.mjs
           node --check experiments/neon-pilot/app/neon-identity.mjs
           node --check experiments/neon-pilot/app/main-neon.js
+          node --check experiments/neon-pilot/app/offline-store-neon.js
+          node --check experiments/neon-pilot/app/media-cache-neon.js
           node --test experiments/neon-pilot/app/neon-identity.test.mjs
       - name: Verify strict source isolation and legacy-ID mapping
         run: |
@@ -62,6 +66,11 @@ jobs:
           import assert from 'node:assert/strict';
           assert.equal(typeof createClient,'function');
           assert.equal(typeof SupabaseAuthAdapter,'function');
+          const auth=createClient({auth:{url:'https://example.neonauth.c-13.us-east-1.aws.neon.tech/test/auth',adapter:SupabaseAuthAdapter()},dataApi:{url:'https://example.apirest.c-13.us-east-1.aws.neon.tech/test/rest/v1'}});
+          assert.equal(typeof auth.auth.getSession,'function');
+          assert.equal(typeof auth.auth.signInWithPassword,'function');
+          assert.equal(typeof auth.auth.onAuthStateChange,'function');
+          assert.equal(typeof auth.auth.signOut,'function');
           const pg=new NeonPostgrestClient({dataApiUrl:'https://invalid.example/rest/v1',options:{global:{fetch:fetchWithToken(async()=>'a.b.c')}}});
           assert.equal(typeof pg.schema,'function');
           assert.equal(typeof pg.schema('viaggio_app').rpc,'function');
