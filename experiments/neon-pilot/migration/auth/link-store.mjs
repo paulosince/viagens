@@ -19,6 +19,34 @@ export function createLinkRepository({central,a,b}) {
  if(!central?.connect||!a?.connect||!b?.connect)throw Error('LINK_POOLS_NOT_CONFIGURED');
  const pools={a,b};
  return {
+  // Derived only from private, server-side user directories and project ownership.
+  // A shared guest needs a link in the host project; an unrelated project must
+  // NOT receive a foreign identity or block migration.
+  async projectsForLegacy(record) {
+   check(record);
+   const entries=await Promise.all(Object.entries(pools).map(async ([name,pool])=>{
+     const result=await pool.query(
+       `SELECT EXISTS(
+          SELECT 1 FROM viaggio_identity.users
+          WHERE id=$1::uuid AND email_confirmed_at IS NOT NULL AND deleted_at IS NULL
+        ) AS known_user,
+        EXISTS(
+          SELECT 1 FROM viaggio_identity.project_binding
+          WHERE singleton AND owner_id=$1::uuid
+        ) AS is_owner`,
+       [record.legacy_user_id]);
+     const row=result?.rows?.[0];
+     if(result?.rowCount!==1 || typeof row?.known_user!=='boolean'
+        || typeof row?.is_owner!=='boolean')
+       throw Error('PROJECT_DIRECTORY_UNAVAILABLE');
+     return {name,known:row.known_user,owner:row.is_owner};
+   }));
+   const selected=entries.filter(x=>x.known);
+   if(selected.length===0 || entries.filter(x=>x.owner).length!==1
+       || !selected.some(x=>x.owner))
+     throw Error('PROJECT_MAPPING_AMBIGUOUS');
+   return selected.map(x=>x.name);
+  },
   withLock(record,fn) {
    check(record);
    return transaction(central,async db=>{
