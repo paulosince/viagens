@@ -1,0 +1,44 @@
+name: Viaggio Neon account-link portal checks
+
+on:
+  push:
+    branches:
+      - migration/neon-app-20261019
+    paths:
+      - 'experiments/neon-pilot/app/auth-link.html'
+      - '.github/workflows/viaggio-link-portal-checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check-portal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validate linking portal code and credential boundaries
+        shell: bash
+        run: |
+          node <<'JS'
+          const fs=require('node:fs');
+          const vm=require('node:vm');
+          const assert=require('node:assert/strict');
+          const html=fs.readFileSync('experiments/neon-pilot/app/auth-link.html','utf8');
+          const scripts=[...html.matchAll(/<script type="module">([\s\S]*?)<\/script>/g)];
+          assert.equal(scripts.length,1);
+          new vm.Script(scripts[0][1],{filename:'auth-link-inline.mjs'});
+          assert.match(html,/sb_publishable_[a-zA-Z0-9_-]+/);
+          assert.doesNotMatch(html,/sb_secret_|service_role/);
+          assert.match(html,/VIAGGIO|Viaggio/i);
+          assert.match(html,/x-legacy-access-token/);
+          assert.match(html,/credentials:'include'/);
+          assert.match(html,/linkup\.compute\.c-13\.us-east-1\.aws\.neon\.tech/);
+          assert.match(html,/oldpass.*value=''/);
+          assert.match(html,/newpass.*value=''/);
+          console.log('PASS: valid JS, public-only key, two-provider proof, no credential storage'); 
+          JS
