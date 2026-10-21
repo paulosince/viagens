@@ -1,0 +1,40 @@
+name: Viaggio linkup routing bundle (temporary)
+on:
+  pull_request:
+    branches:
+      - migration/neon-app-20261019
+    paths:
+      - '.github/workflows/viaggio-link-routing-bundle.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: migration/neon-stage3-personal-routing-20261021
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Unit tests
+        run: node --test experiments/neon-pilot/migration/auth/*.test.mjs
+      - name: Build server-only package
+        working-directory: experiments/neon-pilot/migration/auth/link-service
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+          node --check dist/index.mjs
+          cd dist && zip -q -j function.zip index.mjs
+      - name: Temporarily stage secret-free bundle for authorized Neon deployment
+        run: |
+          mkdir -p experiments/neon-pilot/migration/.build
+          base64 -w0 experiments/neon-pilot/migration/auth/link-service/dist/function.zip > experiments/neon-pilot/migration/.build/linkup-routing.zip.b64
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add experiments/neon-pilot/migration/.build/linkup-routing.zip.b64
+          git commit -m "Temporary server-only linkup routing bundle"
+          git push origin HEAD:migration/neon-stage3-personal-routing-20261021
