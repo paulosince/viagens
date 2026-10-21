@@ -18,18 +18,18 @@ const PROFILE_IMAGE_BUCKET = 'profile-photos';
 const NEW_AGENDA_TITLE = 'Nova atividade';
 const NEW_AGENDA_DESCRIPTION = 'Adicione uma descrição';
 const HISTORY_RESET_AT = '2026-09-27T01:32:01.347Z';
-let supabase = null;
-let supabaseLoad = null;
+let neonClient = null;
+let neonLoad = null;
 let leafletLoad = null;
 let orderedDaySchemaSupport = null;
 let outboxFlushPromise = null;
 let outboxSyncing = false;
 let lastOutboxError = null;
 
-async function ensureSupabase() {
-  if (supabase) return supabase;
-  if (supabaseLoad) return supabaseLoad;
-  supabaseLoad = Promise.all([
+async function ensureNeon() {
+  if (neonClient) return neonClient;
+  if (neonLoad) return neonLoad;
+  neonLoad = Promise.all([
     import('https://cdn.jsdelivr.net/npm/@neondatabase/neon-js@0.9.0-beta/+esm'),
     import('https://cdn.jsdelivr.net/npm/@neondatabase/postgrest-js@0.2.0-beta/+esm')
   ]).then(([{createClient,SupabaseAuthAdapter},{NeonPostgrestClient,fetchWithToken}]) => {
@@ -37,21 +37,21 @@ async function ensureSupabase() {
         auth:{url:NEON_AUTH_URL,adapter:SupabaseAuthAdapter()},
         dataApi:{url:API_ROOTS.a}
       });
-      supabase=createNeonPreview({authSdk,NeonPostgrestClient,fetchWithToken});
-      return supabase;
+      neonClient=createNeonPreview({authSdk,NeonPostgrestClient,fetchWithToken});
+      return neonClient;
     })
     .catch(error => {
-      supabaseLoad = null;
+      neonLoad = null;
       throw error;
     });
-  return supabaseLoad;
+  return neonLoad;
 }
 
-async function trySupabase(timeoutMs = 1800) {
+async function tryNeon(timeoutMs = 1800) {
   if (!navigator.onLine) return null;
   try {
     return await Promise.race([
-      ensureSupabase(),
+      ensureNeon(),
       new Promise(resolve => setTimeout(() => resolve(null), timeoutMs))
     ]);
   } catch {
@@ -426,7 +426,7 @@ function normalizeActivityRecord(activity) {
 
 async function supportsOrderedDaySchema(client = null) {
   if (orderedDaySchemaSupport !== null) return orderedDaySchemaSupport;
-  const activeClient = client || await trySupabase();
+  const activeClient = client || await tryNeon();
   if (!activeClient) return false;
   try {
     const probe = await activeClient.from('trips').select('day_count').limit(1);
@@ -506,7 +506,7 @@ async function refreshWorkspaceInBackground() {
   setTimeout(async () => {
     try {
       // The avatar and shared-owner badge should not wait for pending trip edits.
-      const client = await trySupabase(5000);
+      const client = await tryNeon(5000);
       if (client) {
         await Promise.allSettled([loadProfile(), refreshSharedTripOwners(client)]);
         syncTripList();
@@ -556,7 +556,7 @@ function refreshUsage({ force = false } = {}) {
   if (usageRequest?.userId === id) return usageRequest.promise;
   if (!force && Date.now() - usageLastUpdatedAt < 45000) return Promise.resolve();
   const promise = (async () => {
-    const client = await trySupabase(3500);
+    const client = await tryNeon(3500);
     if (!client) return;
     const { data, error } = await client.rpc('viaggio_my_usage');
     if (error) throw error;
@@ -746,7 +746,7 @@ async function restoreSnapshot(snapshotId, button = null) {
     const synced = await flushOutbox();
     if (!synced) throw new Error('Há alterações pendentes que ainda não puderam ser sincronizadas.');
 
-    const client = await trySupabase();
+    const client = await tryNeon();
     if (!client) throw new Error('Backend indisponível.');
 
     dom.changeLogMessage.textContent = 'Restaurando snapshot…';
@@ -781,7 +781,7 @@ async function refreshChangeLog() {
   state.changeLog = local;
   renderChangeLog(local);
 
-  const client = await trySupabase();
+  const client = await tryNeon();
   if (!client) return;
 
   const remote = await client
@@ -818,7 +818,7 @@ function openChatgptIntegration() {
 async function refreshChatgptConnection() {
   const userId = state.user?.id;
   if (!userId) return;
-  const client = await trySupabase();
+  const client = await tryNeon();
   if (!client) return;
   const { data, error } = await client.rpc('has_chatgpt_connection');
   if (error || state.user?.id !== userId) return;
@@ -1330,7 +1330,7 @@ async function loadLeaflet() {
 
 async function firstUnsplashPhoto(query) {
   if (!query || !navigator.onLine) return null;
-  const client = await trySupabase();
+  const client = await tryNeon();
   if (!client) return null;
   try {
     const { data, error } = await client.functions.invoke('unsplash-photos', { body: { action: 'search', query } });
@@ -1598,7 +1598,7 @@ async function recoverHiddenDay(day) {
 }
 
 async function softDeleteHiddenDay(day) {
-  const client = await trySupabase();
+  const client = await tryNeon();
   if (!client || !await supportsOrderedDaySchema(client)) {
     throw new Error('A lixeira de dias ficará disponível após a migração do banco.');
   }
@@ -1972,7 +1972,7 @@ async function loadPlacePhotos(result) {
   dom.placePhotoMessage.dataset.kind = '';
   const currentPlaceId = `${result.osm_type}/${result.osm_id}`;
   try {
-    const client = await trySupabase();
+    const client = await tryNeon();
     if (!client) throw new Error('Fotos online indisponíveis.');
     const { data, error } = await client.functions.invoke('unsplash-photos', { body: { action: 'search', query: unsplashQuery(result) } });
     const selected = state.placeSearch?.results?.[state.placeSearch.selectedIndex];
@@ -2094,7 +2094,7 @@ function confirmPlaceSearch() {
       location.photoAuthorUrl = photo.authorUrl || '';
       location.photoSourceUrl = photo.sourceUrl || '';
       if (photo.downloadLocation) {
-        trySupabase()
+        tryNeon()
           .then(client => client?.functions.invoke('unsplash-photos', { body: { action: 'track', downloadLocation: photo.downloadLocation } }))
           .catch(() => {});
       }
@@ -2379,7 +2379,7 @@ async function loadDayAttachments(dayId) {
   const key = String(dayId);
   if (state.dayAttachmentLoads.has(key)) return state.dayAttachmentLoads.get(key);
   const loading = (async () => {
-    const client = await trySupabase(5000);
+    const client = await tryNeon(5000);
     if (!client) throw new Error('Conecte-se à internet para acessar os arquivos do dia.');
     const { data, error } = await client.from('day_attachments').select('*').eq('day_id', key).order('created_at');
     if (error) throw error;
@@ -2413,7 +2413,7 @@ function openDayAttachments() {
 async function uploadDayAttachments(files) {
   const day = state.tripDays.find(item => String(item.id) === state.activeDayId);
   if (!day || !files.length) return;
-  const client = await trySupabase(5000);
+  const client = await tryNeon(5000);
   if (!client) { setDayAttachmentStatus('É preciso estar conectado para enviar arquivos.', 'error'); return; }
   const uploadControl = dom.dayAttachmentsInput.closest('.day-attachments-upload');
   uploadControl.dataset.busy = 'true';
@@ -2437,7 +2437,7 @@ async function uploadDayAttachments(files) {
 async function removeDayAttachment(attachment) {
   if (!canEditActiveTrip()) return false;
   if (!window.confirm(attachment.day_id ? 'Excluir este arquivo do dia?' : 'Excluir este arquivo da viagem?')) return null;
-  const client = await trySupabase(5000);
+  const client = await tryNeon(5000);
   const setStatus = document.body.dataset.dayAttachments === 'open'
     ? setDayAttachmentStatus
     : (message, kind) => setTripPanelStatus(dom.tripFilesStatus, message, kind);
@@ -3688,7 +3688,7 @@ function locationForRemote(location) {
 }
 
 async function syncMutation(mutation, previousDay = null) {
-  const client = await trySupabase();
+  const client = await tryNeon();
   if (!client) throw new Error('Backend indisponível.');
 
   mutation = await normalizeLegacyMutationMedia(client, mutation);
@@ -3855,7 +3855,7 @@ async function flushOutbox() {
       await refreshSyncStatus();
       return false;
     }
-    if (!await trySupabase()) {
+    if (!await tryNeon()) {
       lastOutboxError = new Error('Não foi possível conectar ao Supabase.');
       await refreshSyncStatus();
       return false;
@@ -4151,7 +4151,7 @@ async function fetchTripData(tripId, { preferLocal = false } = {}) {
       }
     }
     try {
-      const client = await trySupabase();
+      const client = await tryNeon();
       if (!client) throw new Error('Backend indisponível.');
       const localBefore = await offlineStore.loadTripData(key).catch(() => ({ days: [], activities: [], locations: [] }));
       const orderedSchema = await supportsOrderedDaySchema(client);
@@ -4201,7 +4201,7 @@ async function ensureTripBaselineSnapshot(tripId) {
   const synced = await flushOutbox();
   if (!synced) return null;
 
-  const client = await trySupabase();
+  const client = await tryNeon();
   if (!client) return null;
 
   const result = await client.rpc('ensure_trip_baseline_snapshot', {
@@ -4379,7 +4379,7 @@ async function loadTripBudget(tripId) {
   const revisionAtStart = budgetToggleRevision;
   if (state.budgetByTrip.has(key)) renderTripBudget(key);
   setTripPanelStatus(dom.budgetStatus, 'Atualizando orçamento…');
-  const client = await trySupabase(5000);
+  const client = await tryNeon(5000);
   if (!client) {
     setTripPanelStatus(dom.budgetStatus, state.budgetByTrip.has(key) ? 'Mostrando a última consulta deste acesso.' : 'Conecte-se para consultar o orçamento.');
     return;
@@ -4441,7 +4441,7 @@ async function persistBudgetToggle(job) {
   const status = job.desired;
   job.inFlight = (async () => {
     try {
-      const client = await trySupabase(5000);
+      const client = await tryNeon(5000);
       if (!client) throw new Error('Conecte-se para salvar o orçamento.');
       const { data, error } = await client.from('budget_items').update({ purchase_status: status })
         .eq('id', job.itemId).eq('trip_id', job.tripId).select('*').single();
@@ -4555,7 +4555,7 @@ async function saveBudgetEditor(event, existing) {
       actual_amount: amountFromInput(value('actual_amount')) };
     if (!payload.label) throw new Error('Informe a descrição do gasto.');
     if (existing) await flushBudgetToggle(tripId, existing.id);
-    const client = await trySupabase(5000);
+    const client = await tryNeon(5000);
     if (!client) throw new Error('É necessária uma conexão para salvar o orçamento.');
     const result = existing
       ? await client.from('budget_items').update(payload).eq('id', existing.id).eq('trip_id', tripId).select('*').single()
@@ -4582,7 +4582,7 @@ async function deleteBudgetItem(item) {
   if (!canEditActiveTrip() || !window.confirm(`Excluir “${item.label}” do orçamento?`)) return;
   const tripId = String(state.activeTripId);
   await flushBudgetToggle(tripId, item.id);
-  const client = await trySupabase(5000);
+  const client = await tryNeon(5000);
   if (!client) { setTripPanelStatus(dom.budgetStatus, 'Conecte-se para excluir.', 'error'); dom.budgetPageMessage.textContent = 'Conecte-se para excluir.'; return; }
   const { error } = await client.from('budget_items').delete().eq('id', item.id).eq('trip_id', tripId);
   if (error) { setTripPanelStatus(dom.budgetStatus, error.message, 'error'); dom.budgetPageMessage.textContent = error.message; return; }
@@ -4995,7 +4995,7 @@ async function loadTripFiles(tripId) {
   }
   if (state.activeTripId !== key) return;
   if (state.tripFilesByTrip.has(key)) renderTripFiles(key, days);
-  const client = await trySupabase(5000);
+  const client = await tryNeon(5000);
   if (!client) {
     renderTripFiles(key, days);
     setTripPanelStatus(dom.tripFilesStatus, 'Conecte-se para consultar e enviar arquivos.');
@@ -5017,7 +5017,7 @@ async function uploadTripFiles(files) {
   const day = dayId ? state.tripDays.find(item => String(item.id) === dayId && String(item.trip_id) === tripId) : null;
   if (!tripId || !canEditActiveTrip() || !files.length) return;
   if (dayId && !day) { setTripPanelStatus(dom.tripFilesStatus, 'Escolha um dia válido ou deixe sem dia.', 'error'); return; }
-  const client = await trySupabase(5000);
+  const client = await tryNeon(5000);
   if (!client) { setTripPanelStatus(dom.tripFilesStatus, 'Conecte-se para enviar arquivos.', 'error'); return; }
   const button = dom.tripFilesInput.closest('.trip-files-pick'); button.dataset.busy = 'true';
   try {
@@ -5289,7 +5289,7 @@ function setEditingMode(editing) {
 
 async function softDeleteSelectedTrips() {
   if (!state.selectedTripIds.size) return;
-  const client = await trySupabase();
+  const client = await tryNeon();
   if (!client) {
     dom.deleteSelectedTrips.textContent = 'Exclusão requer conexão';
     return;
@@ -5518,7 +5518,7 @@ function availableSavedPassengers() {
 async function cacheCompleteWorkspace() {
   if (!state.user?.id || !state.trips.length || !navigator.onLine) return;
   if (await offlineStore.countOutbox()) return;
-  const client = await trySupabase();
+  const client = await tryNeon();
   if (!client) return;
   const lastSnapshot = await offlineStore.getMeta(`complete_snapshot:${state.user.id}`);
   if (lastSnapshot && Date.now() - new Date(lastSnapshot).getTime() < 30 * 60 * 1000) return;
@@ -5583,7 +5583,7 @@ async function refreshSharedTripOwners(client) {
 
 async function loadTrips({ allowLocalFallback = true } = {}) {
   try {
-    const client = await trySupabase();
+    const client = await tryNeon();
     if (!client) throw new Error('Backend indisponível.');
     const localBefore = state.user?.id
       ? await offlineStore.loadWorkspace(state.user.id).catch(() => ({ trips: [], passengers: [] }))
@@ -5637,7 +5637,7 @@ async function loadTrips({ allowLocalFallback = true } = {}) {
 
 async function loadProfile({ allowLocalFallback = true } = {}) {
   try {
-    const client = await trySupabase();
+    const client = await tryNeon();
     if (!client) throw new Error('Backend indisponível.');
     const result = await client.from('passenger_profiles').select('*').eq('user_id', state.user.id).maybeSingle();
     if (result.error) throw result.error;
@@ -5866,7 +5866,7 @@ async function createTripInstantly() {
   dom.tripCreateMessage.textContent = '';
 
   try {
-    const client = await trySupabase();
+    const client = await tryNeon();
     if (!client) throw new Error('É necessária uma conexão para criar a viagem.');
     const now = new Date();
     const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -5974,7 +5974,7 @@ function openTripPassengers() {
 }
 
 async function loadTripMembers(tripId) {
-  const client = await trySupabase();
+  const client = await tryNeon();
   if (!client) return;
   const { data, error } = await client.rpc('list_trip_members', { p_trip_id: tripId });
   if (error) throw error;
@@ -5996,7 +5996,7 @@ async function shareActiveTrip() {
   if (!tripId || !email) return;
   dom.tripShareButton.disabled = true; dom.tripShareMessage.textContent = 'Compartilhando…';
   try {
-    const client = await trySupabase(); if (!client) throw new Error('Compartilhar requer conexão.');
+    const client = await tryNeon(); if (!client) throw new Error('Compartilhar requer conexão.');
     const { error } = await client.rpc('share_trip_with_email', { p_trip_id: tripId, p_email: email, p_role: 'editor' });
     if (error) throw error;
     dom.tripShareEmail.value = '';
@@ -6009,7 +6009,7 @@ async function shareActiveTrip() {
 async function refreshTripShares() {
   const trip = state.trips.find(item => String(item.id) === String(state.activeTripId));
   if (tripRole(trip) !== 'owner') return;
-  const client = await trySupabase();
+  const client = await tryNeon();
   if (!client) throw new Error('É necessária uma conexão para ver os convites.');
   const { data, error } = await client.rpc('list_trip_shares', { p_trip_id: trip.id });
   if (error) throw error;
@@ -6063,7 +6063,7 @@ async function submitTripShare(event) {
   dom.tripShareStatus.dataset.kind = 'info';
   dom.tripShareStatus.textContent = 'Compartilhando…';
   try {
-    const client = await trySupabase();
+    const client = await tryNeon();
     if (!client) throw new Error('É necessária uma conexão para compartilhar.');
     const { data, error } = await client.rpc('invite_trip_by_email', { p_trip_id: trip.id, p_email: email, p_role: role });
     if (error) throw error;
@@ -6133,7 +6133,7 @@ async function prepareAvatar(file) {
 }
 
 async function saveProfile() {
-  const client = await trySupabase();
+  const client = await tryNeon();
   if (!client) {
     dom.profileMessage.dataset.kind = 'error';
     dom.profileMessage.textContent = 'Perfil requer conexão. O roteiro continua disponível offline.';
@@ -6386,7 +6386,7 @@ async function persistPassengerEdits() {
   }
   const task = passengerSaveTask.catch(() => {}).then(async () => {
     if (revision <= passengerSavedRevision) return true;
-    const client = await trySupabase();
+    const client = await tryNeon();
     if (!client) throw new Error('É necessária uma conexão para salvar os passageiros.');
     const before = (state.passengers.get(tripId) || []).map(person => ({ id: person.id, name: person.name }));
     const error = await saveTripPassengers(client, tripId);
@@ -6472,7 +6472,7 @@ async function saveTripFields(changes, { syncDays = false, summary = 'Dados da v
     if (!trip) throw new Error('Viagem indisponível.');
     if (!canEditTrip(trip)) throw new Error('Você só pode visualizar esta viagem.');
     if (!syncDays && Object.entries(changes).every(([key, value]) => String(trip[key] ?? '') === String(value ?? ''))) return trip;
-    const client = await trySupabase();
+    const client = await tryNeon();
     if (!client) throw new Error('É necessária uma conexão para salvar a viagem.');
     const before = { name: trip.name, start_date: trip.start_date, day_count: tripDayCount(trip), secondary_color: trip.secondary_color };
     const orderedSchema = syncDays ? await supportsOrderedDaySchema(client) : true;
@@ -6569,7 +6569,7 @@ async function saveTripSchedule() {
 }
 
 async function saveTrip() {
-  const client = await trySupabase();
+  const client = await tryNeon();
   if (!client) {
     dom.newTripMessage.textContent = 'Criar ou alterar a viagem requer conexão. O roteiro já salvo continua editável offline.';
     return;
@@ -6721,7 +6721,7 @@ async function saveTrip() {
 }
 
 async function deleteAccount() {
-  const client = await trySupabase();
+  const client = await tryNeon();
   if (!client) { dom.profileMessage.textContent = 'Excluir conta requer conexão.'; return; }
   if (!window.confirm('Desativar esta conta? A sessão será encerrada, mas nenhuma viagem, foto ou outro dado será apagado.')) return;
   const result = await client.rpc('soft_delete_own_account');
@@ -6842,7 +6842,7 @@ dom.tripPageCoverInput.addEventListener('change', async () => {
     const tripId = String(state.activeTripId || '');
     const blob = await compressImage(file);
     const prepared = await prepareTripMedia(blob, tripId, 'trip', tripId);
-    const client = await trySupabase();
+    const client = await tryNeon();
     if (!client) throw new Error('É necessária uma conexão para salvar a foto.');
     await uploadCachedMedia(client, prepared.bucket, prepared.path, prepared.hash, prepared.contentType, prepared.blob);
     const trip = await saveTripFields({
@@ -6948,7 +6948,7 @@ dom.yearButton.addEventListener('click', () => setYearMenu(document.body.dataset
 document.addEventListener('click', event => { if (document.body.dataset.yearMenu === 'open' && !dom.tripHeading.contains(event.target)) setYearMenu(false); });
 dom.birthDateInput.addEventListener('input', syncAge);
 dom.logoutButton.addEventListener('click', async () => {
-  const client = await trySupabase(5000);
+  const client = await tryNeon(5000);
   if(!client){dom.profileMessage.textContent='Sem conexão. O logout deve ser confirmado no Neon antes de sair.';return;}
   const outcome=await client.auth.signOut().catch(error=>({error}));
   if(outcome?.error){dom.profileMessage.textContent='Não foi possível encerrar a sessão Neon. Tente novamente.';return;}
@@ -7053,7 +7053,7 @@ async function applyPendingSignupAvatar() {
     const avatar = await offlineStore.getMeta(key);
     if (!avatar) return;
     if (state.profile?.avatar_path) { await offlineStore.deleteMeta(key); return; }
-    const client = await trySupabase();
+    const client = await tryNeon();
     if (!client) return;
     const { data, error: authError } = await client.auth.getUser();
     if (authError || data.user?.id !== user.id) return;
@@ -7109,7 +7109,7 @@ dom.authForm.addEventListener('submit', async event => {
   const button = dom.authForm.querySelector('.auth-submit');
   button.disabled = true;
   try {
-    const client = await trySupabase();
+    const client = await tryNeon();
     if (!client) { dom.authMessage.textContent = 'Sem conexão. Abra o app normalmente se este aparelho já tiver uma cópia da viagem.'; return; }
     const result = await client.auth.signInWithPassword(Object.fromEntries(new FormData(dom.authForm)));
     if (result.error) { dom.authMessage.textContent = result.error.message; return; }
@@ -7135,7 +7135,7 @@ dom.signupForm.addEventListener('submit', async event => {
   let accountCreated = false;
   try {
     if (signupAvatarPreparing) await signupAvatarPreparing;
-    const client = await trySupabase();
+    const client = await tryNeon();
     if (!client) throw new Error('A criação de conta precisa de conexão com a internet.');
     const { data, error } = await client.auth.signUp({
       email,
@@ -7201,7 +7201,7 @@ async function boot() {
     }
 
     setSplashStatus('Validando sua sessão no Neon…');
-    const client=await trySupabase(8500);
+    const client=await tryNeon(8500);
     if(!client)throw new Error('Serviço Neon temporariamente indisponível.');
     const {data,error}=await client.auth.getSession();
     if(error)throw error;
@@ -7266,7 +7266,7 @@ window.addEventListener('online', () => {
   }).catch(console.warn);
 });
 
-ensureSupabase()
+ensureNeon()
   .then(client => client.auth.onAuthStateChange((_event, session) => {
     if (_event === 'SIGNED_OUT') offlineStore.clearSession().catch(console.warn);
     if (session) {
