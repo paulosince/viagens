@@ -1,0 +1,103 @@
+name: Viaggio Auth 3/14 provider contract (no secrets)
+
+on:
+  pull_request:
+    branches:
+      - migration/neon-app-20261019
+    paths:
+      - '.github/workflows/viaggio-auth3-provider-contract.yml'
+      - 'experiments/neon-pilot/migration/auth/**'
+      - 'experiments/neon-pilot/app/link-session*.mjs'
+      - 'experiments/neon-pilot/app/auth-link-otp.html'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Test session bridging without real credentials
+        run: node --test experiments/neon-pilot/app/link-session.test.mjs
+      - name: Validate OTP portal syntax and legacy session continuity
+        shell: bash
+        run: |
+          node <<'JS'
+          const fs=require('node:fs');
+          const assert=require('node:assert/strict');
+          const html=fs.readFileSync('experiments/neon-pilot/app/auth-link-otp.html','utf8');
+          assert.match(html,/auth\.auth\.getSession\(\)/);
+          assert.match(html,/type:'sign-in'/);
+          assert.match(html,/sign-in\/email-otp/);
+          assert.match(html,/linkVerifiedSessions\(/);
+          assert.doesNotMatch(html,/name=["']oldpass|id=["']oldpass/);
+          const match=html.match(/<script type="module">([\s\S]*?)<\/script>/);
+          assert.ok(match);
+          fs.writeFileSync('/tmp/viaggio-auth-otp.mjs',match[1]);
+          console.log('OTP source and session contract PASS');
+          JS
+          node --check /tmp/viaggio-auth-otp.mjs
+      - name: Validate providers and fail-closed bridge using anonymous HTTP
+        shell: bash
+        run: |
+          set -euo pipefail
+          ORIGIN='https://paulosince.github.io'
+          NEON='https://ep-small-bread-b7uq0zva.neonauth.c-13.us-east-1.aws.neon.tech/viaggio_auth/auth'
+          BRIDGE='https://br-square-river-b765bpl4-linkup.compute.c-13.us-east-1.aws.neon.tech/link'
+          SUPABASE='https://siabldasqinpfmxslwji.supabase.co'
+          status=$(curl -sS -X OPTIONS -o /tmp/neon_preflight -D /tmp/neon_headers -w '%{http_code}' --max-time 20 \
+            -H "Origin: $ORIGIN" \
+            -H 'Access-Control-Request-Method: POST' \
+            -H 'Access-Control-Request-Headers: content-type' \
+            "$NEON/sign-in/email")
+          echo "Neon email sign-in preflight: $status"
+          test "$status" = 200 -o "$status" = 204
+          grep -iq 'access-control-allow-origin: https://paulosince.github.io' /tmp/neon_headers
+          for path in email-otp/send-verification-otp sign-in/email-otp; do
+            otp_status=$(curl -sS -X OPTIONS -o /tmp/neon_otp -D /tmp/neon_otp_headers -w '%{http_code}' --max-time 20 \
+              -H "Origin: $ORIGIN" -H 'Access-Control-Request-Method: POST' \
+              -H 'Access-Control-Request-Headers: content-type' "$NEON/$path")
+            echo "Neon OTP $path preflight: $otp_status"
+            test "$otp_status" = 200 -o "$otp_status" = 204
+            grep -iq 'access-control-allow-origin: https://paulosince.github.io' /tmp/neon_otp_headers
+          done
+          status=$(curl -sS -o /tmp/anon_token -w '%{http_code}' --max-time 20 -H "Origin: $ORIGIN" "$NEON/token")
+          echo "Neon anonymous JWT request: $status (must reject)"
+          test "$status" != 200
+          status=$(curl -sS -X OPTIONS -o /tmp/legacy_preflight -D /tmp/legacy_headers -w '%{http_code}' --max-time 20 \
+            -H "Origin: $ORIGIN" -H 'Access-Control-Request-Method: POST' \
+            -H 'Access-Control-Request-Headers: content-type, apikey' \
+            "$SUPABASE/auth/v1/token?grant_type=password")
+          echo "Supabase legacy login preflight: $status"
+          test "$status" = 200 -o "$status" = 204
+          status=$(curl -sS -X POST -o /tmp/rejected -w '%{http_code}' --max-time 20 \
+            -H "Origin: $ORIGIN" -H 'Content-Type: application/json' \
+            -H 'Authorization: Bearer invalid.jwt.token' \
+            -H 'x-legacy-access-token: invalid.jwt.token' -d '{}' "$BRIDGE")
+          echo "Neon linkup invalid-identity status: $status"
+          echo 'Non-sensitive error code:'
+          head -c 160 /tmp/rejected; echo
+          test "$status" = 401
+          grep -q 'UNAUTHORIZED' /tmp/rejected
+          status=$(curl -sS -X OPTIONS -o /tmp/preflight -w '%{http_code}' --max-time 20 \
+            -H "Origin: $ORIGIN" \
+            -H 'Access-Control-Request-Method: POST' \
+            -H 'Access-Control-Request-Headers: authorization, x-legacy-access-token' "$BRIDGE")
+          echo "Neon linkup auth preflight: $status"
+          test "$status" = 204
+          echo 'PASS: provider preflight and verified-credential gate (no accounts modified)'
+          SITE='https://paulosince.github.io/viagens/experiments/neon-pilot/app'
+          portal_status=$(curl -L -sS --max-time 25 -o /tmp/otp-page -w '%{http_code}' "$SITE/auth-link-otp.html")
+          module_status=$(curl -L -sS --max-time 25 -o /tmp/link-module -w '%{http_code}' "$SITE/link-session.mjs")
+          echo "OTP portal HTTP: $portal_status; module HTTP: $module_status"
+          test "$portal_status" = 200
+          test "$module_status" = 200
+          grep -q 'Vincular suas viagens' /tmp/otp-page
+          grep -q 'linkVerifiedSessions' /tmp/link-module
+          echo 'PASS: deployed one-time-code page and script available on GitHub Pages'
