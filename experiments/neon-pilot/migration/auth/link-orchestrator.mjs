@@ -1,27 +1,32 @@
-// Server-only federation link operation. Does not create accounts or accept client UUIDs.
-// Dependencies are injected to make unauthorized and interrupted flows testable.
+// Server-only identity migration. The verified legacy principal determines
+// which data projects require an identity map; the browser never chooses.
 export async function linkTwoProjects({record,repository}) {
-  if (!record || typeof record.neon_subject!=='string' || typeof record.legacy_user_id!=='string'
+  if (!record || typeof record.neon_subject!=='string'
+      || typeof record.legacy_user_id!=='string'
       || record.proof_kind!=='dual_session') throw Error('UNVERIFIED_IDENTITY');
   if (!repository || typeof repository.withLock!=='function'
-      || typeof repository.prepare!=='function' || typeof repository.activate!=='function'
-      || typeof repository.deactivate!=='function') throw Error('LINK_STORE_NOT_CONFIGURED');
+      || typeof repository.projectsForLegacy!=='function'
+      || typeof repository.prepare!=='function'
+      || typeof repository.activate!=='function'
+      || typeof repository.deactivate!=='function')
+    throw Error('LINK_STORE_NOT_CONFIGURED');
   return repository.withLock(record, async()=>{
-    // Both records remain INACTIVE until both projects have prepared successfully.
-    await repository.prepare('a',record);
-    await repository.prepare('b',record);
+    const projects=await repository.projectsForLegacy(record);
+    if (!Array.isArray(projects) || projects.length<1
+        || projects.length>2 || new Set(projects).size!==projects.length
+        || projects.some(p=>p!=='a'&&p!=='b')) throw Error('INVALID_PROJECT_ROUTE');
+
+    // Both links remain inactive until ALL required projects are prepared.
+    for (const project of projects) await repository.prepare(project,record);
     try {
-      await repository.activate('a',record);
-      await repository.activate('b',record);
+      for (const project of projects) await repository.activate(project,record);
       return Object.freeze({status:'linked'});
-    } catch (error) {
-      // A compensating rollback is necessary because PostgreSQL transactions
-      // cannot span two separate Neon projects. This is NOT atomic commit.
-      const repairs=await Promise.allSettled([
-        repository.deactivate('a',record),
-        repository.deactivate('b',record)
-      ]);
-      if (repairs.some(r=>r.status==='rejected'))
+    } catch {
+      // Compensating transaction, NOT a distributed atomic commit.
+      const repairs=await Promise.allSettled(
+        projects.map(project=>repository.deactivate(project,record))
+      );
+      if (repairs.some(x=>x.status==='rejected'))
         throw Error('LINK_REQUIRES_ADMIN_RECONCILIATION');
       throw Error('LINK_ACTIVATION_ROLLED_BACK');
     }
