@@ -26,6 +26,6 @@ jobs:
           status=$(curl -sS --max-time 20 -o /tmp/preflight -w '%{http_code}' -X OPTIONS -H 'Origin: https://paulosince.github.io' -H 'Access-Control-Request-Method: POST' "$BASE")
           echo "preflight_status=$status"; test "$status" = 204
           status=$(curl -sS --max-time 20 -o /tmp/disabled -w '%{http_code}' -X POST -H 'Origin: https://paulosince.github.io' -H 'Content-Type: application/json' -d '{}' "$BASE")
-          echo "disabled_status=$status"; test "$status" = 503
+          echo "disabled_status=$status"; head -c 180 /tmp/disabled; echo; test "$status" = 503
           grep -q 'MIGRATION_NOT_ENABLED' /tmp/disabled
           echo "PASS: live Origin-denial=403, authorized preflight=204, linking disabled=503"
