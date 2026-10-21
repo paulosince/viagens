@@ -37,6 +37,7 @@ function newFixture() {
     if(typeof url!=='string'||(!url.startsWith(API_ROOTS.a)&&!url.startsWith(API_ROOTS.b)))
       throw Error('DISALLOWED_NETWORK_URL');
     const auth=options?.headers?.Authorization||options?.headers?.authorization||
+      options?.headers?.get?.('authorization')||
       (request?.headers?.get?.('authorization'))||'';
     headers.push({url,auth});
     if(!auth||auth==='Bearer undefined'||auth==='Bearer null')
