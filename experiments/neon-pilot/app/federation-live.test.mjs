@@ -31,6 +31,11 @@ test('real-JWT-shaped owner A sees four owned trips and own profile only',async(
   assert.equal(result.projects.a.trips,4);
   assert.equal(result.projects.b.trips,0);
   assert.ok(calls.every(c=>c.opt.cache==='no-store'&&c.opt.redirect==='error'));
+  // Real schema uses user_id as the PRIMARY KEY; querying id caused HTTP 400.
+  const personalCalls=calls.filter(c=>c.url.includes('/passenger_profiles?'));
+  assert.equal(personalCalls.length,2);
+  assert.ok(personalCalls.every(c=>c.url.includes('select=user_id')));
+  assert.ok(personalCalls.every(c=>!c.url.includes('select=id')));
 });
 test('owner B sees one trip on A and private profile on B',async()=>{
   const result=await testSignedFederation({token,fetcher:mock({who:'b'}).fetcher});
