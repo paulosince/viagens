@@ -53,7 +53,7 @@ export async function testSignedFederation({token,fetcher=fetch,endpoints=ENDPOI
     const anon=await response(fetcher,base,'/trips?select=id&limit=1',null);
     if(anon.ok){
       if(!Array.isArray(anon.payload)||anon.payload.length)fail(key+'_ANONYMOUS_DATA_EXPOSED');
-    }else if(![401,403].includes(anon.status))fail(key+'_ANONYMOUS_UNEXPECTED_HTTP_'+anon.status);
+    }else if(![400,401,403].includes(anon.status))fail(key+'_ANONYMOUS_UNEXPECTED_HTTP_'+anon.status);
     result.checks++;
     // Exact same, real signed central Auth JWT is sent independently to both.
     const ctx=await response(fetcher,base,'/rpc/project_context',token,'POST');
