@@ -54,10 +54,10 @@ export function createLinkRepository({central,a,b}) {
    check(record);
    if(!Object.hasOwn(pools,project))throw Error('UNKNOWN_PROJECT');
    const result=await pools[project].query(
-     `UPDATE viagem_identity_nonexistent SET activated_at=COALESCE(activated_at,now())
+     `UPDATE viaggio_identity.neon_auth_links SET activated_at=COALESCE(activated_at,now())
       WHERE neon_subject=$1::uuid AND legacy_user_id=$2::uuid
         AND verified_at IS NOT NULL AND proof_kind='dual_session'
-      RETURNING neon_subject`.replace('viagem_identity_nonexistent','viaggio_identity.neon_auth_links'),
+      RETURNING neon_subject`,
      [record.neon_subject,record.legacy_user_id]);
    if(result.rowCount!==1)throw Error('LINK_ACTIVATION_NOT_READY');
   },
