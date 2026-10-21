@@ -16,12 +16,12 @@ jobs:
         run: |
           set -euo pipefail
           root='https://paulosince.github.io/viagens/experiments/neon-pilot/app'
-          for file in neon-preview.html main-neon.js backend-neon.mjs storage-neon.mjs; do
+          for file in neon-media-preview.html main-neon.js backend-neon.mjs storage-neon.mjs; do
             http=$(curl -sSL --retry 2 --max-time 40 -o /tmp/media-public -w '%{http_code}' "$root/$file")
             echo "$file HTTP $http"
             test "$http" = 200
             case "$file" in
-              neon-preview.html) grep -q 'main-neon.js?v=20261021-7media' /tmp/media-public;;
+              neon-media-preview.html) grep -q 'main-neon.js?v=20261021-7media' /tmp/media-public;;
               main-neon.js) grep -q 'backend-neon.mjs?v=20261021-7media' /tmp/media-public;;
               backend-neon.mjs)
                 grep -q "from './storage-neon.mjs'" /tmp/media-public
@@ -48,7 +48,7 @@ jobs:
           const page=await browser.newPage({serviceWorkers:'block'});
           const errors=[];
           page.on('pageerror',error=>errors.push(error.message));
-          await page.goto('https://paulosince.github.io/viagens/experiments/neon-pilot/app/neon-preview.html',{waitUntil:'domcontentloaded',timeout:40000});
+          await page.goto('https://paulosince.github.io/viagens/experiments/neon-pilot/app/neon-media-preview.html',{waitUntil:'domcontentloaded',timeout:40000});
           await page.waitForFunction(()=>document.body.dataset.appReady==='true',{timeout:40000});
           const state=await page.evaluate(()=>({session:document.body.dataset.session,auth:document.querySelector('#auth_view')?.getAttribute('aria-hidden')}));
           console.log('state',JSON.stringify(state),'errors',JSON.stringify(errors));
