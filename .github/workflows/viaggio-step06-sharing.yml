@@ -1,0 +1,56 @@
+name: Viaggio step 06 shared trips routing
+on:
+  pull_request:
+    branches:
+      - migration/neon-app-20261019
+    paths:
+      - 'experiments/neon-pilot/app/router-neon.mjs'
+      - 'experiments/neon-pilot/app/main-neon.js'
+      - 'experiments/neon-pilot/app/router-stage6.test.mjs'
+      - '.github/workflows/viaggio-step06-sharing.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  sharing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Safe sharing, invitation and revocation routing tests
+        run: |
+          node --check experiments/neon-pilot/app/main-neon.js
+          node --check experiments/neon-pilot/app/router-neon.mjs
+          node --check experiments/neon-pilot/app/router-stage6.test.mjs
+          node --test experiments/neon-pilot/app/router-stage6.test.mjs
+          grep -Fq 'window.confirm(' experiments/neon-pilot/app/main-neon.js
+          grep -Fq 'remove_trip_share' experiments/neon-pilot/app/main-neon.js
+
+      - name: Live staging APIs reject forged JWT on invitation and revocation RPCs
+        shell: bash
+        run: |
+          set -euo pipefail
+          fake='eyJhbGciOiJFZERTQSJ9.eyJzdWIiOiJhYWFhYWFhYS1hYWFhLTRhYWEtOGFhYS1hYWFhYWFhYWFhYWFhYWEiLCJyb2xlIjoiYXV0aGVudGljYXRlZCJ9.YWJj'
+          for base in \
+            'https://ep-empty-pine-b8r7sa8d.apirest.c-14.us-east-1.aws.neon.tech/viaggio_lab/rest/v1' \
+            'https://ep-spring-moon-b8fi6yxc.apirest.c-14.us-east-1.aws.neon.tech/viaggio_lab/rest/v1'; do
+            for rpc in invite_trip_by_email remove_trip_share; do
+              if test "$rpc" = invite_trip_by_email; then
+                body='{"p_trip_id":"00000000-0000-4000-8000-000000000000","p_email":"fake@example.invalid","p_role":"viewer"}'
+              else
+                body='{"p_trip_id":"00000000-0000-4000-8000-000000000000","p_email":"fake@example.invalid"}'
+              fi
+              status=$(curl --max-time 25 -sS -o /tmp/viaggio-invalid-rpc -w '%{http_code}' \
+                -H 'Origin: https://paulosince.github.io' \
+                -H 'Authorization: Bearer '"$fake" \
+                -H 'Content-Type: application/json' \
+                -H 'Content-Profile: viaggio_app' \
+                -X POST --data "$body" "$base/rpc/$rpc")
+              echo "$rpc invalid-jwt HTTP $status"
+              test "$status" = 400 -o "$status" = 401 -o "$status" = 403
+            done
+          done
+          echo 'PASS: forged JWT cannot invoke invite or revoke on either data project'
