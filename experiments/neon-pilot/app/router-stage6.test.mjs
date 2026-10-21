@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createRouter} from './router.mjs';
+import {createRouter} from './router-neon.mjs';
 
 const TRIP='trip-A', USER='user-guest';
 const err=(msg)=>new Error(msg);
