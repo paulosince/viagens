@@ -3,10 +3,10 @@
 // Before activating set all *staging* connection strings and VIAGGIO_LINK_ENABLED=true.
 import pg from 'pg';
 import {createRemoteJWKSet,jwtVerify} from 'jose';
-import {prepareIdentityProof} from './identity-proof-core.mjs';
-import {makeSupabaseSessionVerifier,makeCentralUserLookup} from './trusted-auth-adapters.mjs';
-import {createLinkRepository} from './link-store.mjs';
-import {linkTwoProjects,createLinkHandler} from './link-orchestrator.mjs';
+import {prepareIdentityProof} from '../identity-proof-core.mjs';
+import {makeSupabaseSessionVerifier,makeCentralUserLookup} from '../trusted-auth-adapters.mjs';
+import {createLinkRepository} from '../link-store.mjs';
+import {linkTwoProjects,createLinkHandler} from '../link-orchestrator.mjs';
 
 const required=['DATABASE_URL','VIAGGIO_A_STAGING_DATABASE_URL',
  'VIAGGIO_B_STAGING_DATABASE_URL','VIAGGIO_SUPABASE_URL','VIAGGIO_SUPABASE_PUBLISHABLE_KEY',
