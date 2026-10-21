@@ -16,6 +16,15 @@ const enabled=configured&&process.env.VIAGGIO_LINK_ENABLED==='true';
 let handler;
 if (configured) {
   const centralURL=new URL(process.env.DATABASE_URL);
+  const aURL=new URL(process.env.VIAGGIO_A_STAGING_DATABASE_URL);
+  const bURL=new URL(process.env.VIAGGIO_B_STAGING_DATABASE_URL);
+  // Mandatory operational guard: NEVER write identity links to parent branches
+  // while this service is in validation. Prevent accidental main DB secrets.
+  if (!centralURL.hostname.startsWith('ep-small-bread-b7uq0zva.')
+      || !aURL.hostname.startsWith('ep-empty-pine-b8r7sa8d.')
+      || !bURL.hostname.startsWith('ep-spring-moon-b8fi6yxc.')
+      || aURL.pathname!=='/viaggio_lab'
+      || bURL.pathname!=='/viaggio_lab') throw Error('STAGING_PROJECT_BOUNDARY_REQUIRED');
   centralURL.pathname='/viaggio_auth';
   const central=new pg.Pool({connectionString:centralURL.href,max:2,connectionTimeoutMillis:8000,
     idleTimeoutMillis:15000});
