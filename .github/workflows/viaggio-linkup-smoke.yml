@@ -1,0 +1,31 @@
+name: Viaggio linkup live negative smoke
+
+on:
+  pull_request:
+    branches:
+      - migration/neon-app-20261019
+    paths:
+      - '.github/workflows/viaggio-linkup-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  negative-http:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Verify fail-closed live Neon Function (no credentials)
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='https://br-square-river-b765bpl4-linkup.compute.c-13.us-east-1.aws.neon.tech/link'
+          status=$(curl -sS --max-time 20 -o /tmp/foreign -w '%{http_code}' -H 'Origin: https://untrusted.invalid' -X POST -H 'Content-Type: application/json' -d '{}' "$BASE")
+          test "$status" = 403
+          status=$(curl -sS --max-time 20 -o /tmp/preflight -w '%{http_code}' -X OPTIONS -H 'Origin: https://paulosince.github.io' -H 'Access-Control-Request-Method: POST' "$BASE")
+          test "$status" = 204
+          status=$(curl -sS --max-time 20 -o /tmp/disabled -w '%{http_code}' -X POST -H 'Origin: https://paulosince.github.io' -H 'Content-Type: application/json' -d '{}' "$BASE")
+          test "$status" = 503
+          grep -q 'MIGRATION_NOT_ENABLED' /tmp/disabled
+          echo "PASS: live Origin-denial=403, authorized preflight=204, linking disabled=503"
