@@ -59,3 +59,27 @@ jobs:
             if test "$status" = 200; then test "$(cat /tmp/anonymous)" = '[]'; else test "$status" = 400 -o "$status" = 401 -o "$status" = 403; fi
           done
           echo 'PASS: both Neon staging APIs reject forged tokens and expose no anonymous trips'
+      - name: Verify browser CORS for signed Neon API queries and published page
+        shell: bash
+        run: |
+          set -euo pipefail
+          for base in \
+           'https://ep-empty-pine-b8r7sa8d.apirest.c-14.us-east-1.aws.neon.tech/viaggio_lab/rest/v1' \
+           'https://ep-spring-moon-b8fi6yxc.apirest.c-14.us-east-1.aws.neon.tech/viaggio_lab/rest/v1'; do
+            status=$(curl -sS -X OPTIONS --max-time 20 -D /tmp/headers -o /tmp/preflight -w '%{http_code}' \
+             -H 'Origin: https://paulosince.github.io' \
+             -H 'Access-Control-Request-Method: POST' \
+             -H 'Access-Control-Request-Headers: authorization,accept-profile,content-profile,content-type' \
+             "$base/rpc/project_context")
+            echo "preflight=$status"
+            test "$status" = 200 -o "$status" = 204
+            grep -iq 'access-control-allow-origin: https://paulosince.github.io' /tmp/headers
+          done
+          SITE='https://paulosince.github.io/viagens/experiments/neon-pilot/app'
+          for file in auth-neon-smoke.html federation-live.mjs; do
+            status=$(curl -sS -L --max-time 30 -w '%{http_code}' -o /tmp/site "$SITE/$file")
+            echo "page=$file http=$status"
+            test "$status" = 200
+          done
+          echo 'PASS: browser preflight and test page published'
+
