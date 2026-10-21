@@ -56,15 +56,16 @@ export function createLinkHandler({prove,link,origin='https://paulosince.github.
     const legacyToken=request.headers.get('x-legacy-access-token')||'';
     if (!neonToken||!legacyToken || neonToken.length>8192 || legacyToken.length>8192)
       return Response.json({error:'UNAUTHORIZED'},{status:401,headers});
+    let proof;
+    try { proof=await prove({centralToken:neonToken,legacyToken}); }
+    catch { return Response.json({error:'UNAUTHORIZED'},{status:401,headers}); }
     try {
-      const proof=await prove({centralToken:neonToken,legacyToken});
       const outcome=await link(proof);
       return Response.json(outcome,{status:200,headers});
-    }catch(error) {
-      const retry=error?.message==='LINK_ACTIVATION_ROLLED_BACK'
-          || error?.message==='LINK_REQUIRES_ADMIN_RECONCILIATION';
-      return Response.json({error:retry?'MIGRATION_UNAVAILABLE':'UNAUTHORIZED'},
-        {status:retry?503:401,headers});
+    } catch {
+      // Database, conflict and reconciliation failures are retriable and never
+      // confused with invalid personal credentials. Do not leak internal errors.
+      return Response.json({error:'MIGRATION_UNAVAILABLE'},{status:503,headers});
     }
   };
 }
