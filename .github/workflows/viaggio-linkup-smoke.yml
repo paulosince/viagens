@@ -1,0 +1,32 @@
+name: Viaggio linkup live negative smoke
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  negative-http:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Verify fail-closed live Neon Function (no credentials)
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='https://br-square-river-b765bpl4-linkup.compute.c-13.us-east-1.aws.neon.tech/link'
+          status=$(curl -sS --max-time 20 -o /tmp/foreign -w '%{http_code}' -H 'Origin: https://untrusted.invalid' -X POST -H 'Content-Type: application/json' -d '{}' "$BASE")
+          echo "foreign_origin_status=$status"; test "$status" = 403
+          status=$(curl -sS --max-time 20 -o /tmp/preflight -w '%{http_code}' -X OPTIONS -H 'Origin: https://paulosince.github.io' -H 'Access-Control-Request-Method: POST' "$BASE")
+          echo "preflight_status=$status"; test "$status" = 204
+          status=$(curl -sS --max-time 20 -o /tmp/disabled -w '%{http_code}' -X POST -H 'Origin: https://paulosince.github.io' -H 'Content-Type: application/json' -d '{}' "$BASE")
+          echo "disabled_status=$status"; head -c 180 /tmp/disabled; echo; test "$status" = 503
+          grep -q 'MIGRATION_NOT_ENABLED' /tmp/disabled
+          echo "PASS: live Origin-denial=403, authorized preflight=204, linking disabled=503"
+          PORTAL='https://paulosince.github.io/viagens/experiments/neon-pilot/app/auth-upgrade.html'
+          portal_status=$(curl -L -sS --max-time 30 -o /tmp/portal -w '%{http_code}' "$PORTAL")
+          echo "signup_portal_status=$portal_status"
+          test "$portal_status" = 200
+          grep -q 'Criar nova credencial' /tmp/portal
+          echo 'PASS: standalone family upgrade portal is reachable'
