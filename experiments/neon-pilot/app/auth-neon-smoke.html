@@ -61,7 +61,7 @@ table{width:100%;border-collapse:collapse;font-size:14px;margin:8px 0}td{border-
 <p class="foot">O código é enviado diretamente ao Neon Auth. O token temporário é usado somente nas duas APIs oficiais do Neon e descartado após o teste. Nenhuma senha é solicitada; nenhum token é gravado no GitHub, no navegador ou enviado ao ChatGPT. Os resultados são contagens de registros autorizados, não o conteúdo das viagens.</p>
 </main>
 <script type="module">
-import {testSignedFederation} from './federation-live.mjs';
+import {testSignedFederation} from './federation-live.mjs?v=20261021-schemafix1';
 const NEON='https://ep-small-bread-b7uq0zva.neonauth.c-13.us-east-1.aws.neon.tech/viaggio_auth/auth';
 const $=id=>document.getElementById(id);
 let busy=false;
