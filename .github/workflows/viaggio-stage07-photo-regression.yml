@@ -1,0 +1,43 @@
+name: Viaggio step07 photo fallback regression
+on:
+  pull_request:
+    branches: [migration/neon-app-20261019]
+    paths:
+      - '.github/workflows/viaggio-stage07-photo-regression.yml'
+      - 'experiments/neon-pilot/app/photo-source-neon*'
+      - 'experiments/neon-pilot/app/main-neon.js'
+      - 'experiments/neon-pilot/app/neon-media-review.html'
+      - 'experiments/neon-pilot/app/neon-photo-check.html'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  photo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '24'}
+      - name: Verify original managed photos cannot fall back to duplicate Unsplash imagery
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check experiments/neon-pilot/app/main-neon.js
+          node --check experiments/neon-pilot/app/photo-source-neon.mjs
+          node --test experiments/neon-pilot/app/photo-source-neon.test.mjs
+          grep -Fq "activityPhotoForPreview(activity, location)" experiments/neon-pilot/app/main-neon.js
+          grep -Fq "from './photo-source-neon.mjs" experiments/neon-pilot/app/main-neon.js
+          grep -Fq 'main-neon.js?v=20261021-7photofix' experiments/neon-pilot/app/neon-media-review.html
+          node <<'JS'
+          const fs=require('node:fs'),assert=require('node:assert/strict');
+          const html=fs.readFileSync('experiments/neon-pilot/app/neon-photo-check.html','utf8');
+          const match=html.match(/<script type="module">([\s\S]*?)<\/script>/);
+          assert.ok(match,'expected module script');
+          assert.match(match[1],/SHA-256/);
+          assert.match(match[1],/allowMutations:false/);
+          assert.doesNotMatch(html,/console\.log\(.*token|localStorage\.setItem/);
+          fs.writeFileSync('/tmp/viaggio-check-photos.mjs',match[1]);
+          JS
+          node --check /tmp/viaggio-check-photos.mjs
+          echo 'PASS: no misleading photo fallback; signed read-only diagnostic parses'
