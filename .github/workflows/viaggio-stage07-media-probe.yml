@@ -1,0 +1,47 @@
+name: Viaggio step07 Neon Functions authorization probe
+on:
+  pull_request:
+    branches: [migration/neon-app-20261019]
+    paths:
+      - '.github/workflows/viaggio-stage07-media-probe.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Confirm staging media service rejects unauthenticated reads and signed URLs
+        shell: bash
+        run: |
+          set -euo pipefail
+          for origin in \
+            'https://br-silent-band-b80nklzl-appmedia.compute.c-14.us-east-1.aws.neon.tech' \
+            'https://br-falling-leaf-b8xuv1d0-appmedia.compute.c-14.us-east-1.aws.neon.tech'; do
+            for path in download sign; do
+              for auth in anonymous forged; do
+                headers=(-H 'Origin: https://paulosince.github.io')
+                if test "$auth" = forged; then
+                  headers+=(-H 'Authorization: Bearer eyJhbGciOiJFZERTQSJ9.eyJzdWIiOiJmb3JnZWQifQ.ZmFrZQ')
+                fi
+                status=$(curl -sS --max-time 25 -o /tmp/media-response -w '%{http_code}' \
+                  "${headers[@]}" \
+                  "$origin/$path?bucket=trip-images&path=00000000-0000-4000-8000-000000000000/trip/missing.jpg")
+                echo "service=$origin route=$path $auth http=$status"
+                test "$status" = 400 -o "$status" = 401 -o "$status" = 403 -o "$status" = 404
+                if grep -Eqi '(X-Amz-Signature|X-Amz-Credential|AWSAccessKeyId)' /tmp/media-response; then
+                  echo 'ERROR: unsigned request exposed object presign'
+                  exit 1
+                fi
+              done
+            done
+            status=$(curl -sS -X OPTIONS --max-time 25 -o /tmp/media-preflight -D /tmp/media-headers -w '%{http_code}' \
+              -H 'Origin: https://paulosince.github.io' \
+              -H 'Access-Control-Request-Method: GET' \
+              -H 'Access-Control-Request-Headers: authorization' "$origin/download?bucket=trip-images&path=missing")
+            echo "media_preflight=$status"
+            test "$status" = 200 -o "$status" = 204
+            grep -Ei '^access-control-' /tmp/media-headers || true
+          done
+          echo 'PASS: media endpoints do not disclose objects or signed URLs without a valid JWT'
