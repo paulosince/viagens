@@ -30,8 +30,8 @@ jobs:
           set -euo pipefail
           DIR=/tmp/viaggio-step5-refresh
           mkdir -p "$DIR"
-          cp experiments/neon-pilot/app/{neon-refresh-integration.test.mjs,neon-identity.mjs,backend-neon.mjs} "$DIR/"
-          cp main-source/experiments/neon-pilot/app/{router.mjs,storage.mjs} "$DIR/"
+          cp experiments/neon-pilot/app/{neon-refresh-integration.test.mjs,neon-identity.mjs,backend-neon.mjs,router-neon.mjs} "$DIR/"
+          cp main-source/experiments/neon-pilot/app/storage.mjs "$DIR/"
           cd "$DIR"
           npm init -y >/dev/null
           npm install --no-audit --no-fund @neondatabase/postgrest-js@0.2.0-beta
