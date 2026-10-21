@@ -33,7 +33,7 @@ export function createLinkRepository({central,a,b}) {
    return transaction(pools[project],async db=>{
     // Ensure the legacy identity actually exists and is verified in this project.
     const dir=await db.query(
-      'SELECT id FROM viagem_identity_nonexistent WHERE id=$1::uuid FOR SHARE'.replace('viagem_identity_nonexistent','viaggio_identity.users'),
+      'SELECT id FROM viaggio_identity.users WHERE id=$1::uuid AND email_confirmed_at IS NOT NULL AND deleted_at IS NULL FOR SHARE',
       [record.legacy_user_id]);
     if(dir.rowCount!==1)throw Error('IDENTITY_DIRECTORY_MISSING');
     await db.query(
