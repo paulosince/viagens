@@ -48,10 +48,10 @@ jobs:
            'https://ep-spring-moon-b8fi6yxc.apirest.c-14.us-east-1.aws.neon.tech/viaggio_lab/rest/v1'; do
             status=$(curl -sS --max-time 20 -o /tmp/forged -w '%{http_code}' \
              -H 'Origin: https://paulosince.github.io' \
-             -H 'Accept-Profile: viaggio_app' -H 'Authorization: Bearer not.a.valid.jwt' \
+             -H 'Accept-Profile: viaggio_app' -H 'Authorization: Bearer eyJhbGciOiJFZERTQSJ9.eyJzdWIiOiJhYWFhYWFhYS1hYWFhLTRhYWEtOGFhYS1hYWFhYWFhYWFhYWFhYWEiLCJyb2xlIjoiYXV0aGVudGljYXRlZCJ9.YWJj' \
              "$base/trips?select=id&limit=1")
             echo "invalid_jwt_http=$status"
-            test "$status" = 401 -o "$status" = 403
+            test "$status" = 400 -o "$status" = 401 -o "$status" = 403
             status=$(curl -sS --max-time 20 -o /tmp/anonymous -w '%{http_code}' \
              -H 'Origin: https://paulosince.github.io' -H 'Accept-Profile: viaggio_app' \
              "$base/trips?select=id&limit=1")
