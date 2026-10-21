@@ -1,0 +1,60 @@
+name: Viaggio step 06 live preview boot
+on:
+  pull_request:
+    branches:
+      - migration/neon-app-20261019
+    paths:
+      - '.github/workflows/viaggio-step06-live-preview.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  public-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 11
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Confirm published isolated Neon files
+        shell: bash
+        run: |
+          set -euo pipefail
+          root='https://paulosince.github.io/viagens/experiments/neon-pilot/app'
+          for file in neon-preview.html main-neon.js backend-neon.mjs router-neon.mjs; do
+            http=$(curl -sSL --retry 2 --max-time 45 -o /tmp/viaggio-public -w '%{http_code}' "$root/$file")
+            echo "$file status=$http"
+            test "$http" = 200
+            if test "$file" = backend-neon.mjs; then
+              grep -q "from './router-neon.mjs'" /tmp/viaggio-public
+            fi
+            if test "$file" = router-neon.mjs; then
+              grep -q "Number.isSafeInteger" /tmp/viaggio-public
+            fi
+            if test "$file" = neon-preview.html; then
+              grep -q 'main-neon.js?v=20261021-2' /tmp/viaggio-public
+            fi
+          done
+      - name: Verify anonymous Safari-equivalent browser boot
+        shell: bash
+        run: |
+          mkdir -p /tmp/viaggio-browser
+          cd /tmp/viaggio-browser
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund playwright >/dev/null
+          node --input-type=module <<'JS'
+          import {chromium} from 'playwright';
+          import assert from 'node:assert/strict';
+          const browser=await chromium.launch({channel:'chrome',headless:true,args:['--no-sandbox']});
+          const page=await browser.newPage({serviceWorkers:'block'});
+          const errors=[];
+          page.on('pageerror',e=>errors.push(e.message));
+          await page.goto('https://paulosince.github.io/viagens/experiments/neon-pilot/app/neon-preview.html',{waitUntil:'domcontentloaded',timeout:40000});
+          await page.waitForFunction(()=>document.body.dataset.appReady==='true',{timeout:40000});
+          const status=await page.evaluate(()=>({session:document.body.dataset.session,auth:document.querySelector('#auth_view')?.getAttribute('aria-hidden')}));
+          assert.equal(status.session,'anonymous');
+          assert.equal(status.auth,'false');
+          assert.deepEqual(errors,[]);
+          console.log('PASS: isolated Neon sharing preview loads without a session or JS errors');
+          await browser.close();
+          JS
