@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>Viaggio — Vincular conta</title>
+  <style>
+    :root{color-scheme:light;--blue:#0764c2;--ink:#14263c;--muted:#64778d}
+    *{box-sizing:border-box}body{background:#f4f7fb;color:var(--ink);font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0}
+    main{max-width:475px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 28px) 22px calc(env(safe-area-inset-bottom) + 40px)}
+    header{display:flex;gap:10px;align-items:center;color:var(--blue);font-weight:800}.mark{background:var(--blue);border-radius:14px;color:white;padding:10px}
+    h1{font-size:29px;letter-spacing:-1px;line-height:1.15;margin:29px 0 11px}
+    p{margin:0 0 18px}.muted{color:var(--muted)}.card{background:white;border:1px solid #e2e9f2;border-radius:23px;padding:22px;box-shadow:0 8px 30px #142f4e0a}
+    label{display:block;font-size:13px;font-weight:700;margin:17px 0 7px}input{width:100%;background:white;border:1px solid #cbd6e4;border-radius:13px;padding:14px 15px;font:16px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    button{font:650 16px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;width:100%;border:0;border-radius:14px;padding:15px;background:var(--blue);color:white;margin-top:23px}
+    button:disabled{opacity:.52}#status{white-space:pre-wrap;margin-top:19px;border-radius:12px;padding:14px;background:#e8f1ff;color:#07549d}
+    #status.error{background:#fff1f1;color:#962729}#status[hidden],section[hidden]{display:none}
+    footer{font-size:12px;line-height:1.55;color:var(--muted);margin-top:22px}
+  </style>
+</head>
+<body><main>
+<header><span class="mark">V</span> VIAGGIO · Migração Neon</header>
+<h1>Vincular suas viagens</h1>
+<p class="muted">Você já criou uma conta no Neon. Agora confirme que também controla sua conta antiga do Viaggio. Suas viagens não serão apagadas nem copiadas por este procedimento.</p>
+<section class="card" id="form-panel">
+  <form id="link-form" autocomplete="on">
+    <label for="email">E-mail usado nas duas contas</label>
+    <input id="email" type="email" required autocomplete="email" maxlength="254">
+    <label for="oldpass">Senha antiga do Viaggio (Supabase)</label>
+    <input id="oldpass" type="password" required autocomplete="current-password">
+    <label for="newpass">Senha nova do Viaggio (Neon)</label>
+    <input id="newpass" type="password" required autocomplete="new-password">
+    <button id="link-button" type="submit">Verificar e vincular</button>
+  </form>
+  <div id="status" role="status" aria-live="polite" hidden></div>
+</section>
+<section class="card" id="success-panel" hidden>
+  <h2>Vínculo registrado</h2>
+  <p>O serviço confirmou o vínculo nos ambientes de validação. O Viaggio principal continua no Supabase até a conclusão das 14 etapas de migração.</p>
+</section>
+<footer>
+  Senhas são enviadas diretamente aos respectivos provedores oficiais por HTTPS. O serviço privado de vinculação recebe apenas tokens temporários das duas sessões, nunca as senhas. Nenhum token é salvo ou exibido nesta página. Se houver falha, não repita a operação continuamente; informe somente a mensagem exibida, sem fornecer credenciais.
+</footer>
+</main>
+<script type="module">
+const SUPABASE='https://siabldasqinpfmxslwji.supabase.co';
+const NEON='https://ep-small-bread-b7uq0zva.neonauth.c-13.us-east-1.aws.neon.tech/viaggio_auth/auth';
+const LINKUP='https://br-square-river-b765bpl4-linkup.compute.c-13.us-east-1.aws.neon.tech/link';
+const $=id=>document.getElementById(id);
+let busy=false;
+function showStatus(text,isError=false){const el=$('status');el.hidden=false;el.textContent=text;el.classList.toggle('error',isError);}
+async function parseResponse(response){
+ const data=await response.json().catch(()=>null);
+ if(!response.ok||data?.error)throw new Error(data?.message||data?.error?.message||'Não foi possível autenticar. Verifique os dados e tente novamente.');
+ return data;
+}
+async function proveOld(email,password){
+ const key=await getPublishableKey();
+ const r=await fetch(SUPABASE+'/auth/v1/token?grant_type=password',{
+  method:'POST',mode:'cors',cache:'no-store',redirect:'error',referrerPolicy:'no-referrer',
+  headers:{'content-type':'application/json','apikey':key},
+  body:JSON.stringify({email,password})
+ });
+ const data=await parseResponse(r);
+ if(typeof data?.access_token!=='string'||data.access_token.split('.').length!==3)throw new Error('A sessão antiga não retornou um token válido.');
+ return data.access_token;
+}
+async function getPublishableKey(){
+ // The Supabase key used here is a public client key, never a service-role secret.
+ // This value is injected from the same public, existing Viaggio configuration
+ // when promoting this page to the deployed preview.
+ const key='__PUBLIC_SUPABASE_KEY__';
+ if(key.startsWith('__'))throw new Error('Portal de vinculação ainda não foi publicado.');
+ return key;
+}
+async function proveNeon(email,password){
+ const response=await fetch(NEON+'/sign-in/email',{
+  method:'POST',mode:'cors',cache:'no-store',redirect:'error',credentials:'include',
+  referrerPolicy:'no-referrer',headers:{'content-type':'application/json'},
+  body:JSON.stringify({email,password})
+ });
+ const data=await parseResponse(response);
+ if(data?.user?.emailVerified!==true)throw new Error('A conta Neon ainda não está verificada.');
+ let token=data?.session?.access_token||data?.access_token||null;
+ if(!token){
+  const jwtRes=await fetch(NEON+'/token',{method:'GET',mode:'cors',cache:'no-store',
+   redirect:'error',credentials:'include',referrerPolicy:'no-referrer'});
+  const jwt=await parseResponse(jwtRes);token=jwt?.token||jwt?.data?.token||null;
+ }
+ if(typeof token!=='string'||token.split('.').length!==3)
+  throw new Error('O navegador não conseguiu obter a sessão Neon. Em alguns dispositivos iOS, os cookies entre domínios podem estar bloqueados.');
+ return token;
+}
+$('link-form').addEventListener('submit',async e=>{
+ e.preventDefault();if(busy)return;busy=true;
+ const button=$('link-button');button.disabled=true;
+ const email=$('email').value.trim().toLowerCase(),oldpass=$('oldpass').value,newpass=$('newpass').value;
+ $('oldpass').value='';$('newpass').value='';
+ try {
+  showStatus('Verificando as duas sessões com segurança…');
+  const [legacyToken,centralToken]=await Promise.all([proveOld(email,oldpass),proveNeon(email,newpass)]);
+  showStatus('Credenciais confirmadas. Solicitando a vinculação protegida…');
+  const response=await fetch(LINKUP,{method:'POST',mode:'cors',cache:'no-store',redirect:'error',
+   referrerPolicy:'no-referrer',headers:{
+    'authorization':'Bearer '+centralToken,
+    'x-legacy-access-token':legacyToken
+   }});
+  const result=await response.json().catch(()=>null);
+  if(response.status===503)throw new Error('A vinculação ainda não foi liberada ou está temporariamente indisponível. Seus dados permanecem seguros no Supabase.');
+  if(response.status!==200||result?.status!=='linked')throw new Error('O serviço não confirmou o vínculo. Nenhuma alteração na produção foi realizada.');
+  $('form-panel').hidden=true;$('success-panel').hidden=false;
+ }catch(err){showStatus(err?.message||'Falha inesperada. Nenhum vínculo confirmado.',true);}
+ finally {busy=false;button.disabled=false;}
+});
+</script>
+</body></html>
