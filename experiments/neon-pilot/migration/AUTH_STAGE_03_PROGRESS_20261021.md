@@ -69,3 +69,10 @@ Neon relatou deployment `completed` da versão limitada que não manipula identi
 - Leitura do diretório central `neon_auth.user`: **1 conta total, 1 com `emailVerified=true`**. Nenhum e-mail, UUID, senha ou OTP foi incluído neste registro.
 - **Etapa 03/14 continua parcial**: o serviço `linkup` permanece desabilitado, e a prova simultânea de sessão Supabase + Neon e os vínculos com os dados ainda não foram executados.
 - Próximo acesso humano: confirmar a identidade de Cíntia no mesmo portal com o e-mail original dela, sem repassar credenciais no chat. Depois completar fluxo privado de dupla sessão e testar antes de ativar mapeamento real.
+
+## Duas contas reais verificadas — 21/10/2026 (segunda confirmação)
+- `neon_auth.user`, no Auth central, consultado diretamente: **2 usuários cadastrados, 2 com emailVerified=true, 0 não verificados**.
+- O diretório privado de origem no projeto A possui **2 contas antigas elegíveis**; comparação de endereços de e-mail normalizados executada sem imprimir e-mails: **2/2 correspondências**.
+- Nas branches de staging A/B: `neon_auth_links` possui **0 vínculos preparados** e **0 ativados** em ambas. O serviço `linkup` continua no deployment 8 e com `VIAGGIO_LINK_ENABLED=false`.
+- Iniciada uma página isolada de dupla autenticação em `experiments/neon-pilot/app/auth-link.html` **apenas na branch de migração**. O objetivo é conferir a sessão Supabase antiga e a sessão Neon nova no navegador e enviar somente JWTs de curta duração à Neon Function; nenhuma senha é enviada ao ChatGPT nem ao próprio linkup. O portal **não está publicado nem liberado para utilização** porque falta validação final da obtenção de JWT no Safari/iOS e teste live da ligação.
+- O cadastro das duas credenciais foi concluído, **mas a etapa 3/14 ainda está pendente da vinculação real e validação posterior**. Não confundir correspondência de e-mail com prova de controle de duas sessões.
