@@ -69,7 +69,7 @@ async function init(){
    $('legacy-login').hidden=false;return;
  }
  email=data.session.user.email.trim().toLowerCase();
- $('legacy-description').textContent='Sessão antiga encontrada. A confirmação será enviada ao e-mail dessa conta.';
+ $('legacy-description').textContent='Conta antiga conectada: '+email+'. O código Neon será enviado para este e-mail.';
  $('otp-panel').hidden=false;
 }
 async function run(button,action){
