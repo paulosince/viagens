@@ -1,4 +1,4 @@
-import {createNeonPreview,NEON_AUTH_URL,API_ROOTS} from './backend-neon.mjs?v=20261021-1';
+import {createNeonPreview,NEON_AUTH_URL,API_ROOTS} from './backend-neon.mjs?v=20261021-2';
 import { offlineStore } from './offline-store-neon.js?v=20261021-1';
 import {
   adoptLegacyDataUrl,
@@ -6024,8 +6024,13 @@ async function refreshTripShares() {
     const role = document.createElement('span'); role.className = 'trip-share-row-role';
     role.textContent = person.role === 'editor' ? 'Pode editar' : 'Só visualiza';
     const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'trip-share-row-remove';
-    remove.textContent = '×'; remove.setAttribute('aria-label', `Remover acesso de ${person.email}`);
+    remove.textContent = '×'; remove.setAttribute('aria-label', `Revogar acesso de ${person.email}`);
+    remove.title = 'Revogar acesso';
     remove.addEventListener('click', async () => {
+      const confirmed = window.confirm(
+        `Remover o acesso de ${person.email} a esta viagem? O acesso online será encerrado. Cópias offline anteriores podem continuar visíveis até o próximo acesso à internet.`
+      );
+      if (!confirmed) return;
       remove.disabled = true;
       try {
         const removed = await client.rpc('remove_trip_share', { p_trip_id: trip.id, p_email: person.email });
