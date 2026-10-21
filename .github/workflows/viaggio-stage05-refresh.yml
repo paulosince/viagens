@@ -17,6 +17,10 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main-source
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -26,7 +30,8 @@ jobs:
           set -euo pipefail
           DIR=/tmp/viaggio-step5-refresh
           mkdir -p "$DIR"
-          cp experiments/neon-pilot/app/{neon-refresh-integration.test.mjs,neon-identity.mjs,backend-neon.mjs,router.mjs,storage.mjs} "$DIR/"
+          cp experiments/neon-pilot/app/{neon-refresh-integration.test.mjs,neon-identity.mjs,backend-neon.mjs} "$DIR/"
+          cp main-source/experiments/neon-pilot/app/{router.mjs,storage.mjs} "$DIR/"
           cd "$DIR"
           npm init -y >/dev/null
           npm install --no-audit --no-fund @neondatabase/postgrest-js@0.2.0-beta
