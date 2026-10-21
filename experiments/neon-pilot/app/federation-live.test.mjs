@@ -8,7 +8,7 @@ function mock({who='a',leak=false,forged=false,authFail=false,wrongCounts=false}
     calls.push({url,opt});
     const project=url.startsWith(ENDPOINTS.a)?'a':'b';
     const auth=opt.headers.Authorization||'';
-    if(auth==='Bearer not.a.valid.jwt'&&!forged)
+    if(auth==='Bearer eyJhbGciOiJFZERTQSJ9.eyJzdWIiOiJhYWFhYWFhYS1hYWFhLTRhYWEtOGFhYS1hYWFhYWFhYWFhYWFhYWEiLCJyb2xlIjoiYXV0aGVudGljYXRlZCJ9.YWJj'&&!forged)
       return {status:401,ok:false,json:async()=>({})};
     if(!auth&&!leak)
       return {status:403,ok:false,json:async()=>({})};
