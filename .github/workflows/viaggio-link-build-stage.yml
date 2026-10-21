@@ -24,6 +24,8 @@ jobs:
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: migration/linkup-stage3-check-20261021
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
