@@ -1,0 +1,60 @@
+name: Viaggio Stage07 browser and published media preview
+on:
+  pull_request:
+    branches: [migration/neon-app-20261019]
+    paths: ['.github/workflows/viaggio-stage07-live-preview.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  published:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Verify public files with secure media wiring and read-only mutation guards
+        shell: bash
+        run: |
+          set -euo pipefail
+          root='https://paulosince.github.io/viagens/experiments/neon-pilot/app'
+          for file in neon-media-preview.html main-neon.js backend-neon.mjs storage-neon.mjs; do
+            http=$(curl -sSL --retry 2 --max-time 40 -o /tmp/media-public -w '%{http_code}' "$root/$file")
+            echo "$file HTTP $http"
+            test "$http" = 200
+            case "$file" in
+              neon-media-preview.html) grep -q 'main-neon.js?v=20261021-7media' /tmp/media-public;;
+              main-neon.js) grep -q 'backend-neon.mjs?v=20261021-7media' /tmp/media-public;;
+              backend-neon.mjs)
+                grep -q "from './storage-neon.mjs'" /tmp/media-public
+                grep -q 'br-silent-band-b80nklzl-appmedia' /tmp/media-public
+                grep -q 'br-falling-leaf-b8xuv1d0-appmedia' /tmp/media-public
+                grep -q 'allowMutations:false' /tmp/media-public;;
+              storage-neon.mjs)
+                grep -q 'allowMutations=false' /tmp/media-public
+                grep -q 'redirect:' /tmp/media-public;;
+            esac
+          done
+          echo 'PASS: published preview imports isolated Neon private read-only media'
+      - name: Open published preview with real Chrome in unauthenticated state
+        shell: bash
+        run: |
+          mkdir -p /tmp/viaggio-stage7
+          cd /tmp/viaggio-stage7
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund playwright >/dev/null
+          node --input-type=module <<'JS'
+          import {chromium} from 'playwright';
+          import assert from 'node:assert/strict';
+          const browser=await chromium.launch({channel:'chrome',headless:true,args:['--no-sandbox']});
+          const page=await browser.newPage({serviceWorkers:'block'});
+          const errors=[];
+          page.on('pageerror',error=>errors.push(error.message));
+          await page.goto('https://paulosince.github.io/viagens/experiments/neon-pilot/app/neon-media-preview.html',{waitUntil:'domcontentloaded',timeout:40000});
+          await page.waitForFunction(()=>document.body.dataset.appReady==='true',{timeout:40000});
+          const state=await page.evaluate(()=>({session:document.body.dataset.session,auth:document.querySelector('#auth_view')?.getAttribute('aria-hidden')}));
+          console.log('state',JSON.stringify(state),'errors',JSON.stringify(errors));
+          assert.equal(state.session,'anonymous');
+          assert.equal(state.auth,'false');
+          assert.deepEqual(errors,[]);
+          await browser.close();
+          console.log('PASS: browser loads new Neon media adapter with zero JS errors');
+          JS
