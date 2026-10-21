@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   bundle:
@@ -45,3 +45,14 @@ jobs:
           name: viaggio-neon-link-service-zip
           path: experiments/neon-pilot/migration/auth/link-service/dist/function.zip
           retention-days: 3
+
+      - name: Stage one-time secret-free ZIP for connected Neon deploy
+        if: github.event_name == 'pull_request'
+        run: |
+          mkdir -p experiments/neon-pilot/migration/.build
+          base64 -w0 experiments/neon-pilot/migration/auth/link-service/dist/function.zip > experiments/neon-pilot/migration/.build/linkup-function.zip.b64
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add experiments/neon-pilot/migration/.build/linkup-function.zip.b64
+          git commit -m "Stage fresh temporary linkup bundle"
+          git push origin HEAD:migration/linkup-stage3-check-20261021
