@@ -24,6 +24,7 @@ jobs:
           node --check experiments/neon-pilot/app/federation-live.mjs
           node --check experiments/neon-pilot/app/federation-live.test.mjs
           node --test experiments/neon-pilot/app/federation-live.test.mjs
+          grep -Fq '/passenger_profiles?select=user_id&limit=5' experiments/neon-pilot/app/federation-live.mjs
       - name: Check browser OTP flow syntax and no token persistence
         run: |
           node <<'JS'
