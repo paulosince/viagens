@@ -84,3 +84,12 @@ jobs:
           echo "Neon linkup auth preflight: $status"
           test "$status" = 204
           echo 'PASS: provider preflight and verified-credential gate (no accounts modified)'
+          SITE='https://paulosince.github.io/viagens/experiments/neon-pilot/app'
+          portal_status=$(curl -L -sS --max-time 25 -o /tmp/otp-page -w '%{http_code}' "$SITE/auth-link-otp.html")
+          module_status=$(curl -L -sS --max-time 25 -o /tmp/link-module -w '%{http_code}' "$SITE/link-session.mjs")
+          echo "OTP portal HTTP: $portal_status; module HTTP: $module_status"
+          test "$portal_status" = 200
+          test "$module_status" = 200
+          grep -q 'Vincular suas viagens' /tmp/otp-page
+          grep -q 'linkVerifiedSessions' /tmp/link-module
+          echo 'PASS: deployed one-time-code page and script available on GitHub Pages'
