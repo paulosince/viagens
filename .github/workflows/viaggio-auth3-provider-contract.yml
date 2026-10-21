@@ -68,9 +68,17 @@ jobs:
             "$SUPABASE/auth/v1/token?grant_type=password")
           echo "Supabase legacy login preflight: $status"
           test "$status" = 200 -o "$status" = 204
-          status=$(curl -sS -X POST -o /tmp/disabled -w '%{http_code}' --max-time 20 \
-            -H "Origin: $ORIGIN" -H 'Content-Type: application/json' -d '{}' "$BRIDGE")
-          echo "Neon linkup gated status: $status"
-          test "$status" = 503
-          grep -q 'MIGRATION_NOT_ENABLED' /tmp/disabled
-          echo 'PASS: provider preflight and bridge fail-closed contract'
+          status=$(curl -sS -X POST -o /tmp/rejected -w '%{http_code}' --max-time 20 \
+            -H "Origin: $ORIGIN" -H 'Content-Type: application/json' \
+            -H 'Authorization: Bearer invalid.jwt.token' \
+            -H 'x-legacy-access-token: invalid.jwt.token' -d '{}' "$BRIDGE")
+          echo "Neon linkup invalid-identity status: $status"
+          test "$status" = 401
+          grep -q 'UNAUTHORIZED' /tmp/rejected
+          status=$(curl -sS -X OPTIONS -o /tmp/preflight -w '%{http_code}' --max-time 20 \
+            -H "Origin: $ORIGIN" \
+            -H 'Access-Control-Request-Method: POST' \
+            -H 'Access-Control-Request-Headers: authorization, x-legacy-access-token' "$BRIDGE")
+          echo "Neon linkup auth preflight: $status"
+          test "$status" = 204
+          echo 'PASS: provider preflight and verified-credential gate (no accounts modified)'
