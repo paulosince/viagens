@@ -72,7 +72,7 @@ async function getPublishableKey(){
  // The Supabase key used here is a public client key, never a service-role secret.
  // This value is injected from the same public, existing Viaggio configuration
  // when promoting this page to the deployed preview.
- const key='__PUBLIC_SUPABASE_KEY__';
+ const key='sb_publishable_UgbBIOq1TnInuPRrQpAFag_JLIzYuFf';
  if(key.startsWith('__'))throw new Error('Portal de vinculação ainda não foi publicado.');
  return key;
 }
