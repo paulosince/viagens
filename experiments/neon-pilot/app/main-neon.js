@@ -1,4 +1,4 @@
-import {createNeonPreview,NEON_AUTH_URL,API_ROOTS} from './backend-neon.mjs?v=20261021-2';
+import {createNeonPreview,NEON_AUTH_URL,API_ROOTS} from './backend-neon.mjs?v=20261021-7media';
 import { offlineStore } from './offline-store-neon.js?v=20261021-1';
 import {
   adoptLegacyDataUrl,
