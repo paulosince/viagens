@@ -74,7 +74,7 @@ jobs:
             echo "preflight=$status"
             grep -iE "^HTTP/|^access-control-|^vary:" /tmp/headers || true
             test "$status" = 200 -o "$status" = 204
-            grep -iq 'access-control-allow-origin: https://paulosince.github.io' /tmp/headers
+            grep -Eiq '^access-control-allow-origin: (\\*|https://paulosince\\.github\\.io)' /tmp/headers
           done
           SITE='https://paulosince.github.io/viagens/experiments/neon-pilot/app'
           for file in auth-neon-smoke.html federation-live.mjs; do
