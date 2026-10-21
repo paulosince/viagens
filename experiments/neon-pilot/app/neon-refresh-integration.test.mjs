@@ -72,8 +72,14 @@ test('refreshed JWT is used for both Neon Data APIs without stale bearer',async(
    assert.equal(tripA.error,null);
    assert.equal(tripA.data.length,1);
    assert.equal(x.stats().refreshes,1,'only one refresh despite concurrent reads');
-   const first=x.headers.filter(q=>q.url.includes('/trips'));
-   assert.ok(first.length>=1);
+   // Query the PERSONAL table so router must use project B, and check both
+   // data projects receive the same *new* token, never the pre-refresh token.
+   const personal=await x.app.from('passenger_profiles').select('user_id');
+   assert.equal(personal.error,null);
+   assert.equal(personal.data.length,1);
+   const first=x.headers.filter(q=>q.url.includes('/trips')||q.url.includes('/passenger_profiles'));
+   assert.ok(first.some(q=>q.url.startsWith(API_ROOTS.a)));
+   assert.ok(first.some(q=>q.url.startsWith(API_ROOTS.b)));
    assert.ok(first.every(q=>q.auth==='Bearer '+TOKEN_B),JSON.stringify(first));
    x.headers.length=0;
    const newSession=await x.app.auth.getSession();
