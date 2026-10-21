@@ -4,7 +4,7 @@ on:
     branches:
       - migration/neon-app-20261019
     paths:
-      - 'experiments/neon-pilot/app/router.mjs'
+      - 'experiments/neon-pilot/app/router-neon.mjs'
       - 'experiments/neon-pilot/app/main-neon.js'
       - 'experiments/neon-pilot/app/router-stage6.test.mjs'
       - '.github/workflows/viaggio-step06-sharing.yml'
@@ -23,7 +23,7 @@ jobs:
       - name: Safe sharing, invitation and revocation routing tests
         run: |
           node --check experiments/neon-pilot/app/main-neon.js
-          node --check experiments/neon-pilot/app/router.mjs
+          node --check experiments/neon-pilot/app/router-neon.mjs
           node --check experiments/neon-pilot/app/router-stage6.test.mjs
           node --test experiments/neon-pilot/app/router-stage6.test.mjs
           grep -Fq 'window.confirm(' experiments/neon-pilot/app/main-neon.js
