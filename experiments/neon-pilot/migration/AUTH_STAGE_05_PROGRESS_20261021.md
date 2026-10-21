@@ -37,3 +37,9 @@ A prévia permite operar sobre **cópias de staging**, mas não é o cutover de 
 - A Neon Function `appmedia` existe e foi implantada em staging A e B, mas **não foi validada com JWT real Neon para operações privadas de mídia**. Não habilitar leitura via URL pública, não reintroduzir fallback Supabase, não expor presigned URLs sem verificação de autorização por objeto. Esse trabalho está programado na **etapa 7 da lista fixa**, não é etapa adicional.
 - Banner do arquivo `neon-preview.html` atualizado nas branches `main`, `migration/neon-app-20261019` e branch de teste para esclarecer que as imagens privadas estão indisponíveis até validação. Nenhuma operação de foto, metadata ou viagem foi executada.
 - Próxima ação para concluir etapa 05: confirmar persistência de login após atualizar/fechar/abrir URL, logout e reentrada com a senha Neon. Depois testar a Cíntia. Excluir possibilidade de troca de conta/contaminação de cache local.
+
+## Ciclo de sessão — confirmação de Paulo (21/10/2026)
+- Após login real na prévia Neon, Paulo confirmou em conversa que **fechou/reabriu o Safari, executou o logout e voltou a entrar com a nova senha Neon**, respondendo "Tudo certo" à solicitação explícita desses testes. Resultado informado: sem falhas.
+- Isso é evidência de teste manual **da conta de Paulo**, não uma captura técnica de refresh com token expirado e não uma confirmação do teste equivalente da conta Cíntia.
+- Mantemos a limitação conhecida de **mídia privada bloqueada**, com arquivos presentes no Object Storage, para etapa 07/14.
+- **Pendente para aceite da etapa 05/14:** mesma verificação na conta de Cíntia; confirmar controle de sessão dela ao recarregar/reabrir, logout e novo login, além de testar ou instrumentar o refresh automático com token expirado. Não repetir testes de JWT A/B de 11/11 já aceitos na etapa 04.
