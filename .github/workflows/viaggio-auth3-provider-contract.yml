@@ -1,0 +1,50 @@
+name: Viaggio Auth 3/14 provider contract (no secrets)
+
+on:
+  pull_request:
+    branches:
+      - migration/neon-app-20261019
+    paths:
+      - '.github/workflows/viaggio-auth3-provider-contract.yml'
+      - 'experiments/neon-pilot/migration/auth/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Validate providers and fail-closed bridge using anonymous HTTP
+        shell: bash
+        run: |
+          set -euo pipefail
+          ORIGIN='https://paulosince.github.io'
+          NEON='https://ep-small-bread-b7uq0zva.neonauth.c-13.us-east-1.aws.neon.tech/viaggio_auth/auth'
+          BRIDGE='https://br-square-river-b765bpl4-linkup.compute.c-13.us-east-1.aws.neon.tech/link'
+          SUPABASE='https://siabldasqinpfmxslwji.supabase.co'
+          status=$(curl -sS -X OPTIONS -o /tmp/neon_preflight -D /tmp/neon_headers -w '%{http_code}' --max-time 20 \
+            -H "Origin: $ORIGIN" \
+            -H 'Access-Control-Request-Method: POST' \
+            -H 'Access-Control-Request-Headers: content-type' \
+            "$NEON/sign-in/email")
+          echo "Neon email sign-in preflight: $status"
+          test "$status" = 200 -o "$status" = 204
+          grep -iq 'access-control-allow-origin: https://paulosince.github.io' /tmp/neon_headers
+          status=$(curl -sS -o /tmp/anon_token -w '%{http_code}' --max-time 20 -H "Origin: $ORIGIN" "$NEON/token")
+          echo "Neon anonymous JWT request: $status (must reject)"
+          test "$status" != 200
+          status=$(curl -sS -X OPTIONS -o /tmp/legacy_preflight -D /tmp/legacy_headers -w '%{http_code}' --max-time 20 \
+            -H "Origin: $ORIGIN" -H 'Access-Control-Request-Method: POST' \
+            -H 'Access-Control-Request-Headers: content-type, apikey' \
+            "$SUPABASE/auth/v1/token?grant_type=password")
+          echo "Supabase legacy login preflight: $status"
+          test "$status" = 200 -o "$status" = 204
+          status=$(curl -sS -X POST -o /tmp/disabled -w '%{http_code}' --max-time 20 \
+            -H "Origin: $ORIGIN" -H 'Content-Type: application/json' -d '{}' "$BRIDGE")
+          echo "Neon linkup gated status: $status"
+          test "$status" = 503
+          grep -q 'MIGRATION_NOT_ENABLED' /tmp/disabled
+          echo 'PASS: provider preflight and bridge fail-closed contract'
