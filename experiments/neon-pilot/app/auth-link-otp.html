@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Viaggio — Vincular acessos</title>
+<style>
+:root{color-scheme:light;--ink:#172b41;--brand:#0865c3;--muted:#63758b}*{box-sizing:border-box}
+body{font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:#f3f7fc;margin:0}
+main{max-width:470px;padding:calc(25px + env(safe-area-inset-top)) 22px 42px;margin:auto}
+header{font-weight:800;color:var(--brand);letter-spacing:-.4px}h1{font-size:29px;letter-spacing:-.9px;line-height:1.16;margin:28px 0 10px}
+p{color:var(--muted)}.panel{background:#fff;border:1px solid #e3eaf3;border-radius:23px;padding:22px;margin-top:22px;box-shadow:0 8px 24px #263f5908}
+label{font-weight:650;font-size:14px;display:block;margin:15px 0 7px}input{width:100%;border:1px solid #c9d7e5;padding:15px;border-radius:13px;font-size:18px}
+button,.link{display:block;width:100%;margin-top:18px;border:0;border-radius:14px;padding:15px;text-align:center;background:var(--brand);color:white;text-decoration:none;font-size:16px;font-weight:680}
+button:disabled{opacity:.55}.secondary{background:#e8f2ff;color:#15528c}
+.notice{padding:12px;border-radius:12px;margin-top:16px;background:#eaf4ff;color:#20547b;white-space:pre-wrap}
+.notice.error{background:#fff0ef;color:#9c302f}[hidden]{display:none!important}
+.small{font-size:13px;color:var(--muted)}
+</style>
+</head>
+<body>
+<main>
+<header>V · VIAGGIO <span class="small">Migração Neon</span></header>
+<h1>Vincular suas viagens</h1>
+<p>Vamos confirmar sua sessão atual no Viaggio e um código de acesso do Neon. <b>Nenhuma senha antiga será solicitada nesta página.</b></p>
+<div class="panel">
+<strong>1. Sua sessão atual</strong>
+<p class="small" id="legacy-description">Consultando o Viaggio antigo…</p>
+<a class="link secondary" id="legacy-login" href="../../../index.html" hidden>Entrar no Viaggio antigo</a>
+</div>
+<div class="panel" id="otp-panel" hidden>
+<strong>2. Confirmação Neon</strong>
+<p class="small">Enviaremos um código ao mesmo endereço que você usa no Viaggio. Ele não será exibido nem salvo aqui.</p>
+<button id="send-code" type="button">Enviar código por e-mail</button>
+<div id="otp-entry" hidden>
+<label for="otp">Código recebido por e-mail</label>
+<input id="otp" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{4,10}" minlength="4" maxlength="10" required>
+<button id="verify-and-link" type="button">Confirmar e vincular</button>
+</div>
+</div>
+<div class="panel" id="complete" hidden><strong>Vinculação concluída no ambiente de teste</strong><p>Seus dados no Supabase continuam preservados até a mudança definitiva do Viaggio.</p></div>
+<div role="status" aria-live="polite" id="status" class="notice" hidden></div>
+<p class="small" style="margin-top:23px">Este procedimento usa a sessão antiga já aberta e a autenticação por e-mail do Neon. Nunca compartilhe senhas, códigos ou tokens nesta conversa.</p>
+</main>
+<script type="module">
+import {linkVerifiedSessions} from './link-session.mjs';
+const SUPABASE_URL='https://siabldasqinpfmxslwji.supabase.co';
+const SUPABASE_PUBLIC_KEY='sb_publishable_UgbBIOq1TnInuPRrQpAFag_JLIzYuFf';
+const NEON='https://ep-small-bread-b7uq0zva.neonauth.c-13.us-east-1.aws.neon.tech/viaggio_auth/auth';
+const $=id=>document.getElementById(id);
+let auth=null, email='',sessionJwt='',working=false;
+function notice(msg,error=false){const el=$('status');el.textContent=msg;el.classList.toggle('error',error);el.hidden=false;}
+async function request(url,body){
+ const response=await fetch(url,{method:'POST',mode:'cors',credentials:'include',
+  cache:'no-store',redirect:'error',referrerPolicy:'no-referrer',
+  headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+ const result=await response.json().catch(()=>null);
+ if(!response.ok||result?.error)throw Error('O Neon recusou a operação. Verifique a situação do código e tente novamente.');
+ return {result,response};
+}
+async function init(){
+ const {createClient}=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/+esm');
+ auth=createClient(SUPABASE_URL,SUPABASE_PUBLIC_KEY,{auth:{persistSession:true,detectSessionInUrl:false}});
+ const {data,error}=await auth.auth.getSession();
+ if(error||!data?.session?.access_token||!data?.session?.user?.email){
+   $('legacy-description').textContent='É necessário estar conectado à sua conta antiga no mesmo navegador. Depois de entrar, volte a esta página.';
+   $('legacy-login').hidden=false;return;
+ }
+ email=data.session.user.email.trim().toLowerCase();
+ $('legacy-description').textContent='Sessão antiga encontrada. A confirmação será enviada ao e-mail dessa conta.';
+ $('otp-panel').hidden=false;
+}
+async function run(button,action){
+ if(working)return;working=true;button.disabled=true;
+ try{await action()}catch(e){notice(e?.message||'Não foi possível completar a operação.',true)}
+ finally{working=false;button.disabled=false}
+}
+$('send-code').addEventListener('click',()=>run($('send-code'),async()=>{
+ await request(NEON+'/email-otp/send-verification-otp',{email,type:'sign-in'});
+ $('otp-entry').hidden=false;
+ notice('Código solicitado. Confira sua caixa de entrada. Não compartilhe o código.');
+}));
+$('verify-and-link').addEventListener('click',()=>run($('verify-and-link'),async()=>{
+ const otp=$('otp').value.trim();
+ if(!/^[0-9]{4,10}$/.test(otp))throw Error('Digite o código recebido por e-mail.');
+ const {result,response}=await request(NEON+'/sign-in/email-otp',{email,otp});
+ $('otp').value='';
+ if(result?.user?.emailVerified!==true)throw Error('O Neon ainda não confirmou a identidade.');
+ sessionJwt=result?.session?.access_token||result?.access_token||response.headers.get('set-auth-jwt')||'';
+ if(!sessionJwt){
+  const r=await fetch(NEON+'/token',{mode:'cors',method:'GET',credentials:'include',redirect:'error',cache:'no-store',referrerPolicy:'no-referrer'});
+  const data=await r.json().catch(()=>null);
+  if(r.ok)sessionJwt=data?.token||'';
+ }
+ if(!sessionJwt)throw Error('O Safari não disponibilizou a sessão Neon. Nenhuma viagem foi alterada.');
+ notice('Identidades confirmadas. Registrando vínculo protegido…');
+ const answer=await linkVerifiedSessions({
+   getLegacyToken:async()=>{const {data}=await auth.auth.getSession();return data?.session?.access_token||null;},
+   getNeonToken:async()=>sessionJwt
+ });
+ sessionJwt='';
+ if(!answer?.linked)throw Error('O serviço não confirmou o vínculo.');
+ $('otp-panel').hidden=true;$('complete').hidden=false;
+ notice('Vinculação confirmada no ambiente de teste.');
+}));
+init().catch(()=>{$('legacy-description').textContent='Falha ao consultar o Viaggio antigo. Recarregue a página.';});
+</script>
+</body>
+</html>
