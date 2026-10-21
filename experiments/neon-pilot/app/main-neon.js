@@ -1,5 +1,5 @@
 import {createNeonPreview,NEON_AUTH_URL,API_ROOTS} from './backend-neon.mjs?v=20261021-1';
-import { offlineStore } from './offline-store.js?v=20261007-59';
+import { offlineStore } from './offline-store-neon.js?v=20261021-1';
 import {
   adoptLegacyDataUrl,
   dataUrlToBlob,
@@ -8,7 +8,7 @@ import {
   mediaObjectUrl,
   prepareMediaBlob,
   uploadCachedMedia
-} from './media-cache.js?v=20261019-3';
+} from './media-cache-neon.js?v=20261021-1';
 
 // Authentication and data requests use Neon central Auth and Neon Data API only.
 const VIAGGIO_MCP_URL = '';
@@ -6948,9 +6948,11 @@ dom.yearButton.addEventListener('click', () => setYearMenu(document.body.dataset
 document.addEventListener('click', event => { if (document.body.dataset.yearMenu === 'open' && !dom.tripHeading.contains(event.target)) setYearMenu(false); });
 dom.birthDateInput.addEventListener('input', syncAge);
 dom.logoutButton.addEventListener('click', async () => {
+  const client = await trySupabase(5000);
+  if(!client){dom.profileMessage.textContent='Sem conexão. O logout deve ser confirmado no Neon antes de sair.';return;}
+  const outcome=await client.auth.signOut().catch(error=>({error}));
+  if(outcome?.error){dom.profileMessage.textContent='Não foi possível encerrar a sessão Neon. Tente novamente.';return;}
   await offlineStore.clearSession().catch(console.warn);
-  const client = await trySupabase();
-  if (client) await client.auth.signOut().catch(console.warn);
   state.user = null;
   state.profile = null;
   state.trips = [];
@@ -7171,91 +7173,71 @@ dom.signupForm.addEventListener('submit', async event => {
 });
 
 async function boot() {
-  let bootSettled = false;
-  const bootWatchdog = setTimeout(() => {
-    if (bootSettled) return;
-    const cached = state.user;
-    if (cached) {
-      setSessionView('authenticated');
-      setSplashStatus('Abrindo com os dados disponíveis…');
-    } else {
-      setSessionView('anonymous');
-      setSplashStatus('A inicialização demorou demais. Tente entrar novamente.');
-    }
-  }, 5000);
-
+  let settled = false;
+  const watchdog = setTimeout(() => {
+    if(settled)return;
+    setSessionView('anonymous');
+    setSplashStatus('Não foi possível verificar a sessão Neon. Tente novamente.');
+  }, 11000);
   try {
-    setSplashStatus('Preparando armazenamento local…');
+    setSplashStatus('Preparando armazenamento Neon isolado…');
     await offlineStore.open();
     await offlineStore.discardHistoryBefore(HISTORY_RESET_AT);
-    navigator.storage?.persist?.().catch(() => {});
+    navigator.storage?.persist?.().catch(()=>{});
+    const cachedUser=await offlineStore.getCachedSession();
 
-    const cachedUser = await offlineStore.getCachedSession();
-    if (cachedUser) {
-      state.user = cachedUser;
-      const hasLocalWorkspace = await loadLocalWorkspace(cachedUser);
-
-      if (hasLocalWorkspace) {
-        setSessionView('authenticated');
-        await refreshSyncStatus();
-        setSplashStatus('Pronto');
-        refreshWorkspaceInBackground();
-        return;
-      }
-    }
-
-    setSplashStatus('Conectando à sua conta…');
-    const client = await trySupabase(2200);
-    let remoteUser = null;
-
-    if (client) {
-      const { data } = await client.auth.getSession();
-      remoteUser = data.session?.user || null;
-    }
-
-    state.user = remoteUser || cachedUser || null;
-    if (!state.user) {
-      setSessionView('anonymous');
-      setSplashStatus('Pronto');
+    // Offline-only fallback is permitted solely for an identity previously
+    // VERIFIED by Neon in this separate preview, never for Supabase-era cache.
+    if(!navigator.onLine){
+      if(!cachedUser?.neon_subject)
+        throw new Error('Sem rede. Entre uma vez com Neon Auth antes de usar a cópia offline.');
+      state.user=cachedUser;
+      const present=await loadLocalWorkspace(cachedUser);
+      if(!present)throw new Error('Cópia offline não disponível neste aparelho.');
+      setSessionView('authenticated');
+      await refreshSyncStatus();
+      setSplashStatus('Modo offline');
       return;
     }
 
-    await offlineStore.cacheSession(state.user);
-
-    setSplashStatus('Carregando seu perfil…');
-    await loadProfile({ allowLocalFallback: true });
-
-    setSplashStatus('Carregando suas viagens…');
-    await loadTrips({ allowLocalFallback: true });
-
+    setSplashStatus('Validando sua sessão no Neon…');
+    const client=await trySupabase(8500);
+    if(!client)throw new Error('Serviço Neon temporariamente indisponível.');
+    const {data,error}=await client.auth.getSession();
+    if(error)throw error;
+    const current=data?.session?.user||null;
+    if(!current?.id||!current?.neon_subject){
+      await offlineStore.clearSession().catch(()=>{});
+      state.user=null;
+      setSessionView('anonymous');
+      setSplashStatus('Entre com sua conta Neon.');
+      return;
+    }
+    // Only reuse offline data whose owner is the exact authenticated
+    // Neon+legacy identity pair; this stops cross-account cache leakage.
+    state.user=current;
+    const matches=cachedUser?.neon_subject===current.neon_subject&&cachedUser?.id===current.id;
+    const local=matches?await loadLocalWorkspace(current).catch(()=>false):false;
+    await offlineStore.cacheSession(current);
+    if(!local){
+      setSplashStatus('Carregando perfil Neon…');
+      await loadProfile({allowLocalFallback:false});
+      setSplashStatus('Carregando viagens Neon…');
+      await loadTrips({allowLocalFallback:false});
+    }
     setSessionView('authenticated');
     await refreshSyncStatus();
     setSplashStatus('Pronto');
-
     refreshWorkspaceInBackground();
-  } catch (error) {
-    const localUser = await offlineStore.getCachedSession().catch(() => null);
-
-    if (localUser) {
-      try {
-        state.user = localUser;
-        setSplashStatus('Abrindo a cópia salva neste iPhone…');
-        await loadLocalWorkspace(localUser);
-        setSessionView('authenticated');
-        await refreshSyncStatus();
-        dom.authMessage.textContent = 'Modo offline: usando a cópia salva neste aparelho.';
-      } catch {
-        dom.authMessage.textContent = error.message || 'Não foi possível iniciar o aplicativo.';
-        setSessionView('anonymous');
-      }
-    } else {
-      dom.authMessage.textContent = error.message || 'Não foi possível iniciar o aplicativo.';
-      setSessionView('anonymous');
-    }
-  } finally {
-    bootSettled = true;
-    clearTimeout(bootWatchdog);
-    document.body.dataset.appReady = 'true';
+  }catch(error){
+    // An ON-LINE failure may never authorize cached data as another user.
+    state.user=null;
+    dom.authMessage.textContent=error.message||'Não foi possível verificar sua sessão Neon.';
+    setSessionView('anonymous');
+  }finally {
+    settled=true;
+    clearTimeout(watchdog);
+    document.body.dataset.appReady='true';
   }
 }
 
@@ -7286,6 +7268,7 @@ window.addEventListener('online', () => {
 
 ensureSupabase()
   .then(client => client.auth.onAuthStateChange((_event, session) => {
+    if (_event === 'SIGNED_OUT') offlineStore.clearSession().catch(console.warn);
     if (session) {
       offlineStore.cacheSession(session.user).catch(console.warn);
       return;
