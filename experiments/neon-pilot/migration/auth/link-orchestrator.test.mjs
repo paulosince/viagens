@@ -63,6 +63,6 @@ test('unverified central and legacy credentials fail closed',async()=>{
 });
 test('link error is not disclosed',async()=>{
  const f=createLinkHandler({prove:async()=>record,link:async()=>{throw Error('secret database error');},enabled:true});
- const response=await f(req());assert.equal(response.status,401);
+ const response=await f(req());assert.equal(response.status,503);
  assert.equal((await response.text()).includes('secret'),false);
 });
