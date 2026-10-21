@@ -1,4 +1,5 @@
 import {createNeonPreview,NEON_AUTH_URL,API_ROOTS} from './backend-neon.mjs?v=20261021-7media';
+import {activityPhotoForPreview} from './photo-source-neon.mjs?v=20261021-7photofix';
 import { offlineStore } from './offline-store-neon.js?v=20261021-1';
 import {
   adoptLegacyDataUrl,
@@ -3266,7 +3267,7 @@ function renderDayPageAgenda(day, activities, locations) {
     description.addEventListener('click', () => beginInlineTextEdit(description, day, activity, 'description', true));
     copy.append(description);
 
-    const photoUrl = activity.photo_url || location?.photo_url || '';
+    const photoUrl = activityPhotoForPreview(activity, location);
     item.dataset.hasPhoto = String(Boolean(photoUrl));
     item.append(time, pin);
     if (googleMapsLink) item.append(googleMapsLink);
