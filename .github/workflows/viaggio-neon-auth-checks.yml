@@ -6,6 +6,7 @@ on:
       - migration/neon-app-20261019
     paths:
       - 'experiments/neon-pilot/migration/auth/**'
+      - 'experiments/neon-pilot/app/auth-link.html'
       - '.github/workflows/viaggio-neon-auth-checks.yml'
   pull_request:
     paths:
@@ -39,5 +40,8 @@ jobs:
           node --check experiments/neon-pilot/migration/auth/link-store.test.mjs
           node --check experiments/neon-pilot/migration/auth/link-service/index.mjs
           node --check experiments/neon-pilot/migration/auth/link-service/build.mjs
+      - name: Validate separate account-link portal (no live passwords)
+        run: |
+          node -e "const fs=require('fs');const vm=require('vm');const a=fs.readFileSync('experiments/neon-pilot/app/auth-link.html','utf8');const b=a.match(/<script type=\"module\">([\\s\\S]*?)<\\/script>/); if(!b||!a.includes('sb_publishable_')||a.includes('sb_secret_'))process.exit(1);new vm.Script(b[1]); console.log('Portal syntax and public-key checks passed');"
       - name: Simulated federation security tests (no secrets)
         run: node --test experiments/neon-pilot/migration/auth/*.test.mjs
