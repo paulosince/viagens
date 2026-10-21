@@ -63,6 +63,20 @@ export function createNeonIdentity({sdkAuth,projects}) {
   function notify(kind,session) {
     for(const callback of observers)try{callback(kind,session)}catch{/* consumer error */}
   }
+  // Neon Auth's compatible adapter emits cross-tab sign-out and token refresh.
+  // Never forward its new UUID to the application: remap through RLS first.
+  if(typeof sdkAuth.onAuthStateChange==='function'){
+    sdkAuth.onAuthStateChange((event,rawSession)=>{
+      if(event==='SIGNED_OUT'||(!rawSession && event==='USER_DELETED')){
+        lastNeonSubject=null;lastLegacyUser=null;
+        notify('SIGNED_OUT',null);
+      }else if(event==='TOKEN_REFRESHED'){
+        normalized().then(r=>{
+          if(!r.error && r.data.session)notify('TOKEN_REFRESHED',r.data.session);
+        }).catch(()=>{});
+      }
+    });
+  }
   async function signInWithPassword({email,password}) {
     const reply=await sdkAuth.signInWithPassword({email,password});
     if(reply.error)return reply;
