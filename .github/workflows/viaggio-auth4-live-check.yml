@@ -72,6 +72,7 @@ jobs:
              -H 'Access-Control-Request-Headers: authorization,accept-profile,content-profile,content-type' \
              "$base/rpc/project_context")
             echo "preflight=$status"
+            grep -iE "^HTTP/|^access-control-|^vary:" /tmp/headers || true
             test "$status" = 200 -o "$status" = 204
             grep -iq 'access-control-allow-origin: https://paulosince.github.io' /tmp/headers
           done
