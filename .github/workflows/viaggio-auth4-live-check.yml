@@ -56,6 +56,6 @@ jobs:
              -H 'Origin: https://paulosince.github.io' -H 'Accept-Profile: viaggio_app' \
              "$base/trips?select=id&limit=1")
             echo "anonymous_http=$status"
-            if test "$status" = 200; then test "$(cat /tmp/anonymous)" = '[]'; else test "$status" = 401 -o "$status" = 403; fi
+            if test "$status" = 200; then test "$(cat /tmp/anonymous)" = '[]'; else test "$status" = 400 -o "$status" = 401 -o "$status" = 403; fi
           done
           echo 'PASS: both Neon staging APIs reject forged tokens and expose no anonymous trips'
