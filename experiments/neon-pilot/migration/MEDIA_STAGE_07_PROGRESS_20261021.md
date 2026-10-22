@@ -39,3 +39,22 @@
 - Correção em `photo-source-neon.mjs` e `main-neon.js`: atividades com `photo_path` privado **NUNCA** herdam a foto pública genérica da localização quando a mídia privada falha. Sem download autorizado, mostram a ausência da foto, em vez de uma foto errada. 4 testes de regressão criados; CI dedicado em `.github/workflows/viaggio-stage07-photo-regression.yml`. As fontes estão espelhadas na branch de migração; o código desta correção também foi publicado aditivamente na prévia, não no app principal.
 - Nova página `neon-media-review.html` publicada para visualização sem cache antigo; **nova ferramenta de conferência privada** `neon-photo-check.html` publicada também em `main`, faz leitura **somente GET** usando o login Neon e compara SHA-256 das fotos hotel/elevador em A, sem mostrar JWT, caminho de storage ou senha na saída.
 - Os arquivos do Supabase e Neon não foram alterados durante a investigação. Nenhum token de usuário foi solicitado no chat. Não encerrar etapa 07 antes da confirmação do acesso positivo e de upload/exclusão em staging seguro.
+
+## 22/10/2026 — Falha HTTP 503/403 com JWT real: diagnóstico e correção implantada
+
+- A captura real do Safari (10:25 BRT) na página `neon-photo-check.html` mostrou:
+  - `Hotel Jardim Lisboa`: **503 — Serviço privado de arquivos indisponível**;
+  - `Elevador de Santa Justa`: **403 — Você não tem permissão**.
+- Essas respostas demonstraram falha real no proxy de mídia, não erro de foto de referência do banco; a página já consulta `activities` e utiliza caminho privado específico.
+- Inspeção do código-fonte `experiments/neon-pilot/functions/appmedia/index.mjs`: a versão implantada usava os Data API endpoints **obsoletos** `ep-floral-sea-b829egtf` (projeto A) e `ep-aged-pine-b8pd3upm` (projeto B).
+- A consulta oficial `get_data_api` das branches staging confirmou endpoints **atuais e ativos**:
+  - A: `ep-empty-pine-b8r7sa8d`, branch `br-silent-band-b80nklzl`;
+  - B: `ep-spring-moon-b8fi6yxc`, branch `br-falling-leaf-b8xuv1d0`.
+- A função chama `/rpc/media_access` com o JWT recebido. Um destino incorreto pode resultar em 403/503 mesmo que a autorização por RLS no banco correto esteja íntegra.
+- Teste read-only com claims simuladas sob role `authenticated` no banco **A staging** verificou `viaggio_app.media_access('trip-images', photo_path, false)` para hotel e elevador: **allowed=true** para ambas as fotos da proprietária. Isso NÃO substitui teste HTTP com JWT assinado.
+- Código corrigido em `experiments/neon-pilot/functions/appmedia/index.mjs`, [PR #24](https://github.com/paulosince/viagens/pull/24), build de função com dependências fixadas e testes aprovados: [Actions 39787844393](https://github.com/paulosince/viagens/actions/runs/39787844393) e [39788598669](https://github.com/paulosince/viagens/actions/runs/39788598669).
+- Dois ZIPs compilados `index.mjs` gerados para `VIAGGIO_MEDIA_PROJECT=a/b` e enviados por conector diretamente a `deploy_function`. **Deploy atualizado em staging A e B com status `completed`**, ambos em **22/10/2026**. Não foi implantado em branch principal, nem alterados arquivos do storage, Supabase ou PWA de produção. Fonte corrigida e CI espelhados na branch canônica da migração.
+- Regressão HTTP **após deploy**: [Actions 39788598559](https://github.com/paulosince/viagens/actions/runs/39788598559) passou nos dois endpoints: anônimo recebe **401**, preflight CORS **204**, com `Access-Control-Allow-Origin: https://paulosince.github.io`.
+- A correção de source URL é material; ainda NÃO há **nova execução positiva com sessão assinada da Cíntia** após o deploy. Não declarar 7/14 concluída por isso.
+- **Próxima validação:** acessar a mesma página `https://paulosince.github.io/viagens/experiments/neon-pilot/app/neon-photo-check.html` com a conta Neon da Cíntia, tocar em “Testar com a sessão Neon atual” e confirmar **APROVADO/hashes correspondentes** para as duas fotos, ou coletar os novos status. Nunca enviar JWT, senha ou URL assinada ao chat.
+- **Status:** 6/14 concluídas; etapa 07 em execução. Upload/remoção continuam desabilitados, e ainda serão testados em objeto descartável antes de aceitar etapa 07.
