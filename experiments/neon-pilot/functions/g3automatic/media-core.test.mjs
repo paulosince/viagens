@@ -17,7 +17,7 @@ function fixture(){
  }};
  const client={query:async(sql,args=[])=>{
   if(sql.includes('pg_advisory_'))return {rows:[],rowCount:1};
-  if(sql.includes('from viaggio_shadow.media_inventory'))return {rows:[{expected_size:source.length,content_type:'image/jpeg',source_metadata:values.key?{neon_storage_key:values.key,neon_sha256:values.hash}:{}}],rowCount:1};
+  if(sql.includes('from viaggio_shadow.media_inventory'))return {rows:[{expected_size:source.length,content_type:'image/jpeg',source_metadata:values.key?{neon_key:values.key,neon_sha256:values.hash}:{}}],rowCount:1};
   if(sql.includes('v2_reserve_upload')){reserved+=args[1];return {rows:[{object_key:'uploads/12345678-1234-4234-8234-123456789abc'}],rowCount:1}};
   if(sql.includes('v2_commit_upload')){reserved-=args[1];used+=args[1];return {rows:[],rowCount:1}};
   if(sql.includes('update viaggio_shadow.media_inventory')){values.key=args[2];values.hash=args[3];return {rows:[{object_key:'synthetic.jpeg'}],rowCount:1}};
