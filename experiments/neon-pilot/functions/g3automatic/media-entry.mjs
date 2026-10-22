@@ -26,8 +26,8 @@ export default {async fetch(req){
  try{
   client=await pool.connect();
   if(req.headers.get('content-type')==='application/json'){
-   const r=await client.query("select bucket_id,object_key,expected_size,content_type from viaggio_shadow.media_inventory where bucket_id='trip-images' and source_metadata->>'neon_storage_key' is null order by expected_size limit 1");
-   return reply({ok:true,remaining: Number((await client.query("select count(*) n from viaggio_shadow.media_inventory where source_metadata->>'neon_storage_key' is null")).rows[0].n),item:r.rows[0]||null});
+   const r=await client.query("select bucket_id,object_key,expected_size,content_type from viaggio_shadow.media_inventory where bucket_id='trip-images' and coalesce(source_metadata->>'neon_key',source_metadata->>'neon_storage_key') is null order by expected_size limit 1");
+   return reply({ok:true,remaining: Number((await client.query("select count(*) n from viaggio_shadow.media_inventory where coalesce(source_metadata->>'neon_key',source_metadata->>'neon_storage_key') is null")).rows[0].n),item:r.rows[0]||null});
   }
   if(req.headers.get('content-type')!=='application/octet-stream')return reply({ok:false,error:'INVALID_CONTENT_TYPE'},415);
   const sourceBucket=req.headers.get('x-viaggio-bucket')||'',encoded=req.headers.get('x-viaggio-path')||'',expectedHash=req.headers.get('x-viaggio-sha256')||'';
