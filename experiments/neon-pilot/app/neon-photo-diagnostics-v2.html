@@ -135,7 +135,8 @@ async function check(){
    box.className='status pass';
    img.src=URL.createObjectURL(file.data);img.hidden=false;
  }
- info('Conferência concluída. Veja os dois cartões abaixo.');
+ const bothVerified=['hotel','elevador'].every(name=>$(name+'-status').classList.contains('pass'));
+ info(bothVerified?'APROVADO — as duas fotos foram recebidas e tiveram SHA-256 verificado.':'REPROVADO — não foi possível comprovar as duas fotos. Consulte os erros abaixo.',!bothVerified);
 }
 async function execute(fn){
  if(busy)return;busy=true;
