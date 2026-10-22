@@ -119,11 +119,11 @@ async function check(){
    const file=await media.from('trip-images').download(row.photo_path);
    if(file.error){
      box.textContent='Falha na leitura privada: '+file.error.message+
-       '\\nDiagnóstico atual do serviço: verificando…';
+       '\nDiagnóstico atual do serviço: verificando…';
      box.className='status fail';
      const reason=await inspectFailure(row.photo_path);
      box.textContent='Falha na leitura privada: '+file.error.message+
-       '\\nResposta da função agora: '+reason;
+       '\nResposta da função agora: '+reason;
      continue;
    }
    const actual=await digest(file.data);
