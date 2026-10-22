@@ -50,7 +50,7 @@ jobs:
             else
               grep -q 'ep-spring-moon-b8fi6yxc' dist/index.mjs
             fi
-            (cd dist && zip -q -9 "../../appmedia-$profile.zip" index.mjs)
+            (cd dist && zip -q -9 "../appmedia-$profile.zip" index.mjs)
             echo "ZIP_PROFILE=$profile SIZE=$(wc -c < "appmedia-$profile.zip")"
           done
       - name: Stage immutable compiled bundles
