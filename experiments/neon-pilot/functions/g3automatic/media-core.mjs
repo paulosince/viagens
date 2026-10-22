@@ -25,8 +25,9 @@ export async function copyOne({client,store,sourceBucket,path,sourceBytes,expect
   if(response.rowCount!==1)return {ok:false,error:'NOT_IN_INVENTORY'};
   const item=response.rows[0],size=Number(item.expected_size);
   if(!Number.isSafeInteger(size)||size<=0||size>25000000)return {ok:false,error:'FILE_SIZE_UNSUPPORTED'};
-  if(item.source_metadata?.neon_storage_key){
-   const key=item.source_metadata.neon_storage_key;
+  const existingKey=item.source_metadata?.neon_key||item.source_metadata?.neon_storage_key;
+  if(existingKey){
+   const key=existingKey;
    if(item.source_metadata.neon_sha256===expectedHash&&await matched(store,key,size,expectedHash))return {ok:true,already:true,bytes:size};
    return {ok:false,error:'EXISTING_COPY_CONFLICT'};
   }
@@ -39,7 +40,7 @@ export async function copyOne({client,store,sourceBucket,path,sourceBytes,expect
    await store.send(new PutObjectCommand({Bucket:bucket,Key:key,Body:sourceBytes,ContentLength:size,ContentType:item.content_type||'application/octet-stream'}));
    if(!await matched(store,key,size,expectedHash))throw Error('PHYSICAL_CHECK_FAILED');
    await client.query('select viaggio_lab.v2_commit_upload($1::uuid,$2::bigint)',[id,size]);
-   const set=await client.query("update viaggio_shadow.media_inventory set source_metadata=source_metadata||jsonb_build_object('neon_storage_key',$3::text,'neon_sha256',$4::text,'neon_verified_bytes',$5::bigint) where bucket_id=$1 and object_key=$2 and source_metadata->>'neon_storage_key' is null returning object_key",[sourceBucket,path,key,expectedHash,size]);
+   const set=await client.query("update viaggio_shadow.media_inventory set source_metadata=source_metadata||jsonb_build_object('neon_key',$3::text,'neon_sha256',$4::text,'neon_verified_bytes',$5::bigint) where bucket_id=$1 and object_key=$2 and coalesce(source_metadata->>'neon_key',source_metadata->>'neon_storage_key') is null returning object_key",[sourceBucket,path,key,expectedHash,size]);
    if(set.rowCount!==1)throw Error('CONCURRENT_STATE_CHANGE');
    recorded=true;
    return {ok:true,bytes:size,sha256:expectedHash};
