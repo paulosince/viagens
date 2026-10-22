@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="pt-BR"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer">
+<title>Viaggio — diagnóstico privado rev. 3</title>
+<style>
+*{box-sizing:border-box}body{font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f4f7fb;color:#183047;margin:0}
+main{max-width:520px;margin:auto;padding:calc(30px + env(safe-area-inset-top)) 20px 60px}
+h1{font-size:28px;line-height:1.15;margin:22px 0 12px}p{color:#60748a}
+.card{padding:20px;background:#fff;border:1px solid #dce6f0;border-radius:20px;margin:18px 0}
+label{font-size:13px;font-weight:700;display:block;margin-top:12px}
+input{font:16px system-ui;width:100%;border:1px solid #b8cadd;border-radius:12px;padding:13px;margin-top:6px}
+button{background:#0567bd;color:white;font-weight:700;border:0;border-radius:14px;width:100%;padding:15px;margin-top:16px;font-size:16px}
+button:disabled{opacity:.5}img{width:100%;border-radius:12px;display:block;margin-top:13px}
+.status{padding:12px;background:#e6f1fa;border-radius:12px;font-size:14px;white-space:pre-wrap;margin-top:10px}
+.pass{color:#117844;font-weight:700}.fail{color:#b43b38;font-weight:700}.muted{font-size:13px} [hidden]{display:none!important}
+</style></head><body><main>
+<strong style="color:#0567bd">VIAGGIO · DIAGNÓSTICO NEON · ETAPA 7/14 · REV. 3</strong>
+<h1>Conferir fotos privadas — revisão 3</h1>
+<p>Este diagnóstico testa a nova função appmedia (implantação 3) do Neon, consulta o banco privado e baixa somente as fotos de <b>Hotel Jardim Lisboa</b> e <b>Elevador de Santa Justa</b>, verificando sua assinatura SHA-256. Não modifica fotos nem viagens.</p>
+<div class="card">
+<button id="current">Testar com a sessão Neon atual</button>
+<div id="login" hidden>
+<label for="email">E-mail Neon</label><input id="email" autocomplete="email" type="email">
+<label for="password">Senha Neon</label><input id="password" autocomplete="current-password" type="password">
+<button id="signIn">Entrar e testar</button>
+</div><div id="progress" class="status" role="status" aria-live="polite" hidden></div>
+</div>
+<div id="results" hidden>
+<section class="card"><b>Hotel Jardim Lisboa</b><div id="hotel-status" class="status">Não testado</div><img id="hotel-image" alt="Imagem real do Hotel Jardim Lisboa" hidden></section>
+<section class="card"><b>Elevador de Santa Justa</b><div id="elevador-status" class="status">Não testado</div><img id="elevador-image" alt="Imagem real do Elevador de Santa Justa" hidden></section>
+</div>
+<p class="muted">Envie apenas uma captura dos resultados. Não compartilhe senha, código de autenticação, JWT ou URLs privadas. Se houver falha, o teste apresenta os códigos HTTP e o erro técnico público, nunca a credencial.</p>
+</main><script type="module">
+import {API_ROOTS,NEON_AUTH_URL} from './backend-neon.mjs?v=20261022-media3';
+import {createNeonMediaClient} from './storage-neon.mjs?v=20261022-media3';
+const $=id=>document.getElementById(id);
+let sdk,dbs,media,busy=false;
+function info(message,bad=false){$('progress').hidden=false;$('progress').textContent=message;$('progress').className='status '+(bad?'fail':'');}
+async function boot(){
+ if(sdk)return;
+ const [{createClient,SupabaseAuthAdapter},{NeonPostgrestClient,fetchWithToken}]
+  =await Promise.all([
+    import('https://cdn.jsdelivr.net/npm/@neondatabase/neon-js@0.9.0-beta/+esm'),
+    import('https://cdn.jsdelivr.net/npm/@neondatabase/postgrest-js@0.2.0-beta/+esm')
+  ]);
+ sdk=createClient({auth:{url:NEON_AUTH_URL,adapter:SupabaseAuthAdapter()},dataApi:{url:API_ROOTS.a}});
+ async function token(){
+   const r=await sdk.auth.getSession();
+   if(r.error)throw r.error;
+   return r.data?.session?.access_token||null;
+ }
+ dbs=Object.entries(API_ROOTS).map(([id,url])=>({
+    id,media:id==='a'
+      ?'https://br-silent-band-b80nklzl-appmedia.compute.c-14.us-east-1.aws.neon.tech/'
+      :'https://br-falling-leaf-b8xuv1d0-appmedia.compute.c-14.us-east-1.aws.neon.tech/',
+    client:new NeonPostgrestClient({dataApiUrl:url,options:{global:{fetch:fetchWithToken(token)}}}).schema('viaggio_app')
+ }));
+ media=createNeonMediaClient({projects:dbs,accessToken:token,allowMutations:false});
+}
+async function digest(blob){
+ const hash=new Uint8Array(await crypto.subtle.digest('SHA-256',await blob.arrayBuffer()));
+ return Array.from(hash,n=>n.toString(16).padStart(2,'0')).join('');
+}
+// Only extract a compact machine-readable error code from the Function response.
+// Never print raw error bodies, signed URLs, JWTs or any Authorization headers.
+async function readFailureCode(res) {
+  const type=(res.headers.get('content-type')||'').toLowerCase();
+  if(!type.includes('json'))return null;
+  try {
+    const body=await res.json();
+    const candidate=body?.code||body?.error?.code||body?.error_code||
+      (typeof body?.error==='string'?body.error:null);
+    if(typeof candidate==='string'&&/^[A-Za-z][A-Za-z0-9_-]{1,60}$/.test(candidate))
+      return candidate;
+  } catch {}
+  return null;
+}
+async function inspectFailure(path) {
+  const s=await sdk.auth.getSession();
+  const jwt=s?.data?.session?.access_token;
+  if(!jwt||typeof jwt!=='string')return 'Sessão ausente (nenhum teste enviado).';
+  const endpoint=new URL('download',dbs[0].media);
+  endpoint.searchParams.set('bucket','trip-images');
+  endpoint.searchParams.set('path',path);
+  let output=[];
+  // Retry only temporary 5xx once to distinguish transient failure from denial.
+  for(let attempt=0;attempt<2;attempt++){
+    try{
+      const res=await fetch(endpoint.toString(),{
+        method:'GET',mode:'cors',credentials:'omit',redirect:'error',
+        referrerPolicy:'no-referrer',cache:'no-store',
+        headers:{Authorization:'Bearer '+jwt},signal:AbortSignal.timeout(25000)
+      });
+      const code=await readFailureCode(res);
+      output.push('HTTP '+res.status+(code?' / '+code:''));
+      if(res.status<500)break;
+      if(attempt===0)await new Promise(resolve=>setTimeout(resolve,850));
+    }catch{output.push('Falha de rede/CORS');break;}
+  }
+  return output.join(' → ');
+}
+
+async function check(){
+ const r=await sdk.auth.getSession();
+ if(r.error)throw r.error;
+ if(!r.data?.session){$('login').hidden=false;info('Entre com sua conta Neon para iniciar o teste.');return;}
+ $('login').hidden=true;$('results').hidden=false;
+ info('Consultando as referências originais…');
+ const result=await dbs[0].client.from('activities').select('title,photo_path,photo_hash').in('title',['Hotel Jardim Lisboa','Elevador de Santa Justa']);
+ if(result.error)throw new Error('Consulta RLS do projeto A: '+result.error.message);
+ for(const [name,label] of [['Hotel Jardim Lisboa','hotel'],['Elevador de Santa Justa','elevador']]){
+   const box=$(label+'-status'),img=$(label+'-image');
+   const row=(result.data||[]).find(r=>r.title===name);
+   if(!row?.photo_path||!row.photo_hash){
+     box.textContent='Não foi localizada a referência à foto privada.';box.className='status fail';continue;
+   }
+   box.textContent='Verificando o download privado…';
+   const file=await media.from('trip-images').download(row.photo_path);
+   if(file.error){
+     box.textContent='Falha na leitura privada: '+file.error.message+
+       '\nDiagnóstico atual do serviço: verificando…';
+     box.className='status fail';
+     const reason=await inspectFailure(row.photo_path);
+     box.textContent='Falha na leitura privada: '+file.error.message+
+       '\nResposta da função agora: '+reason;
+     continue;
+   }
+   const actual=await digest(file.data);
+   if(actual.toLowerCase()!==row.photo_hash.toLowerCase()){
+     box.textContent='Erro de integridade: hash físico diferente do banco.';
+     box.className='status fail';continue;
+   }
+   box.textContent='APROVADO — arquivo original recebido; hash SHA-256 correto; '+file.data.size+' bytes.';
+   box.className='status pass';
+   img.src=URL.createObjectURL(file.data);img.hidden=false;
+ }
+ const bothVerified=['hotel','elevador'].every(name=>$(name+'-status').classList.contains('pass'));
+ info(bothVerified?'APROVADO — as duas fotos foram recebidas e tiveram SHA-256 verificado.':'REPROVADO — não foi possível comprovar as duas fotos. Consulte os erros abaixo.',!bothVerified);
+}
+async function execute(fn){
+ if(busy)return;busy=true;
+ for(const b of [$('current'),$('signIn')])b.disabled=true;
+ try{await boot();await fn();}
+ catch(e){info('Erro: '+(e?.message||'Não foi possível consultar o Neon.'),true);}
+ finally{busy=false;for(const b of [$('current'),$('signIn')])b.disabled=false;}
+}
+$('current').addEventListener('click',()=>execute(check));
+$('signIn').addEventListener('click',()=>execute(async()=>{
+ const email=$('email').value.trim();
+ const password=$('password').value;
+ if(!email||!password)throw new Error('Informe seu e-mail e senha Neon.');
+ const r=await sdk.auth.signInWithPassword({email,password});
+ $('password').value='';
+ if(r.error)throw r.error;
+ await check();
+}));
+</script></body></html>
