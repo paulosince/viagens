@@ -1,0 +1,75 @@
+name: Viaggio Stage07 - build corrected Neon media functions
+on:
+  pull_request:
+    branches:
+      - migration/neon-app-20261019
+    paths:
+      - 'experiments/neon-pilot/functions/appmedia/index.mjs'
+      - 'experiments/neon-pilot/functions/appmedia/service.mjs'
+      - '.github/workflows/viaggio-media-build-correct-endpoints.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validate exact staged URLs and source
+        shell: bash
+        run: |
+          set -euo pipefail
+          file=experiments/neon-pilot/functions/appmedia/index.mjs
+          grep -q 'ep-empty-pine-b8r7sa8d' "$file"
+          grep -q 'ep-spring-moon-b8fi6yxc' "$file"
+          ! grep -Eq 'ep-floral-sea-b829egtf|ep-aged-pine-b8pd3upm' "$file"
+          node --check "$file"
+          node --check experiments/neon-pilot/functions/appmedia/service.mjs
+          echo 'PASS: source points only to currently active A/B staging APIs'
+      - name: Install pinned dependencies and test security functions
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd experiments/neon-pilot/functions/appmedia
+          npm ci --no-audit --no-fund
+          npm test
+      - name: Build function archive for A and B, with no secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd experiments/neon-pilot/functions/appmedia
+          for profile in a b; do
+            VIAGGIO_MEDIA_PROJECT="$profile" npm run build
+            node --check dist/index.mjs
+            if test "$profile" = a; then
+              grep -q 'ep-empty-pine-b8r7sa8d' dist/index.mjs
+            else
+              grep -q 'ep-spring-moon-b8fi6yxc' dist/index.mjs
+            fi
+            (cd dist && zip -q -9 "../appmedia-$profile.zip" index.mjs)
+            echo "ZIP_PROFILE=$profile SIZE=$(wc -c < "appmedia-$profile.zip")"
+          done
+      - name: Stage immutable compiled bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: viaggio-staging-appmedia-fixed
+          path: |
+            experiments/neon-pilot/functions/appmedia/appmedia-a.zip
+            experiments/neon-pilot/functions/appmedia/appmedia-b.zip
+          retention-days: 3
+          if-no-files-found: error
+      - name: Emit public-code-only ZIP transfers for audited manual staging deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd experiments/neon-pilot/functions/appmedia
+          for profile in a b; do
+            echo "BEGIN_VIAGGIO_ZIP_$profile"
+            base64 -w0 "appmedia-$profile.zip" | fold -w 10000
+            echo
+            echo "END_VIAGGIO_ZIP_$profile"
+          done

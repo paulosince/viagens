@@ -1,0 +1,33 @@
+name: Viaggio media function post-deploy health
+on:
+  pull_request:
+    branches: [migration/neon-app-20261019]
+    paths:
+      - '.github/workflows/viaggio-media-postdeploy-smoke.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Ensure redeployed staging functions are reachable and require authentication
+        shell: bash
+        run: |
+          set -euo pipefail
+          for host in \
+            'https://br-silent-band-b80nklzl-appmedia.compute.c-14.us-east-1.aws.neon.tech' \
+            'https://br-falling-leaf-b8xuv1d0-appmedia.compute.c-14.us-east-1.aws.neon.tech'; do
+            url="$host/download?bucket=trip-images&path=00000000-0000-4000-8000-000000000001/activity/absent.jpg"
+            code=$(curl -sS --max-time 25 -o /tmp/media-status -w '%{http_code}' -H 'Origin: https://paulosince.github.io' "$url")
+            echo "unauthenticated_status=$code"
+            test "$code" = 401
+            options=$(curl -sS -X OPTIONS --max-time 25 -o /tmp/media-options -D /tmp/media-headers -w '%{http_code}' \
+               -H 'Origin: https://paulosince.github.io' -H 'Access-Control-Request-Method: GET' \
+               -H 'Access-Control-Request-Headers: authorization' "$url")
+            echo "preflight_status=$options"
+            test "$options" = 204
+            grep -iq '^access-control-allow-origin: https://paulosince.github.io' /tmp/media-headers
+          done
+          echo 'PASS: updated staging functions reachable with auth protection and browser CORS'
