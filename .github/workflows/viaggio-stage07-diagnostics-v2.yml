@@ -1,0 +1,46 @@
+name: Viaggio Neon media diagnosis v2 security
+on:
+  pull_request:
+    branches: [migration/neon-app-20261019]
+    paths:
+      - '.github/workflows/viaggio-stage07-diagnostics-v2.yml'
+      - 'experiments/neon-pilot/app/neon-photo-diagnostics-v2.html'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '24'}
+      - name: Validate diagnostic is strictly read-only, syntax-valid and never displays JWT
+        run: |
+          node <<'JS'
+          const fs=require('node:fs'),assert=require('node:assert/strict');
+          const html=fs.readFileSync('experiments/neon-pilot/app/neon-photo-diagnostics-v2.html','utf8');
+          const script=html.match(/<script type="module">([\s\S]*?)<\/script>/)?.[1];
+          assert.ok(script);
+          const clean=script.replace(/import\s+[\s\S]*?\s+from\s+['"][^'"]+['"];?/g,'');
+          fs.writeFileSync('/tmp/neon-media-diag-v2.mjs',clean);
+          assert.match(script,/allowMutations:false/);
+          assert.match(script,/redirect:'error'/);
+          assert.match(script,/attempt<2/);
+          assert.match(script,/readFailureCode/);
+          assert.doesNotMatch(html,/console\.log\(\s*jwt\s*\)|localStorage\.setItem\(/);
+          console.log('PASS: read-only diagnostic with safe HTTP codes and bounded retry');
+          JS
+          node --check /tmp/neon-media-diag-v2.mjs
+      - name: Verify live new static URL over HTTPS
+        shell: bash
+        run: |
+          set -euo pipefail
+          url='https://paulosince.github.io/viagens/experiments/neon-pilot/app/neon-photo-diagnostics-v2.html'
+          status=$(curl -sSL --retry 2 --max-time 40 -o /tmp/live-diag -w '%{http_code}' "$url")
+          echo "new_diag_http=$status"
+          test "$status" = 200
+          grep -q 'readFailureCode' /tmp/live-diag
+          grep -q 'allowMutations:false' /tmp/live-diag
+          echo 'PASS: new diagnostic publicly served without credentials'
