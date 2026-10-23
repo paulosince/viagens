@@ -84,7 +84,10 @@ export function createNeonMediaClient({projects,accessToken,fetcher=fetch,allowM
       throw safeError('Sessão Neon sem token JWT. Entre na sua conta.');
     if(!p.media||!/^https:\/\/[^/]+\/$/.test(p.media))
       throw safeError('Destino de mídia do Neon inválido.');
-    const u=new URL(route,p.media);
+    const endpoint=(route==='upload'||route==='remove')?p.mediaWrite:p.media;
+    if(!endpoint||!/^https:\/\/[^/]+\/$/.test(endpoint))
+      throw safeError('Destino de escrita de mídia não configurado.');
+    const u=new URL(route,endpoint);
     u.searchParams.set('bucket',bucket);
     if(path)u.searchParams.set('path',path);
     if(expires!==undefined)u.searchParams.set('expires',String(expires));
