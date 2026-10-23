@@ -2,14 +2,15 @@
 // No Supabase calls, secrets or credentials exposed to browser.
 import { createHash } from 'node:crypto';
 import { signedReadUrl } from './storage-sign.mjs';
+import {writeMedia} from './media-write.mjs';
 
 const ORIGIN = 'https://paulosince.github.io';
 const API = 'https://ep-empty-pine-b8r7sa8d.apirest.c-14.us-east-1.aws.neon.tech/viaggio_lab/rest/v1';
 const BUCKETS = new Set(['trip-images','profile-photos','day-attachments']);
 const headers = {
   'access-control-allow-origin': ORIGIN,
-  'access-control-allow-headers': 'authorization, content-type',
-  'access-control-allow-methods': 'GET, OPTIONS',
+  'access-control-allow-headers': 'authorization, content-type, x-upsert',
+  'access-control-allow-methods': 'GET, POST, OPTIONS',
   'cache-control': 'private, no-store',
   'vary': 'Origin'
 };
@@ -49,23 +50,25 @@ export default {
   const origin=req.headers.get('origin');
   if (origin && origin!==ORIGIN) return fail('ORIGIN_DENIED',403);
   if (req.method==='OPTIONS') return new Response(null,{status:204,headers});
-  if (req.method!=='GET') return fail('READ_ONLY',405);
+
   const url=new URL(req.url);
   const action=url.pathname.replace(/^\/+|\/+$/g,'');
-  if (!['download','sign'].includes(action)) return fail('NOT_FOUND',404);
+  if (!['download','sign','upload','remove'].includes(action)) return fail('NOT_FOUND',404);
+  if(req.method!==(['download','sign'].includes(action)?'GET':'POST')) return fail('METHOD_DENIED',405);
   const auth=req.headers.get('authorization')||'';
   if (!/^Bearer [\w.-]+$/i.test(auth)) return fail('AUTH_REQUIRED',401);
   const jwt=auth.slice(7);
   if (jwt.split('.').length!==3) return fail('AUTH_REQUIRED',401);
   const bucket=url.searchParams.get('bucket')||'';
   const path=url.searchParams.get('path')||'';
-  if (!BUCKETS.has(bucket) || !path || path.length>1024
-    || path.includes('\\') || path.split('/').some(v=>!v||v==='.'||v==='..'))
+  if (!BUCKETS.has(bucket) || (action!=='remove'&&(!path || path.length>1024
+    || path.includes('\\') || path.split('/').some(v=>!v||v==='.'||v==='..'))))
     return fail('INVALID_PATH',400);
   const ttl=action==='sign'?Number(url.searchParams.get('expires')):60;
-  if (!Number.isInteger(ttl)||ttl<1||ttl>3600) return fail('INVALID_EXPIRATION',400);
+  if (action==='sign'&&(!Number.isInteger(ttl)||ttl<1||ttl>3600)) return fail('INVALID_EXPIRATION',400);
 
   try {
+    if(action==='upload'||action==='remove') return await writeMedia({request:req,route:action,bucket,path,jwt,api:API,error:fail,success:json});
     const record=await authorizedManifest(jwt,bucket,path);
     if (record.error) return fail(record.error,record.status);
     const file=record.item;
