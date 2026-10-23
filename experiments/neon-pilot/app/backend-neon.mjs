@@ -13,10 +13,14 @@ const MEDIA=Object.freeze({
  a:'https://br-silent-band-b80nklzl-appmedia.compute.c-14.us-east-1.aws.neon.tech/',
  b:'https://br-falling-leaf-b8xuv1d0-appmedia.compute.c-14.us-east-1.aws.neon.tech/'
 });
+const MEDIA_WRITE=Object.freeze({
+ a:'https://br-silent-band-b80nklzl-appwrite.compute.c-14.us-east-1.aws.neon.tech/',
+ b:'https://br-falling-leaf-b8xuv1d0-appmedia.compute.c-14.us-east-1.aws.neon.tech/'
+});
 // The Neon Functions have rejected missing and forged JWTs (401/403).
 // Enable READ ONLY pending a positive real-user JWT authorization test.
 // Never enable mutations until their separate positive and negative tests pass.
-export function createNeonPreview({authSdk,NeonPostgrestClient,fetchWithToken}){
+export function createNeonPreview({authSdk,NeonPostgrestClient,fetchWithToken,enableMediaWrites=false}){
  if(!authSdk?.auth||!NeonPostgrestClient||!fetchWithToken)throw Error('Neon SDK não inicializado.');
  // Token-provider calls the official Neon Auth adapter, which manages
  // refresh and session persistence. No legacy Supabase session fallback.
@@ -35,13 +39,13 @@ export function createNeonPreview({authSdk,NeonPostgrestClient,fetchWithToken}){
       dataApiUrl:url,
       options:{global:{fetch:fetchWithToken(getToken)}}
    });
-   return {id,media:MEDIA[id],client:pg.schema('viaggio_app')};
+   return {id,media:MEDIA[id],mediaWrite:MEDIA_WRITE[id],client:pg.schema('viaggio_app')};
  });
  const facade=createNeonIdentity({sdkAuth:rawAuth,projects});
  // Keep the existing preview's generic RPC router, but never silently send
  // old Supabase Edge Functions (Unsplash, deletion etc.) to Supabase.
  const functions={async invoke(){return {data:null,error:new Error('Serviço ainda não disponível na prévia Neon.')};}};
- const storage=createNeonMediaClient({projects,accessToken:getToken,allowMutations:false});
+ const storage=createNeonMediaClient({projects,accessToken:getToken,allowMutations:enableMediaWrites===true});
  const router=createRouter({projects,auth:facade.auth,functions,storage});
  // No user data operation succeeds unless Neon JWT is presented.
  return {...router,accessToken:facade.accessToken,provider:'neon-auth-central'};
