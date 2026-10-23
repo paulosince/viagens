@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="pt-BR"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer">
+<title>Viaggio | Neon Gate 3 A</title>
+<style>
+*{box-sizing:border-box}body{font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#143047;background:#f3f8fc;margin:0}
+main{max-width:520px;padding:calc(32px + env(safe-area-inset-top)) 20px 56px;margin:auto}
+h1{font-size:27px;letter-spacing:-.025em;line-height:1.17}p{color:#667789}
+section{background:white;border:1px solid #d8e5ed;padding:20px;border-radius:20px;margin:20px 0}
+button{border:0;border-radius:12px;background:#0468bd;color:white;width:100%;padding:15px;font-size:16px;font-weight:700}
+button:disabled{opacity:.5}
+.info{background:#eaf0f6;white-space:pre-wrap;overflow-wrap:anywhere;border-radius:12px;padding:14px;margin:12px 0}
+.pass{background:#e1f2e7;color:#116633}.fail{background:#fee8e8;color:#952e2e}
+small{color:#718393}[hidden]{display:none!important}
+</style></head><body><main>
+<strong style="color:#0468bd">VIAGGIO · MIGRAÇÃO NEON · ETAPA 3/4 · A</strong>
+<h1>Teste da viagem Lisboa–Paris no Neon</h1>
+<p>Esta verificação usa sua sessão Neon de editor e cria somente uma imagem de 8 × 8 pixels com nome novo, sem vinculá-la a nenhuma atividade. Depois compara o SHA-256, faz remoção lógica e confirma que uma foto original segue acessível. O Supabase não é utilizado.</p>
+<section><button id="run">Testar armazenamento na viagem</button><div class="info" id="result" role="status" aria-live="polite" hidden></div></section>
+<small>Nenhuma fotografia real será excluída. Envie somente a captura do resultado.</small>
+</main>
+<script type="module">
+import {API_ROOTS,NEON_AUTH_URL} from './backend-neon.mjs?v=20261023-g3-a1';
+const $=id=>document.getElementById(id);
+const projectA=API_ROOTS.a;
+const tripId='cc4b6649-edf1-422d-867d-c9740020da1c';
+const originalPath='cc4b6649-edf1-422d-867d-c9740020da1c/activity/b66ae4f8-e5bb-4216-b291-f687ea06eb2f.png',originalSHA='f54f0911157dc451addf27923b0686fd70a6d1afb01caf2368aa254b0536632e';
+const writeHost='https://br-silent-band-b80nklzl-appwrite.compute.c-14.us-east-1.aws.neon.tech/';
+const readHost='https://br-silent-band-b80nklzl-appmedia.compute.c-14.us-east-1.aws.neon.tech/';
+function status(msg,passed){const v=$('result');v.hidden=false;v.className='info '+(passed===true?'pass':passed===false?'fail':'');v.textContent=msg}
+async function hash(blob){
+ const data=await crypto.subtle.digest('SHA-256',await blob.arrayBuffer());
+ return Array.from(new Uint8Array(data),n=>n.toString(16).padStart(2,'0')).join('');
+}
+async function request(host,route,jwt,bucket,path,method='GET',body,headers={}){
+ const u=new URL(route,host);u.searchParams.set('bucket',bucket);if(path)u.searchParams.set('path',path);
+ return fetch(u.toString(),{method,body,headers:{Authorization:'Bearer '+jwt,...headers},
+  mode:'cors',credentials:'omit',redirect:'error',cache:'no-store',
+  referrerPolicy:'no-referrer',signal:AbortSignal.timeout(60000)});
+}
+const readError=async response=>{const obj=await response.json().catch(()=>({}));
+ return 'HTTP '+response.status+' / '+String(obj?.error||'UNKNOWN').slice(0,65)};
+async function run(){
+ $('run').disabled=true;
+ let path=null,token=null,uploaded=false,removed=false;
+ try{
+  status('Autenticando com Neon…');
+  const [{createClient,SupabaseAuthAdapter},{NeonPostgrestClient,fetchWithToken}]=await Promise.all([
+   import('https://cdn.jsdelivr.net/npm/@neondatabase/neon-js@0.9.0-beta/+esm'),
+   import('https://cdn.jsdelivr.net/npm/@neondatabase/postgrest-js@0.2.0-beta/+esm')
+  ]);
+  const auth=createClient({auth:{url:NEON_AUTH_URL,adapter:SupabaseAuthAdapter()},dataApi:{url:projectA}});
+  const session=await auth.auth.getSession();
+  token=session.data?.session?.access_token;
+  if(!token)throw Error('Entre na sessão Neon da prévia antes deste teste.');
+  const db=new NeonPostgrestClient({dataApiUrl:projectA,options:{global:{fetch:fetchWithToken(async()=>token)}}}).schema('viaggio_app');
+  const trip=await db.from('trips').select('id').eq('id',tripId).limit(1);
+  if(trip.error||trip.data?.length!==1)throw Error('Viagem não acessível por esta sessão no Neon A.');
+  const canvas=document.createElement('canvas');canvas.width=8;canvas.height=8;
+  const ctx=canvas.getContext('2d');ctx.fillStyle='#0976c8';ctx.fillRect(0,0,8,8);
+  const image=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(Error('Falha ao criar PNG')),'image/png'));
+  path=tripId+'/neon-test-20261023-'+crypto.randomUUID()+'.png';
+  status('Enviando imagem sintética para o projeto A…');
+  const up=await request(writeHost,'upload',token,'trip-images',path,'POST',image,{'Content-Type':'image/png','x-upsert':'false'});
+  if(!up.ok)throw Error('Upload: '+await readError(up));
+  const data=await up.json();uploaded=true;
+  const digest=await hash(image);
+  if(data?.data?.sha256!==digest)throw Error('Registro de SHA-256 incorreto');
+  const down=await request(writeHost,'download',token,'trip-images',path);
+  if(!down.ok)throw Error('Download: '+await readError(down));
+  const received=await down.blob();
+  if(received.size!==image.size||await hash(received)!==digest)throw Error('Integridade física incorreta');
+  status('Imagem temporária OK. Confirmando preservação do original…');
+  const original=await request(readHost,'download',token,'trip-images',originalPath);
+  if(!original.ok)throw Error('Foto original: '+await readError(original));
+  const originalBlob=await original.blob();
+  if(originalBlob.size!==3638197||await hash(originalBlob)!==originalSHA)throw Error('Foto original não confere');
+  const rm=await request(writeHost,'remove',token,'trip-images',null,'POST',JSON.stringify({paths:[path]}),{'Content-Type':'application/json'});
+  if(!rm.ok)throw Error('Remoção lógica: '+await readError(rm));
+  removed=true;
+  const blocked=await request(writeHost,'download',token,'trip-images',path);
+  if(blocked.status!==404)throw Error('Remoção não bloqueou leitura: HTTP '+blocked.status);
+  const denied=await request(writeHost,'upload',token,'trip-images',
+   '11111111-1111-4111-8111-111111111111/forbidden.png','POST',image,{'Content-Type':'image/png'});
+  if(denied.status!==403)throw Error('Falha de controle de acesso: HTTP '+denied.status);
+  status('APROVADO — Neon A, sessão de editor.\\nUpload sintético: OK\\nRegistro no banco: OK\\nSHA-256 físico: OK\\nFoto original preservada: OK\\nRemoção lógica: OK\\nBloqueio após remover: OK\\nAcesso indevido negado: OK\\nSupabase: intacto.',true);
+ }catch(e){status('REPROVADO — '+String(e?.message||'Falha de rede').slice(0,220),false)}
+ finally{
+  if(uploaded&&!removed&&token&&path){
+   try{await request(writeHost,'remove',token,'trip-images',null,'POST',
+    JSON.stringify({paths:[path]}),{'Content-Type':'application/json'})}catch{}
+  }
+  $('run').disabled=false;
+ }
+}
+$('run').addEventListener('click',run);
+</script>
+</body></html>
