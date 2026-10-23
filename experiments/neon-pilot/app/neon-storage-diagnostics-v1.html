@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="pt-BR"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer">
+<title>Viaggio — mídia Neon, etapa 3/4</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f4f8fc;color:#17344a;font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+main{max-width:520px;margin:auto;padding:calc(25px + env(safe-area-inset-top)) 20px 65px}
+h1{font-size:29px;line-height:1.15;letter-spacing:-.025em}
+p{color:#61748a}.card{margin-top:19px;padding:20px;background:#fff;border:1px solid #d9e7f1;border-radius:20px}
+button{border:0;border-radius:13px;background:#0668bd;color:white;width:100%;padding:15px;font:inherit;font-weight:700;margin-top:13px}
+button:disabled{opacity:.5}
+input{font:16px system-ui;border:1px solid #bac9d7;border-radius:10px;padding:11px;width:100%;margin:6px 0}
+label{font-size:13px;font-weight:700}
+.status{background:#e7f0fb;padding:12px;border-radius:12px;margin-top:13px;white-space:pre-wrap;overflow-wrap:break-word}
+.pass{background:#e2f3e7;color:#126e3b}.fail{background:#fee9e8;color:#9b2e2e}
+small{color:#61748a}[hidden]{display:none!important}
+</style></head><body><main>
+<strong style="color:#086cbd">VIAGGIO · MIGRAÇÃO NEON · ETAPA 3/4</strong>
+<h1>Teste de armazenamento privado</h1>
+<p>Usa uma <b>imagem sintética de 8 × 8 pixels</b> — nunca uma fotografia da família. Em um bucket isolado do projeto Neon B, verifica <b>upload, download, SHA-256, exclusão e ausência do arquivo após a exclusão</b>.</p>
+<p>Não modifica viagens, fotos existentes ou o Supabase. O teste envia apenas a imagem sintética e a sessão autenticada ao serviço Neon.</p>
+<div class="card">
+<button id="start">Executar teste com minha sessão Neon</button>
+<div id="login" hidden>
+<label for="email">E-mail da conta Neon</label><input id="email" type="email" autocomplete="email">
+<label for="password">Senha da conta Neon</label><input id="password" type="password" autocomplete="current-password">
+<button id="sign-in">Entrar e testar</button>
+</div>
+<div id="result" role="status" aria-live="polite" class="status" hidden></div>
+</div>
+<p><small>Compartilhe apenas o resultado mostrado em verde ou vermelho. Não compartilhe senhas, JWTs ou links assinados.</small></p>
+<script type="module">
+import {API_ROOTS,NEON_AUTH_URL} from './backend-neon.mjs?v=20261023-gate3';
+const $=id=>document.getElementById(id);
+const endpoint='https://br-falling-leaf-b8xuv1d0-mediatest.compute.c-14.us-east-1.aws.neon.tech/trial';
+let sdk=null,db=null,busy=false;
+function status(text,kind=''){$('result').hidden=false;$('result').textContent=text;$('result').className='status '+kind;}
+async function boot(){
+ if(sdk)return;
+ const [{createClient,SupabaseAuthAdapter},{NeonPostgrestClient,fetchWithToken}]=await Promise.all([
+  import('https://cdn.jsdelivr.net/npm/@neondatabase/neon-js@0.9.0-beta/+esm'),
+  import('https://cdn.jsdelivr.net/npm/@neondatabase/postgrest-js@0.2.0-beta/+esm')
+ ]);
+ sdk=createClient({auth:{url:NEON_AUTH_URL,adapter:SupabaseAuthAdapter()},dataApi:{url:API_ROOTS.b}});
+ const token=async()=>{
+  const r=await sdk.auth.getSession();if(r.error)throw r.error;
+  return r.data?.session?.access_token||null;
+ };
+ db=new NeonPostgrestClient({dataApiUrl:API_ROOTS.b,options:{global:{fetch:fetchWithToken(token)}}}).schema('viaggio_app');
+}
+async function trial(){
+ const session=await sdk.auth.getSession();
+ if(session.error)throw Error('Sessão Neon indisponível.');
+ if(!session.data?.session){$('login').hidden=false;status('Entre com sua conta Neon antes de iniciar o teste.');return;}
+ $('login').hidden=true;status('Verificando proprietário do projeto pessoal B…');
+ const context=await db.rpc('project_context');
+ if(context.error||context.data?.is_home!==true){
+  status('REPROVADO — esta conta não está autorizada como proprietária do projeto B. Nenhuma imagem enviada.','fail');return;
+ }
+ const canvas=document.createElement('canvas');canvas.width=8;canvas.height=8;
+ const ctx=canvas.getContext('2d');ctx.fillStyle='#0570c5';ctx.fillRect(0,0,8,8);
+ const img=await new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(Error('PNG indisponível')),'image/png'));
+ status('Enviando imagem sintética de '+img.size+' bytes, verificando SHA-256 e excluindo…');
+ let response;
+ try{
+  response=await fetch(endpoint,{method:'POST',headers:{Authorization:'Bearer '+session.data.session.access_token,'Content-Type':'image/png'},body:img,
+   mode:'cors',credentials:'omit',redirect:'error',cache:'no-store',referrerPolicy:'no-referrer',signal:AbortSignal.timeout(45000)});
+ }catch{status('REPROVADO — erro de rede/CORS no serviço de teste Neon.','fail');return}
+ const result=await response.json().catch(()=>null);
+ if(response.ok&&result?.ok===true&&result.uploaded&&result.downloaded&&result.sha256_verified&&result.deleted&&result.delete_confirmed){
+  status('APROVADO — sessão Neon B autenticada.\nUpload: OK\nDownload: OK\nSHA-256 físico: OK\nExclusão: OK\nAusência após excluir: OK\nImagem sintética: '+result.bytes+' bytes\nViagens originais e Supabase: intactos.','pass');
+ }else{
+  const code=typeof result?.error==='string'&&/^[A-Za-z0-9_-]{2,65}$/.test(result.error)?result.error:'TEST_ERROR';
+  status('REPROVADO — HTTP '+response.status+' / '+code+'.\nO armazenamento privado não foi aprovado ainda.','fail');
+ }
+}
+async function execute(fn){
+ if(busy)return;busy=true;$('start').disabled=$('sign-in').disabled=true;
+ try{await boot();await fn()}catch(e){status('REPROVADO — '+String(e?.message||'Falha do teste').slice(0,150),'fail')}
+ finally{busy=false;$('start').disabled=$('sign-in').disabled=false}
+}
+$('start').addEventListener('click',()=>execute(trial));
+$('sign-in').addEventListener('click',()=>execute(async()=>{
+ const email=$('email').value.trim(),password=$('password').value;
+ if(!email||!password)throw Error('Informe e-mail e senha Neon.');
+ const signed=await sdk.auth.signInWithPassword({email,password});$('password').value='';
+ if(signed.error)throw Error('Falha na autenticação Neon.');
+ await trial();
+}));
+</script></main></body></html>
