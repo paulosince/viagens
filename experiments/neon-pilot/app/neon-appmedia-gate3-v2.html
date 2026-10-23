@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="pt-BR"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer">
+<title>Viaggio — integração de mídia Neon 3/4</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f4f8fc;color:#17344a;font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+main{max-width:520px;margin:auto;padding:calc(25px + env(safe-area-inset-top)) 20px 65px}
+h1{font-size:29px;line-height:1.15;letter-spacing:-.025em}
+p{color:#61748a}.card{margin-top:19px;padding:20px;background:#fff;border:1px solid #d9e7f1;border-radius:20px}
+button{border:0;border-radius:13px;background:#0668bd;color:white;width:100%;padding:15px;font:inherit;font-weight:700;margin-top:13px}
+button:disabled{opacity:.5}
+input{font:16px system-ui;border:1px solid #bac9d7;border-radius:10px;padding:11px;width:100%;margin:6px 0}
+label{font-size:13px;font-weight:700}
+.status{background:#e7f0fb;padding:12px;border-radius:12px;margin-top:13px;white-space:pre-wrap;overflow-wrap:break-word}
+.pass{background:#e2f3e7;color:#126e3b}.fail{background:#fee9e8;color:#9b2e2e}
+small{color:#61748a}[hidden]{display:none!important}
+</style></head><body><main>
+<strong style="color:#086cbd">VIAGGIO · MIGRAÇÃO NEON · ETAPA 3/4</strong>
+<h1>Teste de mídia do Viaggio</h1>
+<p>Usa uma imagem sintética de 8 × 8 pixels para testar o novo serviço de mídia usado pelo Viaggio: upload privado, registro no Neon, leitura com SHA-256 e remoção lógica.</p>
+<p>Não altera as fotos existentes nem o Supabase. A imagem temporária é removida do aplicativo ao final, mantendo seus bytes para recuperação.</p>
+<div class="card">
+<button id="start">Executar teste com minha sessão Neon</button>
+<div id="login" hidden>
+<label for="email">E-mail da conta Neon</label><input id="email" type="email" autocomplete="email">
+<label for="password">Senha da conta Neon</label><input id="password" type="password" autocomplete="current-password">
+<button id="sign-in">Entrar e testar</button>
+</div>
+<div id="result" role="status" aria-live="polite" class="status" hidden></div>
+</div>
+<p><small>Compartilhe apenas o resultado mostrado em verde ou vermelho. Não compartilhe senhas, JWTs ou links assinados.</small></p>
+<script type="module">
+import {API_ROOTS,NEON_AUTH_URL} from './backend-neon.mjs?v=20261023-gateway3';
+const el=id=>document.getElementById(id),host='https://br-falling-leaf-b8xuv1d0-appmedia.compute.c-14.us-east-1.aws.neon.tech/';
+let sdk,db,busy=false;
+function report(message,bad=false){const v=el('result');v.hidden=false;v.textContent=message;v.className='status '+(bad?'fail':'pass');}
+async function boot(){
+ if(sdk)return;
+ const [{createClient,SupabaseAuthAdapter},{NeonPostgrestClient,fetchWithToken}]=await Promise.all([
+ import('https://cdn.jsdelivr.net/npm/@neondatabase/neon-js@0.9.0-beta/+esm'),
+ import('https://cdn.jsdelivr.net/npm/@neondatabase/postgrest-js@0.2.0-beta/+esm')]);
+ sdk=createClient({auth:{url:NEON_AUTH_URL,adapter:SupabaseAuthAdapter()},dataApi:{url:API_ROOTS.b}});
+ const token=async()=>{const r=await sdk.auth.getSession();if(r.error)throw r.error;return r.data?.session?.access_token||null};
+ db=new NeonPostgrestClient({dataApiUrl:API_ROOTS.b,options:{global:{fetch:fetchWithToken(token)}}}).schema('viaggio_app');
+}
+async function send(route,jwt,bucket,path,method='GET',body,extra={}){
+ const u=new URL(route,host);u.searchParams.set('bucket',bucket);
+ if(path)u.searchParams.set('path',path);
+ return fetch(u.toString(),{method,body,headers:{Authorization:'Bearer '+jwt,...extra},
+  mode:'cors',credentials:'omit',redirect:'error',referrerPolicy:'no-referrer',cache:'no-store',signal:AbortSignal.timeout(45000)});
+}
+async function digest(blob){
+ const d=new Uint8Array(await crypto.subtle.digest('SHA-256',await blob.arrayBuffer()));
+ return Array.from(d,n=>n.toString(16).padStart(2,'0')).join('');
+}
+async function check(){
+ const sess=await sdk.auth.getSession();if(sess.error)throw Error('Sessão Neon indisponível');
+ if(!sess.data?.session){el('login').hidden=false;report('Entre com sua conta Neon para testar.');return}
+ const jwt=sess.data.session.access_token;
+ el('login').hidden=true;report('Confirmando seu projeto pessoal B…');
+ const context=await db.rpc('project_context');
+ if(context.error||context.data?.is_home!==true){report('REPROVADO — sessão não é dona do projeto pessoal B.',true);return}
+ const profiles=await db.from('passenger_profiles').select('user_id').limit(2);
+ const owner=profiles.data?.[0]?.user_id;
+ if(profiles.error||profiles.data?.length!==1||typeof owner!=='string')throw Error('Identidade pessoal não encontrada');
+ const bucket='profile-photos';
+ const path=owner+'/neon-gate3-'+crypto.randomUUID()+'.png';
+ const canvas=document.createElement('canvas');canvas.width=8;canvas.height=8;
+ const ctx=canvas.getContext('2d');ctx.fillStyle='#0570c5';ctx.fillRect(0,0,8,8);
+ const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(Error('PNG não disponível')),'image/png'));
+ let uploaded=false,removed=false,problem='';
+ try{
+  report('Enviando imagem de teste ao novo gateway...');
+  const up=await send('upload',jwt,bucket,path,'POST',blob,{'Content-Type':'image/png','x-upsert':'false'});
+  if(!up.ok){const e=await up.json().catch(()=>({}));throw Error('UPLOAD HTTP '+up.status+' / '+(e.error||'ERRO'))}
+  uploaded=true;
+  const registered=await up.json();
+  if(registered.data?.sha256!==await digest(blob))throw Error('HASH_NA_RESPOSTA_DIFERENTE');
+  const down=await send('download',jwt,bucket,path);
+  if(!down.ok){const e=await down.json().catch(()=>({}));throw Error('DOWNLOAD HTTP '+down.status+' / '+(e.error||'ERRO'))}
+  const read=await down.blob();
+  if(read.size!==blob.size||await digest(read)!==await digest(blob))throw Error('SHA256_FISICO_DIVERGENTE');
+  const rm=await send('remove',jwt,bucket,null,'POST',JSON.stringify({paths:[path]}),{'Content-Type':'application/json'});
+  if(!rm.ok){const e=await rm.json().catch(()=>({}));throw Error('REMOVE HTTP '+rm.status+' / '+(e.error||'ERRO'))}
+  removed=true;
+  const after=await send('download',jwt,bucket,path);
+  if(after.status!==404){const e=await after.json().catch(()=>({}));throw Error('RETENCAO_INVALIDA HTTP '+after.status+' '+(e.error||''))}
+  report('APROVADO — gateway Viaggio autenticado no Neon B.\nUpload: OK\nRegistro no banco: OK\nDownload: OK\nSHA-256 físico: OK\nRemoção lógica: OK\nBloqueio de leitura após remover: OK\nArquivo temporário: '+blob.size+' bytes\nSupabase e fotos da família: intactos.');
+ }catch(e){
+  problem=String(e?.message||'UNKNOWN').slice(0,150);
+  report('REPROVADO — '+problem,true);
+ }finally{
+  if(uploaded&&!removed){
+   try{await send('remove',jwt,bucket,null,'POST',JSON.stringify({paths:[path]}),{'Content-Type':'application/json'})}catch{}
+  }
+ }
+}
+async function run(fn){
+ if(busy)return;busy=true;el('start').disabled=el('sign-in').disabled=true;
+ try{await boot();await fn()}catch(e){report('REPROVADO — '+String(e?.message||'Falha de rede').slice(0,170),true)}
+ finally{busy=false;el('start').disabled=el('sign-in').disabled=false}
+}
+el('start').addEventListener('click',()=>run(check));
+el('sign-in').addEventListener('click',()=>run(async()=>{
+ const email=el('email').value.trim(),password=el('password').value;
+ if(!email||!password)throw Error('Informe e-mail e senha Neon.');
+ const r=await sdk.auth.signInWithPassword({email,password});el('password').value='';
+ if(r.error)throw Error('Falha na autenticação Neon.');
+ await check();
+}));
+</script></main></body></html>
