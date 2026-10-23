@@ -1,0 +1,537 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#159bf0">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Viaggio">
+  <title>Viaggio · Neon editável</title>
+  <link rel="icon" href="../../../assets/app-icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="../../../icon-180.PNG">
+  <style id="splash-critical">
+    html { width: 100%; min-height: 100%; min-height: 100dvh; margin: 0; background: #b9eff8; }
+    body { width: 100%; min-height: 100vh; min-height: 100dvh; margin: 0; background: linear-gradient(180deg, #159bf0 0%, #65d8ef 58%, #b9eff8 100%); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", sans-serif; }
+    body[data-app-ready="false"] { overflow: hidden; }
+    .app-splash {
+      position: fixed;
+      z-index: 100;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh;
+      min-height: 100%;
+      display: grid;
+      overflow: hidden;
+      place-items: center;
+      color: #fff;
+      background: linear-gradient(180deg, #159bf0 0%, #65d8ef 58%, #b9eff8 100%);
+      opacity: 1;
+      visibility: visible;
+      transition: opacity .65s ease, visibility 0s linear .65s;
+    }
+    body[data-app-ready="true"] .app-splash { opacity: 0; visibility: hidden; pointer-events: none; }
+    .splash-content { position: relative; z-index: 2; width: min(86vw, 440px); text-align: center; text-shadow: 0 3px 18px rgba(17,83,130,.28); }
+    .splash-plane { display: block; width: min(78vw, 360px); height: auto; margin: 0 auto 18px; filter: drop-shadow(0 18px 22px rgba(21,74,116,.24)); }
+    .splash-content h1 { margin: 0; font-size: clamp(46px, 13vw, 72px); line-height: 1; letter-spacing: -.055em; }
+    .splash-content p { max-width: 330px; margin: 13px auto 0; font-size: clamp(16px, 4.5vw, 20px); font-weight: 600; line-height: 1.3; }
+    .splash-loading { display:flex; align-items:center; justify-content:center; gap:9px; min-height:22px; margin:22px auto 0; font-size:13px; font-weight:650; opacity:.9; }
+    #splash_retry { margin: 20px auto 0; padding: 12px 18px; border: 1px solid rgba(255,255,255,.75); border-radius: 12px; background: rgba(255,255,255,.18); color: #fff; font: inherit; font-weight: 650; }
+    #splash_retry[hidden] { display: none; }
+    .splash-spinner { width:15px; height:15px; flex:0 0 15px; border:2px solid rgba(255,255,255,.36); border-top-color:#fff; border-radius:50%; animation:splash-spin .8s linear infinite; }
+    @keyframes splash-spin { to { transform:rotate(360deg); } }
+    .splash-cloud { position: absolute; z-index: 1; width: 180px; height: 52px; border-radius: 999px; background: rgba(255,255,255,.7); opacity: .65; }
+    .splash-cloud-one { top: 18%; right: -80px; }
+    .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
+    .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
+  </style>
+  <link rel="preload" href="../../../style.css?v=20261018-64" as="style">
+  <link rel="stylesheet" href="../../../style.css?v=20261018-64" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="../../../style.css?v=20261018-64"></noscript>
+  <link rel="stylesheet" href="../../../src/update-manager.css?v=20261018-63">
+  <script>
+    function showViaggioStartupError(detail) {
+      if (!document.body || document.body.dataset.session !== 'loading') return;
+      var status = document.getElementById('splash_status');
+      var retry = document.getElementById('splash_retry');
+      if (status) status.textContent = 'Não foi possível abrir o Viaggio' + (detail ? ' · ' + detail : '') + '.';
+      if (retry) retry.hidden = false;
+    }
+    window.addEventListener('error', function (event) {
+      var file = event.filename && event.filename.split('/').pop().split('?')[0];
+      if (file === 'main.js' || file === 'offline-store.js' || file === 'media-cache.js') {
+        window.__viaggioStartupError = file + ':' + event.lineno + ':' + event.colno + ' ' + event.message;
+        showViaggioStartupError(window.__viaggioStartupError);
+      }
+    });
+    window.__viaggioBootGuard = window.setTimeout(function () {
+      showViaggioStartupError(window.__viaggioStartupError || 'inicialização interrompida');
+    }, 8000);
+  </script>
+</head>
+<body data-session="loading" data-active-sheet="none" data-editing="false" data-year-menu="closed" data-trip-page="closed" data-budget-page="closed" data-day-page="closed" data-day-attachments="closed" data-app-ready="false">
+  <div id="app_splash" class="app-splash" aria-label="Carregando Viaggio">
+    <span class="splash-cloud splash-cloud-one" aria-hidden="true"></span>
+    <span class="splash-cloud splash-cloud-two" aria-hidden="true"></span>
+    <span class="splash-cloud splash-cloud-three" aria-hidden="true"></span>
+    <div class="splash-content">
+      <img class="splash-plane" src="../../../assets/splash-plane.png" alt="">
+      <h1>Viaggio</h1>
+      <p>Suas viagens começam muito antes do embarque ✈️</p>
+      <div class="splash-loading" role="status" aria-live="polite">
+        <span class="splash-spinner" aria-hidden="true"></span>
+        <span id="splash_status">Preparando o Viaggio…</span>
+      </div>
+      <button id="splash_retry" type="button" hidden onclick="location.reload()">Tentar novamente</button>
+    </div>
+  </div>
+
+  <aside style="position:relative;z-index:9999;padding:12px;background:#fff3cf;color:#3b2e13;text-align:center">NEON EDITÁVEL · Esta versão salva alterações no Neon, NÃO no Supabase. Faça a primeira edição de teste com conexão e confirme que persistiu após reabrir. Evite alterar a mesma viagem no aplicativo antigo enquanto valida.</aside>
+  <main id="app" aria-live="polite">
+    <section id="auth_view" class="auth" aria-hidden="true">
+      <span class="splash-cloud splash-cloud-one" aria-hidden="true"></span>
+      <span class="splash-cloud splash-cloud-two" aria-hidden="true"></span>
+      <span class="splash-cloud splash-cloud-three" aria-hidden="true"></span>
+      <div class="auth-card" data-mode="login">
+        <div class="auth-brand"><img src="../../../assets/splash-plane.png" alt="" aria-hidden="true"><h1>Viaggio</h1></div>
+        <p id="auth_intro" class="auth-intro">Entre com sua conta Neon. Nesta versão editável, suas alterações serão salvas no Neon, não no Supabase.</p>
+        <form id="auth_form" class="auth-form" aria-hidden="false">
+          <label class="visually-hidden" for="auth_email">E-mail</label>
+          <input id="auth_email" name="email" type="email" autocomplete="email" placeholder="E-mail" required>
+          <label class="visually-hidden" for="auth_password">Senha</label>
+          <input id="auth_password" name="password" type="password" autocomplete="current-password" placeholder="Senha" required>
+          <button class="auth-submit" type="submit">Entrar</button>
+          <p id="auth_message" class="auth-message" role="status" aria-live="polite"></p>
+          <p class="auth-switch">Ainda não tem conta? <button id="show_signup" type="button" hidden disabled>Cadastro por convite indisponível nesta prévia</button></p>
+        </form>
+        <form id="signup_form" class="auth-form" aria-hidden="true" inert hidden>
+          <label class="signup-photo-picker" for="signup_photo">
+            <span class="signup-photo-preview"><img id="signup_photo_preview" alt="" hidden><span id="signup_photo_placeholder" aria-hidden="true">＋</span></span>
+            <span>Adicionar foto <small>Opcional · será salva ao entrar neste aparelho</small></span>
+          </label>
+          <input id="signup_photo" class="visually-hidden" name="photo" type="file" accept="image/*">
+          <label class="visually-hidden" for="signup_name">Seu nome</label>
+          <input id="signup_name" name="name" type="text" autocomplete="name" placeholder="Seu nome" maxlength="120" required>
+          <label class="visually-hidden" for="signup_email">E-mail</label>
+          <input id="signup_email" name="email" type="email" autocomplete="email" placeholder="E-mail" required>
+          <label class="visually-hidden" for="signup_password">Senha</label>
+          <input id="signup_password" name="password" type="password" autocomplete="new-password" placeholder="Senha · pelo menos 6 caracteres" minlength="6" required>
+          <label class="visually-hidden" for="signup_confirm_password">Confirmar senha</label>
+          <input id="signup_confirm_password" name="confirm_password" type="password" autocomplete="new-password" placeholder="Confirme sua senha" minlength="6" required>
+          <button class="auth-submit" type="submit">Criar minha conta</button>
+          <p id="signup_message" class="auth-message" role="status" aria-live="polite"></p>
+          <p class="auth-switch">Já tem conta? <button id="show_login" type="button">Entrar</button></p>
+        </form>
+      </div>
+    </section>
+
+    <section id="user_home" class="home" aria-hidden="true">
+      <header class="home-header">
+        <div class="header-actions">
+          <div class="profile-with-integration">
+            <button id="profile_button" class="profile-button" type="button" aria-label="Abrir perfil">
+              <img id="header_profile_image" alt="" hidden>
+              <span id="header_profile_fallback" class="profile-fallback" aria-hidden="true">?</span>
+            </button>
+            <button id="home_chatgpt_button" class="glass-button chatgpt-header-button" hidden type="button" aria-label="Conectar o Viaggio ao ChatGPT"><img src="../../../assets/chatgpt-mark.svg" alt="" aria-hidden="true"><span>ChatGPT</span></button>
+          </div>
+          <div class="header-buttons">
+            <div class="home-usage-container">
+              <button id="home_usage_button" class="home-usage-summary" type="button" aria-expanded="false" aria-controls="home_usage_details" aria-label="Ver uso da conta">
+                <span class="home-usage-row"><span>Banco</span><strong id="home_database_usage">—</strong></span>
+                <span class="home-usage-row"><span>Arquivos</span><strong id="home_storage_usage">—</strong></span>
+              </button>
+              <section id="home_usage_details" class="home-usage-popover" hidden aria-label="Detalhes do uso">
+                <strong>Meu espaço utilizado</strong>
+                <p>Banco <b id="home_database_detail">—</b></p>
+                <p>Imagens <b id="home_images_detail">—</b></p>
+                <p>Anexos <b id="home_attachments_detail">—</b></p>
+                <small id="home_usage_note">Suas viagens próprias, seu perfil e passageiros salvos. Banco aproximado; arquivos medidos pelo Storage. Sem limite individual definido para o beta.</small>
+              </section>
+            </div>
+            <button id="edit_trips_button" class="glass-button" type="button">Editar</button>
+          </div>
+        </div>
+        <div id="trip_heading" class="trip-heading">
+          <p class="home-context">Minhas viagens</p>
+          <p id="session_email" class="session-reference"></p>
+          <button id="sync_status" class="sync-status" data-kind="synced" type="button" aria-live="polite">Sincronizado</button>
+          <h1 class="home-title"><button id="year_selector_button" type="button" aria-expanded="false" aria-controls="year_menu"><span id="current_year">2026</span><span class="year-chevron" aria-hidden="true"></span></button></h1>
+          <div id="year_menu" class="year-menu" aria-hidden="true"><ol id="year_list"></ol></div>
+        </div>
+      </header>
+
+      <ol id="trip_list" class="trip-list"></ol>
+      <section id="home_empty" class="home-empty" aria-hidden="true">
+        <h2>Nenhuma viagem ainda</h2>
+        <p>Sua próxima história começa aqui.</p>
+        <button id="empty_new_trip_button" class="glass-button" type="button">Criar viagem</button>
+      </section>
+      <p id="trip_create_message" class="trip-create-message" role="alert"></p>
+      <button id="new_trip_button" class="circle-button home-create-fab" type="button" aria-label="Criar nova viagem">＋</button>
+
+      <button id="sheet_scrim" class="scrim" type="button" aria-label="Fechar formulário"></button>
+
+      <section id="home_new_trip" class="new-trip-sheet" aria-hidden="true" aria-labelledby="new-trip-title" inert>
+        <form id="new_trip_form">
+          <header class="sheet-header">
+            <button id="close_new_trip" class="sheet-control" type="button" aria-label="Cancelar">×</button>
+            <h2 id="new-trip-title">Nova viagem</h2>
+            <button id="save_new_trip" class="sheet-control confirm" type="submit" aria-label="Criar viagem"><span class="confirm-check">✓</span><span class="confirm-spinner" aria-hidden="true"></span></button>
+          </header>
+          <section class="form-section"><h3>Viagem</h3><div class="form-group">
+            <div class="form-row"><label for="trip-name">Nome</label><input id="trip-name" name="name" required autocomplete="off" placeholder="Lisboa e Paris"></div>
+            <div class="form-row"><label for="destination">Destino</label><input id="destination" name="destination" required autocomplete="off" placeholder="Portugal e França"></div>
+            <div class="form-row"><label for="start-date">Início</label><input id="start-date" name="start_date" type="date" required></div>
+            <div class="form-row"><label for="day-count">Dias</label><input id="day-count" name="day_count" type="number" inputmode="numeric" min="1" max="365" step="1" value="1" required></div>
+          </div></section>
+          <section class="form-section"><h3>Chegada</h3><div class="form-group">
+            <div class="form-row"><label for="arrival-method">Transporte</label><select id="arrival-method" name="arrival_method"><option value="avião">Avião</option><option value="trem">Trem</option><option value="carro">Carro</option><option value="ônibus">Ônibus</option><option value="navio">Navio</option><option value="outro">Outro</option></select></div>
+            <div class="form-row"><label for="arrival-place">Local</label><input id="arrival-place" name="location_label" autocomplete="off" placeholder="Aeroporto de Lisboa"></div>
+          </div></section>
+          <section class="form-section"><h3>Cor da viagem</h3>
+            <div class="form-group trip-color-group">
+              <input id="trip-color-value" name="secondary_color" type="hidden" value="#4775d1">
+              <div id="trip_color_palette" class="trip-color-palette" aria-label="Escolha a cor da viagem">
+                <button class="trip-color-option" type="button" data-color="#4775d1" style="--swatch:#4775d1" aria-label="Azul" aria-pressed="true"></button>
+                <button class="trip-color-option" type="button" data-color="#2f9c95" style="--swatch:#2f9c95" aria-label="Turquesa" aria-pressed="false"></button>
+                <button class="trip-color-option" type="button" data-color="#5a8f5a" style="--swatch:#5a8f5a" aria-label="Verde" aria-pressed="false"></button>
+                <button class="trip-color-option" type="button" data-color="#c6a85b" style="--swatch:#c6a85b" aria-label="Dourado" aria-pressed="false"></button>
+                <button class="trip-color-option" type="button" data-color="#d66d5d" style="--swatch:#d66d5d" aria-label="Coral" aria-pressed="false"></button>
+                <button class="trip-color-option" type="button" data-color="#c06c84" style="--swatch:#c06c84" aria-label="Rosa" aria-pressed="false"></button>
+                <button class="trip-color-option" type="button" data-color="#7967c3" style="--swatch:#7967c3" aria-label="Violeta" aria-pressed="false"></button>
+                <label class="trip-color-custom" aria-label="Escolher outra cor"><input id="trip-color-custom" type="color" value="#4775d1"><span aria-hidden="true"></span></label>
+              </div>
+            </div>
+          </section>
+          <section class="form-section"><h3>Passageiros</h3>
+            <div class="form-group passenger-form-group">
+              <div id="saved_trip_passengers" class="saved-trip-passengers" hidden>
+                <p class="saved-trip-heading">Passageiros salvos</p>
+                <div id="saved_trip_passenger_list" class="saved-trip-passenger-list" aria-label="Selecionar passageiros salvos"></div>
+              </div>
+              <div id="new_trip_passenger_list" class="new-trip-passenger-list"></div>
+              <button id="add_trip_passenger" class="add-trip-passenger" type="button"><span>＋</span>Adicionar outro passageiro</button>
+            </div>
+            <p class="form-note">Você já está incluído nesta viagem.</p>
+          </section>
+          <section id="trip_sharing_section" class="form-section" hidden><h3>Compartilhar viagem</h3><div class="form-group trip-sharing-group"><div id="trip_member_list" class="trip-member-list"></div><div class="trip-share-entry"><input id="trip_share_email" type="email" inputmode="email" autocomplete="email" placeholder="E-mail da conta Viaggio"><button id="trip_share_button" type="button">Adicionar</button></div></div><p id="trip_share_message" class="form-note" role="status">A pessoa usa a própria conta Viaggio e conecta o próprio ChatGPT.</p></section>
+          <section class="form-section"><h3>Imagem</h3><div class="form-group">
+            <label class="form-row upload-row" for="cover-image"><span class="upload-copy">Foto da viagem<small>Escolha uma imagem do aparelho</small></span><span class="upload-preview" data-has-image="false"><img id="cover_preview_image" alt="Prévia da imagem"><span class="upload-placeholder">＋</span></span><input id="cover-image" name="cover" type="file" accept="image/*"></label>
+          </div><p class="form-note">A imagem será ajustada para o card antes de ser salva.</p><p id="new_trip_message" class="form-message" role="status"></p></section>
+        </form>
+      </section>
+
+      <section id="profile-sheet" class="new-trip-sheet profile-sheet" aria-hidden="true" aria-labelledby="profile-title">
+        <form id="profile_form">
+          <header class="sheet-header">
+            <button id="close_profile" class="sheet-control" type="button" aria-label="Cancelar">×</button>
+            <h2 id="profile-title">Perfil</h2>
+            <button id="save_profile" class="sheet-control confirm" type="submit" aria-label="Salvar perfil" aria-busy="false" data-loading="false"><span class="confirm-check">✓</span><span class="confirm-spinner" aria-hidden="true"></span></button>
+          </header>
+          <p id="profile_message" class="profile-save-message" role="status"></p>
+          <section class="profile-photo-section">
+            <label class="profile-photo-editor" for="profile-photo"><img id="profile_editor_image" src="../../../assets/avatar-placeholder.svg" alt=""><span>Alterar foto</span><input id="profile-photo" type="file" accept="image/*"></label>
+            <strong id="profile_display_name"></strong><span id="profile_email"></span>
+          </section>
+          <section class="form-section"><h3>Passageiro</h3><div class="form-group">
+            <div class="form-row"><label for="profile-name">Nome</label><input id="profile-name" name="name" required autocomplete="name"></div>
+            <div class="form-row"><label for="birth-date">Nascimento</label><input id="birth-date" name="birth_date" type="date"></div>
+            <div class="form-row static-row"><span>Idade</span><output id="profile_age">—</output></div>
+          </div><p class="form-note">A idade é calculada automaticamente pela data de nascimento.</p></section>
+          <section class="form-section"><h3>Passageiros salvos</h3>
+            <div class="form-group saved-passenger-manager">
+              <div id="profile_saved_passenger_list" class="profile-saved-passenger-list"></div>
+              <button id="add_profile_saved_passenger" class="add-trip-passenger profile-add-saved-passenger" type="button"><span>＋</span>Adicionar passageiro</button>
+            </div>
+            <p class="form-note">Família e pessoas frequentes ficam disponíveis em todas as viagens. Passageiros ocasionais são adicionados somente na viagem.</p>
+          </section>
+          <section class="form-section legacy-chatgpt-profile" hidden><h3>Integrações</h3>
+            <div class="form-group account-actions">
+              <button id="chatgpt_button" class="account-row account-row-detail integration-row" type="button">
+                <span><strong>ChatGPT</strong><small>Crie e altere viagens conversando</small></span>
+                <span aria-hidden="true">›</span>
+              </button>
+            </div>
+          </section>
+          <section class="form-section"><h3>Conta</h3>
+            <div class="form-group"><div class="form-row static-row"><span>Perfil criado em</span><output id="profile_created_at"></output></div></div>
+            <div class="form-group account-actions">
+              <button id="change_log_button" class="account-row account-row-detail" type="button"><span>Histórico de alterações</span><span aria-hidden="true">›</span></button>
+              <button id="logout_button" class="account-row" type="button">Sair</button>
+            </div>
+          </section>
+          <section class="form-section danger-section"><div class="form-group"><button id="delete_account_button" class="account-row destructive" type="button">Excluir conta</button></div><p class="form-note">A conta será desativada, sem apagar viagens, fotos ou qualquer outro dado.</p></section>
+        </form>
+      </section>
+
+      <section id="chatgpt_sheet" class="new-trip-sheet chatgpt-sheet" aria-hidden="true" aria-labelledby="chatgpt-title">
+        <header class="sheet-header">
+          <button id="close_chatgpt" class="sheet-control change-log-back" type="button" aria-label="Voltar ao perfil">‹</button>
+          <h2 id="chatgpt-title">ChatGPT</h2>
+          <span class="sheet-header-spacer" aria-hidden="true"></span>
+        </header>
+        <section class="chatgpt-integration-card">
+          <div class="chatgpt-integration-mark" aria-hidden="true"><img src="../../../assets/chatgpt-mark.svg" alt=""></div>
+          <h3>Dirija o Viaggio conversando</h3>
+          <p>Depois de conectar sua conta, o ChatGPT pode criar viagens, organizar dias, editar agenda, passageiros, checklist e orçamento, além de restaurar snapshots quando você pedir.</p>
+          <ul>
+            <li>Você autoriza sua conta do Viaggio via OAuth.</li>
+            <li>Enquanto o Viaggio ainda não está no diretório público, a primeira conexão é adicionada uma vez em Configurações → Plugins.</li>
+            <li>Toda mudança feita pelo ChatGPT aparece no Histórico e gera um snapshot restaurável.</li>
+          </ul>
+          <button id="connect_chatgpt" class="chatgpt-connect-button" type="button">Abrir app ChatGPT</button>
+          <button id="copy_mcp_url" class="chatgpt-copy-button" type="button">Copiar endereço da integração</button>
+          <p id="chatgpt_message" class="chatgpt-message" role="status"></p>
+          <code id="chatgpt_mcp_url" class="chatgpt-endpoint">https://siabldasqinpfmxslwji.supabase.co/functions/v1/viaggio-mcp</code>
+        </section>
+      </section>
+
+      <section id="change_log_sheet" class="new-trip-sheet change-log-sheet" aria-hidden="true" aria-labelledby="change-log-title">
+        <header class="sheet-header">
+          <button id="close_change_log" class="sheet-control change-log-back" type="button" aria-label="Voltar ao perfil">‹</button>
+          <h2 id="change-log-title">Alterações</h2>
+          <span class="sheet-header-spacer" aria-hidden="true"></span>
+        </header>
+        <section class="change-log-intro">
+          <p>Últimas mudanças feitas neste perfil. Cada alteração da viagem gera um snapshot restaurável.</p>
+          <p id="change_log_message" class="change-log-message" role="status"></p>
+        </section>
+        <ol id="change_log_list" class="change-log-list"></ol>
+        <p id="change_log_empty" class="change-log-empty">Nenhuma alteração registrada ainda.</p>
+      </section>
+    </section>
+
+    <section id="trip_page" class="trip-page" aria-hidden="true">
+      <nav class="trip-page-nav" aria-label="Navegação da viagem">
+        <button id="close_trip_page" class="trip-page-control trip-page-back" type="button" aria-label="Voltar"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 4 7 12l8 8"/></svg></button>
+        <div class="trip-page-nav-actions">
+          <button id="trip_page_pdf" class="trip-page-control trip-page-pdf" type="button" aria-label="Exportar roteiro em PDF" title="Exportar roteiro em PDF"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l4 4v5M14 3v5h4M7 3H5v18h14v-2M12 11v8m0 0-3-3m3 3 3-3"/></svg></button>
+          <button id="trip_page_share" class="trip-page-control trip-page-share" type="button" aria-label="Compartilhar viagem"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3m0 0L8 7m4-4 4 4M5 11v9h14v-9"/></svg></button>
+        </div>
+      </nav>
+      <header id="trip_page_hero" class="trip-page-hero">
+        <div class="trip-page-hero-copy">
+          <h1><button id="trip_page_title" class="trip-page-inline-title" type="button" aria-label="Editar nome da viagem"></button><input id="trip_page_title_input" class="trip-page-title-input" type="text" maxlength="120" aria-label="Nome da viagem" hidden></h1>
+          <button id="trip_page_duration" class="trip-page-duration" type="button" aria-expanded="false" aria-controls="trip_page_date_editor" aria-label="Editar duração da viagem"></button>
+          <button id="trip_page_dates" class="trip-page-dates-button" type="button" aria-expanded="false" aria-controls="trip_page_date_editor" aria-label="Editar início e duração da viagem"></button>
+          <div id="trip_page_date_editor" class="trip-page-date-editor" hidden>
+            <label>Início<input id="trip_page_start_date" type="date" aria-label="Data inicial da viagem"></label>
+            <label>Dias<input id="trip_page_day_count" type="number" inputmode="numeric" min="1" max="365" step="1" aria-label="Quantidade de dias"></label>
+            <button id="trip_page_date_done" type="button">Concluir</button>
+          </div>
+          <div class="trip-page-hero-meta">
+            <button id="trip_page_passengers" class="passenger-stack trip-page-passengers" type="button" aria-label="Editar passageiros da viagem"><span id="trip_page_passenger_count" class="passenger-count"></span></button>
+            <div class="trip-page-actions">
+              <label class="trip-page-color-control" aria-label="Cor da viagem"><input id="trip_page_color" type="color" value="#4775d1" aria-label="Cor da viagem"></label>
+              <label class="trip-page-cover-control trip-page-cover-inline" aria-label="Trocar foto da viagem"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9a2 2 0 0 1 2-2h3l1.5-2h5L16 7h3a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><circle cx="12" cy="13.5" r="3.2"/></svg><input id="trip_page_cover_input" type="file" accept="image/*" aria-label="Trocar foto da viagem"></label>
+            </div>
+          </div>
+          <span id="trip_page_save_status" class="trip-page-save-status" role="status" aria-live="polite"></span>
+        </div>
+      </header>
+      <div id="trip_panel_roteiro" class="trip-page-content" role="tabpanel" aria-labelledby="trip_tab_roteiro">
+        <ol id="trip_day_list" class="trip-day-list"></ol>
+        <p id="trip_day_message" class="trip-day-message" role="status"></p>
+      </div>
+      <section id="trip_panel_orcamento" class="trip-page-content trip-detail-panel" role="tabpanel" aria-labelledby="trip_tab_orcamento" hidden>
+        <div class="trip-panel-heading"><h2>Orçamento</h2><button id="budget_add" class="trip-panel-add" type="button">+ Adicionar</button></div>
+        <p id="budget_status" class="trip-panel-status" role="status" aria-live="polite"></p>
+        <div id="budget_summary" class="budget-summary"></div>
+        <div id="budget_list" class="budget-list"></div>
+      </section>
+      <section id="trip_panel_arquivos" class="trip-page-content trip-detail-panel" role="tabpanel" aria-labelledby="trip_tab_arquivos" hidden>
+        <div class="trip-panel-heading"><h2>Arquivos</h2></div>
+        <p id="trip_files_status" class="trip-panel-status" role="status" aria-live="polite"></p>
+        <div class="trip-files-upload"><label for="trip_files_day">Dia (opcional)</label><select id="trip_files_day" aria-label="Vincular arquivos a um dia, opcional" disabled><option value="">Sem dia</option></select><label class="trip-files-pick" hidden>+ Adicionar fotos ou documentos<input id="trip_files_input" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.pdf,.doc,.docx" multiple></label></div>
+        <div id="trip_files_list" class="trip-files-list"></div>
+      </section>
+    </section>
+
+    <nav class="trip-tabs" role="tablist" aria-label="Seções da viagem" aria-hidden="true" inert style="--active-index: 0">
+      <span class="trip-tab-indicator" aria-hidden="true"></span>
+      <button id="trip_tab_roteiro" class="trip-tab" role="tab" type="button" aria-controls="trip_panel_roteiro" aria-selected="true" tabindex="0"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V8l5-3 6 3 5-3v12l-5 3-6-3-5 3Z"/><path d="M9 5v12m6-9v12"/></svg><span>Roteiro</span></button>
+      <button id="trip_tab_orcamento" class="trip-tab" role="tab" type="button" aria-controls="trip_panel_orcamento" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 10h18m-5 5h2M6 6V4h12"/></svg><span>Orçamento</span></button>
+      <button id="trip_tab_arquivos" class="trip-tab" role="tab" type="button" aria-controls="trip_panel_arquivos" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/><path d="M3 11h18"/></svg><span>Arquivos</span></button>
+    </nav>
+
+    <section id="budget_item_page" class="budget-item-page" aria-hidden="true" aria-labelledby="budget_item_page_title" inert>
+      <header class="budget-item-page-header">
+        <button id="close_budget_item_page" class="budget-item-page-back" type="button" aria-label="Voltar ao orçamento"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 4 7 12l8 8"/></svg></button>
+        <h2 id="budget_item_page_title">Editar gasto</h2>
+      </header>
+      <div id="budget_editor" class="budget-editor"></div>
+      <p id="budget_item_message" class="budget-item-message" role="status" aria-live="polite"></p>
+    </section>
+
+    <dialog id="trip_file_viewer" class="trip-file-viewer" aria-labelledby="trip_file_viewer_title">
+      <div class="trip-file-viewer-shell">
+        <header class="trip-file-viewer-header">
+          <button id="close_trip_file_viewer" type="button" aria-label="Voltar aos arquivos">‹</button>
+          <h2 id="trip_file_viewer_title"></h2>
+          <button id="delete_trip_file_viewer" class="trip-file-viewer-delete" type="button" aria-label="Excluir arquivo" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v6m4-6v6"/></svg></button>
+        </header>
+        <div id="trip_file_viewer_media" class="trip-file-viewer-media"></div>
+        <footer class="trip-file-viewer-footer">
+          <p id="trip_file_viewer_status" role="status" aria-live="polite"></p>
+          <div class="trip-file-viewer-navigation">
+            <button id="previous_trip_file_viewer" type="button" aria-label="Arquivo anterior">‹</button>
+            <span id="trip_file_viewer_position"></span>
+            <button id="next_trip_file_viewer" type="button" aria-label="Próximo arquivo">›</button>
+          </div>
+        </footer>
+      </div>
+    </dialog>
+
+    <button id="trip_share_scrim" class="trip-share-scrim" type="button" aria-label="Fechar compartilhamento"></button>
+    <section id="trip_share_sheet" class="new-trip-sheet trip-share-sheet" aria-hidden="true" aria-labelledby="trip_share_title">
+      <header class="sheet-header"><button id="close_trip_share" class="sheet-control" type="button" aria-label="Fechar">×</button><h2 id="trip_share_title">Compartilhar viagem</h2><span class="sheet-header-spacer" aria-hidden="true"></span></header>
+      <p class="trip-share-intro">Quem receber o acesso verá esta viagem ao entrar ou criar uma conta com o e-mail informado.</p>
+      <form id="trip_share_form" class="trip-share-form">
+        <label for="trip_share_recipient">E-mail</label><input id="trip_share_recipient" type="email" autocomplete="email" inputmode="email" required placeholder="nome@exemplo.com">
+        <fieldset class="trip-share-permission"><legend>Permissão</legend><label><input type="radio" name="permission" value="viewer" checked><span>Só visualizar</span></label><label><input type="radio" name="permission" value="editor"><span>Pode editar</span></label></fieldset>
+        <button id="send_trip_share" class="trip-share-submit" type="submit">Compartilhar</button>
+      </form>
+      <p id="trip_share_status" class="trip-share-status" role="status" aria-live="polite"></p>
+      <h3 class="trip-share-list-title">Pessoas com acesso</h3><div id="trip_share_list" class="trip-share-list"></div>
+    </section>
+
+    <section id="trip_passenger_sheet" class="new-trip-sheet trip-passenger-sheet" aria-hidden="true" aria-labelledby="trip_passenger_title">
+      <header class="sheet-header"><button id="close_trip_passengers" class="sheet-control" type="button" aria-label="Fechar passageiros">×</button><h2 id="trip_passenger_title">Passageiros</h2><span class="sheet-header-spacer" aria-hidden="true"></span></header>
+      <p id="trip_passenger_message" class="trip-passenger-message" role="status" aria-live="polite"></p>
+      <div id="trip_passenger_self" class="trip-passenger-self" hidden><img id="trip_passenger_self_image" alt=""><span><strong id="trip_passenger_self_name"></strong><small>Seu perfil · incluído na viagem</small></span><span aria-hidden="true">✓</span></div>
+      <div id="trip_passenger_sheet_body"></div>
+    </section>
+
+    <section id="day_page" class="day-page" aria-hidden="true" inert>
+      <nav class="trip-page-nav day-page-nav" aria-label="Navegação do dia">
+        <button id="close_day_page" class="trip-page-control trip-page-back" type="button" aria-label="Voltar"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 4 7 12l8 8"/></svg></button>
+      </nav>
+      <header id="day_page_hero" class="day-page-hero">
+        <div class="trip-page-hero-copy day-page-hero-copy">
+          <span id="day_page_badge" class="day-page-badge"></span>
+          <div class="day-page-title-row">
+            <button id="day_page_title" class="day-inline-heading" type="button" aria-label="Editar nome do dia"></button>
+            <span id="day_page_save_status" class="day-hero-save-status" data-state="idle" role="status" aria-live="polite"></span>
+          </div>
+          <p id="day_page_date"></p>
+        </div>
+        <label id="day_page_camera" class="day-hero-camera" aria-label="Alterar imagem do dia">
+          <svg class="day-photo-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 8.5A2.5 2.5 0 0 1 6.5 6H9l1.4-2h3.2L15 6h2.5A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5v-8Z"/>
+            <circle cx="12" cy="12.5" r="3.2"/>
+          </svg>
+          <input id="day_page_photo_input" type="file" accept="image/*">
+        </label>
+        <button id="day_attachments_button" class="day-hero-attachments" type="button" aria-label="Abrir arquivos do dia">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12.5 13.3 7.2a3.2 3.2 0 0 1 4.5 4.5l-7.2 7.2a5 5 0 0 1-7.1-7.1l8.1-8.1"/></svg>
+          <span>Arquivos</span><span id="day_attachments_count" class="day-attachments-count" hidden></span>
+        </button>
+      </header>
+      <div class="day-page-content">
+        <span id="day_agenda_sticky_marker" class="day-agenda-sticky-marker" aria-hidden="true"></span>
+        <button id="add_day_page_activity" class="day-page-add" type="button" aria-label="Adicionar item à agenda" data-stuck="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 4v16M4 12h16"/></svg></button>
+        <section class="day-view-section">
+          <h2>Agenda</h2>
+          <ol id="day_page_agenda" class="day-view-agenda"></ol>
+          <p id="day_page_empty" class="day-view-empty"></p>
+        </section>
+        <section id="day_map_section" class="day-view-section day-map-section" data-expanded="false">
+          <div class="day-map-heading">
+            <h2>Mapa</h2>
+            <button id="day_map_toggle" class="day-map-toggle" type="button" aria-controls="day_page_map" aria-expanded="false" aria-label="Ampliar mapa"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5m0-5 7 7m6-7h5v5m0-5-7 7M3 16v5h5m-5 0 7-7m11 2v5h-5m5 0-7-7"/></svg><span>Ampliar</span></button>
+          </div>
+          <div id="day_page_map" class="day-view-map"></div>
+          <div id="day_page_directions" class="day-view-directions"></div>
+        </section>
+      </div>
+    </section>
+
+    <button id="day_attachments_scrim" class="day-attachments-scrim" type="button" aria-label="Fechar arquivos do dia"></button>
+    <section id="day_attachments_sheet" class="day-attachments-sheet" aria-hidden="true" aria-label="Arquivos do dia">
+      <header class="sheet-header">
+        <button id="close_day_attachments" class="sheet-control" type="button" aria-label="Fechar">×</button>
+        <h2>Arquivos do dia</h2>
+        <span class="day-attachments-header-spacer" aria-hidden="true"></span>
+      </header>
+      <p class="day-attachments-intro">Ingressos, tickets, comprovantes, fotos e documentos ficam aqui, separados da capa do dia.</p>
+      <label class="day-attachments-upload">
+        <span>＋ Adicionar fotos ou documentos</span>
+        <input id="day_attachments_input" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.pdf,.doc,.docx" multiple>
+      </label>
+      <p id="day_attachments_status" class="day-attachments-status" role="status" aria-live="polite"></p>
+      <ul id="day_attachments_list" class="day-attachments-list"></ul>
+    </section>
+
+    <button id="day_sheet_scrim" class="day-sheet-scrim" type="button" aria-label="Fechar edição do dia"></button>
+    <section id="day_edit_sheet" class="day-edit-sheet" aria-hidden="true">
+      <form id="day_edit_form">
+        <header class="sheet-header">
+          <button id="close_day_edit" class="sheet-control" type="button" aria-label="Cancelar">×</button>
+          <div class="day-edit-heading"><h2 id="day_edit_title">Dia</h2><span id="day_edit_date"></span></div>
+          <button id="save_day_edit" class="sheet-control confirm" type="submit" aria-label="Salvar dia"><span class="confirm-check">✓</span><span class="confirm-spinner" aria-hidden="true"></span></button>
+        </header>
+
+        <section class="form-section"><h3>Dia</h3><div class="form-group">
+          <div class="form-row"><label for="day-title-input">Título</label><input id="day-title-input" type="text" autocomplete="off" placeholder="Primeiro dia em Lisboa"></div>
+        </div></section>
+
+        <section class="form-section"><h3>Locais</h3><div class="form-group day-locations-group">
+          <div id="day_locations_editor" class="day-locations-editor"></div>
+          <button id="add_day_location" class="add-trip-passenger" type="button"><span>＋</span>Adicionar local</button>
+        </div><p class="form-note">Digite um lugar, toque em Buscar e escolha um resultado. O primeiro local define a imagem principal do card do dia.</p><p class="map-attribution">Busca por <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a></p></section>
+
+        <section class="form-section"><h3>Agenda</h3><div class="form-group day-agenda-group">
+          <div id="day_agenda_editor" class="day-agenda-editor"></div>
+          <button id="add_day_activity" class="add-trip-passenger" type="button"><span>＋</span>Adicionar horário</button>
+        </div><p class="form-note">Manhã, tarde e noite são definidas automaticamente pelo horário.</p></section>
+
+        <section class="form-section"><h3>Notas</h3><div class="form-group">
+          <textarea id="day-notes-input" class="day-notes-input" placeholder="Informações gerais do dia"></textarea>
+        </div><p id="day_edit_message" class="form-message" role="status"></p></section>
+      </form>
+    </section>
+
+    <button id="place_search_scrim" class="place-search-scrim" type="button" aria-label="Fechar busca de locais"></button>
+    <section id="place_search_sheet" class="place-search-sheet" aria-hidden="true" aria-labelledby="place-search-title">
+      <form id="place_search_form">
+        <header class="sheet-header place-search-header">
+          <button id="close_place_search" class="sheet-control" type="button" aria-label="Cancelar busca">×</button>
+          <div class="day-edit-heading"><h2 id="place-search-title">Escolher local</h2><span>OpenStreetMap</span></div>
+          <button id="confirm_place_search" class="sheet-control confirm" type="submit" aria-label="Confirmar local" disabled><span class="confirm-check">✓</span><span class="confirm-spinner" aria-hidden="true"></span></button>
+        </header>
+        <div class="place-search-field">
+          <span aria-hidden="true"></span>
+          <input id="place_search_input" type="search" autocomplete="off" enterkeyhint="search" placeholder="Buscar local">
+          <button id="run_place_search" type="button">Buscar</button>
+        </div>
+        <p id="place_search_message" class="place-search-message" role="status"></p>
+        <ol id="place_search_results" class="place-search-results"></ol>
+        <section id="place_photo_section" class="place-photo-section" hidden>
+          <div class="place-photo-heading"><h3>Escolha uma foto</h3><span>opcional</span></div>
+          <p id="place_photo_message" class="place-search-message" role="status"></p>
+          <div id="place_photo_results" class="place-photo-results"></div>
+        </section>
+        <p class="map-attribution place-search-attribution">Resultados de <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a></p>
+      </form>
+    </section>
+
+    <dialog id="trip_pdf_dialog" class="trip-pdf-dialog" aria-labelledby="trip_pdf_title">
+      <div class="trip-pdf-dialog-header"><h2 id="trip_pdf_title">Roteiro em PDF</h2><button id="close_trip_pdf" type="button" aria-label="Fechar">×</button></div>
+      <p id="trip_pdf_status" role="status" aria-live="polite">Preparando roteiro…</p>
+      <div id="trip_pdf_actions" class="trip-pdf-actions" hidden>
+        <button id="share_trip_pdf" type="button" hidden>Compartilhar PDF</button>
+        <button id="download_trip_pdf" type="button">Salvar PDF</button>
+      </div>
+    </dialog>
+
+    <footer id="trip_edit_footer" class="trip-edit-footer" aria-hidden="true">
+      <button id="delete_selected_trips" type="button" disabled>Excluir selecionadas</button>
+    </footer>
+  </main>
+  <script type="module" src="./main-neon.js?v=20261023-editable1"></script>
+
+</body>
+</html>
