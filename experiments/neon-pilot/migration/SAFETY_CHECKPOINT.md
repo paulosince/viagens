@@ -26,3 +26,14 @@ After that: implement relational schema and row-level authorization, validate fa
 - Validação com `SET LOCAL ROLE authenticated` e contexto JWT simulado dentro de transações somente de teste: owner do projeto A visualiza 1 perfil e 5 passageiros salvos; colaborador do mesmo projeto visualiza **0/0**; owner do projeto B visualiza 1 perfil e 0 passageiros salvos; colaborador no B visualiza **0/0**; usuário sem vínculo válido visualiza **0/0**.
 - Teste negativo de escrita no projeto A: sessão de colaborador tentando `UPDATE` sobre registros do owner obteve **0 registros modificáveis** nas duas tabelas, com `SAVEPOINT` e `ROLLBACK TO SAVEPOINT`.
 - **Gate 1/4 aprovado em escopo RLS dessas duas tabelas.** Os testes de sessão são simulações do contexto PostgreSQL (não substituem teste end-to-end de JWT válido pelo Data API). Não foram modificados dados, políticas ou arquivos do banco. Supabase de produção intocado.
+
+
+## Gate 2/4 — CRUD relacional e restauração (23/10/2026)
+- Projeto A: teste com `SET LOCAL ROLE authenticated` e claims de owner/editor vinculados comprovou INSERT de viagem, membros, dia e atividade; UPDATE pelo proprietário e editor; SELECT do valor alterado; DELETE da atividade; ROLLBACK TO SAVEPOINT; **zero registros residuais**.
+- Projeto A: viagem sintética com usuário `viewer` tentou UPDATE e afetou **zero registros**; `capture_trip_snapshot`, alteração posterior e `restore_trip_snapshot` retornaram a descrição original; operações inteiramente revertidas.
+- Projeto B: INSERT/UPDATE/DELETE sintéticos com identidade do próprio owner, seguidos por ROLLBACK; zero resíduos.
+- Roteador `router-neon.mjs`: testes em memória sobre o código real rotearam INSERT/UPDATE/DELETE às branches corretas; INSERT de nova viagem ao projeto pessoal; rejeitaram gravação entre projetos e identificador inexistente.
+- Criada em **ambiente A de testes apenas** a RPC `viaggio_app.gate2_crud_selftest()` `SECURITY INVOKER`, executável só por `authenticated`, requer `viaggio_identity.uid() = project_owner()`, executa criar/editar/ler/excluir **na mesma transação** e não deixa registros sintéticos. Simulação positiva de owner retornou os seis flags `true`; execução simulada como editor devolveu `TEST_OWNER_ONLY`. Contagens antes/depois inalteradas.
+- Página de validação com sessão real Neon: `experiments/neon-pilot/app/neon-crud-diagnostics-v1.html`. O JavaScript passou na verificação de sintaxe.
+- **Pendência Gate 2:** abrir página no iPhone logado no Neon e obter aprovação com JWT real; mais tarde validar operação normal na interface completa antes do cutover. A flag `allowMutations:false` presente em `backend-neon.mjs` bloqueia somente **mutações de arquivos no storage**, não o CRUD relacional.
+- Nenhuma edição em Supabase de produção ou viagem real; gate 3 de upload privado continua pendente.
