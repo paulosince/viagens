@@ -20,7 +20,10 @@ async function rpc(api,jwt,name,payload){
  if(code==='23505')return {error:'FILE_ALREADY_EXISTS',status:409};
  if(code==='P0002')return {error:'FILE_NOT_FOUND',status:404};
  if(code==='22023')return {error:'INVALID_FILE_METADATA',status:400};
- return {error:'MEDIA_DATABASE_ERROR',status:503};
+ const safeCode=typeof code==='string'&&/^[A-Z0-9]{4,12}$/.test(code)
+  ?code:'HTTP_'+r.status;
+ console.error('VIAGGIO_MEDIA_RPC_REJECTED',name,safeCode);
+ return {error:'MEDIA_DATABASE_'+safeCode,status:503};
 }
 async function s3(method,key,body){
  return fetch(signedObjectUrl(method,key,90),{
