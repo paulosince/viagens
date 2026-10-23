@@ -18,3 +18,11 @@ After that: implement relational schema and row-level authorization, validate fa
 - Funções `appmedia` dos branches isolados A/B receberam override de endpoints JWKS/base da **autenticação Neon central**, criando deployment #2 completed em ambos. Acesso HTTP autenticado às fotos ainda requer confirmação no iPhone; 503 **não considerado resolvido** sem resultado físico positivo.
 - O RPC `viaggio_app.media_read_manifest` foi adicionado somente ao branch de prévia A; rejeita requisições sem identidade autenticada. Não está integrado ao gateway existente nem ao aplicativo em produção.
 - **Bloqueios até cutover:** execução do diagnóstico real com JWT, hash SHA-256 físico, auditoria completa dos snapshots históricos e testes de compartilhamento/offline. Não excluir nem modificar arquivos de origem.
+
+
+## Gate 1/4 — autorização de dados pessoais (23/10/2026)
+
+- Revisadas as políticas RLS nas tabelas `viaggio_app.passenger_profiles` e `viaggio_app.saved_passengers` nos projetos A e B. As políticas `project_personal_profile` e `project_saved_passengers` estão corretamente marcadas como **RESTRICTIVE**, portanto se combinam por AND com políticas permissivas de identidade própria. O alerta anterior de autorização ampla por OR era um **falso positivo**. Nenhuma mudança de RLS foi necessária.
+- Validação com `SET LOCAL ROLE authenticated` e contexto JWT simulado dentro de transações somente de teste: owner do projeto A visualiza 1 perfil e 5 passageiros salvos; colaborador do mesmo projeto visualiza **0/0**; owner do projeto B visualiza 1 perfil e 0 passageiros salvos; colaborador no B visualiza **0/0**; usuário sem vínculo válido visualiza **0/0**.
+- Teste negativo de escrita no projeto A: sessão de colaborador tentando `UPDATE` sobre registros do owner obteve **0 registros modificáveis** nas duas tabelas, com `SAVEPOINT` e `ROLLBACK TO SAVEPOINT`.
+- **Gate 1/4 aprovado em escopo RLS dessas duas tabelas.** Os testes de sessão são simulações do contexto PostgreSQL (não substituem teste end-to-end de JWT válido pelo Data API). Não foram modificados dados, políticas ou arquivos do banco. Supabase de produção intocado.
