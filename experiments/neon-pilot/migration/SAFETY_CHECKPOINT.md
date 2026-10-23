@@ -37,3 +37,13 @@ After that: implement relational schema and row-level authorization, validate fa
 - Página de validação com sessão real Neon: `experiments/neon-pilot/app/neon-crud-diagnostics-v1.html`. O JavaScript passou na verificação de sintaxe.
 - **Pendência Gate 2:** abrir página no iPhone logado no Neon e obter aprovação com JWT real; mais tarde validar operação normal na interface completa antes do cutover. A flag `allowMutations:false` presente em `backend-neon.mjs` bloqueia somente **mutações de arquivos no storage**, não o CRUD relacional.
 - Nenhuma edição em Supabase de produção ou viagem real; gate 3 de upload privado continua pendente.
+
+## Gate 2/4 — validação JWT em navegador (23/10/2026)
+- O usuário executou o diagnóstico `neon-crud-diagnostics-v2.html` no iPhone e recebeu **APROVADO** com sessão Neon central autenticada, projeto pessoal **B**, criação/edição/leitura/exclusão e limpeza transacional OK.
+- O primeiro diagnóstico estava errado porque fixava projeto A. A revisão 2 usa `project_context` para localizar a única branch pessoal autorizada. Essa falha era do teste, não do esquema.
+- Gate 2 de CRUD essencial aprovado. Ainda falta validar a interface completa antes do cutover.
+
+## Gate 3/4 — teste físico isolado em andamento (23/10/2026)
+- Projeto B: bucket privado `viaggio-lab-media` ativo; implantada a função separada `mediatest` (deployment 1: completed) com operação temporária de upload/GET SHA-256/DELETE/confirmação de ausência no prefixo `tests/`. Somente owner B autenticado por JWT e RPC `project_context` está autorizado; arquivo e caminho são gerados pelo servidor e tamanho máximo 128 KiB. Nenhum arquivo de viagem é admitido nesse teste.
+- Criada página `experiments/neon-pilot/app/neon-storage-diagnostics-v1.html`; JS validado em sintaxe e commitado. **Aguardando o resultado do teste com sessão JWT real no navegador.**
+- Nenhuma mudança em `appmedia` dos projetos A/B, nem na flag `allowMutations:false` do PWA. Para liberar fotos reais ainda será necessário implementar integração segura de upload/exclusão e metadata no appmedia do projeto A, com limites de tamanho, permissão e verificação física. Não declarar gate 3 aprovado até lá.
