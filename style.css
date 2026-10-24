@@ -3359,3 +3359,108 @@ body[data-home-tab="tickets"] #home_tab_content { width:min(100%,760px); }
 
 .ticket-metadata-simple .ticket-metadata-form label.ticket-card-cover-pick { display:inline-flex; flex-direction:row; width:max-content; min-width:0; }
 .ticket-metadata-simple .ticket-category-symbol svg { width:24px; height:24px; stroke:currentColor; display:block; }
+
+
+/* iOS ticket sheet containment. Native file controls must NEVER expand a sheet. */
+.ticket-metadata-dialog.ticket-metadata-simple {
+  box-sizing:border-box;
+  width:100%;
+  max-width:min(100vw,600px);
+  max-width:min(100dvw,600px);
+  min-width:0;
+  overflow-x:hidden;
+  overscroll-behavior-x:none;
+}
+.ticket-metadata-simple .ticket-metadata-form,
+.ticket-metadata-simple .ticket-metadata-form *,
+.ticket-metadata-simple .ticket-metadata-form *::before,
+.ticket-metadata-simple .ticket-metadata-form *::after {
+  box-sizing:border-box;
+}
+.ticket-metadata-simple .ticket-metadata-form {
+  display:flex;
+  flex-direction:column;
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  overflow-x:clip;
+  padding-inline:clamp(12px,4vw,20px);
+}
+.ticket-metadata-simple .ticket-metadata-form > *,
+.ticket-metadata-simple .ticket-metadata-form > label,
+.ticket-metadata-simple .ticket-category-options,
+.ticket-metadata-simple .ticket-card-cover-editor,
+.ticket-metadata-simple .ticket-metadata-inline {
+  min-width:0;
+  max-width:100%;
+}
+.ticket-metadata-simple .ticket-category-grid { width:100%; min-width:0; grid-template-columns:repeat(4,minmax(0,1fr)); }
+.ticket-metadata-simple .ticket-category-option { max-width:100%; min-width:0; overflow:hidden; }
+.ticket-metadata-simple .ticket-category-option span { min-width:0; max-width:100%; }
+.ticket-metadata-simple .ticket-card-cover-preview,
+.ticket-metadata-simple .ticket-metadata-form label.ticket-card-cover-preview {
+  position:relative;
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  height:160px;
+  flex:0 0 160px;
+  padding:0;
+  border-radius:16px;
+  border:1px solid #d9e4f1;
+  background:#e4eefb;
+  display:block;
+  overflow:hidden;
+  cursor:pointer;
+}
+.ticket-metadata-simple .ticket-card-cover-preview img {
+  width:100%;height:100%;display:block;object-fit:cover;
+}
+.ticket-metadata-simple .ticket-card-cover-empty {
+  width:100%;height:100%;display:flex;align-items:center;justify-content:center;
+}
+.ticket-card-cover-tap-hint {
+  position:absolute;
+  bottom:0;left:0;right:0;
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:12px 14px 9px;
+  background:linear-gradient(transparent,rgba(12,33,61,.75));
+  color:white;font-size:12px;font-weight:680;
+  text-shadow:0 1px 2px rgba(0,0,0,.25);
+}
+.ticket-card-cover-tap-hint span {flex:0 0 auto;}
+/* Overrides .ticket-metadata-form input { display:block } and native Safari sizing. */
+#ticket_card_cover_input,
+.ticket-metadata-simple .ticket-card-cover-file-input,
+.ticket-metadata-simple input[type="file"][hidden] {
+  display:none!important;
+  position:absolute!important;
+  width:0!important;
+  min-width:0!important;
+  max-width:0!important;
+  height:0!important;
+  min-height:0!important;
+  padding:0!important;
+  border:0!important;
+  opacity:0!important;
+  overflow:hidden!important;
+}
+.ticket-metadata-simple .ticket-card-cover-remove {
+  width:max-content;
+  max-width:100%;
+  border:0;background:none;
+  color:#637e98;font-size:12px;font-weight:650;
+  padding:4px 2px;
+}
+.ticket-metadata-simple .ticket-card-cover-remove[hidden]{display:none!important;}
+.ticket-metadata-simple .ticket-metadata-inline {width:100%;}
+@media (max-width:600px){
+  .ticket-metadata-simple .ticket-metadata-inline,
+  .ticket-metadata-simple .ticket-metadata-inline > label {
+    width:100%;min-width:0;max-width:100%;
+  }
+  .ticket-metadata-simple .ticket-metadata-inline input[type="date"],
+  .ticket-metadata-simple .ticket-metadata-inline input[type="time"] {
+    width:100%;min-width:0;max-width:100%;
+  }
+}
