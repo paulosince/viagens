@@ -5685,15 +5685,19 @@ let ticketPreviewRequest = 0;
 let ticketCardCoverRequest = 0;
 
 function makeTicketCategoryIcon(category) {
-  const span=document.createElement('span');
-  span.className='tickets-item-icon';
-  // Stable single-color cutlery artwork (not the platform's red steaming-food emoji).
-  if(category.id==='restaurant') {
-    span.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2v8a3 3 0 0 0 6 0V2M7 2v20M16 2c-3 3-3 8 0 11h3V2h-3ZM19 13v9"/></svg>';
+  const icon=document.createElement('span');
+  icon.className='tickets-item-icon';
+  // Same DOM artwork as the category tile, not an approximate second icon.
+  const tile=document.querySelector('[data-ticket-category="'+category.id+'"] .ticket-category-symbol');
+  if (tile) {
+    icon.append(tile.cloneNode(true));
   } else {
-    span.textContent=category.symbol;
+    const fallback=document.createElement('span');
+    fallback.className='ticket-category-symbol';
+    fallback.textContent=category.symbol;
+    icon.append(fallback);
   }
-  return span;
+  return icon;
 }
 
 function ticketStatusLabel(file) {
@@ -5782,24 +5786,58 @@ async function selectTicketCardCoverFile(file) {
   const context=ticketEditorContext;
   if (!context || !file) return;
   const error=document.getElementById('ticket_metadata_error');
-  if (!/^image\//.test(file.type) && !/\.(?:jpe?g|png|webp|heic|heif)$/i.test(file.name))
-    {error.textContent='Escolha uma imagem para a capa.';return;}
-  if (file.size>30*1024*1024) {error.textContent='Escolha uma imagem de até 30 MB.';return;}
+  const feedback=document.getElementById('ticket_card_cover_feedback');
+  const hint=document.getElementById('ticket_card_cover_hint');
+  const save=document.getElementById('ticket_metadata_save');
+  if (!/^image\//.test(file.type) && !/\.(?:jpe?g|png|webp|heic|heif)$/i.test(file.name)) {
+    feedback.dataset.kind='error';
+    feedback.textContent='Escolha uma foto do iPhone, JPG ou PNG.';
+    return;
+  }
+  if (file.size>30*1024*1024) {
+    feedback.dataset.kind='error';
+    feedback.textContent='Esta foto é muito grande. Escolha outra imagem de até 30 MB.';
+    return;
+  }
+  // Show the chosen photo immediately, independently of the compression step.
+  const request=++ticketCardCoverRequest;
+  if(context.coverDraftUrl) URL.revokeObjectURL(context.coverDraftUrl);
+  context.coverDraftUrl=URL.createObjectURL(file);
+  context.coverBlob=null;
+  context.coverPending=true;
+  context.removeCover=false;
+  feedback.dataset.kind='info';
+  feedback.textContent='Preparando a imagem escolhida…';
+  hint.textContent='Imagem selecionada · preparando…';
+  error.textContent='';
+  save.disabled=true;
+  showTicketCardCoverPreview(context.coverDraftUrl);
   try {
-    error.textContent='';
     const blob=await prepareTicketCardCover(file);
-    if(!blob?.size || blob.size>6*1024*1024) throw new Error('Imagem muito grande após otimização.');
-    if(ticketEditorContext!==context) return;
-    ++ticketCardCoverRequest;
+    if(ticketEditorContext!==context || request!==ticketCardCoverRequest) return;
+    if(!blob?.size || blob.size>6*1024*1024) throw new Error('IMAGE_TOO_LARGE');
+    const ready=URL.createObjectURL(blob);
     if(context.coverDraftUrl) URL.revokeObjectURL(context.coverDraftUrl);
+    context.coverDraftUrl=ready;
     context.coverBlob=blob;
-    context.removeCover=false;
-    context.coverDraftUrl=URL.createObjectURL(blob);
-    showTicketCardCoverPreview(context.coverDraftUrl);
-  } catch (error) {
-    console.warn('Não foi possível preparar a foto da capa',error);
-    document.getElementById('ticket_metadata_error').textContent=
-      'Não foi possível abrir esta foto. Tente novamente ou compartilhe pelo Fotos em formato JPEG (Mais Compatível).';
+    context.coverPending=false;
+    save.disabled=false;
+    hint.textContent='Toque para trocar a capa';
+    feedback.dataset.kind='info';
+    feedback.textContent='Capa pronta. Toque em Salvar para confirmar.';
+    showTicketCardCoverPreview(ready);
+  } catch (cause) {
+    if(ticketEditorContext!==context || request!==ticketCardCoverRequest) return;
+    console.warn('Não foi possível preparar a capa escolhida',cause);
+    if(context.coverDraftUrl) URL.revokeObjectURL(context.coverDraftUrl);
+    context.coverDraftUrl=null;
+    context.coverBlob=null;
+    context.coverPending=false;
+    save.disabled=false;
+    hint.textContent='Toque para escolher ou trocar a capa';
+    showTicketCardCoverPreview(context.file.cardSignedUrl || '');
+    feedback.dataset.kind='error';
+    feedback.textContent='Esta imagem não pôde ser preparada. Escolha outra foto; o comprovante não foi alterado.';
   }
 }
 
@@ -5810,7 +5848,11 @@ function clearTicketCardCover() {
   if(ctx.coverDraftUrl) URL.revokeObjectURL(ctx.coverDraftUrl);
   ctx.coverDraftUrl=null;
   ctx.coverBlob=null;
+  ctx.coverPending=false;
   ctx.removeCover=true;
+  document.getElementById('ticket_metadata_save').disabled=false;
+  document.getElementById('ticket_card_cover_hint').textContent='Toque para escolher uma capa';
+  document.getElementById('ticket_card_cover_feedback').textContent='';
   showTicketCardCoverPreview('');
 }
 
@@ -5925,12 +5967,15 @@ function openTicketMetadataEditor(trip, file, onSaved) {
   const dialog = document.getElementById('ticket_metadata_dialog');
   const form = document.getElementById('ticket_metadata_form');
   form.reset();
-  ticketEditorContext = { trip, file, onSaved, coverBlob:null, coverDraftUrl:null, removeCover:false };
+  ticketEditorContext = { trip, file, onSaved, coverBlob:null, coverDraftUrl:null, coverPending:false, removeCover:false };
   form.elements.display_title.value = file.display_title || '';
   selectTicketCategory(file.item_category || '');
   form.elements.event_date.value = file.event_date || '';
   form.elements.event_time.value = String(file.event_time || '').slice(0, 5);
   document.getElementById('ticket_metadata_error').textContent = '';
+  document.getElementById('ticket_card_cover_feedback').textContent = '';
+  document.getElementById('ticket_card_cover_hint').textContent = 'Toque para escolher ou trocar a capa';
+  document.getElementById('ticket_metadata_save').disabled=false;
   dialog.showModal();
   dialog.scrollLeft=0; 
   form.scrollLeft=0;
@@ -5943,6 +5988,10 @@ async function saveTicketMetadata(event) {
   event.preventDefault();
   const context = ticketEditorContext;
   if (!context) return;
+  if (context.coverPending) {
+    document.getElementById('ticket_card_cover_feedback').textContent='A foto ainda está sendo preparada.';
+    return;
+  }
   const form = document.getElementById('ticket_metadata_form');
   const save = document.getElementById('ticket_metadata_save');
   const error = document.getElementById('ticket_metadata_error');
