@@ -5653,7 +5653,7 @@ function isTicketImageFile(file) {
 const TICKET_CATEGORIES = Object.freeze({
   flight: { id:'flight', label:'Voo', symbol:'✈', tone:'flight' },
   hotel: { id:'hotel', label:'Hospedagem', symbol:'▤', tone:'hotel' },
-  restaurant: { id:'restaurant', label:'Restaurante', symbol:'♨', tone:'restaurant' },
+  restaurant: { id:'restaurant', label:'Restaurante', symbol:'🍴', tone:'restaurant' },
   show: { id:'show', label:'Show', symbol:'♫', tone:'show' },
   sport: { id:'sport', label:'Esporte', symbol:'⚽', tone:'sport' },
   attraction: { id:'attraction', label:'Passeio', symbol:'★', tone:'attraction' },
@@ -5683,6 +5683,18 @@ function tripTicketDay(trip, date, days = []) {
 let ticketEditorContext = null;
 let ticketPreviewRequest = 0;
 let ticketCardCoverRequest = 0;
+
+function makeTicketCategoryIcon(category) {
+  const span=document.createElement('span');
+  span.className='tickets-item-icon';
+  // Stable single-color cutlery artwork (not the platform's red steaming-food emoji).
+  if(category.id==='restaurant') {
+    span.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2v8a3 3 0 0 0 6 0V2M7 2v20M16 2c-3 3-3 8 0 11h3V2h-3ZM19 13v9"/></svg>';
+  } else {
+    span.textContent=category.symbol;
+  }
+  return span;
+}
 
 function ticketStatusLabel(file) {
   const date = /^\d{4}-\d{2}-\d{2}$/.test(String(file?.event_date || ''))
@@ -5922,8 +5934,10 @@ async function saveTicketMetadata(event) {
       }
       const updatedFile = await updateTicketDetailsSafely(client,context,patch);
       if (newCoverPath) {
-        const signed=await client.storage.from(DAY_ATTACHMENT_BUCKET).createSignedUrl(newCoverPath,3600);
-        newCoverUrl=signed.error ? '' : signed.data?.signedUrl || '';
+        try {
+          const signed=await client.storage.from(DAY_ATTACHMENT_BUCKET).createSignedUrl(newCoverPath,3600);
+          newCoverUrl=signed.error ? '' : signed.data?.signedUrl || '';
+        } catch(error) { console.warn('Capa salva; prévia temporariamente indisponível',error); }
       }
       const saved = {
         ...context.file,...updatedFile,
@@ -6081,7 +6095,7 @@ function renderTicketsFeed(panel, trips) {
   let selectedFilter = 'all';
   let available = [];
   const editTicket = file => openTicketMetadataEditor(trip,file,updated => {
-    available = available.map(item=>String(item.id)===String(updated.id)?updated:item);
+    available = available.map(item=>String(item.id)===String(updated.id)?{...item,...updated}:item);
     paint();
   });
   const openTicketFile = async file => {
@@ -6119,30 +6133,29 @@ function renderTicketsFeed(panel, trips) {
       preview.type = 'button'; preview.className = 'tickets-item-main';
       const art = document.createElement('span');
       art.className = 'tickets-item-art ' + category.tone;
-      const icon = document.createElement('span');
-      icon.className = 'tickets-item-icon'; icon.textContent = category.symbol;
+      const icon = makeTicketCategoryIcon(category);
       art.append(icon);
-      if (isTicketImageFile(file) && file.signedUrl) {
-        const thumbnail = document.createElement('img');
-        thumbnail.className = 'tickets-item-thumbnail';
-        thumbnail.alt = '';
-        thumbnail.loading = 'lazy';
-        thumbnail.decoding = 'async';
-        thumbnail.onerror = () => { thumbnail.hidden = true; };
-        thumbnail.src = file.signedUrl;
-        art.prepend(thumbnail);
+      // A card only displays its OWN optional cover. Receipts never become artwork.
+      if (file.card_image_path && file.cardSignedUrl) {
+        const cover = document.createElement('img');
+        cover.className = 'tickets-item-cover';
+        cover.alt = '';
+        cover.loading = 'lazy';
+        cover.decoding = 'async';
+        cover.onerror = () => { cover.hidden = true; };
+        cover.src = file.cardSignedUrl;
+        art.prepend(cover);
       }
-      const tag = document.createElement('small');
-      tag.className = 'tickets-item-tag';
-      tag.textContent = category.label;
-      art.append(tag);
+      const status = document.createElement('span');
+      status.className = 'tickets-item-status';
+      status.textContent = ticketStatusLabel(file);
+      art.append(status);
+      if (!file.cardSignedUrl) art.classList.add('no-cover');
       const details = document.createElement('span'); details.className = 'tickets-item-info';
       const name = document.createElement('strong'); name.textContent = ticketDisplayTitle(file);
       const subtitle = document.createElement('span');
-      subtitle.textContent = [
-        ticketDateLabel(file),
-        !identified ? 'Defina título e categoria' : ''
-      ].filter(Boolean).join(' · ') || 'Sem data informada';
+      subtitle.textContent = !identified ? 'Toque para identificar'
+        : file.venue || category.label;
       details.append(name,subtitle);
       preview.append(art,details);
       preview.setAttribute('aria-label',(identified ? 'Abrir na agenda: ' : 'Identificar: ')+ticketDisplayTitle(file));
@@ -6194,12 +6207,12 @@ function renderTicketsFeed(panel, trips) {
     if (panel.ticketsRenderToken !== token || state.homeTab !== 'tickets') return;
     const files = result.data || [];
     available = await Promise.all(files.map(async file => {
-      if (!isTicketImageFile(file) || !file.storage_path) return file;
+      if (!file.card_image_path) return file;
       try {
-        const signed = await client.storage.from(DAY_ATTACHMENT_BUCKET).createSignedUrl(file.storage_path, 3600);
-        return { ...file, signedUrl: signed.error ? '' : (signed.data?.signedUrl || '') };
+        const signed = await client.storage.from(DAY_ATTACHMENT_BUCKET).createSignedUrl(file.card_image_path, 3600);
+        return { ...file, cardSignedUrl:signed.error ? '' : (signed.data?.signedUrl || '') };
       } catch (error) {
-        console.warn('Prévia de imagem indisponível', error);
+        console.warn('Capa de ingresso indisponível', error);
         return file;
       }
     }));
