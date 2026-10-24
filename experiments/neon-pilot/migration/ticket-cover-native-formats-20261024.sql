@@ -15,6 +15,8 @@ ALTER TABLE viaggio_app.day_attachments
         right(card_image_path,5)='.webp'
         OR right(card_image_path,4)='.jpg'
         OR right(card_image_path,4)='.png'
+        OR right(card_image_path,5)='.heic'
+        OR right(card_image_path,5)='.heif'
       )
     )
   );
