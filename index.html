@@ -47,9 +47,9 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20261024-tabs7" as="style">
-  <link rel="stylesheet" href="style.css?v=20261024-tabs7" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20261024-tabs7"></noscript>
+  <link rel="preload" href="style.css?v=20261024-calendar8" as="style">
+  <link rel="stylesheet" href="style.css?v=20261024-calendar8" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20261024-calendar8"></noscript>
   <link rel="stylesheet" href="src/update-manager.css?v=20261024-home3">
   <script>
     function showViaggioStartupError(detail) {
@@ -141,7 +141,9 @@
         </div>
         <div id="trip_heading" class="trip-heading"><h1 class="home-title">Minhas Viagens</h1></div>
       </header>
-      <div class="home-discovery">
+      <header class="calendar-toolbar"><img src="assets/splash-plane.png" alt="Viaggio"><h1>Calendário</h1><button id="calendar_menu_button" type="button" aria-label="Busca e filtros" aria-controls="home_discovery" aria-expanded="false">•••</button></header>
+      <button id="calendar_menu_scrim" class="calendar-menu-scrim" type="button" aria-label="Fechar busca e filtros" hidden></button>
+      <div id="home_discovery" class="home-discovery">
         <button id="home_search_access" class="home-search-access" type="button" aria-controls="home_search_reveal" aria-expanded="false">Buscar viagens</button>
         <div id="home_search_reveal" class="home-search-reveal" data-open="false" aria-hidden="true" inert><label class="home-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6.5"/><path d="m15 15 6 6"/></svg><input id="home_search" type="search" placeholder="Buscar viagens" aria-label="Buscar viagens"></label></div>
         <div class="home-filters" aria-label="Filtrar viagens">
@@ -569,7 +571,7 @@
       if (legacyPending > 0) {
         location.replace('./legacy-supabase.html?recover=1');
       } else {
-        await import('./experiments/neon-pilot/app/main-neon.js?v=20261024-tabs7');
+        await import('./experiments/neon-pilot/app/main-neon.js?v=20261024-calendar8');
       }
     } catch (error) {
       console.error('Não foi possível validar o estado local antes da migração Neon', error);

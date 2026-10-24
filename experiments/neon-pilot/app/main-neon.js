@@ -5470,7 +5470,7 @@ function installHomeSearchGesture() {
   const home = document.getElementById('user_home');
   const input = document.getElementById('home_search');
   let start = null;
-  const available = () => document.body.dataset.session === 'authenticated' && document.body.dataset.tripPage === 'closed' && document.body.dataset.activeSheet === 'none' && !state.editing;
+  const available = () => state.homeTab !== 'calendar' && document.body.dataset.session === 'authenticated' && document.body.dataset.tripPage === 'closed' && document.body.dataset.activeSheet === 'none' && !state.editing;
   home.addEventListener('touchstart', event => {
     start = available() && window.scrollY <= 1 && event.touches.length === 1 && !event.target.closest('button:not(.trip-card-button):not(.home-trip-shortcut),input,nav,.home-filters')
       ? { x: event.touches[0].clientX, y: event.touches[0].clientY } : null;
@@ -5535,14 +5535,17 @@ async function refreshSharedByMe() {
 function renderHomeTab(trips) {
   const panel = document.getElementById('home_tab_content');
   const tab = state.homeTab;
+  document.body.dataset.homeTab = tab;
+  panel.classList.toggle('calendar-feed', tab === 'calendar');
+  panel.onscroll = null;
   panel.hidden = tab === 'trips';
   dom.tripList.hidden = tab !== 'trips';
   if (tab === 'trips') return;
   panel.replaceChildren();
+  if (tab === 'calendar') { renderCalendarFeed(panel, trips); return; }
   const intro = document.createElement('p'); intro.className = 'home-tab-intro';
   intro.textContent = tab === 'calendar' ? 'Datas e contagens regressivas das suas viagens.' : tab === 'tickets' ? 'Escolha uma viagem para abrir tickets, comprovantes e documentos.' : 'Escolha uma viagem para acompanhar valores previstos e gastos.';
   panel.append(intro);
-  if (tab === 'calendar') renderHomeCalendar(panel, trips);
   for (const trip of trips) {
     const button = document.createElement('button'); button.type = 'button'; button.className = 'home-trip-shortcut';
     const title = document.createElement('strong'); title.textContent = trip.name;
@@ -5561,28 +5564,97 @@ function renderHomeTab(trips) {
   if (!trips.length) { const empty = document.createElement('p'); empty.textContent = 'Nenhuma viagem encontrada para este ano e filtro.'; panel.append(empty); }
 }
 
-function renderHomeCalendar(panel, trips) {
+function calendarCountdown(trip, now = new Date()) {
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  const asDay = value => { const [y,m,d] = String(value).split('-').map(Number); return Date.UTC(y,m-1,d); };
+  const days = Math.round((asDay(trip.start_date) - today) / 86400000);
+  if (days > 0) return { number: days, label: days === 1 ? 'dia para embarcar' : 'dias para embarcar', heading: 'SUA PRÓXIMA VIAGEM' };
+  const elapsed = Math.round((today - asDay(trip.start_date)) / 86400000) + 1;
+  if (today <= asDay(tripEndDate(trip))) return { number: elapsed, label: 'dia de viagem', heading: 'APROVEITE CADA MOMENTO' };
+  const ago = Math.round((today - asDay(tripEndDate(trip))) / 86400000);
+  return { number: ago, label: ago === 1 ? 'dia desde o retorno' : 'dias desde o retorno', heading: 'MEMÓRIAS DA VIAGEM' };
+}
+
+function setCalendarMenu(open) {
+  document.body.dataset.calendarMenu = open ? 'open' : 'closed';
+  document.getElementById('calendar_menu_button').setAttribute('aria-expanded', String(open));
+  document.getElementById('calendar_menu_scrim').hidden = !open;
+  if (open) setHomeSearchOpen(true);
+}
+document.getElementById('calendar_menu_button').addEventListener('click', () => setCalendarMenu(document.body.dataset.calendarMenu !== 'open'));
+document.getElementById('calendar_menu_scrim').addEventListener('click', () => setCalendarMenu(false));
+document.addEventListener('keydown', event => { if (event.key === 'Escape' && document.body.dataset.calendarMenu === 'open') { setCalendarMenu(false); document.getElementById('calendar_menu_button').focus(); } });
+
+function renderCalendarFeed(panel, trips) {
+  panel.classList.add('calendar-feed');
+  panel.setAttribute('aria-label', 'Viagens em ordem de data');
+  if (!trips.length) {
+    const empty = document.createElement('p'); empty.className = 'calendar-empty';
+    empty.textContent = 'Nenhuma viagem encontrada. Ajuste a busca e os filtros no menu acima.';
+    panel.append(empty); return;
+  }
+  for (const [index, trip] of trips.entries()) {
+    const page = document.createElement('article'); page.className = 'calendar-trip'; page.dataset.calendarTrip = String(trip.id);
+    const background = document.createElement('div'); background.className = 'calendar-backdrop'; background.setAttribute('aria-hidden', 'true');
+    if (trip.cover_url) {
+      const image = document.createElement('img'); image.src = trip.cover_url; image.alt = ''; image.loading = index ? 'lazy' : 'eager'; image.decoding = 'async';
+      image.addEventListener('error', () => image.remove(), { once: true }); background.append(image);
+    }
+    const content = document.createElement('div'); content.className = 'calendar-trip-content';
+    const title = document.createElement('h2'); title.textContent = trip.name;
+    const dates = document.createElement('p'); dates.className = 'calendar-trip-dates';
+    const dateText = value => new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(value + 'T12:00:00'));
+    dates.textContent = `${dateText(trip.start_date)} — ${dateText(tripEndDate(trip))}`;
+    const countdown = calendarCountdown(trip);
+    const hero = document.createElement('div'); hero.className = 'calendar-countdown';
+    const eyebrow = document.createElement('small'); eyebrow.textContent = countdown.heading;
+    const number = document.createElement('strong'); number.textContent = countdown.number;
+    const label = document.createElement('span'); label.textContent = countdown.label;
+    const motif = document.createElement('span'); motif.className = 'calendar-route'; motif.setAttribute('aria-hidden', 'true'); motif.textContent = '— ✈ —';
+    hero.append(eyebrow, number, label, motif);
+    content.append(title, dates, hero);
+    renderHomeCalendar(content, trip);
+    if (index < trips.length - 1) {
+      const next = document.createElement('button'); next.type = 'button'; next.className = 'calendar-next'; next.textContent = '⌃  Deslize para a próxima viagem';
+      next.addEventListener('click', () => page.nextElementSibling?.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' })); content.append(next);
+    }
+    page.append(background, content); panel.append(page);
+  }
+  const selected = [...panel.children].find(page => page.dataset.calendarTrip === state.calendarTripId);
+  panel.scrollTop = selected?.offsetTop || 0;
+  panel.onscroll = () => {
+    const pages = [...panel.querySelectorAll('.calendar-trip')];
+    const nearest = pages.reduce((best, page) => Math.abs(page.offsetTop - panel.scrollTop) < Math.abs(best.offsetTop - panel.scrollTop) ? page : best, pages[0]);
+    if (nearest) state.calendarTripId = nearest.dataset.calendarTrip;
+  };
+}
+
+function renderHomeCalendar(panel, trip, shownDate = null) {
   const today = new Date();
-  if (state.calendarMonth == null) state.calendarMonth = today.getMonth();
-  const year = state.selectedYear, month = state.calendarMonth;
+  const date = shownDate || new Date(trip.start_date + 'T12:00:00');
+  const year = date.getFullYear(), month = date.getMonth();
   const calendar = document.createElement('section'); calendar.className = 'home-calendar';
   const header = document.createElement('div'); header.className = 'home-calendar-heading';
   const label = document.createElement('strong');
-  label.textContent = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(year, month, 1));
+  label.textContent = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(date);
   for (const direction of [-1, 1]) {
     const button = document.createElement('button'); button.type = 'button'; button.textContent = direction < 0 ? '‹' : '›'; button.setAttribute('aria-label', direction < 0 ? 'Mês anterior' : 'Próximo mês');
-    button.disabled = month + direction < 0 || month + direction > 11;
-    button.addEventListener('click', () => { state.calendarMonth += direction; syncTripList(); });
+    button.addEventListener('click', () => {
+      const holder = document.createElement('div'); renderHomeCalendar(holder, trip, new Date(year, month + direction, 1));
+      const replacement = holder.firstElementChild; calendar.replaceWith(replacement);
+      replacement.querySelector(direction < 0 ? '[aria-label="Mês anterior"]' : '[aria-label="Próximo mês"]').focus({preventScroll:true});
+    });
     if (direction < 0) header.append(button, label); else header.append(button);
   }
   const grid = document.createElement('div'); grid.className = 'home-calendar-grid';
   for (const day of ['D', 'S', 'T', 'Q', 'Q', 'S', 'S']) { const cell = document.createElement('small'); cell.textContent = day; grid.append(cell); }
   for (let n = 0; n < new Date(year, month, 1).getDay(); n++) grid.append(document.createElement('span'));
+  const {start, end} = tripDateRange(trip);
   for (let day = 1; day <= new Date(year, month + 1, 0).getDate(); day++) {
     const date = new Date(year, month, day);
-    const matching = trips.filter(trip => { const {start, end} = tripDateRange(trip); return start && end && date >= start && date <= end; });
     const cell = document.createElement('span'); cell.textContent = day;
-    if (matching.length) { cell.className = 'has-trip'; cell.title = matching.map(trip => trip.name).join(', '); }
+    if (start && end && date >= start && date <= end) { cell.className = 'has-trip'; cell.title = trip.name; }
+    if (date.getTime() === start?.getTime()) cell.classList.add('trip-departure');
     if (date.toDateString() === today.toDateString()) cell.setAttribute('aria-current', 'date');
     grid.append(cell);
   }
@@ -5591,6 +5663,8 @@ function renderHomeCalendar(panel, trips) {
 
 function selectHomeTab(tab) {
   state.homeTab = tab;
+  setCalendarMenu(false);
+  setHomeSearchOpen(Boolean(state.homeSearch));
   setYearMenu(false);
   const titles = {trips: 'Minhas Viagens', calendar: 'Calendário', tickets: 'Tickets', budgets: 'Orçamentos'};
   document.querySelector('.home-title').textContent = titles[tab];
@@ -5618,7 +5692,7 @@ for (const button of document.querySelectorAll('[data-home-filter]')) button.add
 function syncTripList() {
   const now = new Date();
   const visibleTrips = state.trips
-    .filter(trip => Number(String(trip.start_date).slice(0, 4)) === state.selectedYear)
+    .filter(trip => state.homeTab === 'calendar' || Number(String(trip.start_date).slice(0, 4)) === state.selectedYear)
     .filter(matchesHomeFilters)
     .sort((a, b) => compareTripsForHome(a, b, now));
 
