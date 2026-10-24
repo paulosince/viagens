@@ -280,6 +280,7 @@ const state = {
   avatarFile: null,
   avatarPreview: '',
   selectedYear: null,
+  homeTab: "trips", homeFilter: "all", homeSearch: "", sharedByMe: new Set(),
   saving: false,
   editing: false,
   tripColor: '#4775d1',
@@ -5388,7 +5389,7 @@ function setEditingMode(editing) {
   state.editing = editing;
   if (!editing) state.selectedTripIds.clear();
   document.body.dataset.editing = String(editing);
-  dom.editTripsButton.textContent = editing ? 'OK' : 'Editar';
+  dom.editTripsButton.textContent = editing ? 'Concluído' : 'Editar viagens';
   dom.tripEditFooter.setAttribute('aria-hidden', String(!editing));
   syncTripSelectionUI();
 }
@@ -5457,110 +5458,142 @@ function compareTripsForHome(a, b, now = new Date()) {
   return String(a.start_date || '').localeCompare(String(b.start_date || ''));
 }
 
-function setTripSectionCollapsed(item, collapsed) {
-  item.dataset.collapsed = String(collapsed);
-  item._refs.button.setAttribute('aria-expanded', String(!collapsed));
-  item._refs.content.setAttribute('aria-hidden', String(collapsed));
-  item._refs.content.inert = collapsed;
+function matchesHomeFilters(trip) {
+  const query = state.homeSearch.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const text = `${trip.name || ''} ${trip.destination || ''}`.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  if (!text.includes(query)) return false;
+  if (state.homeFilter === 'received') return tripRole(trip) !== 'owner';
+  if (state.homeFilter === 'sent') return tripRole(trip) === 'owner' && state.sharedByMe.has(String(trip.id));
+  if (state.homeFilter === 'past') return tripListGroup(trip) === 'past';
+  return true;
 }
 
-function createTripSection(group, text) {
-  const item = document.createElement('li');
-  item.className = 'trip-section';
-  item.dataset.tripSection = group;
+async function refreshSharedByMe() {
+  const status = document.getElementById('home_filter_status');
+  const userId = state.user?.id;
+  status.textContent = 'Consultando compartilhamentos…';
+  try {
+    const client = await tryNeon();
+    if (!client || !navigator.onLine) throw new Error('Conecte-se para atualizar os compartilhamentos.');
+    const owned = state.trips.filter(trip => tripRole(trip) === 'owner');
+    const results = await Promise.all(owned.map(async trip => {
+      const { data, error } = await client.rpc('list_trip_members', { p_trip_id: trip.id });
+      if (error) throw error;
+      return (data || []).some(member => member.role !== 'owner') ? String(trip.id) : null;
+    }));
+    if (state.user?.id !== userId) return;
+    state.sharedByMe = new Set(results.filter(Boolean));
+    status.textContent = '';
+    syncTripList();
+  } catch (error) { status.textContent = error.message; }
+}
 
-  const heading = document.createElement('h2');
-  heading.className = 'trip-section-title';
-  const button = document.createElement('button');
-  button.className = 'trip-section-toggle';
-  button.type = 'button';
-  button.setAttribute('aria-controls', `trip-section-${group}`);
-  const label = document.createElement('span');
-  label.textContent = text;
-  const count = document.createElement('span');
-  count.className = 'trip-section-count';
-  const divider = document.createElement('span');
-  divider.className = 'trip-section-divider';
-  divider.setAttribute('aria-hidden', 'true');
-  const chevron = document.createElement('span');
-  chevron.className = 'trip-section-chevron';
-  chevron.setAttribute('aria-hidden', 'true');
-  button.append(label, divider, count, chevron);
-  heading.append(button);
-  if (group === 'upcoming') {
-    dom.editTripsButton.hidden = false;
-    heading.append(dom.editTripsButton);
+function renderHomeTab(trips) {
+  const panel = document.getElementById('home_tab_content');
+  const tab = state.homeTab;
+  panel.hidden = tab === 'trips';
+  dom.tripList.hidden = tab !== 'trips';
+  if (tab === 'trips') return;
+  panel.replaceChildren();
+  const intro = document.createElement('p'); intro.className = 'home-tab-intro';
+  intro.textContent = tab === 'calendar' ? 'Datas e contagens regressivas das suas viagens.' : tab === 'tickets' ? 'Escolha uma viagem para abrir tickets, comprovantes e documentos.' : 'Escolha uma viagem para acompanhar valores previstos e gastos.';
+  panel.append(intro);
+  if (tab === 'calendar') renderHomeCalendar(panel, trips);
+  for (const trip of trips) {
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'home-trip-shortcut';
+    const title = document.createElement('strong'); title.textContent = trip.name;
+    const detail = document.createElement('span'); detail.textContent = `${new Intl.DateTimeFormat('pt-BR').format(new Date(trip.start_date + 'T00:00:00'))} · ${tripTiming(trip)}`;
+    button.append(title, detail);
+    button.addEventListener('click', () => {
+      const loading = openTrip(trip.id);
+      // openTrip selects the itinerary synchronously; select the destination now,
+      // so a slow refresh cannot later override the user's navigation.
+      if (tab === 'tickets') selectTripTab('arquivos');
+      if (tab === 'budgets') selectTripTab('orcamento');
+      loading.catch(error => { intro.textContent = error.message; });
+    });
+    panel.append(button);
   }
-
-  const content = document.createElement('div');
-  content.className = 'trip-section-content';
-  content.id = `trip-section-${group}`;
-  const clip = document.createElement('div');
-  clip.className = 'trip-section-clip';
-  const cards = document.createElement('ol');
-  cards.className = 'trip-section-cards';
-  clip.append(cards);
-  content.append(clip);
-  item.append(heading, content);
-  item._refs = { button, count, content, cards };
-
-  button.addEventListener('click', () => {
-    const key = `${state.selectedYear}:${group}`;
-    const collapsed = !state.collapsedTripSections.has(key);
-    if (collapsed) state.collapsedTripSections.add(key);
-    else state.collapsedTripSections.delete(key);
-    setTripSectionCollapsed(item, collapsed);
-  });
-
-  return item;
+  if (!trips.length) { const empty = document.createElement('p'); empty.textContent = 'Nenhuma viagem encontrada para este ano e filtro.'; panel.append(empty); }
 }
+
+function renderHomeCalendar(panel, trips) {
+  const today = new Date();
+  if (state.calendarMonth == null) state.calendarMonth = today.getMonth();
+  const year = state.selectedYear, month = state.calendarMonth;
+  const calendar = document.createElement('section'); calendar.className = 'home-calendar';
+  const header = document.createElement('div'); header.className = 'home-calendar-heading';
+  const label = document.createElement('strong');
+  label.textContent = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(year, month, 1));
+  for (const direction of [-1, 1]) {
+    const button = document.createElement('button'); button.type = 'button'; button.textContent = direction < 0 ? '‹' : '›'; button.setAttribute('aria-label', direction < 0 ? 'Mês anterior' : 'Próximo mês');
+    button.disabled = month + direction < 0 || month + direction > 11;
+    button.addEventListener('click', () => { state.calendarMonth += direction; syncTripList(); });
+    if (direction < 0) header.append(button, label); else header.append(button);
+  }
+  const grid = document.createElement('div'); grid.className = 'home-calendar-grid';
+  for (const day of ['D', 'S', 'T', 'Q', 'Q', 'S', 'S']) { const cell = document.createElement('small'); cell.textContent = day; grid.append(cell); }
+  for (let n = 0; n < new Date(year, month, 1).getDay(); n++) grid.append(document.createElement('span'));
+  for (let day = 1; day <= new Date(year, month + 1, 0).getDate(); day++) {
+    const date = new Date(year, month, day);
+    const matching = trips.filter(trip => { const {start, end} = tripDateRange(trip); return start && end && date >= start && date <= end; });
+    const cell = document.createElement('span'); cell.textContent = day;
+    if (matching.length) { cell.className = 'has-trip'; cell.title = matching.map(trip => trip.name).join(', '); }
+    if (date.toDateString() === today.toDateString()) cell.setAttribute('aria-current', 'date');
+    grid.append(cell);
+  }
+  calendar.append(header, grid); panel.append(calendar);
+}
+
+function selectHomeTab(tab) {
+  state.homeTab = tab;
+  setYearMenu(false);
+  const titles = {trips: 'Minhas Viagens', calendar: 'Calendário', tickets: 'Tickets', budgets: 'Orçamentos'};
+  document.querySelector('.home-title').textContent = titles[tab];
+  document.querySelector('.home-compact-title').textContent = titles[tab];
+  document.querySelector('#home_search').placeholder = 'Buscar viagens';
+  for (const button of document.querySelectorAll('[data-home-tab]')) button.setAttribute('aria-current', String(button.dataset.homeTab === tab));
+  syncTripList();
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+
+for (const button of document.querySelectorAll('[data-home-tab]')) {
+  if (button.dataset.homeTab !== 'profile') button.addEventListener('click', () => selectHomeTab(button.dataset.homeTab));
+}
+document.getElementById('home_search').addEventListener('input', event => { state.homeSearch = event.target.value.trim(); syncTripList(); });
+for (const button of document.querySelectorAll('[data-home-filter]')) button.addEventListener('click', () => {
+  state.homeFilter = button.dataset.homeFilter;
+  document.getElementById('home_filter_status').textContent = '';
+  for (const other of document.querySelectorAll('[data-home-filter]')) other.setAttribute('aria-pressed', String(other === button));
+  syncTripList();
+  if (state.homeFilter === 'sent') refreshSharedByMe();
+});
 
 function syncTripList() {
   const now = new Date();
   const visibleTrips = state.trips
     .filter(trip => Number(String(trip.start_date).slice(0, 4)) === state.selectedYear)
+    .filter(matchesHomeFilters)
     .sort((a, b) => compareTripsForHome(a, b, now));
 
   const existingCards = new Map(
     [...dom.tripList.querySelectorAll('li[data-trip-id]')]
       .map(item => [String(item.dataset.tripId), item])
   );
-  const existingSections = new Map(
-    [...dom.tripList.children]
-      .filter(item => item.dataset.tripSection)
-      .map(item => [item.dataset.tripSection, item])
-  );
-
-  const sectionLabels = {
-    current: 'Viagens em andamento',
-    upcoming: 'Próximas viagens',
-    past: 'Viagens realizadas'
-  };
-  const sections = new Map();
-  for (const trip of visibleTrips) {
-    const group = tripListGroup(trip, now);
-    let section = sections.get(group);
-    if (!section) {
-      section = existingSections.get(group) || createTripSection(group, sectionLabels[group]);
-      section._refs.cards.replaceChildren();
-      setTripSectionCollapsed(section, state.collapsedTripSections.has(`${state.selectedYear}:${group}`));
-      sections.set(group, section);
-    }
-
+  const cards = visibleTrips.map(trip => {
     let item = existingCards.get(String(trip.id));
     if (!item) item = createTripNode(trip);
     else updateTripNode(item, trip);
-
-    section._refs.cards.append(item);
-    section._refs.count.textContent = String(section._refs.cards.childElementCount);
-  }
-
-  dom.editTripsButton.hidden = !sections.has('upcoming');
-  dom.tripList.replaceChildren(...sections.values());
+    return item;
+  });
+  dom.editTripsButton.hidden = !state.trips.some(trip => tripRole(trip) === 'owner');
+  dom.tripList.replaceChildren(...cards);
+  renderHomeTab(visibleTrips);
 
   syncTripSelectionUI();
   const empty = visibleTrips.length === 0;
-  dom.homeEmpty.setAttribute('aria-hidden', String(!empty));
+  dom.homeEmpty.setAttribute('aria-hidden', String(!empty || state.homeTab !== 'trips'));
+  dom.homeEmpty.querySelector('h2').textContent = state.trips.length ? 'Nenhuma viagem encontrada' : 'Nenhuma viagem ainda';
   dom.tripList.setAttribute('aria-hidden', String(empty));
 }
 
@@ -7058,7 +7091,8 @@ dom.copyMcpUrl.addEventListener('click', copyMcpUrl);
 dom.changeLogButton.addEventListener('click', openChangeLog);
 dom.closeChangeLog.addEventListener('click', () => setActiveSheet('profile'));
 dom.scrim.addEventListener('click', closeSheets);
-dom.editTripsButton.addEventListener('click', () => setEditingMode(!state.editing));
+dom.editTripsButton.addEventListener('click', () => { closeSheets(); selectHomeTab('trips'); setEditingMode(!state.editing); });
+document.getElementById('finish_home_edit').addEventListener('click', () => setEditingMode(false));
 dom.deleteSelectedTrips.addEventListener('click', softDeleteSelectedTrips);
 dom.yearButton.addEventListener('click', () => setYearMenu(document.body.dataset.yearMenu !== 'open'));
 document.addEventListener('click', event => { if (document.body.dataset.yearMenu === 'open' && !event.target.closest('.home-year-control')) setYearMenu(false); });
@@ -7073,7 +7107,7 @@ dom.logoutButton.addEventListener('click', async () => {
   state.profile = null;
   state.trips = [];
   state.passengers.clear();
-  state.tripRoles.clear(); state.tripOwners.clear();
+  state.tripRoles.clear(); state.tripOwners.clear(); state.sharedByMe.clear();
   state.savedPassengers = [];
   state.profileSavedPassengers = [];
   state.tripDataCache.clear();
@@ -7393,7 +7427,7 @@ ensureNeon()
       return;
     }
     if (!navigator.onLine && state.user) return;
-    state.user = null; state.profile = null; state.trips = []; state.passengers.clear(); state.tripRoles.clear(); state.tripOwners.clear(); state.savedPassengers = []; state.profileSavedPassengers = []; state.tripDataCache.clear(); state.tripDataLoads.clear(); state.budgetByTrip.clear(); state.tripFilesByTrip.clear(); state.tripFileDeckIndexes.clear(); state.tripTabScroll.clear();
+    state.user = null; state.profile = null; state.trips = []; state.passengers.clear(); state.tripRoles.clear(); state.tripOwners.clear(); state.sharedByMe.clear(); state.savedPassengers = []; state.profileSavedPassengers = []; state.tripDataCache.clear(); state.tripDataLoads.clear(); state.budgetByTrip.clear(); state.tripFilesByTrip.clear(); state.tripFileDeckIndexes.clear(); state.tripTabScroll.clear();
     syncTripList(); closeSheets(); setSessionView('anonymous');
   }))
   .catch(() => {});

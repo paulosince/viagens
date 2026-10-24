@@ -8,7 +8,7 @@ const app = fs.readFileSync('src/main.js', 'utf8');
 const sql = fs.readFileSync('supabase/migrations/20260926_chatgpt_connection_and_snapshot_timeout.sql', 'utf8');
 const icon = fs.readFileSync('assets/chatgpt-mark.svg', 'utf8');
 
-assert.match(html, /class="profile-with-integration"[\s\S]*id="home_chatgpt_button"/);
+assert.match(html, /id="profile-sheet"[\s\S]*id="home_chatgpt_button"/);
 assert.match(html, /assets\/chatgpt-mark\.svg/);
 assert.doesNotMatch(html, /✦ ChatGPT/);
 assert.match(icon, /viewBox="0 0 180 180"/);
@@ -22,7 +22,7 @@ assert.match(sql, /set statement_timeout to '30s'/);
 assert.match(app, /lastOutboxError\.code === '57014'/);
 assert.equal((app.match(/upsert\(mutation\.entry, \{ onConflict: 'id', ignoreDuplicates: true \}\)/g) || []).length, 2);
 assert.match(app, /\.from\('state_snapshots'\)\.select\('id'\)/);
-assert.match(app, /if \(\(await offlineStore\.listOutbox\(\)\)\.length\) return;/);
+assert.match(app, /if \(await offlineStore\.countOutbox\(\)\) return;/);
 
 const start = app.indexOf('async function loadDayRecords(');
 const end = app.indexOf('\nfunction applyTripData(', start);

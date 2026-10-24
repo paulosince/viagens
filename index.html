@@ -47,9 +47,9 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20261024-header4" as="style">
-  <link rel="stylesheet" href="style.css?v=20261024-header4" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20261024-header4"></noscript>
+  <link rel="preload" href="style.css?v=20261024-navigation5" as="style">
+  <link rel="stylesheet" href="style.css?v=20261024-navigation5" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20261024-navigation5"></noscript>
   <link rel="stylesheet" href="src/update-manager.css?v=20261024-home3">
   <script>
     function showViaggioStartupError(detail) {
@@ -128,56 +128,30 @@
 
     <section id="user_home" class="home" aria-hidden="true">
       <header class="home-header" id="home_header">
-        <div class="home-compact-title" role="heading" aria-level="1" aria-hidden="true">Minhas viagens</div>
+        <div class="home-compact-title" role="heading" aria-level="1" aria-hidden="true">Minhas Viagens</div>
         <div class="header-actions">
-          <div class="home-profile-area"><div class="profile-with-integration">
-            <button id="profile_button" class="profile-button" type="button" aria-label="Abrir perfil">
-              <img id="header_profile_image" alt="" hidden>
-              <span id="header_profile_fallback" class="profile-fallback" aria-hidden="true">?</span>
-            </button>
-            <button id="home_chatgpt_button" class="glass-button chatgpt-header-button" hidden type="button" aria-label="Conectar o Viaggio ao ChatGPT"><img src="assets/chatgpt-mark.svg" alt="" aria-hidden="true"><span>ChatGPT</span></button>
-          </div>
-          <button id="sync_status" class="sync-status" data-kind="synced" type="button" aria-live="polite">Sincronizado</button></div>
+          <img class="home-brand-plane" src="assets/splash-plane.png" alt="Viaggio">
           <div class="header-buttons">
-            <div class="home-usage-container">
-              <button id="home_usage_button" class="home-usage-summary" type="button" aria-expanded="false" aria-controls="home_usage_details" aria-label="Ver distribuição do armazenamento da conta">
-                <span class="home-usage-label">Armazenamento</span>
-                <span class="home-usage-summary-values">
-                  <span class="home-usage-row"><span class="home-usage-icon" aria-label="Dados das viagens"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16v-2l-8-5V3.5a2 2 0 0 0-4 0V9l-8 5v2l8-2.5V19l-2 1.5V22l4-1 4 1v-1.5L14 19v-5.5L22 16Z"/></svg></span><span class="home-usage-bar" aria-hidden="true"><i data-usage-bar="database"></i></span><strong id="home_database_usage">…</strong></span>
-                  <span class="home-usage-row"><span class="home-usage-icon" aria-label="Fotos e arquivos"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8" cy="8" r="1.5"/><path d="m4 17 5-5 4 4 3-3 4 5"/></svg></span><span class="home-usage-bar" aria-hidden="true"><i data-usage-bar="files"></i></span><strong id="home_storage_usage">…</strong></span>
-                </span>
-              </button>
-              <section id="home_usage_details" class="home-usage-popover" hidden aria-label="Detalhes do uso">
-                <header class="home-usage-heading">
-                  <strong>Armazenamento</strong>
-                  <span id="home_usage_mode">Uso dos limites</span>
-                </header>
-                <div class="home-usage-chart">
-                  <span class="home-usage-chart-center"><small>Espaço usado</small><strong id="home_usage_total">—</strong></span>
-                </div>
-                <div class="home-usage-legend">
-                  <p><span><i class="home-usage-dot home-usage-dot--database"></i>Viagens</span><span class="home-usage-bar" aria-hidden="true"><i data-usage-bar="database"></i></span><span class="home-usage-legend-values"><b id="home_database_detail">—</b><small id="home_database_percent">—</small></span></p>
-                  <p><span><i class="home-usage-dot home-usage-dot--files"></i>Arquivos</span><span class="home-usage-bar" aria-hidden="true"><i data-usage-bar="files"></i></span><span class="home-usage-legend-values"><b id="home_storage_detail">—</b><small id="home_storage_percent">—</small></span></p>
-                </div>
-                <div class="home-usage-breakdown">
-                  <p>Imagens ativas <b id="home_images_detail">—</b></p>
-                  <p>Anexos ativos <b id="home_attachments_detail">—</b></p>
-                </div>
-                <small id="home_usage_note">Consultando o armazenamento do seu projeto…</small>
-              </section>
-            </div>
-            <button id="edit_trips_button" class="trip-edit-text" type="button" hidden>Editar</button>
-          </div>
-        </div>
-        <div id="trip_heading" class="trip-heading">
-          <h1 class="home-title">Minhas viagens</h1>
             <div class="home-year-control">
               <button id="year_selector_button" class="glass-button" type="button" aria-label="Selecionar ano" aria-expanded="false" aria-controls="year_menu"><span id="current_year">2026</span><span class="year-chevron" aria-hidden="true"></span></button>
               <div id="year_menu" class="year-menu" aria-hidden="true"><ol id="year_list"></ol></div>
             </div>
+            <button id="new_trip_button" class="circle-button home-create-fab" type="button" aria-label="Criar nova viagem"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16M4 12h16"/></svg></button>
+          </div>
         </div>
+        <div id="trip_heading" class="trip-heading"><h1 class="home-title">Minhas Viagens</h1></div>
       </header>
-
+      <div class="home-discovery">
+        <label class="home-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6.5"/><path d="m15 15 6 6"/></svg><input id="home_search" type="search" placeholder="Buscar viagens" aria-label="Buscar viagens"></label>
+        <div class="home-filters" aria-label="Filtrar viagens">
+          <button type="button" data-home-filter="all" aria-pressed="true">Todas</button>
+          <button type="button" data-home-filter="received" aria-pressed="false">Compartilhado comigo</button>
+          <button type="button" data-home-filter="sent" aria-pressed="false">Compartilhado por mim</button>
+          <button type="button" data-home-filter="past" aria-pressed="false">Passadas</button>
+        </div>
+        <p id="home_filter_status" role="status"></p>
+      </div>
+      <section id="home_tab_content" aria-label="Conteúdo da aba" hidden></section>
       <ol id="trip_list" class="trip-list"></ol>
       <section id="home_empty" class="home-empty" aria-hidden="true">
         <h2>Nenhuma viagem ainda</h2>
@@ -185,8 +159,20 @@
         <button id="empty_new_trip_button" class="glass-button" type="button">Criar viagem</button>
       </section>
       <p id="trip_create_message" class="trip-create-message" role="alert"></p>
-      <button id="new_trip_button" class="circle-button home-create-fab" type="button" aria-label="Criar nova viagem">＋</button>
 
+
+      <div class="home-bottom">
+        <button id="sync_status" class="sync-status" data-kind="synced" type="button" aria-live="polite">Sincronizado</button>
+        <nav class="home-tabs" aria-label="Navegação principal"><button class="home-nav-item" type="button" data-home-tab="trips" aria-current="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2 7 7 5v2l-8-3v5l2 2-3-1-3 1 2-2v-5l-8 3v-2l7-5 2-7Z"/></svg><span class="home-nav-label">Viagens</span></button>
+          <button class="home-nav-item" type="button" data-home-tab="calendar" aria-current="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 2v6M17 2v6M3 11h18"/></svg><span class="home-nav-label">Calendário</span></button>
+          <button class="home-nav-item" type="button" data-home-tab="tickets" aria-current="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v5a2 2 0 0 0 0 4v5H3v-5a2 2 0 0 0 0-4V5Z"/><path d="M15 7v2m0 3v1m0 3v1"/></svg><span class="home-nav-label">Tickets</span></button>
+          <button class="home-nav-item" type="button" data-home-tab="budgets" aria-current="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6V4h14v3M4 7h16v14H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2"/><path d="M20 11h-6v6h6"/></svg><span class="home-nav-label">Orçamentos</span></button>            <button id="profile_button" class="profile-button home-nav-item" data-home-tab="profile" type="button" aria-label="Abrir perfil">
+              <img id="header_profile_image" alt="" hidden>
+              <span id="header_profile_fallback" class="profile-fallback" aria-hidden="true">?</span>
+              <span class="home-nav-label">Perfil</span>
+            </button>
+</nav>
+      </div>
       <button id="sheet_scrim" class="scrim" type="button" aria-label="Fechar formulário"></button>
 
       <section id="home_new_trip" class="new-trip-sheet" aria-hidden="true" aria-labelledby="new-trip-title" inert>
@@ -246,6 +232,34 @@
             <h2 id="profile-title">Perfil</h2>
             <button id="save_profile" class="sheet-control confirm" type="submit" aria-label="Salvar perfil" aria-busy="false" data-loading="false"><span class="confirm-check">✓</span><span class="confirm-spinner" aria-hidden="true"></span></button>
           </header>
+<section class="form-section profile-storage"><h3>Armazenamento</h3>            <div class="home-usage-container">
+              <button id="home_usage_button" class="home-usage-summary" type="button" aria-expanded="false" aria-controls="home_usage_details" aria-label="Ver distribuição do armazenamento da conta">
+                <span class="home-usage-label">Armazenamento</span>
+                <span class="home-usage-summary-values">
+                  <span class="home-usage-row"><span class="home-usage-icon" aria-label="Dados das viagens"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16v-2l-8-5V3.5a2 2 0 0 0-4 0V9l-8 5v2l8-2.5V19l-2 1.5V22l4-1 4 1v-1.5L14 19v-5.5L22 16Z"/></svg></span><span class="home-usage-bar" aria-hidden="true"><i data-usage-bar="database"></i></span><strong id="home_database_usage">…</strong></span>
+                  <span class="home-usage-row"><span class="home-usage-icon" aria-label="Fotos e arquivos"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8" cy="8" r="1.5"/><path d="m4 17 5-5 4 4 3-3 4 5"/></svg></span><span class="home-usage-bar" aria-hidden="true"><i data-usage-bar="files"></i></span><strong id="home_storage_usage">…</strong></span>
+                </span>
+              </button>
+              <section id="home_usage_details" class="home-usage-popover" hidden aria-label="Detalhes do uso">
+                <header class="home-usage-heading">
+                  <strong>Armazenamento</strong>
+                  <span id="home_usage_mode">Uso dos limites</span>
+                </header>
+                <div class="home-usage-chart">
+                  <span class="home-usage-chart-center"><small>Espaço usado</small><strong id="home_usage_total">—</strong></span>
+                </div>
+                <div class="home-usage-legend">
+                  <p><span><i class="home-usage-dot home-usage-dot--database"></i>Viagens</span><span class="home-usage-bar" aria-hidden="true"><i data-usage-bar="database"></i></span><span class="home-usage-legend-values"><b id="home_database_detail">—</b><small id="home_database_percent">—</small></span></p>
+                  <p><span><i class="home-usage-dot home-usage-dot--files"></i>Arquivos</span><span class="home-usage-bar" aria-hidden="true"><i data-usage-bar="files"></i></span><span class="home-usage-legend-values"><b id="home_storage_detail">—</b><small id="home_storage_percent">—</small></span></p>
+                </div>
+                <div class="home-usage-breakdown">
+                  <p>Imagens ativas <b id="home_images_detail">—</b></p>
+                  <p>Anexos ativos <b id="home_attachments_detail">—</b></p>
+                </div>
+                <small id="home_usage_note">Consultando o armazenamento do seu projeto…</small>
+              </section>
+            </div>
+</section><section class="form-section"><button id="edit_trips_button" class="trip-edit-text" type="button">Editar viagens</button><button id="home_chatgpt_button" class="glass-button chatgpt-header-button" hidden type="button"><img src="assets/chatgpt-mark.svg" alt=""><span>ChatGPT</span></button></section>
           <p id="profile_message" class="profile-save-message" role="status"></p>
           <section class="profile-photo-section">
             <label class="profile-photo-editor" for="profile-photo"><img id="profile_editor_image" src="assets/avatar-placeholder.svg" alt=""><span>Alterar foto</span><input id="profile-photo" type="file" accept="image/*"></label>
@@ -369,7 +383,7 @@
       <span class="trip-tab-indicator" aria-hidden="true"></span>
       <button id="trip_tab_roteiro" class="trip-tab" role="tab" type="button" aria-controls="trip_panel_roteiro" aria-selected="true" tabindex="0"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V8l5-3 6 3 5-3v12l-5 3-6-3-5 3Z"/><path d="M9 5v12m6-9v12"/></svg><span>Roteiro</span></button>
       <button id="trip_tab_orcamento" class="trip-tab" role="tab" type="button" aria-controls="trip_panel_orcamento" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 10h18m-5 5h2M6 6V4h12"/></svg><span>Orçamento</span></button>
-      <button id="trip_tab_arquivos" class="trip-tab" role="tab" type="button" aria-controls="trip_panel_arquivos" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/><path d="M3 11h18"/></svg><span>Arquivos</span></button>
+      <button id="trip_tab_arquivos" class="trip-tab" role="tab" type="button" aria-controls="trip_panel_arquivos" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/><path d="M3 11h18"/></svg><span>Tickets</span></button>
     </nav>
 
     <section id="budget_item_page" class="budget-item-page" aria-hidden="true" aria-labelledby="budget_item_page_title" inert>
@@ -543,7 +557,7 @@
     </dialog>
 
     <footer id="trip_edit_footer" class="trip-edit-footer" aria-hidden="true">
-      <button id="delete_selected_trips" type="button" disabled>Excluir selecionadas</button>
+      <button id="finish_home_edit" class="trip-edit-text" type="button">Concluído</button><button id="delete_selected_trips" type="button" disabled>Excluir selecionadas</button>
     </footer>
   </main>
   <!-- Prevent hidden loss of unsent legacy work during backend cutover. -->
@@ -554,7 +568,7 @@
       if (legacyPending > 0) {
         location.replace('./legacy-supabase.html?recover=1');
       } else {
-        await import('./experiments/neon-pilot/app/main-neon.js?v=20261024-header4');
+        await import('./experiments/neon-pilot/app/main-neon.js?v=20261024-navigation5');
       }
     } catch (error) {
       console.error('Não foi possível validar o estado local antes da migração Neon', error);
