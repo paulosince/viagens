@@ -48,6 +48,7 @@ jobs:
         run: |
           node tests/tickets-render.cjs
           node tests/ticket-cover-ios.cjs
+          node tests/ticket-cover-selection.cjs
           node tests/offline-sync.cjs
           node tests/day-map-order.cjs
           node tests/inline-agenda.cjs
