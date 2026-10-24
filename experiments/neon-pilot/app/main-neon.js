@@ -5921,6 +5921,7 @@ async function saveTicketMetadata(event) {
     const patch = { display_title, item_category, event_date, event_time };
     let newCoverPath=null;
     let newCoverUrl='';
+    let commitSucceeded=false;
     try {
       if (context.coverBlob) {
         newCoverPath=context.trip.id+'/general/card-'+context.file.id+'-'+crypto.randomUUID()+'.webp';
@@ -5933,6 +5934,7 @@ async function saveTicketMetadata(event) {
         patch.card_image_path=null;
       }
       const updatedFile = await updateTicketDetailsSafely(client,context,patch);
+      commitSucceeded=true;
       if (newCoverPath) {
         try {
           const signed=await client.storage.from(DAY_ATTACHMENT_BUCKET).createSignedUrl(newCoverPath,3600);
@@ -5956,7 +5958,10 @@ async function saveTicketMetadata(event) {
       context.onSaved?.(saved);
     } catch (error) {
       // If the DB update fails, leave the original cover intact and release only the new upload.
-      if(newCoverPath) {
+      // A lost network response can happen after the database committed. Keep
+      // the new cover in storage when commit status is uncertain, rather than
+      // leave a persisted card pointing to a deleted file.
+      if(newCoverPath && !commitSucceeded && !ticketSaveIsNetworkError(error)) {
         const cleanup=await client.storage.from(DAY_ATTACHMENT_BUCKET).remove([newCoverPath]).catch(()=>null);
         if(cleanup?.error) console.warn('Limpeza da capa temporária indisponível',cleanup.error);
       }
