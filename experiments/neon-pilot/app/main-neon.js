@@ -5746,13 +5746,48 @@ async function loadTicketCardCoverPreview(file) {
 // iOS Photos frequently supplies HEIC/HEIF. Safari may decode a file through an
 // <img> element even when createImageBitmap(file) rejects it. Always transcode
 // to small WebP artwork; never upload the original giant phone image as a card.
+function ticketCoverMime(file) {
+  const type=String(file?.type||'').toLowerCase();
+  if(type==='image/jpeg'||type==='image/jpg')return 'image/jpeg';
+  if(type==='image/png')return 'image/png';
+  if(type==='image/webp')return 'image/webp';
+  if(type==='image/heic')return 'image/heic';
+  if(type==='image/heif')return 'image/heif';
+  const name=String(file?.name||'').toLowerCase();
+  if(/\.jpe?g$/.test(name))return 'image/jpeg';
+  if(/\.png$/.test(name))return 'image/png';
+  if(/\.webp$/.test(name))return 'image/webp';
+  if(/\.heic$/.test(name))return 'image/heic';
+  if(/\.heif$/.test(name))return 'image/heif';
+  return '';
+}
+function ticketCoverUploadInfo(blob) {
+  const mime=ticketCoverMime(blob);
+  const extension={
+    'image/jpeg':'jpg',
+    'image/png':'png',
+    'image/webp':'webp',
+    'image/heic':'heic',
+    'image/heif':'heif'
+  }[mime];
+  if(!extension)throw new Error('UNSUPPORTED_IMAGE');
+  return {mime,extension};
+}
+
+// Native JPEG/PNG/WebP from iOS Photos are valid card covers. An earlier
+// implementation required Safari to encode WebP first, dropping valid photos
+// when canvas.toBlob failed. Preserve these bytes when within the 6MB limit.
 async function prepareTicketCardCover(file) {
+  const mime=ticketCoverMime(file);
+  const limit=DAY_ATTACHMENT_MAX_BYTES;  // Same limit already used by private storage.
+  if(['image/jpeg','image/png','image/webp'].includes(mime) && file.size>0 && file.size<=limit)
+    return file;
+
   let source=null, objectUrl=null;
   try {
     if(typeof createImageBitmap==='function') {
-      try {source=await createImageBitmap(file);} catch(error) {
-        console.info('Usando decodificação compatível com Fotos do iPhone',error);
-      }
+      try {source=await createImageBitmap(file);}
+      catch(error) {console.info('Decodificando foto pelo Safari',error);}
     }
     if(!source) {
       objectUrl=URL.createObjectURL(file);
@@ -5765,17 +5800,30 @@ async function prepareTicketCardCover(file) {
     }
     const w=source.naturalWidth||source.width;
     const h=source.naturalHeight||source.height;
-    if(!w||!h) throw new Error('IMAGE_NOT_DECODABLE');
-    const scale=Math.min(1,1400/Math.max(w,h));
+    if(!w||!h)throw new Error('IMAGE_NOT_DECODABLE');
+    const scale=Math.min(1,1200/Math.max(w,h));
     const canvas=document.createElement('canvas');
     canvas.width=Math.max(1,Math.round(w*scale));
     canvas.height=Math.max(1,Math.round(h*scale));
     const ctx=canvas.getContext('2d',{alpha:false});
-    if(!ctx) throw new Error('CANVAS_NOT_AVAILABLE');
+    if(!ctx)throw new Error('CANVAS_NOT_AVAILABLE');
     ctx.drawImage(source,0,0,canvas.width,canvas.height);
-    const blob=await canvasBlob(canvas,'image/webp',.8);
-    if(blob.type!=='image/webp') throw new Error('WEBP_NOT_SUPPORTED');
-    return blob;
+    // Not all iOS Safari versions produce WebP in canvas.toBlob.
+    for(const [format,quality] of [['image/webp',.8],['image/jpeg',.76]]) {
+      try {
+        const blob=await canvasBlob(canvas,format,quality);
+        if(blob?.size>0 && blob.size<=limit && ticketCoverMime(blob)===format) return blob;
+      } catch(error) { console.info('Codificação de foto alternativa',format,error); }
+    }
+    throw new Error('IMAGE_CANNOT_ENCODE');
+  } catch(error) {
+    // For a browser that can display a native HEIC/HEIF but cannot reencode,
+    // preserve its original bytes instead of falsely claiming conversion success.
+    if(['image/heic','image/heif'].includes(mime) && file.size>0 && file.size<=limit) {
+      console.info('Mantendo foto original do iPhone para a capa');
+      return file;
+    }
+    throw error;
   } finally {
     if(typeof source?.close==='function')source.close();
     if(objectUrl)URL.revokeObjectURL(objectUrl);
@@ -5827,7 +5875,7 @@ async function selectTicketCardCoverFile(file) {
   try {
     const blob=await prepareTicketCardCover(file);
     if(ticketEditorContext!==context || request!==ticketCardCoverRequest) return;
-    if(!blob?.size || blob.size>6*1024*1024) throw new Error('IMAGE_TOO_LARGE');
+    if(!blob?.size || blob.size>DAY_ATTACHMENT_MAX_BYTES) throw new Error('IMAGE_TOO_LARGE');
     const ready=URL.createObjectURL(blob);
     if(context.coverDraftUrl) URL.revokeObjectURL(context.coverDraftUrl);
     context.coverDraftUrl=ready;
@@ -5836,7 +5884,7 @@ async function selectTicketCardCoverFile(file) {
     save.disabled=false;
     hint.textContent='Toque para trocar a capa';
     feedback.dataset.kind='info';
-    feedback.textContent='Capa pronta. Toque em Salvar para confirmar.';
+    feedback.textContent='Foto pronta para salvar.';
     showTicketCardCoverPreview(ready);
   } catch (cause) {
     if(ticketEditorContext!==context || request!==ticketCardCoverRequest) return;
@@ -5849,7 +5897,7 @@ async function selectTicketCardCoverFile(file) {
     hint.textContent='Toque para escolher ou trocar a capa';
     showTicketCardCoverPreview(context.file.cardSignedUrl || '');
     feedback.dataset.kind='error';
-    feedback.textContent='Esta imagem não pôde ser preparada. Escolha outra foto; o comprovante não foi alterado.';
+    feedback.textContent='O iPhone não conseguiu abrir essa foto. Tente outro arquivo; sua reserva e o comprovante não foram alterados.';
   }
 }
 
@@ -6027,9 +6075,10 @@ async function saveTicketMetadata(event) {
     let commitSucceeded=false;
     try {
       if (context.coverBlob) {
-        newCoverPath=context.trip.id+'/general/card-'+context.file.id+'-'+crypto.randomUUID()+'.webp';
+        const media=ticketCoverUploadInfo(context.coverBlob);
+        newCoverPath=context.trip.id+'/general/card-'+context.file.id+'-'+crypto.randomUUID()+'.'+media.extension;
         const uploaded=await client.storage.from(DAY_ATTACHMENT_BUCKET).upload(newCoverPath,context.coverBlob,{
-          contentType:'image/webp',upsert:false
+          contentType:media.mime,upsert:false
         });
         if(uploaded.error) throw uploaded.error;
         patch.card_image_path=newCoverPath;

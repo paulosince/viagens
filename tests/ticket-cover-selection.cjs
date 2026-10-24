@@ -21,7 +21,7 @@ const urls={
 const prepare=()=>new Promise(resolve=>{resolveImage=resolve;});
 const snapshot=[];
 const make=new Function('document','URL','prepareTicketCardCover','showTicketCardCoverPreview','console',
-  'let ticketCardCoverRequest=0;let ticketEditorContext={file:{id:"one",cardSignedUrl:""},coverDraftUrl:null,coverBlob:null,coverPending:false,removeCover:false};'+
+  'const DAY_ATTACHMENT_MAX_BYTES=6*1024*1024;let ticketCardCoverRequest=0;let ticketEditorContext={file:{id:"one",cardSignedUrl:""},coverDraftUrl:null,coverBlob:null,coverPending:false,removeCover:false};'+
   source.slice(a,b)+';return {selectTicketCardCoverFile,getContext:()=>ticketEditorContext};'
 );
 const ui=make(doc,urls,prepare,url=>snapshot.push(url),{warn:()=>{}});
@@ -39,7 +39,7 @@ const ui=make(doc,urls,prepare,url=>snapshot.push(url),{warn:()=>{}});
   assert.equal(ui.getContext().coverDraftUrl,'blob:mock-2');
   assert.equal(snapshot.at(-1),'blob:mock-2');
   assert.equal(formElements.ticket_metadata_save.disabled,false);
-  assert.match(formElements.ticket_card_cover_feedback.textContent,/Toque em Salvar/);
+  assert.match(formElements.ticket_card_cover_feedback.textContent,/Foto pronta para salvar/);
   assert.ok(calls.some(x=>x[0]==='revoke'&&x[1]==='blob:mock-1'));
   console.log('PASS photo is previewed immediately and is marked ready only after transcoding');
 })().catch(e=>{console.error(e);process.exitCode=1;});

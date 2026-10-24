@@ -3536,3 +3536,74 @@ body[data-home-tab="tickets"] #home_tab_content { width:min(100%,760px); }
 .tickets-item-art.attraction .tickets-item-icon .ticket-category-symbol { background:#bd8b18; color:white; }
 .tickets-item-art.transport .tickets-item-icon .ticket-category-symbol { background:#149ca4; color:white; }
 .tickets-item-art.other .tickets-item-icon .ticket-category-symbol { background:#728096; color:white; }
+
+
+/* Viaggio ticket icon system: one circular motif, one stable category color.
+   Never put a colored square inside the floating white circle. */
+.ticket-metadata-simple .ticket-category-option .ticket-category-symbol,
+.ticket-metadata-simple .ticket-category-option[aria-pressed="true"] .ticket-category-symbol {
+  display:grid;
+  place-items:center;
+  width:42px;
+  height:42px;
+  min-width:42px;
+  min-height:42px;
+  border-radius:50%!important;
+  background:var(--category-soft)!important;
+  color:var(--category-color)!important;
+}
+.ticket-metadata-simple .ticket-category-symbol svg {
+  width:25px;
+  height:25px;
+  display:block;
+  stroke:currentColor!important;
+  fill:none!important;
+  stroke-width:2;
+}
+.ticket-metadata-simple .ticket-category-option[aria-pressed="true"] {
+  border:2px solid var(--category-color);
+  background:var(--category-soft);
+}
+.tickets-item-art .tickets-item-icon,
+.tickets-item-art:has(.tickets-item-thumbnail:not([hidden])) .tickets-item-icon {
+  width:62px;
+  height:62px;
+  left:12px;
+  bottom:-31px;
+  padding:0!important;
+  border:5px solid white;
+  border-radius:50%!important;
+  background:white!important;
+  display:grid;
+  place-items:center;
+  box-shadow:0 5px 13px rgba(13,32,51,.16);
+  color:var(--category-color)!important;
+}
+.tickets-item-art .tickets-item-icon .ticket-category-symbol,
+.tickets-item-art.flight .tickets-item-icon .ticket-category-symbol,
+.tickets-item-art.hotel .tickets-item-icon .ticket-category-symbol,
+.tickets-item-art.restaurant .tickets-item-icon .ticket-category-symbol,
+.tickets-item-art.show .tickets-item-icon .ticket-category-symbol,
+.tickets-item-art.sport .tickets-item-icon .ticket-category-symbol,
+.tickets-item-art.attraction .tickets-item-icon .ticket-category-symbol,
+.tickets-item-art.transport .tickets-item-icon .ticket-category-symbol,
+.tickets-item-art.other .tickets-item-icon .ticket-category-symbol {
+  display:grid;
+  place-items:center;
+  width:100%;
+  height:100%;
+  min-width:0;
+  min-height:0;
+  border:0;
+  border-radius:50%!important;
+  background:transparent!important;
+  color:var(--category-color)!important;
+  font-size:25px;
+}
+.tickets-item-art .tickets-item-icon .ticket-category-symbol svg {
+  width:30px;
+  height:30px;
+  fill:none!important;
+  stroke:currentColor!important;
+  stroke-width:2;
+}
