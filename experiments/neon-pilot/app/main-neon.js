@@ -6369,6 +6369,7 @@ function startTicketCoverPicker(event) {
   context.coverPickerState='waiting';
   context.coverPickerToken=(context.coverPickerToken||0)+1;
   ticketCoverPickerFeedback('Escolha uma foto. O iPhone pode levar alguns instantes para prepará-la.');
+  document.getElementById('ticket_card_cover_hint').textContent='Aguardando seleção da Fototeca…';
 }
 function receiveTicketCoverSelection(event) {
   const context=ticketEditorContext;
@@ -6403,6 +6404,7 @@ ticketCoverInput?.addEventListener('cancel',()=>{
   if(!context || context.coverPickerState!=='waiting') return;
   context.coverPickerState='cancelled';
   ticketCoverPickerFeedback('Nenhuma foto foi recebida. Se você tocou em OK, tente novamente ou escolha a foto pelo app Arquivos.','error');
+  document.getElementById('ticket_card_cover_hint').textContent='Foto não recebida · toque para tentar novamente';
 });
 // Some iOS WebKit versions return from Photos without 'change' or 'cancel'.
 // Surface a useful message rather than leaving the screen silent.
@@ -6413,6 +6415,7 @@ window.addEventListener('focus',()=>{
   setTimeout(()=>{
     if(ticketEditorContext!==context || context.coverPickerState!=='waiting' || context.coverPickerToken!==token) return;
     ticketCoverPickerFeedback('Ainda não recebemos a foto da Fototeca. Se você já confirmou, tente novamente ou use o app Arquivos.','error');
+    document.getElementById('ticket_card_cover_hint').textContent='Foto não recebida · toque para tentar novamente';
   },3500);
 });
 document.getElementById('ticket_card_cover_remove')?.addEventListener('click',clearTicketCardCover);
