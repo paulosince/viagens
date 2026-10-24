@@ -5813,7 +5813,7 @@ function renderTicketsFeed(panel, trips) {
     } catch (error) { console.warn('Arquivo indisponível',error); }
   };
   const openTicketAgenda = async file => {
-    if (!file.event_date && !file.day_id) { editTicket(file); return; }
+    if (!file.event_date && !file.day_id) { openTicketFile(file); return; }
     try {
       await openTrip(trip.id,{forceRefresh:true});
       const day = tripTicketDay(trip,file.event_date,state.tripDays)
