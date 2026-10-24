@@ -3859,7 +3859,7 @@ async function flushOutbox() {
       return false;
     }
     if (!await tryNeon()) {
-      lastOutboxError = new Error('Não foi possível conectar ao Supabase.');
+      lastOutboxError = new Error('Não foi possível conectar ao Neon.');
       await refreshSyncStatus();
       return false;
     }
@@ -4064,7 +4064,14 @@ async function saveDayEditor() {
     closeDayEditor();
 
     flushOutbox().then(synced => {
-      if (synced && state.activeTripId) state.tripDataCache.get(String(state.activeTripId)).loadedAt = Date.now();
+      if (synced && state.activeTripId) {
+        const cached = state.tripDataCache.get(String(state.activeTripId));
+        if (cached) cached.loadedAt = Date.now();
+      }
+      if (!synced && IS_NEON_EDITABLE && navigator.onLine) {
+        const code = String(lastOutboxError?.code || 'PENDENTE').replace(/[^A-Za-z0-9_-]/g, '').slice(0,20);
+        window.alert('A edição ficou salva neste iPhone, mas não foi confirmada pelo Neon (' + code + '). Toque no indicador de sincronização para tentar novamente. Não limpe os dados do Safari.');
+      }
     }).catch(error => console.warn('Falha ao processar fila local', error));
   } catch (error) {
     dom.dayEditMessage.textContent = error.message || 'Não foi possível salvar a alteração neste aparelho.';
