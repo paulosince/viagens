@@ -5,9 +5,11 @@ on:
     branches: [main]
     paths:
       - 'index.html'
+      - 'legacy-supabase.html'
       - 'style.css'
       - 'sw.js'
       - 'src/**'
+      - 'experiments/neon-pilot/app/**'
       - '.github/workflows/published-app-smoke.yml'
   workflow_dispatch:
 
@@ -20,35 +22,41 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Verify the exact published app shell
+      - name: Verify the actual Neon production shell on GitHub Pages
         shell: bash
         run: |
           set -eu
           base='https://paulosince.github.io/viagens/'
-          main_asset="$(grep -oE 'src/main\.js\?v=[^" ]+' index.html | head -1)"
+          main_asset="$(node -e 'const s=require("fs").readFileSync("index.html","utf8");const m=s.match(/experiments\/neon-pilot\/app\/main-neon\.js\?v=[a-zA-Z0-9-]+/);process.stdout.write(m?m[0]:"")')"
           style_asset="$(grep -oE 'style\.css\?v=[^" ]+' index.html | head -1)"
-          test -n "$main_asset" && test -n "$style_asset"
+          manager_asset="$(grep -oE 'src/update-manager-neon\.js\?v=[^" ]+' index.html | head -1)"
+          backend_asset="$(node -e 'const s=require("fs").readFileSync("experiments/neon-pilot/app/main-neon.js","utf8");const m=s.match(/backend-neon\.mjs\?v=[a-zA-Z0-9-]+/);process.stdout.write(m?"experiments/neon-pilot/app/"+m[0]:"")')"
+          test -n "$main_asset" && test -n "$style_asset" && test -n "$manager_asset" && test -n "$backend_asset"
+          test -f legacy-supabase.html
           mkdir -p /tmp/viaggio-smoke
-          for attempt in $(seq 1 18); do
+          for attempt in $(seq 1 20); do
             if curl -fsSL --max-time 15 "$base" -o /tmp/viaggio-smoke/index.html &&
                grep -Fq "$main_asset" /tmp/viaggio-smoke/index.html &&
-               grep -Fq "$style_asset" /tmp/viaggio-smoke/index.html &&
-               curl -fsSL --max-time 15 "$base$main_asset" -o /tmp/viaggio-smoke/main.js &&
+               grep -Fq "$manager_asset" /tmp/viaggio-smoke/index.html &&
+               grep -Fq 'legacyOfflineStore.countOutbox' /tmp/viaggio-smoke/index.html &&
+               curl -fsSL --max-time 15 "$base$main_asset" -o /tmp/viaggio-smoke/main-neon.js &&
+               curl -fsSL --max-time 15 "$base$backend_asset" -o /tmp/viaggio-smoke/backend-neon.mjs &&
+               curl -fsSL --max-time 15 "$base$manager_asset" -o /tmp/viaggio-smoke/update-manager-neon.js &&
                curl -fsSL --max-time 15 "$base$style_asset" -o /tmp/viaggio-smoke/style.css &&
-               curl -fsSL --max-time 15 "${base}src/offline-store.js" -o /tmp/viaggio-smoke/offline-store.js &&
-               curl -fsSL --max-time 15 "${base}src/media-cache.js" -o /tmp/viaggio-smoke/media-cache.js &&
-               cmp -s src/main.js /tmp/viaggio-smoke/main.js &&
+               curl -fsSL --max-time 15 "$base"legacy-supabase.html -o /tmp/viaggio-smoke/legacy-supabase.html &&
+               cmp -s experiments/neon-pilot/app/main-neon.js /tmp/viaggio-smoke/main-neon.js &&
+               cmp -s experiments/neon-pilot/app/backend-neon.mjs /tmp/viaggio-smoke/backend-neon.mjs &&
+               cmp -s src/update-manager-neon.js /tmp/viaggio-smoke/update-manager-neon.js &&
                cmp -s style.css /tmp/viaggio-smoke/style.css &&
-               cmp -s src/offline-store.js /tmp/viaggio-smoke/offline-store.js &&
-               cmp -s src/media-cache.js /tmp/viaggio-smoke/media-cache.js; then
-              node --input-type=module --check < /tmp/viaggio-smoke/main.js
-              node --input-type=module --check < /tmp/viaggio-smoke/offline-store.js
-              node --input-type=module --check < /tmp/viaggio-smoke/media-cache.js
-              echo "Published app matches this commit and parses as browser modules."
+               cmp -s legacy-supabase.html /tmp/viaggio-smoke/legacy-supabase.html; then
+              node --input-type=module --check < /tmp/viaggio-smoke/main-neon.js
+              node --input-type=module --check < /tmp/viaggio-smoke/backend-neon.mjs
+              node --input-type=module --check < /tmp/viaggio-smoke/update-manager-neon.js
+              echo 'Neon production shell, recovery shell and exact published assets verified.'
               exit 0
             fi
-            echo "Attempt $attempt: waiting for this commit on GitHub Pages."
+            echo "Attempt $attempt: waiting for the verified Neon shell on GitHub Pages."
             sleep 5
           done
-          echo 'GitHub Pages did not serve the current, parseable app shell.' >&2
+          echo 'GitHub Pages did not serve the exact Neon PWA shell.' >&2
           exit 1
