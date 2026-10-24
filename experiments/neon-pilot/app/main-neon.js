@@ -5928,7 +5928,7 @@ function renderTicketsFeed(panel, trips) {
       details.append(name,subtitle);
       preview.append(art,details);
       preview.setAttribute('aria-label',(identified ? 'Abrir na agenda: ' : 'Identificar: ')+ticketDisplayTitle(file));
-      preview.addEventListener('click',()=> identified ? openTicketAgenda(file) : editTicket(file));
+      preview.addEventListener('click',()=> { if (!canEditTrip(trip) && !identified) openTicketFile(file); else if (identified) openTicketAgenda(file); else editTicket(file); });
       const footer = document.createElement('div'); footer.className = 'tickets-item-actions';
       const edit = document.createElement('button');
       edit.type = 'button'; edit.textContent = identified ? 'Editar' : 'Identificar';
