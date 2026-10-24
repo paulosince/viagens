@@ -5654,7 +5654,6 @@ function renderHomeCalendar(panel, trip, shownDate = null) {
     const date = new Date(year, month, day);
     const cell = document.createElement('span'); cell.textContent = day;
     if (start && end && date >= start && date <= end) { cell.className = 'has-trip'; cell.title = trip.name; }
-    if (date.getTime() === start?.getTime()) cell.classList.add('trip-departure');
     if (date.toDateString() === today.toDateString()) cell.setAttribute('aria-current', 'date');
     grid.append(cell);
   }
@@ -5670,14 +5669,14 @@ function selectHomeTab(tab) {
   document.querySelector('.home-title').textContent = titles[tab];
   document.querySelector('.home-compact-title').textContent = titles[tab];
   document.querySelector('#home_search').placeholder = 'Buscar viagens';
-  const tabs = [...document.querySelectorAll('[data-home-tab]')];
+  const tabs = [...document.querySelectorAll('.home-tabs button[data-home-tab]')];
   document.querySelector('.home-tabs').style.setProperty('--active-index', String(tabs.findIndex(button => button.dataset.homeTab === tab)));
   for (const button of tabs) button.setAttribute('aria-current', String(button.dataset.homeTab === tab));
   syncTripList();
   window.scrollTo({ top: 0, behavior: 'instant' });
 }
 
-for (const button of document.querySelectorAll('[data-home-tab]')) {
+for (const button of document.querySelectorAll('.home-tabs button[data-home-tab]')) {
   if (button.dataset.homeTab !== 'profile') button.addEventListener('click', () => selectHomeTab(button.dataset.homeTab));
 }
 document.getElementById('home_search').addEventListener('input', event => { state.homeSearch = event.target.value.trim(); syncTripList(); });

@@ -38,14 +38,17 @@ const fs=require('fs'), assert=require('assert/strict');
   await page.locator('#home_search').fill('sao');assert.equal(await page.locator('#trip_list>li').count(),1);
   await page.locator('#home_search').fill('');await page.locator('[data-home-filter="received"]').click();assert.equal(await page.locator('#trip_list>li').count(),1);
   await page.locator('[data-home-filter="all"]').click();
-  await page.locator('[data-home-tab="tickets"]').click();await page.locator('.home-trip-shortcut').first().click();assert.equal(await page.evaluate(()=>destination),'arquivos');
-  await page.locator('[data-home-tab="budgets"]').click();await page.locator('.home-trip-shortcut').first().click();assert.equal(await page.evaluate(()=>destination),'orcamento');
-  await page.locator('[data-home-tab="calendar"]').click();assert.equal(await page.locator('.home-calendar').count(),2);
+  await page.locator('.home-tabs button[data-home-tab="tickets"]').click();await page.locator('.home-trip-shortcut').first().click();assert.equal(await page.evaluate(()=>destination),'arquivos');
+  await page.locator('.home-tabs button[data-home-tab="budgets"]').click();await page.locator('.home-trip-shortcut').first().click();assert.equal(await page.evaluate(()=>destination),'orcamento');
+  await page.locator('.home-tabs button[data-home-tab="calendar"]').click();assert.equal(await page.locator('.home-calendar').count(),2);
   assert.equal(await page.locator('#new_trip_button').isVisible(),false);
   assert.equal(await page.locator('.home-discovery').isVisible(),false);
   assert.match(await page.locator('.home-calendar-heading strong').first().textContent(),/novembro.*2026/);
   assert.equal(await page.locator('.calendar-trip').first().locator('.has-trip').count(),13);
-  assert.equal(await page.locator('.calendar-trip').first().locator('.trip-departure').textContent(),'18');
+  assert.equal(await page.locator('.trip-departure').count(),0);
+  const hero=await page.locator('.calendar-countdown').first().boundingBox();assert.ok(Math.abs(hero.width-hero.height)<1);
+  await page.evaluate(()=>{const holder=document.createElement('div');renderHomeCalendar(holder,state.trips[0],new Date());document.body.append(holder);holder.id='today_test';});
+  assert.equal(await page.locator('#today_test [aria-current="date"]').textContent(),String(new Date().getDate()));await page.locator('#today_test').evaluate(el=>el.remove());
   await page.locator('[aria-label="Próximo mês"]').first().click();
   assert.match(await page.locator('.home-calendar-heading strong').first().textContent(),/dezembro.*2026/);
   assert.equal(await page.locator('.calendar-trip').first().locator('.has-trip').count(),1);
@@ -58,9 +61,13 @@ const fs=require('fs'), assert=require('assert/strict');
   const countdowns=await page.evaluate(()=>[calendarCountdown(state.trips[0],new Date('2026-10-24T12:00:00')),calendarCountdown(state.trips[0],new Date('2026-11-18T12:00:00')),calendarCountdown(state.trips[0],new Date('2026-12-02T12:00:00'))]);
   assert.deepEqual(countdowns.map(x=>x.number),[25,1,1]);
   assert.match(countdowns[2].label,/retorno/);
-  await page.locator('[data-home-tab="trips"]').click();assert.equal(await page.locator('#trip_list>li').count(),2);
+  await page.locator('.home-tabs button[data-home-tab="trips"]').click();assert.equal(await page.locator('#trip_list>li').count(),2);
   await page.evaluate(()=>setHomeSearchOpen(true));await page.locator('#home_search').waitFor({state:'visible'});await page.locator('#home_search').focus();await page.waitForFunction(()=>document.activeElement.id==='home_search');await page.locator('#home_search').press('Escape');assert.equal(await page.locator('#home_search_reveal').getAttribute('aria-hidden'),'true');
 
+  for(const tab of ['calendar','tickets','budgets','trips','calendar','trips']) {
+    await page.locator('.home-tabs button[data-home-tab="'+tab+'"]').click();
+    await page.waitForFunction(()=>{const a=document.querySelector('.home-tab-indicator').getBoundingClientRect(),b=document.querySelector('.home-tabs button[aria-current="true"]').getBoundingClientRect();return Math.abs(a.x+a.width/2-b.x-b.width/2)<2;});
+  }
   console.log('PASS',width,'layout, search, filters, calendar, ticket/budget destinations');
  }
  await browser.close();

@@ -3064,17 +3064,18 @@ body[data-home-tab="calendar"] #home_tab_content { position:fixed; inset:0; z-in
 .calendar-trip-content { max-width:480px; margin:auto; display:flex; flex-direction:column; gap:12px; }
 .calendar-trip-content>h2 { font-size:clamp(28px,8vw,38px); line-height:1.1; letter-spacing:-.035em; margin:4px 0 0; text-shadow:0 2px 12px #10233833; }
 .calendar-trip-dates { font-size:14px; margin:-4px 0 5px; }
-.calendar-countdown { align-self:center; display:flex; flex-direction:column; align-items:center; justify-content:center; width:80%; min-height:170px; height:clamp(170px,24svh,260px); padding:16px; border:1px solid #ffffffa0; border-radius:30px; background:linear-gradient(140deg,#ffffff45,#ffffff18); box-shadow:inset 0 1px 1px #ffffffe0,0 8px 24px #071b3526; backdrop-filter:blur(18px) saturate(130%); -webkit-backdrop-filter:blur(18px) saturate(130%); }
+.calendar-countdown { align-self:center; display:flex; flex-direction:column; align-items:center; justify-content:center; width:min(220px,66vw,25svh); min-height:0; height:auto; aspect-ratio:1; padding:16px; border:1px solid #ffffffa0; border-radius:30px; background:linear-gradient(140deg,#ffffff20,#ffffff08); box-shadow:inset 0 1px 1px #ffffffe0,0 8px 24px #071b3526; backdrop-filter:blur(8px) saturate(115%); -webkit-backdrop-filter:blur(8px) saturate(115%); }
 .calendar-countdown small { font-size:9px; letter-spacing:.17em; }
-.calendar-countdown strong { font-family:Georgia,serif; font-size:clamp(76px,12svh,120px); font-weight:400; line-height:1.1; font-variant-numeric:tabular-nums; }
-.calendar-countdown>span:not(.calendar-route) { font-family:Georgia,serif; font-size:20px; }
+.calendar-countdown strong { font-family:Georgia,serif; font-size:clamp(56px,9svh,88px); font-weight:400; line-height:1.1; font-variant-numeric:tabular-nums; }
+.calendar-countdown>span:not(.calendar-route) { font-family:Georgia,serif; font-size:clamp(15px,4vw,18px); white-space:nowrap; }
 .calendar-route { font-size:18px; opacity:.7; margin-top:8px; letter-spacing:8px; }
-.calendar-trip .home-calendar { margin-top:5px; padding:10px 14px 14px; border:1px solid #ffffffa0; border-radius:25px; background:linear-gradient(145deg,#ffffffba,#ffffff80); box-shadow:inset 0 1px 1px #ffffffdf,0 5px 20px #0c18301a; backdrop-filter:blur(22px); -webkit-backdrop-filter:blur(22px); color:#102439; }
-.calendar-trip .home-calendar-heading strong { font-size:17px; }
-.calendar-trip .home-calendar-grid { gap:3px 0; }
-.calendar-trip .home-calendar-grid>* { min-height:clamp(24px,3.6svh,34px); font-size:13px; }
+.calendar-trip .home-calendar { align-self:center; width:min(100%,300px,33svh); aspect-ratio:1; display:flex; flex-direction:column; margin-top:5px; padding:10px 14px 14px; border:1px solid #ffffffa0; border-radius:25px; background:linear-gradient(145deg,#ffffff24,#ffffff0c); box-shadow:inset 0 1px 1px #ffffffdf,0 5px 20px #0c18301a; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); color:#fff; }
+.calendar-trip .home-calendar-heading strong { font-size:14px; white-space:nowrap; }
+.calendar-trip .home-calendar-heading button { width:32px; flex-shrink:0; }
+.calendar-trip .home-calendar-grid { gap:3px 0; flex:1; }
+.calendar-trip .home-calendar-grid>* { min-height:24px; font-size:13px; }
 .calendar-trip .home-calendar-grid .has-trip { background:#a8d0f6b8; border-radius:0; }
-.calendar-trip .home-calendar-grid .trip-departure { border-radius:50%; background:#007aff; color:white; }
+.calendar-trip .home-calendar-grid [aria-current="date"] { background-image:radial-gradient(circle,#007aff 0 69%,transparent 71%); background-size:30px 30px; background-position:center; background-repeat:no-repeat; box-shadow:none; color:white; }
 .calendar-next { align-self:center; background:none; border:0; color:white; font:inherit; font-size:11px; padding:8px; opacity:.9; }
 .calendar-empty { max-width:400px; margin:150px auto; padding:30px; color:white; text-align:center; }
 body[data-home-tab="calendar"] .home-tabs { background:linear-gradient(150deg,#ffffff72,#ffffff38); border-color:#ffffffb0; }
@@ -3088,4 +3089,4 @@ body[data-home-tab="calendar"][data-calendar-menu="open"] .calendar-menu-scrim:n
 body:not([data-session="authenticated"]) .calendar-toolbar, body:not([data-session="authenticated"]) #home_tab_content.calendar-feed { display:none; }
 @media(prefers-reduced-motion:reduce) { .calendar-feed { scroll-behavior:auto; } }
 
-@media(max-width:359px) { .calendar-countdown { width:90%; } .calendar-countdown>span:not(.calendar-route) { font-size:18px; } .calendar-trip .home-calendar-heading strong { font-size:15px; } }
+@media(max-width:359px) { .calendar-trip .home-calendar-heading strong { font-size:14px; } .calendar-countdown { padding:10px; } .calendar-countdown small { font-size:8px; letter-spacing:.1em; } }
