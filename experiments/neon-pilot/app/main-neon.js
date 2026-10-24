@@ -2379,11 +2379,12 @@ async function storeTripAttachment(client, tripId, dayId, file) {
   const inserted = await client.from('day_attachments').insert({
     trip_id: tripId, day_id: dayId, storage_path: path, file_name: file.name.slice(0, 180),
     mime_type: accepted.type, size_bytes: file.size
-  });
+  }).select('*').single();
   if (inserted.error) {
     await client.storage.from(DAY_ATTACHMENT_BUCKET).remove([path]);
     throw inserted.error;
   }
+  return inserted.data;
 }
 
 function setDayAttachmentStatus(message, kind = 'info') {
@@ -5762,7 +5763,8 @@ function renderTicketsFeed(panel, trips) {
   panel.innerHTML = [
     '<div class="tickets-screen">',
       '<div class="tickets-toolbar"><img src="assets/splash-plane.png" alt="Viaggio"><span>Tickets</span>',
-      '<button type="button" class="tickets-add" aria-label="Adicionar comprovante" title="Adicionar comprovante">+</button></div>',
+      '<button type="button" class="tickets-add" aria-label="Adicionar ingresso ou reserva" title="Adicionar ingresso ou reserva">+</button>',
+      '<input type="file" class="tickets-add-file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.pdf,.doc,.docx" hidden></div>',
       '<h1>Tickets e reservas</h1>',
       '<p class="tickets-caption">Seus documentos de viagem em um só lugar.</p>',
       '<label class="tickets-trip-picker"><span>Viagem</span><select aria-label="Selecionar viagem dos tickets"></select><span aria-hidden="true">⌄</span></label>',
@@ -5809,7 +5811,39 @@ function renderTicketsFeed(panel, trips) {
       if (feedback) feedback.textContent = error.message || 'Não foi possível abrir os arquivos.';
     });
   };
-  $('.tickets-add').addEventListener('click', openFiles);
+  const addFile = $('.tickets-add-file');
+  const addButton = $('.tickets-add');
+  if (!canEditTrip(trip)) addButton.hidden = true;
+  addButton.addEventListener('click',()=>{
+    if (!canEditTrip(trip)) return;
+    addFile.click();
+  });
+  addFile.addEventListener('change',async()=>{
+    const file = addFile.files?.[0];
+    addFile.value = '';
+    if (!file) return;
+    addButton.disabled = true;
+    try {
+      const client=await tryNeon(7000);
+      if (!client) throw new Error('Conecte-se para adicionar o comprovante.');
+      const created=await storeTripAttachment(client,trip.id,null,file);
+      let signedUrl='';
+      if (isTicketImageFile(created)) {
+        const result=await client.storage.from(DAY_ATTACHMENT_BUCKET).createSignedUrl(created.storage_path,3600);
+        signedUrl=result.error ? '' : result.data?.signedUrl || '';
+      }
+      if (panel.ticketsRenderToken!==token) return;
+      const entry={...created,signedUrl};
+      available.unshift(entry);
+      paint();
+      openTicketMetadataEditor(trip,entry,updated=>{
+        available=available.map(item=>String(item.id)===String(updated.id)?{...item,...updated}:item);
+        paint();
+      });
+    } catch(error) {
+      message.textContent=error.message||'Não foi possível adicionar o comprovante.';
+    } finally { addButton.disabled=false; }
+  });
   $('.tickets-feature').addEventListener('click', openFiles);
   $('.tickets-feature-name').textContent = trip.name || 'Viagem';
   const dateText = value => value
