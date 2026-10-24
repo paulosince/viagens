@@ -37,6 +37,7 @@ jobs:
           node --input-type=module --check < src/main.js
           node --input-type=module --check < experiments/neon-pilot/app/main-neon.js
           node --input-type=module --check < experiments/neon-pilot/app/backend-neon.mjs
+          node --input-type=module --check < experiments/neon-pilot/app/usage-rings.mjs
           node --input-type=module --check < experiments/neon-pilot/app/storage-neon.mjs
           node --input-type=module --check < experiments/neon-pilot/app/offline-store-neon.js
           node --input-type=module --check < src/update-manager-neon.js
@@ -54,6 +55,7 @@ jobs:
           node tests/shared-owner-photos.cjs
           node tests/trip-sections.cjs
           node tests/neon-outbox.cjs
+          node tests/usage-rings.mjs
       - name: Verify offline app shell
         run: |
           test -f index.html
