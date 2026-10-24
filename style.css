@@ -3258,3 +3258,23 @@ body[data-home-tab="tickets"] #home_tab_content { width:min(100%,760px); }
 .ticket-metadata-simple .ticket-metadata-error:empty { display:none; }
 .ticket-metadata-simple .ticket-metadata-actions { padding-top:3px; }
 @media(max-width:360px) { .ticket-metadata-simple .ticket-category-grid { gap:6px; } .ticket-metadata-simple .ticket-category-option { font-size:9px; min-height:73px; padding-inline:1px; } }
+
+
+/* Tickets are surfaced on their scheduled day without creating duplicate agenda activities. */
+.day-ticket-reservations { display:grid; gap:8px; margin:10px 0 18px; }
+.day-ticket-reservations[hidden] { display:none!important; }
+.day-ticket-reservations h3 { margin:0 0 2px; color:#59718b; font-size:11px; text-transform:uppercase; letter-spacing:.08em; font-weight:750; }
+.day-ticket-entry { --category-color:#728096; --category-soft:#edf1f6; width:100%; min-height:59px; border:1px solid #e1e9f2; border-radius:14px; display:flex; align-items:center; gap:11px; padding:9px 12px; background:rgba(255,255,255,.9); text-align:left; color:#152b43; }
+.day-ticket-entry.flight { --category-color:#1879f2; --category-soft:#ddecff; }
+.day-ticket-entry.hotel { --category-color:#7663d8; --category-soft:#ede7ff; }
+.day-ticket-entry.restaurant { --category-color:#df822e; --category-soft:#ffebd8; }
+.day-ticket-entry.show { --category-color:#bc4dad; --category-soft:#fbe5f5; }
+.day-ticket-entry.sport { --category-color:#199b6f; --category-soft:#ddf7e9; }
+.day-ticket-entry.attraction { --category-color:#bd8b18; --category-soft:#fff5d2; }
+.day-ticket-entry.transport { --category-color:#149ca4; --category-soft:#ddf6f6; }
+.day-ticket-entry.other { --category-color:#728096; --category-soft:#edf1f6; }
+.day-ticket-entry-icon { flex:0 0 39px; display:grid; place-items:center; height:39px; border-radius:11px; background:var(--category-soft); color:var(--category-color); font-size:24px; }
+.day-ticket-entry-copy { display:flex; flex:1; min-width:0; flex-direction:column; gap:3px; }
+.day-ticket-entry-copy strong { font-size:13px; line-height:1.25; overflow-wrap:anywhere; }
+.day-ticket-entry-copy small { font-size:11px; color:#7a8b9e; }
+.day-ticket-entry-arrow { color:#8eaccc; font-size:22px; }
