@@ -21,7 +21,7 @@ const urls={
 const prepare=()=>new Promise(resolve=>{resolveImage=resolve;});
 const snapshot=[];
 const make=new Function('document','URL','prepareTicketCardCover','showTicketCardCoverPreview','console',
-  'let ticketCardCoverRequest=0;let ticketEditorContext={file:{id:"one",cardSignedUrl:""},coverDraftUrl:null,coverBlob:null,coverPending:false,removeCover:false};'+
+  'const DAY_ATTACHMENT_MAX_BYTES=6*1024*1024;let ticketCardCoverRequest=0;let ticketEditorContext={file:{id:"one",cardSignedUrl:""},coverDraftUrl:null,coverBlob:null,coverPending:false,removeCover:false};'+
   source.slice(a,b)+';return {selectTicketCardCoverFile,getContext:()=>ticketEditorContext};'
 );
 const ui=make(doc,urls,prepare,url=>snapshot.push(url),{warn:()=>{}});
