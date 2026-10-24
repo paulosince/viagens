@@ -3356,3 +3356,6 @@ body[data-home-tab="tickets"] #home_tab_content { width:min(100%,760px); }
   .tickets-item .tickets-item-info strong { font-size:14px; }
   .tickets-item .tickets-item-actions button { font-size:10px; }
 }
+
+.ticket-metadata-simple .ticket-metadata-form label.ticket-card-cover-pick { display:inline-flex; flex-direction:row; width:max-content; min-width:0; }
+.ticket-metadata-simple .ticket-category-symbol svg { width:24px; height:24px; stroke:currentColor; display:block; }
