@@ -47,6 +47,7 @@ jobs:
       - name: Verify offline sync and independent agenda photos
         run: |
           node tests/tickets-render.cjs
+          node tests/ticket-cover-ios.cjs
           node tests/offline-sync.cjs
           node tests/day-map-order.cjs
           node tests/inline-agenda.cjs

@@ -5739,6 +5739,45 @@ async function loadTicketCardCoverPreview(file) {
   } catch(error) { console.warn('Não foi possível mostrar a capa do card',error); }
 }
 
+// iOS Photos frequently supplies HEIC/HEIF. Safari may decode a file through an
+// <img> element even when createImageBitmap(file) rejects it. Always transcode
+// to small WebP artwork; never upload the original giant phone image as a card.
+async function prepareTicketCardCover(file) {
+  let source=null, objectUrl=null;
+  try {
+    if(typeof createImageBitmap==='function') {
+      try {source=await createImageBitmap(file);} catch(error) {
+        console.info('Usando decodificação compatível com Fotos do iPhone',error);
+      }
+    }
+    if(!source) {
+      objectUrl=URL.createObjectURL(file);
+      source=await new Promise((resolve,reject)=>{
+        const img=new Image();
+        img.onload=()=>resolve(img);
+        img.onerror=()=>reject(new Error('IMAGE_NOT_DECODABLE'));
+        img.src=objectUrl;
+      });
+    }
+    const w=source.naturalWidth||source.width;
+    const h=source.naturalHeight||source.height;
+    if(!w||!h) throw new Error('IMAGE_NOT_DECODABLE');
+    const scale=Math.min(1,1400/Math.max(w,h));
+    const canvas=document.createElement('canvas');
+    canvas.width=Math.max(1,Math.round(w*scale));
+    canvas.height=Math.max(1,Math.round(h*scale));
+    const ctx=canvas.getContext('2d',{alpha:false});
+    if(!ctx) throw new Error('CANVAS_NOT_AVAILABLE');
+    ctx.drawImage(source,0,0,canvas.width,canvas.height);
+    const blob=await canvasBlob(canvas,'image/webp',.8);
+    if(blob.type!=='image/webp') throw new Error('WEBP_NOT_SUPPORTED');
+    return blob;
+  } finally {
+    if(typeof source?.close==='function')source.close();
+    if(objectUrl)URL.revokeObjectURL(objectUrl);
+  }
+}
+
 async function selectTicketCardCoverFile(file) {
   const context=ticketEditorContext;
   if (!context || !file) return;
@@ -5748,7 +5787,7 @@ async function selectTicketCardCoverFile(file) {
   if (file.size>30*1024*1024) {error.textContent='Escolha uma imagem de até 30 MB.';return;}
   try {
     error.textContent='';
-    const blob=await compressImage(file);
+    const blob=await prepareTicketCardCover(file);
     if(!blob?.size || blob.size>6*1024*1024) throw new Error('Imagem muito grande após otimização.');
     if(ticketEditorContext!==context) return;
     ++ticketCardCoverRequest;
@@ -5760,7 +5799,7 @@ async function selectTicketCardCoverFile(file) {
   } catch (error) {
     console.warn('Não foi possível preparar a foto da capa',error);
     document.getElementById('ticket_metadata_error').textContent=
-      'Não foi possível usar esta imagem. Tente JPG, PNG ou uma foto diferente.';
+      'Não foi possível abrir esta foto. Tente novamente ou compartilhe pelo Fotos em formato JPEG (Mais Compatível).';
   }
 }
 
@@ -5893,6 +5932,8 @@ function openTicketMetadataEditor(trip, file, onSaved) {
   form.elements.event_time.value = String(file.event_time || '').slice(0, 5);
   document.getElementById('ticket_metadata_error').textContent = '';
   dialog.showModal();
+  dialog.scrollLeft=0; 
+  form.scrollLeft=0;
   renderTicketEditorPreview(file).catch(error => console.warn('Prévia do comprovante indisponível',error));
   loadTicketCardCoverPreview(file).catch(error => console.warn('Prévia da capa indisponível',error));
   // Don't automatically open the keyboard and hide the entire sheet on iOS.
