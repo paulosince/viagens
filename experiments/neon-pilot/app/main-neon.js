@@ -2511,6 +2511,76 @@ async function removeDayAttachment(attachment) {
   return true;
 }
 
+/* A date automatically makes a ticket visible on that day's agenda.
+   No separate activity is created, and the original document remains in Arquivos. */
+async function renderDayTicketReservations(day) {
+  const host = document.getElementById('day_ticket_reservations');
+  if (!host || !day) return;
+  const tripId = String(day.trip_id || state.activeTripId || '');
+  const trip = state.trips.find(item => String(item.id)===tripId);
+  if (!trip) return;
+  const date = derivedDayDate(day,trip);
+  const request = {};
+  host.ticketRequest = request;
+  host.replaceChildren();
+  host.hidden = true;
+  const stillCurrent = () => host.ticketRequest===request
+    && state.activeDayId===String(day.id)
+    && state.activeTripId===tripId;
+
+  function paint(files) {
+    if (!stillCurrent()) return;
+    const items=files.filter(file=>file.event_date===date
+      && file.display_title && TICKET_CATEGORIES[file.item_category]);
+    host.replaceChildren();
+    host.hidden = items.length===0;
+    if (!items.length) return;
+    const header=document.createElement('h3');
+    header.textContent='Ingressos e reservas';
+    host.append(header);
+    for (const file of items) {
+      const category=ticketFileCategory(file);
+      const button=document.createElement('button');
+      button.type='button';
+      button.className='day-ticket-entry '+category.tone;
+      const icon=document.createElement('span');
+      icon.className='day-ticket-entry-icon';
+      icon.textContent=category.symbol;
+      const copy=document.createElement('span');
+      copy.className='day-ticket-entry-copy';
+      const title=document.createElement('strong');
+      title.textContent=file.display_title;
+      const sub=document.createElement('small');
+      sub.textContent=[category.label,String(file.event_time||'').slice(0,5)].filter(Boolean).join(' · ');
+      copy.append(title,sub);
+      const arrow=document.createElement('span');
+      arrow.className='day-ticket-entry-arrow';arrow.textContent='›';
+      button.append(icon,copy,arrow);
+      button.addEventListener('click',async()=>{
+        try {
+          await loadTripFiles(tripId);
+          const all=state.tripFilesByTrip.get(tripId)||[];
+          const found=all.find(x=>String(x.id)===String(file.id));
+          if (found) openTripFileViewer(found,all);
+        } catch(error) { console.warn('Comprovante indisponível',error); }
+      });
+      host.append(button);
+    }
+  }
+
+  const cached = state.tripFilesByTrip.get(tripId);
+  if (cached) paint(cached);
+  if (!navigator.onLine) return;
+  try {
+    const client=await tryNeon(5000);
+    if (!client || !stillCurrent()) return;
+    const result=await client.from('day_attachments').select('*')
+      .eq('trip_id',tripId).eq('event_date',date).order('event_time',{ascending:true});
+    if (result.error) throw result.error;
+    paint(result.data||[]);
+  } catch(error) { console.warn('Reservas do dia indisponíveis',error); }
+}
+
 function openDayPage(dayId, { pushHistory = true } = {}) {
   const day = state.tripDays.find(item => String(item.id) === String(dayId));
   if (!day) return;
@@ -2532,6 +2602,7 @@ function openDayPage(dayId, { pushHistory = true } = {}) {
     document.body.dataset.dayPage = 'open';
     updateAgendaAddStickyState();
     renderDayAttachments(day.id);
+    renderDayTicketReservations(day).catch(error => console.warn('Reservas do dia indisponíveis',error));
     if (navigator.onLine) loadDayAttachments(day.id).catch(error => console.warn('Arquivos do dia indisponíveis', error));
     return;
   }
@@ -2555,6 +2626,7 @@ function openDayPage(dayId, { pushHistory = true } = {}) {
   document.body.dataset.dayPage = 'open';
   updateAgendaAddStickyState();
   renderDayAttachments(day.id);
+  renderDayTicketReservations(day).catch(error => console.warn('Reservas do dia indisponíveis',error));
   if (navigator.onLine) loadDayAttachments(day.id).catch(error => console.warn('Arquivos do dia indisponíveis', error));
 }
 
