@@ -5653,7 +5653,7 @@ function isTicketImageFile(file) {
 const TICKET_CATEGORIES = Object.freeze({
   flight: { id:'flight', label:'Voo', symbol:'✈', tone:'flight' },
   hotel: { id:'hotel', label:'Hospedagem', symbol:'▤', tone:'hotel' },
-  restaurant: { id:'restaurant', label:'Restaurante', symbol:'♨', tone:'restaurant' },
+  restaurant: { id:'restaurant', label:'Restaurante', symbol:'🍴', tone:'restaurant' },
   show: { id:'show', label:'Show', symbol:'♫', tone:'show' },
   sport: { id:'sport', label:'Esporte', symbol:'⚽', tone:'sport' },
   attraction: { id:'attraction', label:'Passeio', symbol:'★', tone:'attraction' },
@@ -5682,6 +5682,104 @@ function tripTicketDay(trip, date, days = []) {
 
 let ticketEditorContext = null;
 let ticketPreviewRequest = 0;
+let ticketCardCoverRequest = 0;
+
+function makeTicketCategoryIcon(category) {
+  const span=document.createElement('span');
+  span.className='tickets-item-icon';
+  // Stable single-color cutlery artwork (not the platform's red steaming-food emoji).
+  if(category.id==='restaurant') {
+    span.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2v8a3 3 0 0 0 6 0V2M7 2v20M16 2c-3 3-3 8 0 11h3V2h-3ZM19 13v9"/></svg>';
+  } else {
+    span.textContent=category.symbol;
+  }
+  return span;
+}
+
+function ticketStatusLabel(file) {
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(String(file?.event_date || ''))
+    ? new Intl.DateTimeFormat('pt-BR', { day:'numeric', month:'short' }).format(new Date(file.event_date + 'T12:00:00'))
+    : '';
+  const time = String(file?.event_time || '').slice(0,5);
+  return [date,time].filter(Boolean).join(' · ') || 'A confirmar';
+}
+
+function showTicketCardCoverPreview(url) {
+  const photo=document.getElementById('ticket_card_cover_image');
+  const empty=document.getElementById('ticket_card_cover_empty');
+  const remove=document.getElementById('ticket_card_cover_remove');
+  if (!photo || !empty || !remove) return;
+  if (url) {
+    photo.onerror=()=>{photo.hidden=true;empty.hidden=false;};
+    photo.src=url;
+    photo.hidden=false;
+    empty.hidden=true;
+  } else {
+    photo.removeAttribute('src');
+    photo.hidden=true;
+    empty.hidden=false;
+  }
+  remove.hidden=!url;
+}
+
+async function loadTicketCardCoverPreview(file) {
+  const request=++ticketCardCoverRequest;
+  showTicketCardCoverPreview(file.cardSignedUrl || '');
+  if (!file.card_image_path || file.cardSignedUrl || !navigator.onLine) return;
+  try {
+    const client=await tryNeon(5500);
+    if(!client) return;
+    const res=await client.storage.from(DAY_ATTACHMENT_BUCKET).createSignedUrl(file.card_image_path,3600);
+    if(res.error) return;
+    if(request===ticketCardCoverRequest && ticketEditorContext?.file.id===file.id
+       && !ticketEditorContext.coverBlob && !ticketEditorContext.removeCover) {
+      ticketEditorContext.file.cardSignedUrl=res.data?.signedUrl || '';
+      showTicketCardCoverPreview(ticketEditorContext.file.cardSignedUrl);
+    }
+  } catch(error) { console.warn('Não foi possível mostrar a capa do card',error); }
+}
+
+async function selectTicketCardCoverFile(file) {
+  const context=ticketEditorContext;
+  if (!context || !file) return;
+  const error=document.getElementById('ticket_metadata_error');
+  if (!/^image\//.test(file.type) && !/\.(?:jpe?g|png|webp|heic|heif)$/i.test(file.name))
+    {error.textContent='Escolha uma imagem para a capa.';return;}
+  if (file.size>30*1024*1024) {error.textContent='Escolha uma imagem de até 30 MB.';return;}
+  try {
+    error.textContent='';
+    const blob=await compressImage(file);
+    if(!blob?.size || blob.size>6*1024*1024) throw new Error('Imagem muito grande após otimização.');
+    if(ticketEditorContext!==context) return;
+    ++ticketCardCoverRequest;
+    if(context.coverDraftUrl) URL.revokeObjectURL(context.coverDraftUrl);
+    context.coverBlob=blob;
+    context.removeCover=false;
+    context.coverDraftUrl=URL.createObjectURL(blob);
+    showTicketCardCoverPreview(context.coverDraftUrl);
+  } catch (error) {
+    console.warn('Não foi possível preparar a foto da capa',error);
+    document.getElementById('ticket_metadata_error').textContent=
+      'Não foi possível usar esta imagem. Tente JPG, PNG ou uma foto diferente.';
+  }
+}
+
+function clearTicketCardCover() {
+  const ctx=ticketEditorContext;
+  if(!ctx) return;
+  ++ticketCardCoverRequest;
+  if(ctx.coverDraftUrl) URL.revokeObjectURL(ctx.coverDraftUrl);
+  ctx.coverDraftUrl=null;
+  ctx.coverBlob=null;
+  ctx.removeCover=true;
+  showTicketCardCoverPreview('');
+}
+
+function releaseTicketCardCoverDraft() {
+  const context=ticketEditorContext;
+  if(context?.coverDraftUrl) URL.revokeObjectURL(context.coverDraftUrl);
+  if(context) context.coverDraftUrl=null;
+}
 
 function ticketSaveFeedback(cause) {
   const message = String(cause?.message || '');
@@ -5788,7 +5886,7 @@ function openTicketMetadataEditor(trip, file, onSaved) {
   const dialog = document.getElementById('ticket_metadata_dialog');
   const form = document.getElementById('ticket_metadata_form');
   form.reset();
-  ticketEditorContext = { trip, file, onSaved };
+  ticketEditorContext = { trip, file, onSaved, coverBlob:null, coverDraftUrl:null, removeCover:false };
   form.elements.display_title.value = file.display_title || '';
   selectTicketCategory(file.item_category || '');
   form.elements.event_date.value = file.event_date || '';
@@ -5796,6 +5894,7 @@ function openTicketMetadataEditor(trip, file, onSaved) {
   document.getElementById('ticket_metadata_error').textContent = '';
   dialog.showModal();
   renderTicketEditorPreview(file).catch(error => console.warn('Prévia do comprovante indisponível',error));
+  loadTicketCardCoverPreview(file).catch(error => console.warn('Prévia da capa indisponível',error));
   // Don't automatically open the keyboard and hide the entire sheet on iOS.
 }
 
@@ -5818,16 +5917,56 @@ async function saveTicketMetadata(event) {
   try {
     const client = await tryNeon(7000);
     if (!client) throw new Error('Conecte-se para salvar.');
-    // Only presentation fields are changed. Existing documents and activity links stay intact.
+    // A card cover is stored separately from storage_path, the immutable original proof.
     const patch = { display_title, item_category, event_date, event_time };
-    const updatedFile = await updateTicketDetailsSafely(client,context,patch);
-    const saved = { ...context.file, ...updatedFile };
-    const key = String(context.trip.id);
-    const cached = state.tripFilesByTrip.get(key);
-    if (cached) state.tripFilesByTrip.set(key, cached.map(item=>
-      String(item.id) === String(saved.id) ? { ...item, ...saved, signedUrl:item.signedUrl || saved.signedUrl } : item));
-    dialogCloseTicketMetadata();
-    context.onSaved?.(saved);
+    let newCoverPath=null;
+    let newCoverUrl='';
+    let commitSucceeded=false;
+    try {
+      if (context.coverBlob) {
+        newCoverPath=context.trip.id+'/general/card-'+context.file.id+'-'+crypto.randomUUID()+'.webp';
+        const uploaded=await client.storage.from(DAY_ATTACHMENT_BUCKET).upload(newCoverPath,context.coverBlob,{
+          contentType:'image/webp',upsert:false
+        });
+        if(uploaded.error) throw uploaded.error;
+        patch.card_image_path=newCoverPath;
+      } else if (context.removeCover) {
+        patch.card_image_path=null;
+      }
+      const updatedFile = await updateTicketDetailsSafely(client,context,patch);
+      commitSucceeded=true;
+      if (newCoverPath) {
+        try {
+          const signed=await client.storage.from(DAY_ATTACHMENT_BUCKET).createSignedUrl(newCoverPath,3600);
+          newCoverUrl=signed.error ? '' : signed.data?.signedUrl || '';
+        } catch(error) { console.warn('Capa salva; prévia temporariamente indisponível',error); }
+      }
+      const saved = {
+        ...context.file,...updatedFile,
+        cardSignedUrl:newCoverPath ? newCoverUrl : context.removeCover ? '' : context.file.cardSignedUrl || ''
+      };
+      if(context.file.card_image_path && context.file.card_image_path!==saved.card_image_path) {
+        client.storage.from(DAY_ATTACHMENT_BUCKET).remove([context.file.card_image_path])
+          .then(result=>{if(result.error)console.warn('Capa anterior ainda no armazenamento',result.error)})
+          .catch(error=>console.warn('Não foi possível liberar a capa anterior',error));
+      }
+      const key = String(context.trip.id);
+      const cached = state.tripFilesByTrip.get(key);
+      if (cached) state.tripFilesByTrip.set(key,cached.map(item=>
+        String(item.id) === String(saved.id) ? {...item,...saved,signedUrl:item.signedUrl||saved.signedUrl} : item));
+      dialogCloseTicketMetadata();
+      context.onSaved?.(saved);
+    } catch (error) {
+      // If the DB update fails, leave the original cover intact and release only the new upload.
+      // A lost network response can happen after the database committed. Keep
+      // the new cover in storage when commit status is uncertain, rather than
+      // leave a persisted card pointing to a deleted file.
+      if(newCoverPath && !commitSucceeded && !ticketSaveIsNetworkError(error)) {
+        const cleanup=await client.storage.from(DAY_ATTACHMENT_BUCKET).remove([newCoverPath]).catch(()=>null);
+        if(cleanup?.error) console.warn('Limpeza da capa temporária indisponível',cleanup.error);
+      }
+      throw error;
+    }
   } catch (cause) {
     console.warn('Falha ao salvar metadados do comprovante', cause);
     error.textContent = ticketSaveFeedback(cause);
@@ -5838,6 +5977,8 @@ async function saveTicketMetadata(event) {
 }
 
 function dialogCloseTicketMetadata() {
+  ++ticketCardCoverRequest;
+  releaseTicketCardCoverDraft();
   ++ticketPreviewRequest;
   const lightbox = document.getElementById('ticket_image_dialog');
   if(lightbox?.open) lightbox.close();
@@ -5959,7 +6100,7 @@ function renderTicketsFeed(panel, trips) {
   let selectedFilter = 'all';
   let available = [];
   const editTicket = file => openTicketMetadataEditor(trip,file,updated => {
-    available = available.map(item=>String(item.id)===String(updated.id)?updated:item);
+    available = available.map(item=>String(item.id)===String(updated.id)?{...item,...updated}:item);
     paint();
   });
   const openTicketFile = async file => {
@@ -5997,30 +6138,29 @@ function renderTicketsFeed(panel, trips) {
       preview.type = 'button'; preview.className = 'tickets-item-main';
       const art = document.createElement('span');
       art.className = 'tickets-item-art ' + category.tone;
-      const icon = document.createElement('span');
-      icon.className = 'tickets-item-icon'; icon.textContent = category.symbol;
+      const icon = makeTicketCategoryIcon(category);
       art.append(icon);
-      if (isTicketImageFile(file) && file.signedUrl) {
-        const thumbnail = document.createElement('img');
-        thumbnail.className = 'tickets-item-thumbnail';
-        thumbnail.alt = '';
-        thumbnail.loading = 'lazy';
-        thumbnail.decoding = 'async';
-        thumbnail.onerror = () => { thumbnail.hidden = true; };
-        thumbnail.src = file.signedUrl;
-        art.prepend(thumbnail);
+      // A card only displays its OWN optional cover. Receipts never become artwork.
+      if (file.card_image_path && file.cardSignedUrl) {
+        const cover = document.createElement('img');
+        cover.className = 'tickets-item-cover';
+        cover.alt = '';
+        cover.loading = 'lazy';
+        cover.decoding = 'async';
+        cover.onerror = () => { cover.hidden = true; };
+        cover.src = file.cardSignedUrl;
+        art.prepend(cover);
       }
-      const tag = document.createElement('small');
-      tag.className = 'tickets-item-tag';
-      tag.textContent = category.label;
-      art.append(tag);
+      const status = document.createElement('span');
+      status.className = 'tickets-item-status';
+      status.textContent = ticketStatusLabel(file);
+      art.append(status);
+      if (!file.cardSignedUrl) art.classList.add('no-cover');
       const details = document.createElement('span'); details.className = 'tickets-item-info';
       const name = document.createElement('strong'); name.textContent = ticketDisplayTitle(file);
       const subtitle = document.createElement('span');
-      subtitle.textContent = [
-        ticketDateLabel(file),
-        !identified ? 'Defina título e categoria' : ''
-      ].filter(Boolean).join(' · ') || 'Sem data informada';
+      subtitle.textContent = !identified ? 'Toque para identificar'
+        : file.venue || category.label;
       details.append(name,subtitle);
       preview.append(art,details);
       preview.setAttribute('aria-label',(identified ? 'Abrir na agenda: ' : 'Identificar: ')+ticketDisplayTitle(file));
@@ -6072,12 +6212,12 @@ function renderTicketsFeed(panel, trips) {
     if (panel.ticketsRenderToken !== token || state.homeTab !== 'tickets') return;
     const files = result.data || [];
     available = await Promise.all(files.map(async file => {
-      if (!isTicketImageFile(file) || !file.storage_path) return file;
+      if (!file.card_image_path) return file;
       try {
-        const signed = await client.storage.from(DAY_ATTACHMENT_BUCKET).createSignedUrl(file.storage_path, 3600);
-        return { ...file, signedUrl: signed.error ? '' : (signed.data?.signedUrl || '') };
+        const signed = await client.storage.from(DAY_ATTACHMENT_BUCKET).createSignedUrl(file.card_image_path, 3600);
+        return { ...file, cardSignedUrl:signed.error ? '' : (signed.data?.signedUrl || '') };
       } catch (error) {
-        console.warn('Prévia de imagem indisponível', error);
+        console.warn('Capa de ingresso indisponível', error);
         return file;
       }
     }));
@@ -6103,11 +6243,19 @@ for (const id of ['ticket_metadata_close', 'ticket_metadata_cancel']) {
   document.getElementById(id)?.addEventListener('click', dialogCloseTicketMetadata);
 }
 document.getElementById('ticket_metadata_dialog')?.addEventListener('close', () => {
+  ++ticketCardCoverRequest;
+  releaseTicketCardCoverDraft();
   ++ticketPreviewRequest;
   const viewer = document.getElementById('ticket_image_dialog');
   if (viewer?.open) viewer.close();
   ticketEditorContext = null;
 });
+document.getElementById('ticket_card_cover_input')?.addEventListener('change',event=>{
+  const file=event.target.files?.[0];
+  event.target.value='';
+  if(file)selectTicketCardCoverFile(file).catch(error=>console.warn('Capa não selecionada',error));
+});
+document.getElementById('ticket_card_cover_remove')?.addEventListener('click',clearTicketCardCover);
 document.getElementById('ticket_editor_preview_open')?.addEventListener('click',openTicketImageViewer);
 document.getElementById('ticket_image_close')?.addEventListener('click',()=>document.getElementById('ticket_image_dialog').close());
 document.getElementById('ticket_image_zoom')?.addEventListener('click',()=>{

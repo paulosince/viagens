@@ -47,9 +47,9 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20261024-tickets15" as="style">
-  <link rel="stylesheet" href="style.css?v=20261024-tickets15" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20261024-tickets15"></noscript>
+  <link rel="preload" href="style.css?v=20261024-tickets16" as="style">
+  <link rel="stylesheet" href="style.css?v=20261024-tickets16" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20261024-tickets16"></noscript>
   <link rel="stylesheet" href="src/update-manager.css?v=20261024-home3">
   <script>
     function showViaggioStartupError(detail) {
@@ -591,7 +591,7 @@
         <div class="ticket-category-grid" role="group" aria-label="Escolha a categoria">
           <button type="button" class="ticket-category-option" data-ticket-category="flight" aria-pressed="false"><span class="ticket-category-symbol">✈</span><span>Voo</span></button>
           <button type="button" class="ticket-category-option" data-ticket-category="hotel" aria-pressed="false"><span class="ticket-category-symbol">▤</span><span>Hotel</span></button>
-          <button type="button" class="ticket-category-option" data-ticket-category="restaurant" aria-pressed="false"><span class="ticket-category-symbol">♨</span><span>Restaurante</span></button>
+          <button type="button" class="ticket-category-option" data-ticket-category="restaurant" aria-pressed="false"><span class="ticket-category-symbol"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2v8a3 3 0 0 0 6 0V2M7 2v20M16 2c-3 3-3 8 0 11h3V2h-3ZM19 13v9"/></svg></span><span>Restaurante</span></button>
           <button type="button" class="ticket-category-option" data-ticket-category="show" aria-pressed="false"><span class="ticket-category-symbol">♫</span><span>Show</span></button>
           <button type="button" class="ticket-category-option" data-ticket-category="sport" aria-pressed="false"><span class="ticket-category-symbol">⚽</span><span>Esporte</span></button>
           <button type="button" class="ticket-category-option" data-ticket-category="attraction" aria-pressed="false"><span class="ticket-category-symbol">★</span><span>Passeio</span></button>
@@ -599,6 +599,21 @@
           <button type="button" class="ticket-category-option" data-ticket-category="other" aria-pressed="false"><span class="ticket-category-symbol">▣</span><span>Outros</span></button>
         </div>
       </fieldset>
+      <section class="ticket-card-cover-editor" aria-label="Imagem de capa do card">
+        <div class="ticket-card-cover-heading"><strong>Imagem do card</strong><span>Opcional · independente do comprovante</span></div>
+        <div class="ticket-card-cover-preview" id="ticket_card_cover_preview">
+          <img id="ticket_card_cover_image" alt="Prévia da capa do card" hidden>
+          <div id="ticket_card_cover_empty" class="ticket-card-cover-empty">
+            <span aria-hidden="true">▧</span><small>Sem capa personalizada</small>
+          </div>
+        </div>
+        <div class="ticket-card-cover-actions">
+          <label class="ticket-card-cover-pick" for="ticket_card_cover_input">Escolher imagem
+            <input id="ticket_card_cover_input" type="file" accept="image/*,.heic,.heif" hidden>
+          </label>
+          <button type="button" id="ticket_card_cover_remove" hidden>Remover capa</button>
+        </div>
+      </section>
       <div class="ticket-metadata-inline">
         <label for="ticket_metadata_date">Data <small>Opcional</small>
           <input id="ticket_metadata_date" name="event_date" type="date">
@@ -632,7 +647,7 @@
       if (legacyPending > 0) {
         location.replace('./legacy-supabase.html?recover=1');
       } else {
-        await import('./experiments/neon-pilot/app/main-neon.js?v=20261024-tickets15');
+        await import('./experiments/neon-pilot/app/main-neon.js?v=20261024-tickets16');
       }
     } catch (error) {
       console.error('Não foi possível validar o estado local antes da migração Neon', error);
