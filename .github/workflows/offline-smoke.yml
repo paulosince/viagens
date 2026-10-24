@@ -56,6 +56,7 @@ jobs:
           node tests/trip-sections.cjs
           node tests/neon-outbox.cjs
           node tests/usage-rings.mjs
+          node --test tests/neon-usage.mjs
       - name: Verify offline app shell
         run: |
           test -f index.html

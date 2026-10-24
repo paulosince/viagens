@@ -2,7 +2,7 @@
 // Transport: official @neondatabase/postgrest-js, JWTs: Managed Neon Auth.
 // IMPORTANT: these are staging APIs. Never substitute project main URLs.
 import {createNeonMediaClient} from './storage-neon.mjs';
-import {createRouter} from './router-neon.mjs?v=20261024-usage2';
+import {createRouter} from './router-neon.mjs?v=20261024-home3';
 import {createNeonIdentity} from './neon-identity.mjs';
 export const API_ROOTS=Object.freeze({
   a:'https://ep-empty-pine-b8r7sa8d.apirest.c-14.us-east-1.aws.neon.tech/viaggio_lab/rest/v1',

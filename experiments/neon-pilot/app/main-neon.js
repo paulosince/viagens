@@ -1,6 +1,6 @@
-import {createNeonPreview,NEON_AUTH_URL,API_ROOTS} from './backend-neon.mjs?v=20261024-usage2';
+import {createNeonPreview,NEON_AUTH_URL,API_ROOTS} from './backend-neon.mjs?v=20261024-home3';
 import {activityPhotoForPreview} from './photo-source-neon.mjs?v=20261021-7photofix';
-import {usageRingsModel} from './usage-rings.mjs?v=20261024-usage2';
+import {usageRingsModel} from './usage-rings.mjs?v=20261024-home3';
 import { offlineStore } from './offline-store-neon.js?v=20261021-1';
 import {
   adoptLegacyDataUrl,
@@ -533,7 +533,7 @@ async function refreshWorkspaceInBackground() {
 
 // Usage is attributed to the owner of a trip, never duplicated across members.
 let usageRequest = null, usageLastUpdatedAt = 0, usageLastUserId = '';
-const usageNoteBase = 'Banco: espaço do projeto pessoal, incluindo índices e histórico. Arquivos: bytes físicos no armazenamento, incluindo versões retidas. Limites configurados para este projeto.';
+const usageNoteBase = 'Viagens: espaço do projeto pessoal, incluindo índices e histórico. Arquivos: bytes físicos no armazenamento, incluindo versões retidas. Limites configurados para este projeto.';
 
 function formatUsageBytes(value) {
   const bytes = Number(value);
@@ -572,10 +572,11 @@ function renderUsage(data, cached = false) {
   for (const [kind, percent] of [['database', rings?.databasePercent], ['files', rings?.filesPercent]]) {
     document.querySelectorAll(`[data-usage-bar="${kind}"]`).forEach(el => {
       el.style.width = `${Math.min(100, percent ?? 0)}%`;
+      el.style.minWidth = percent > 0 ? '2px' : '0';
     });
   }
   if (dom.usageButton) dom.usageButton.setAttribute('aria-label',
-    'Armazenamento: Banco ' + databaseText + ', Arquivos ' + filesText + '. Ver detalhes.');
+    'Armazenamento: Dados das viagens ' + databaseText + ', Arquivos ' + filesText + '. Ver detalhes.');
 
   dom.usageNote.textContent = (cached ? 'Última medição salva neste aparelho. ' : '') +
     usageNoteBase;
@@ -636,7 +637,7 @@ function setSessionView(session) {
   if (session === 'authenticated') {
     if (usageLastUserId !== state.user?.id) {
       usageLastUserId = state.user?.id; usageLastUpdatedAt = 0;
-      document.querySelectorAll('[data-usage-bar]').forEach(el => {el.style.width='0%';});
+      document.querySelectorAll('[data-usage-bar]').forEach(el => {el.style.width='0%';el.style.minWidth='0';});
       for (const key of ['databaseUsage','storageUsage','databaseDetail','storageDetail','imagesDetail','attachmentsDetail']) if(dom[key])dom[key].textContent='…';
       for (const id of ['home_usage_total','home_database_percent','home_storage_percent']) { const el=document.getElementById(id); if(el)el.textContent='…'; }
       dom.usageNote.textContent='Consultando o armazenamento…';
@@ -5486,6 +5487,10 @@ function createTripSection(group, text) {
   chevron.setAttribute('aria-hidden', 'true');
   button.append(label, count, divider, chevron);
   heading.append(button);
+  if (group === 'upcoming') {
+    dom.editTripsButton.hidden = false;
+    heading.append(dom.editTripsButton);
+  }
 
   const content = document.createElement('div');
   content.className = 'trip-section-content';
@@ -5550,6 +5555,7 @@ function syncTripList() {
     section._refs.count.textContent = String(section._refs.cards.childElementCount);
   }
 
+  dom.editTripsButton.hidden = !sections.has('upcoming');
   dom.tripList.replaceChildren(...sections.values());
 
   syncTripSelectionUI();
@@ -7390,3 +7396,29 @@ ensureNeon()
   .catch(() => {});
 
 boot();
+
+// The expanded header scrolls naturally; only its last 44px remain sticky.
+const homeHeader = document.getElementById('home_header');
+if (homeHeader) {
+  let frame = 0;
+  const updateHomeHeader = () => {
+    frame = 0;
+    const inset = parseFloat(getComputedStyle(homeHeader).getPropertyValue('--home-safe-top')) || 0;
+    const collapse = Math.max(0, homeHeader.offsetHeight - 44 - inset);
+    homeHeader.style.setProperty('--home-collapse', collapse + 'px');
+    const compact = homeHeader.getBoundingClientRect().top <= -collapse + 1;
+    if (homeHeader.dataset.compact !== String(compact)) {
+      homeHeader.dataset.compact = String(compact);
+      homeHeader.querySelector('.home-compact-title')?.setAttribute('aria-hidden', String(!compact));
+      homeHeader.querySelector('.home-title')?.setAttribute('aria-hidden', String(compact));
+      const controls = homeHeader.querySelector('.header-actions');
+      if (controls) controls.inert = compact;
+      if (compact) { setYearMenu(false); setUsageOpen(false); }
+    }
+  };
+  const scheduleHomeHeader = () => { if (!frame) frame = requestAnimationFrame(updateHomeHeader); };
+  window.addEventListener('scroll', scheduleHomeHeader, {passive:true});
+  window.addEventListener('resize', scheduleHomeHeader, {passive:true});
+  new ResizeObserver(scheduleHomeHeader).observe(homeHeader);
+  scheduleHomeHeader();
+}

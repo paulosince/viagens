@@ -52,3 +52,22 @@ measurement of remaining quota.
   hard limit. Physical measurement intentionally does not rely on ledger totals.
 - SQL database sizes are a Postgres snapshot, not Neon's organization-wide billing
   usage. Concurrent uploads can change file totals during a multi-page inventory.
+
+## Follow-up: N/D and header revision
+
+The user reported N/D in the actual authenticated session after publication.
+The earlier local checks were not evidence of a successful live JWT request.
+Neon documentation requires refreshing the Data API schema after adding RPCs;
+that step was omitted. On 2026-10-24 both app branch Data APIs were refreshed
+using an empty update request (no permission or schema exposure changes).
+Owner-only auth remains unchanged. The service now logs the upstream status and
+sanitized error code/message for diagnosis, without logging tokens.
+A subsequent real authenticated request is still needed to confirm that this
+was the only cause. Do not claim N/D is solved based only on a schema refresh.
+
+The home now labels usage as Armazenamento, with plane/image icons, puts sync
+below the avatar and the text Editar in the upcoming section. The header's
+expanded content scrolls naturally while the compact title stays sticky.
+The local Chromium test confirmed the sticky title sits at y=0 with height
+44px at 390px width, no horizontal overflow, and Editar in the section heading.
+The 11 measurement checks passed again; they are now included in CI.

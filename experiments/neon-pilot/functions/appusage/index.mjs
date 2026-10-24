@@ -14,7 +14,7 @@ export function createUsageHandler({fetcher=fetch,measure=measureStorage,api=pro
    if(!api?.startsWith('https://'))throw Error('USAGE_NOT_CONFIGURED');
    // Data API verifies the JWT; the RPC also requires the project's owner.
    const r=await fetcher(api+'/rpc/viaggio_my_usage',{method:'POST',redirect:'error',cache:'no-store',headers:{authorization:auth,'content-type':'application/json','content-profile':'viaggio_app','accept-profile':'viaggio_app'},body:'{}',signal:AbortSignal.timeout(15000)});
-   if(!r.ok){const e=await r.json().catch(()=>({}));return json({error:'USAGE_AUTH_FAILED'},[401,403].includes(r.status)||e.code==='42501'?403:503);}
+   if(!r.ok){const e=await r.json().catch(()=>({}));console.warn('USAGE_RPC_FAILED',r.status,String(e.code||'NO_CODE').slice(0,40),String(e.message||'').slice(0,180));return json({error:'USAGE_AUTH_FAILED'},[401,403].includes(r.status)||e.code==='42501'?403:503);}
    const rows=await r.json();const row=rows?.[0];
    if(!Array.isArray(rows)||rows.length!==1||!row)throw Error('INVALID_USAGE_RESPONSE');
    for(const key of ['database_bytes','database_quota_bytes','storage_quota_bytes','image_bytes','attachment_bytes']){
