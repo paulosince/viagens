@@ -5802,7 +5802,19 @@ async function selectTicketCardCoverFile(file) {
   // Show the chosen photo immediately, independently of the compression step.
   const request=++ticketCardCoverRequest;
   if(context.coverDraftUrl) URL.revokeObjectURL(context.coverDraftUrl);
-  context.coverDraftUrl=URL.createObjectURL(file);
+  // Keep the native File intact until the conversion finishes. On iPhone,
+  // early clearing of the selection may interfere with Photos-backed files.
+  try {
+    context.coverDraftUrl=URL.createObjectURL(file);
+  } catch (cause) {
+    console.warn('A Fototeca entregou a foto, mas a prévia não pôde ser aberta',cause);
+    context.coverPending=false;
+    save.disabled=false;
+    feedback.dataset.kind='error';
+    feedback.textContent='A foto chegou, mas não pôde ser aberta. Tente outra imagem ou escolha pelo app Arquivos.';
+    hint.textContent='Toque para tentar novamente';
+    return;
+  }
   context.coverBlob=null;
   context.coverPending=true;
   context.removeCover=false;
@@ -5967,7 +5979,8 @@ function openTicketMetadataEditor(trip, file, onSaved) {
   const dialog = document.getElementById('ticket_metadata_dialog');
   const form = document.getElementById('ticket_metadata_form');
   form.reset();
-  ticketEditorContext = { trip, file, onSaved, coverBlob:null, coverDraftUrl:null, coverPending:false, removeCover:false };
+  ticketEditorContext = { trip, file, onSaved, coverBlob:null, coverDraftUrl:null, coverPending:false, removeCover:false,
+    coverPickerState:'idle', coverPickerToken:0, coverSelectedFile:null };
   form.elements.display_title.value = file.display_title || '';
   selectTicketCategory(file.item_category || '');
   form.elements.event_date.value = file.event_date || '';
@@ -6340,10 +6353,70 @@ document.getElementById('ticket_metadata_dialog')?.addEventListener('close', () 
   if (viewer?.open) viewer.close();
   ticketEditorContext = null;
 });
-document.getElementById('ticket_card_cover_input')?.addEventListener('change',event=>{
-  const file=event.target.files?.[0];
-  event.target.value='';
-  if(file)selectTicketCardCoverFile(file).catch(error=>console.warn('Capa não selecionada',error));
+// The native iOS Photos picker may return a file only after an asynchronous
+// preparation phase. Do not clear input.value on change: the File must remain
+// referenced until its bytes have been decoded or read.
+function ticketCoverPickerFeedback(message,kind='info') {
+  const feedback=document.getElementById('ticket_card_cover_feedback');
+  if(feedback) { feedback.dataset.kind=kind; feedback.textContent=message; }
+}
+function startTicketCoverPicker(event) {
+  const context=ticketEditorContext;
+  if(!context) return;
+  // Clear BEFORE opening the native picker to allow choosing the same photo.
+  event.currentTarget.value='';
+  context.coverSelectedFile=null;
+  context.coverPickerState='waiting';
+  context.coverPickerToken=(context.coverPickerToken||0)+1;
+  ticketCoverPickerFeedback('Escolha uma foto. O iPhone pode levar alguns instantes para prepará-la.');
+  document.getElementById('ticket_card_cover_hint').textContent='Aguardando seleção da Fototeca…';
+}
+function receiveTicketCoverSelection(event) {
+  const context=ticketEditorContext;
+  if(!context) return;
+  const file=event.currentTarget.files?.[0];
+  if(!file) return;
+  if(context.coverSelectedFile===file) return; // 'input' and 'change' may both fire.
+  context.coverSelectedFile=file; // Keep the File alive throughout processing.
+  context.coverPickerState='received';
+  ticketCoverPickerFeedback('Foto recebida. Preparando a capa…');
+  try {
+    Promise.resolve(selectTicketCardCoverFile(file)).catch(cause=>{
+      console.warn('Falha inesperada ao receber foto da Fototeca',cause);
+      if(ticketEditorContext!==context) return;
+      context.coverPending=false;
+      document.getElementById('ticket_metadata_save').disabled=false;
+      ticketCoverPickerFeedback('Recebemos a foto, mas não conseguimos prepará-la. Tente selecionar novamente.','error');
+    });
+  } catch(cause) {
+    console.warn('Falha ao processar a seleção do iPhone',cause);
+    context.coverPending=false;
+    document.getElementById('ticket_metadata_save').disabled=false;
+    ticketCoverPickerFeedback('Não foi possível processar a imagem escolhida. Tente novamente.','error');
+  }
+}
+const ticketCoverInput=document.getElementById('ticket_card_cover_input');
+ticketCoverInput?.addEventListener('click',startTicketCoverPicker);
+ticketCoverInput?.addEventListener('input',receiveTicketCoverSelection);
+ticketCoverInput?.addEventListener('change',receiveTicketCoverSelection);
+ticketCoverInput?.addEventListener('cancel',()=>{
+  const context=ticketEditorContext;
+  if(!context || context.coverPickerState!=='waiting') return;
+  context.coverPickerState='cancelled';
+  ticketCoverPickerFeedback('Nenhuma foto foi recebida. Se você tocou em OK, tente novamente ou escolha a foto pelo app Arquivos.','error');
+  document.getElementById('ticket_card_cover_hint').textContent='Foto não recebida · toque para tentar novamente';
+});
+// Some iOS WebKit versions return from Photos without 'change' or 'cancel'.
+// Surface a useful message rather than leaving the screen silent.
+window.addEventListener('focus',()=>{
+  const context=ticketEditorContext;
+  if(context?.coverPickerState!=='waiting') return;
+  const token=context.coverPickerToken;
+  setTimeout(()=>{
+    if(ticketEditorContext!==context || context.coverPickerState!=='waiting' || context.coverPickerToken!==token) return;
+    ticketCoverPickerFeedback('Ainda não recebemos a foto da Fototeca. Se você já confirmou, tente novamente ou use o app Arquivos.','error');
+    document.getElementById('ticket_card_cover_hint').textContent='Foto não recebida · toque para tentar novamente';
+  },3500);
 });
 document.getElementById('ticket_card_cover_remove')?.addEventListener('click',clearTicketCardCover);
 document.getElementById('ticket_editor_preview_open')?.addEventListener('click',openTicketImageViewer);
