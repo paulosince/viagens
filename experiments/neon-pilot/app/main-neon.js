@@ -5458,6 +5458,50 @@ function compareTripsForHome(a, b, now = new Date()) {
   return String(a.start_date || '').localeCompare(String(b.start_date || ''));
 }
 
+function setHomeSearchOpen(open) {
+  const region = document.getElementById('home_search_reveal');
+  region.dataset.open = String(open);
+  region.inert = !open;
+  region.setAttribute('aria-hidden', String(!open));
+  document.getElementById('home_search_access').setAttribute('aria-expanded', String(open));
+}
+
+function installHomeSearchGesture() {
+  const home = document.getElementById('user_home');
+  const input = document.getElementById('home_search');
+  let start = null;
+  const available = () => document.body.dataset.session === 'authenticated' && document.body.dataset.tripPage === 'closed' && document.body.dataset.activeSheet === 'none' && !state.editing;
+  home.addEventListener('touchstart', event => {
+    start = available() && window.scrollY <= 1 && event.touches.length === 1 && !event.target.closest('button:not(.trip-card-button):not(.home-trip-shortcut),input,nav,.home-filters')
+      ? { x: event.touches[0].clientX, y: event.touches[0].clientY } : null;
+  }, { passive: true });
+  home.addEventListener('touchmove', event => {
+    if (!start || event.touches.length !== 1 || !available()) return;
+    const dx = event.touches[0].clientX - start.x, dy = event.touches[0].clientY - start.y;
+    if (Math.abs(dx) > 18 || dy < -8) { start = null; return; }
+    if (dy >= 36 && dy > Math.abs(dx) * 1.5) {
+      if (event.cancelable) event.preventDefault();
+      setHomeSearchOpen(true);
+      start = null;
+    }
+  }, { passive: false });
+  for (const name of ['touchend', 'touchcancel']) home.addEventListener(name, () => { start = null; }, { passive: true });
+  home.addEventListener('wheel', event => {
+    if (available() && window.scrollY <= 1 && event.deltaY < -12) setHomeSearchOpen(true);
+  }, { passive: true });
+  window.addEventListener('scroll', () => {
+    if (window.scrollY > 64 && !input.value && document.activeElement !== input) setHomeSearchOpen(false);
+  }, { passive: true });
+  document.getElementById('home_search_access').addEventListener('click', () => { setHomeSearchOpen(true); input.focus(); });
+  input.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+      input.value = ''; state.homeSearch = ''; syncTripList(); input.blur(); setHomeSearchOpen(false);
+      document.getElementById('home_search_access').focus({ preventScroll: true });
+    }
+  });
+}
+installHomeSearchGesture();
+
 function matchesHomeFilters(trip) {
   const query = state.homeSearch.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   const text = `${trip.name || ''} ${trip.destination || ''}`.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();

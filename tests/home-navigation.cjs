@@ -6,7 +6,7 @@ const fs=require('fs'), assert=require('assert/strict');
  let html=fs.readFileSync('index.html','utf8').replace(/<script\b[\s\S]*?<\/script>/g,'').replace(/<link\b[^>]*>/g,'');
  html=html.replace('</head>','<style>'+fs.readFileSync('style.css','utf8')+'</style></head>');
  const source=fs.readFileSync('experiments/neon-pilot/app/main-neon.js','utf8');
- const funcs=source.slice(source.indexOf('function matchesHomeFilters('),source.indexOf('function setYearMenu('));
+ const funcs=source.slice(source.indexOf('function setHomeSearchOpen('),source.indexOf('function setYearMenu('));
  await page.route('**/*',route=>route.abort());
  for (const width of [320,390,430,768]) {
   await page.setViewportSize({width,height:844});await page.setContent(html);
@@ -22,6 +22,19 @@ const fs=require('fs'), assert=require('assert/strict');
   assert.equal(await page.locator('.home-tabs button').count(),5);
   const bounds=await page.evaluate(()=>({doc:document.documentElement.scrollWidth, viewport:innerWidth,plus:document.getElementById('new_trip_button').getBoundingClientRect().y,year:document.getElementById('year_selector_button').getBoundingClientRect().y}));
   assert.ok(bounds.doc<=width,JSON.stringify(bounds));assert.ok(Math.abs(bounds.plus-bounds.year)<4);
+  assert.equal(await page.locator('#home_search_reveal').getAttribute('aria-hidden'),'true');
+  assert.equal((await page.locator('#home_search_reveal').boundingBox()).height,0);
+  const pull = async (dx,dy) => page.evaluate(({dx,dy})=>{
+    const home=document.querySelector('.trip-card-button');
+    for (const [type,x,y] of [['touchstart',100,150],['touchmove',100+dx,150+dy],['touchend',100+dx,150+dy]]) {
+      const event=new Event(type,{bubbles:true,cancelable:true});
+      Object.defineProperty(event,'touches',{value:type==='touchend'?[]:[{clientX:x,clientY:y}]});home.dispatchEvent(event);
+    }
+  },{dx,dy});
+  await pull(40,45); assert.equal(await page.locator('#home_search_reveal').getAttribute('aria-hidden'),'true');
+  await pull(0,15); assert.equal(await page.locator('#home_search_reveal').getAttribute('aria-hidden'),'true');
+  await pull(0,40); assert.equal(await page.locator('#home_search_reveal').getAttribute('aria-hidden'),'false');
+  const bar=await page.locator('.home-tabs').boundingBox();assert.ok(bar.height<=61);assert.ok(844-bar.y-bar.height<=9);
   await page.locator('#home_search').fill('sao');assert.equal(await page.locator('#trip_list>li').count(),1);
   await page.locator('#home_search').fill('');await page.locator('[data-home-filter="received"]').click();assert.equal(await page.locator('#trip_list>li').count(),1);
   await page.locator('[data-home-filter="all"]').click();
@@ -29,6 +42,7 @@ const fs=require('fs'), assert=require('assert/strict');
   await page.locator('[data-home-tab="budgets"]').click();await page.locator('.home-trip-shortcut').first().click();assert.equal(await page.evaluate(()=>destination),'orcamento');
   await page.locator('[data-home-tab="calendar"]').click();assert.equal(await page.locator('.home-calendar').count(),1);await page.locator('[aria-label="Próximo mês"]').click();
   await page.locator('[data-home-tab="trips"]').click();assert.equal(await page.locator('#trip_list>li').count(),2);
+  await page.locator('#home_search').press('Escape');assert.equal(await page.locator('#home_search_reveal').getAttribute('aria-hidden'),'true');
 
   console.log('PASS',width,'layout, search, filters, calendar, ticket/budget destinations');
  }
