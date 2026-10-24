@@ -2418,7 +2418,7 @@ function renderDayAttachments(dayId) {
     }
     const name = document.createElement('span');
     name.className = 'day-attachment-name';
-    name.textContent = attachment.file_name;
+    name.textContent = attachment.display_title || attachment.file_name;
     const size = document.createElement('small');
     size.textContent = (attachment.size_bytes / 1024 / 1024).toFixed(1) + ' MB';
     name.append(size);
@@ -4768,7 +4768,7 @@ function showTripFileViewerIndex(index, { syncHistory = true } = {}) {
   tripFileViewerState.index = Math.max(0, Math.min(index, entries.length - 1));
   const file = entries[tripFileViewerState.index];
   clearTripFileViewerMedia();
-  dom.tripFileViewerTitle.textContent = file.mime_type?.startsWith('image/') ? 'Foto' : file.file_name;
+  dom.tripFileViewerTitle.textContent = file.display_title || (file.mime_type?.startsWith('image/') ? 'Foto' : file.file_name);
   dom.tripFileViewerStatus.textContent = tripFileSize(file);
   dom.tripFileViewerDelete.hidden = !canEditActiveTrip();
   dom.tripFileViewerDelete.disabled = false;
@@ -4948,7 +4948,7 @@ function renderTripFileDeck(tripId, day, entries) {
     if (card.dataset.kind === 'document') {
       const caption = document.createElement('span');
       caption.className = 'trip-file-card-caption';
-      const name = document.createElement('strong'); name.textContent = file.file_name;
+      const name = document.createElement('strong'); name.textContent = file.display_title || file.file_name;
       const size = document.createElement('small'); size.textContent = tripFileSize(file);
       caption.append(name, size);
       link.append(caption);
