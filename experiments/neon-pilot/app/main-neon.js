@@ -1,5 +1,6 @@
 import {createNeonPreview,NEON_AUTH_URL,API_ROOTS} from './backend-neon.mjs?v=20261023-cutover1';
 import {activityPhotoForPreview} from './photo-source-neon.mjs?v=20261021-7photofix';
+import {usageRingsModel,applyUsageRing} from './usage-rings.mjs?v=20261023-1';
 import { offlineStore } from './offline-store-neon.js?v=20261021-1';
 import {
   adoptLegacyDataUrl,
@@ -330,7 +331,7 @@ const dom = {
   home: document.querySelector('#user_home'), profileButton: document.querySelector('#profile_button'), headerProfileImage: document.querySelector('#header_profile_image'), headerProfileFallback: document.querySelector('#header_profile_fallback'), homeChatgptButton: document.querySelector('#home_chatgpt_button'),
   usageButton: document.querySelector('#home_usage_button'), usageDetails: document.querySelector('#home_usage_details'),
   databaseUsage: document.querySelector('#home_database_usage'), storageUsage: document.querySelector('#home_storage_usage'),
-  databaseDetail: document.querySelector('#home_database_detail'), imagesDetail: document.querySelector('#home_images_detail'),
+  databaseDetail: document.querySelector('#home_database_detail'), storageDetail: document.querySelector('#home_storage_detail'), imagesDetail: document.querySelector('#home_images_detail'),
   attachmentsDetail: document.querySelector('#home_attachments_detail'), usageNote: document.querySelector('#home_usage_note'),
   editTripsButton: document.querySelector('#edit_trips_button'), newTripButton: document.querySelector('#new_trip_button'), emptyNewTripButton: document.querySelector('#empty_new_trip_button'), sessionEmail: document.querySelector('#session_email'), syncStatus: document.querySelector('#sync_status'), tripHeading: document.querySelector('#trip_heading'), yearButton: document.querySelector('#year_selector_button'), currentYear: document.querySelector('#current_year'), yearMenu: document.querySelector('#year_menu'), yearList: document.querySelector('#year_list'),
   tripList: document.querySelector('#trip_list'), homeEmpty: document.querySelector('#home_empty'), scrim: document.querySelector('#sheet_scrim'), tripEditFooter: document.querySelector('#trip_edit_footer'), deleteSelectedTrips: document.querySelector('#delete_selected_trips'), tripPage: document.querySelector('#trip_page'), closeTripPage: document.querySelector('#close_trip_page'), tripPageHero: document.querySelector('#trip_page_hero'), tripPageTitle: document.querySelector('#trip_page_title'), tripPageTitleInput: document.querySelector('#trip_page_title_input'), tripPageDates: document.querySelector('#trip_page_dates'), tripDateEditor: document.querySelector('#trip_page_date_editor'), tripStartDate: document.querySelector('#trip_page_start_date'), tripDayCount: document.querySelector('#trip_page_day_count'), tripDateDone: document.querySelector('#trip_page_date_done'), tripPageColor: document.querySelector('#trip_page_color'), tripPageCoverInput: document.querySelector('#trip_page_cover_input'), tripPageSaveStatus: document.querySelector('#trip_page_save_status'), tripPagePassengers: document.querySelector('#trip_page_passengers'), tripPagePassengerCount: document.querySelector('#trip_page_passenger_count'), tripPassengerSheet: document.querySelector('#trip_passenger_sheet'), tripPassengerSheetBody: document.querySelector('#trip_passenger_sheet_body'), tripPassengerSelf: document.querySelector('#trip_passenger_self'), tripPassengerSelfImage: document.querySelector('#trip_passenger_self_image'), tripPassengerSelfName: document.querySelector('#trip_passenger_self_name'), tripPassengerClose: document.querySelector('#close_trip_passengers'), tripPassengerMessage: document.querySelector('#trip_passenger_message'), tripDayList: document.querySelector('#trip_day_list'), tripDayMessage: document.querySelector('#trip_day_message'),
@@ -543,12 +544,38 @@ function formatUsageBytes(value) {
 }
 function renderUsage(data, cached = false) {
   if (!data || !dom.databaseUsage) return;
-  dom.databaseUsage.textContent = formatUsageBytes(data.database_bytes);
-  dom.storageUsage.textContent = formatUsageBytes(data.storage_bytes);
-  dom.databaseDetail.textContent = formatUsageBytes(data.database_bytes);
+  const databaseText = formatUsageBytes(data.database_bytes);
+  const filesText = formatUsageBytes(data.storage_bytes);
+  dom.databaseUsage.textContent = databaseText;
+  dom.storageUsage.textContent = filesText;
+  dom.databaseDetail.textContent = databaseText;
+  if (dom.storageDetail) dom.storageDetail.textContent = filesText;
   dom.imagesDetail.textContent = formatUsageBytes(data.image_bytes);
   dom.attachmentsDetail.textContent = formatUsageBytes(data.attachment_bytes);
-  dom.usageNote.textContent = (cached ? 'Última medição salva no aparelho. ' : '') + usageNoteBase;
+
+  const rings = usageRingsModel(data);
+  const mode = rings?.mode === 'quota';
+  const total = document.querySelector('#home_usage_total');
+  const label = document.querySelector('#home_usage_mode');
+  const dbPercent = document.querySelector('#home_database_percent');
+  const filePercent = document.querySelector('#home_storage_percent');
+  if (total) total.textContent = rings ? formatUsageBytes(rings.total) : '—';
+  if (label) label.textContent = mode ? 'Uso das cotas' : 'Proporção do uso';
+  if (dbPercent) dbPercent.textContent = rings
+    ? (mode ? Math.round(rings.databasePercent) + '% da cota' : Math.round(rings.databasePercent) + '% dos dados')
+    : '—';
+  if (filePercent) filePercent.textContent = rings
+    ? (mode ? Math.round(rings.filesPercent) + '% da cota' : Math.round(rings.filesPercent) + '% dos dados')
+    : '—';
+  document.querySelectorAll('[data-usage-ring="database"]').forEach(el => applyUsageRing(el, rings?.databasePercent ?? 0));
+  document.querySelectorAll('[data-usage-ring="files"]').forEach(el => applyUsageRing(el, rings?.filesPercent ?? 0));
+  if (dom.usageButton) dom.usageButton.setAttribute('aria-label',
+    'Armazenamento: Banco ' + databaseText + ', Arquivos ' + filesText + '. Ver detalhes.');
+
+  dom.usageNote.textContent = (cached ? 'Última medição salva neste aparelho. ' : '') +
+    (mode
+      ? 'Os anéis mostram o percentual das cotas atribuídas à conta.'
+      : 'Os anéis comparam Banco e Arquivos dentro do espaço medido; não mostram uma cota. ' + usageNoteBase);
 }
 async function restoreCachedUsage() {
   const id = state.user?.id;
