@@ -2,7 +2,7 @@ import { offlineStore } from '../experiments/neon-pilot/app/offline-store-neon.j
 import { offlineStore as legacyStore } from './offline-store.js?v=20261007-59';
 
 // A troca da versão é adiada durante edições e sincronizações locais.
-const SW_URL = './sw.js?v=20261023-110-neon';
+const SW_URL = './sw.js?v=20261023-111-rings';
 const CHECK_INTERVAL_MS = 15 * 60 * 1000;
 const RESUME_WINDOW_MS = 25 * 1000;
 let registration;
