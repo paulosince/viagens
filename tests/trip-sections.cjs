@@ -48,19 +48,26 @@ class Node {
   }
 }
 
+// Deterministic fixture: avoid year-boundary failures in October/December.
+const TEST_CLOCK = new Date('2026-03-15T12:00:00Z');
+class TestDate extends Date {
+  constructor(...args) { super(...(args.length ? args : [TEST_CLOCK.getTime()])); }
+  static now() { return TEST_CLOCK.getTime(); }
+}
 const date = offset => {
-  const day = new Date();
+  const day = new TestDate();
   day.setDate(day.getDate() + offset);
   return [day.getFullYear(), String(day.getMonth() + 1).padStart(2, '0'), String(day.getDate()).padStart(2, '0')].join('-');
 };
 const trip = (id, start, end) => ({ id, start_date: date(start), end_date: date(end) });
 const state = {
-  user: { id: 'user' }, selectedYear: new Date().getFullYear(),
+  user: { id: 'user' }, selectedYear: TEST_CLOCK.getFullYear(),
   trips: [trip('past', -90, -60), trip('next', 60, 90), trip('current', -30, 30)],
   collapsedTripSections: new Set(), selectedTripIds: new Set()
 };
 const dom = { tripList: new Node('ol'), homeEmpty: new Node('section'), deleteSelectedTrips: new Node('button') };
 const context = {
+  Date: TestDate,
   state, dom, document: { createElement: tag => new Node(tag) },
   tripEndDate: item => item.end_date,
   createTripNode(item) {
