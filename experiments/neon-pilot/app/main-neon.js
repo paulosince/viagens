@@ -3311,7 +3311,9 @@ function renderDayPageAgenda(day, activities, locations) {
     place.textContent = location?.name || activity.place_name || (activity.title === NEW_AGENDA_TITLE ? 'Definir local' : 'Sem local definido');
     place.addEventListener('click', () => openInlinePlaceSearch(day, activity, location));
 
-    copy.append(title, place);
+    const heading = document.createElement('div'); heading.className = 'day-agenda-heading';
+    heading.append(title, createCalendarFavoriteButton(day, activity));
+    copy.append(heading, place);
 
     const description = document.createElement('button');
     description.type = 'button';
@@ -5538,6 +5540,8 @@ function renderHomeTab(trips) {
   document.body.dataset.homeTab = tab;
   panel.classList.toggle('calendar-feed', tab === 'calendar');
   panel.onscroll = null;
+  panel.calendarRenderToken = null;
+  panel.calendarResizeObserver?.disconnect();
   panel.hidden = tab === 'trips';
   dom.tripList.hidden = tab !== 'trips';
   if (tab === 'trips') return;
@@ -5585,48 +5589,103 @@ document.getElementById('calendar_menu_button').addEventListener('click', () => 
 document.getElementById('calendar_menu_scrim').addEventListener('click', () => setCalendarMenu(false));
 document.addEventListener('keydown', event => { if (event.key === 'Escape' && document.body.dataset.calendarMenu === 'open') { setCalendarMenu(false); document.getElementById('calendar_menu_button').focus(); } });
 
-function renderCalendarFeed(panel, trips) {
+function calendarFavoritesKey() { return `calendar-favorites:${state.user?.id || 'guest'}`; }
+async function readCalendarFavorites() { return (await offlineStore.getMeta(calendarFavoritesKey())) || {}; }
+function createCalendarFavoriteButton(day, activity) {
+  const button = document.createElement('button'); button.type = 'button'; button.className = 'activity-favorite';
+  const key = `${day.trip_id}:${activity.id}`;
+  const paint = selected => { button.textContent = selected ? '★' : '☆'; button.setAttribute('aria-pressed', String(selected)); button.setAttribute('aria-label', `${selected ? 'Remover dos' : 'Adicionar aos'} favoritos: ${activity.title || 'Passeio'}`); };
+  paint(false); button.disabled = true;
+  readCalendarFavorites().then(items => paint(Boolean(items[key]))).catch(console.warn).finally(()=>{button.disabled=false;});
+  button.addEventListener('click', async () => {
+    button.disabled = true;
+    try {
+      const items = await readCalendarFavorites();
+      if (items[key]) delete items[key];
+      else items[key] = { tripId: String(day.trip_id), activityId: String(activity.id), dayId: String(day.id), title: activity.title || activity.place_name || 'Passeio', date: derivedDayDate(day, state.trips.find(trip => String(trip.id) === String(day.trip_id))) };
+      await offlineStore.setMeta(calendarFavoritesKey(), items); paint(Boolean(items[key]));
+    } catch (error) { button.title = 'Não foi possível salvar o favorito. Tente novamente.'; button.textContent = '!'; console.warn(error); }
+    finally { button.disabled = false; }
+  });
+  return button;
+}
+
+async function renderCalendarFeed(panel, trips) {
+  const renderToken = {}; panel.calendarRenderToken = renderToken;
   panel.classList.add('calendar-feed');
-  panel.setAttribute('aria-label', 'Viagens em ordem de data');
-  if (!trips.length) {
-    const empty = document.createElement('p'); empty.className = 'calendar-empty';
-    empty.textContent = 'Nenhuma viagem encontrada. Ajuste a busca e os filtros no menu acima.';
-    panel.append(empty); return;
+  panel.setAttribute('aria-label', 'Contagens regressivas das viagens');
+  let favorites = {};
+  try { favorites = await readCalendarFavorites(); } catch (error) { console.warn(error); }
+  const milestones = [];
+  for (const trip of trips) {
+    milestones.push({ id: `trip:${trip.id}`, trip, date: trip.start_date, countdown: calendarCountdown(trip) });
+    const saved = Object.values(favorites).filter(item => item.tripId === String(trip.id));
+    let cached = null;
+    if (saved.length) { try { cached = await offlineStore.loadTripData(String(trip.id)); } catch (error) { console.warn(error); } }
+    const events = saved.flatMap(item => {
+      let date = item.date, title = item.title;
+      if (cached?.days?.length) {
+        const day = cached.days.find(day => String(day.id) === item.dayId);
+        const activity = cached.activities.find(activity => String(activity.id) === item.activityId);
+        if (!day || !activity) return [];
+        date = derivedDayDate(day, trip); title = activity.title || activity.place_name || title;
+      }
+      if (!date) return [];
+      const today = new Date(); const [y,m,d] = date.split('-').map(Number);
+      const days = Math.round((Date.UTC(y,m-1,d)-Date.UTC(today.getFullYear(),today.getMonth(),today.getDate()))/86400000);
+      return [{ id: `activity:${item.activityId}`, trip, date, title, countdown: {number: Math.abs(days), heading: '★ PASSEIO FAVORITADO', label: days === 0 ? 'é hoje!' : days < 0 ? (days === -1 ? 'dia desde o passeio' : 'dias desde o passeio') : (days === 1 ? 'dia para o passeio' : 'dias para o passeio')} }];
+    }).sort((a,b) => a.date.localeCompare(b.date));
+    milestones.push(...events);
   }
-  for (const [index, trip] of trips.entries()) {
-    const page = document.createElement('article'); page.className = 'calendar-trip'; page.dataset.calendarTrip = String(trip.id);
-    const background = document.createElement('div'); background.className = 'calendar-backdrop'; background.setAttribute('aria-hidden', 'true');
-    if (trip.cover_url) {
-      const image = document.createElement('img'); image.src = trip.cover_url; image.alt = ''; image.loading = index ? 'lazy' : 'eager'; image.decoding = 'async';
-      image.addEventListener('error', () => image.remove(), { once: true }); background.append(image);
-    }
-    const content = document.createElement('div'); content.className = 'calendar-trip-content';
-    const title = document.createElement('h2'); title.textContent = trip.name;
-    const dates = document.createElement('p'); dates.className = 'calendar-trip-dates';
-    const dateText = value => new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(value + 'T12:00:00'));
+  if (panel.calendarRenderToken !== renderToken || state.homeTab !== 'calendar') return;
+  if (!milestones.length) {
+    const empty = document.createElement('p'); empty.className = 'calendar-empty'; empty.textContent = 'Nenhuma viagem encontrada. Ajuste a busca e os filtros no menu acima.'; panel.append(empty); return;
+  }
+  const page = document.createElement('article'); page.className = 'calendar-trip';
+  const background = document.createElement('div'); background.className = 'calendar-backdrop'; background.setAttribute('aria-hidden', 'true');
+  const content = document.createElement('div'); content.className = 'calendar-trip-content';
+  const title = document.createElement('h2');
+  const dates = document.createElement('p'); dates.className = 'calendar-trip-dates';
+  const carousel = document.createElement('div'); carousel.className = 'calendar-milestones'; carousel.setAttribute('aria-label', 'Marcos da viagem'); carousel.tabIndex = 0;
+  const controls = document.createElement('div'); controls.className = 'calendar-carousel-controls';
+  const previous = document.createElement('button'); previous.type = 'button'; previous.textContent = '‹'; previous.setAttribute('aria-label', 'Marco anterior');
+  const status = document.createElement('span'); status.setAttribute('aria-live', 'polite');
+  const next = document.createElement('button'); next.type = 'button'; next.textContent = '›'; next.setAttribute('aria-label', 'Próximo marco');
+  controls.append(previous, status, next);
+  const calendarHolder = document.createElement('div'); calendarHolder.className = 'calendar-month-holder';
+  let active = -1;
+  const activate = index => {
+    if (index === active) return; active = index;
+    const milestone = milestones[index], trip = milestone.trip;
+    state.calendarMilestoneId = milestone.id;
+    title.textContent = trip.name;
+    const dateText = value => new Intl.DateTimeFormat('pt-BR', {day:'numeric',month:'short',year:'numeric'}).format(new Date(value+'T12:00:00'));
     dates.textContent = `${dateText(trip.start_date)} — ${dateText(tripEndDate(trip))}`;
-    const countdown = calendarCountdown(trip);
-    const hero = document.createElement('div'); hero.className = 'calendar-countdown';
-    const eyebrow = document.createElement('small'); eyebrow.textContent = countdown.heading;
-    const number = document.createElement('strong'); number.textContent = countdown.number;
-    const label = document.createElement('span'); label.textContent = countdown.label;
-    const motif = document.createElement('span'); motif.className = 'calendar-route'; motif.setAttribute('aria-hidden', 'true'); motif.textContent = '— ✈ —';
-    hero.append(eyebrow, number, label, motif);
-    content.append(title, dates, hero);
-    renderHomeCalendar(content, trip);
-    if (index < trips.length - 1) {
-      const next = document.createElement('button'); next.type = 'button'; next.className = 'calendar-next'; next.textContent = '⌃  Deslize para a próxima viagem';
-      next.addEventListener('click', () => page.nextElementSibling?.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' })); content.append(next);
+    if (background.dataset.tripId !== String(trip.id)) {
+      background.dataset.tripId = String(trip.id); background.replaceChildren();
+      if (trip.cover_url) { const image = document.createElement('img'); image.src = trip.cover_url; image.alt = ''; image.addEventListener('error',()=>image.remove(),{once:true}); background.append(image); }
     }
-    page.append(background, content); panel.append(page);
-  }
-  const selected = [...panel.children].find(page => page.dataset.calendarTrip === state.calendarTripId);
-  panel.scrollTop = selected?.offsetTop || 0;
-  panel.onscroll = () => {
-    const pages = [...panel.querySelectorAll('.calendar-trip')];
-    const nearest = pages.reduce((best, page) => Math.abs(page.offsetTop - panel.scrollTop) < Math.abs(best.offsetTop - panel.scrollTop) ? page : best, pages[0]);
-    if (nearest) state.calendarTripId = nearest.dataset.calendarTrip;
+    calendarHolder.replaceChildren(); renderHomeCalendar(calendarHolder, trip, new Date(milestone.date+'T12:00:00'));
+    previous.disabled = index === 0; next.disabled = index === milestones.length-1;
+    status.textContent = `${index+1} de ${milestones.length}`;
   };
+  for (const milestone of milestones) {
+    const slide = document.createElement('div'); slide.className = 'calendar-milestone-slide'; slide.dataset.milestoneId = milestone.id;
+    const hero = document.createElement('div'); hero.className = 'calendar-countdown';
+    const eyebrow = document.createElement('small'); eyebrow.textContent = milestone.countdown.heading;
+    const number = document.createElement('strong'); number.textContent = milestone.countdown.number;
+    const label = document.createElement('span'); label.textContent = milestone.countdown.label;
+    const name = document.createElement('span'); name.className = 'calendar-milestone-name'; name.textContent = milestone.title || '— ✈ —';
+    hero.append(eyebrow,number,label,name); slide.append(hero); carousel.append(slide);
+  }
+  const go = index => carousel.scrollTo({left:Math.max(0,Math.min(milestones.length-1,index))*carousel.clientWidth,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
+  previous.addEventListener('click',()=>go(active-1)); next.addEventListener('click',()=>go(active+1));
+  carousel.addEventListener('keydown',event=>{if(event.key==='ArrowRight'||event.key==='ArrowLeft'){event.preventDefault();go(active+(event.key==='ArrowRight'?1:-1));}});
+  carousel.addEventListener('scroll',()=>activate(Math.max(0,Math.min(milestones.length-1,Math.round(carousel.scrollLeft/carousel.clientWidth)))),{passive:true});
+  content.append(title,dates,carousel,controls,calendarHolder); page.append(background,content); panel.append(page);
+  const initial = Math.max(0,milestones.findIndex(item=>item.id===state.calendarMilestoneId)); activate(initial); carousel.scrollLeft=initial*carousel.clientWidth;
+  const observer = new ResizeObserver(()=>{carousel.scrollLeft=active*carousel.clientWidth;}); observer.observe(carousel);
+  panel.calendarResizeObserver?.disconnect(); panel.calendarResizeObserver=observer;
 }
 
 function renderHomeCalendar(panel, trip, shownDate = null) {
