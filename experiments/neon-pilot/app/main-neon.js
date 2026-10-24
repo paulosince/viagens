@@ -6,6 +6,7 @@ import {
   dataUrlToBlob,
   ensureMediaBlob,
   extensionForBlob,
+  hashBlob,
   mediaObjectUrl,
   prepareMediaBlob,
   uploadCachedMedia
@@ -3697,14 +3698,19 @@ async function syncMutation(mutation, previousDay = null) {
   mutation = await normalizeLegacyMutationMedia(client, mutation);
 
   if (mutation.type === 'upload-image') {
-    await uploadCachedMedia(
-      client,
-      mutation.bucket || TRIP_IMAGE_BUCKET,
-      mutation.path,
-      mutation.hash,
-      mutation.contentType,
-      mutation.blob || null
-    );
+    const bucket = mutation.bucket || TRIP_IMAGE_BUCKET;
+    // The file may have been uploaded successfully before its associated DB
+    // UPDATE failed. Reuse it only after an authenticated SHA-256 readback.
+    // This prevents retries from creating extra private storage objects.
+    const previous = await client.storage.from(bucket).download(mutation.path);
+    const remoteMatches = !previous.error && previous.data
+      && (await hashBlob(previous.data)) === mutation.hash;
+    if (!remoteMatches) {
+      await uploadCachedMedia(
+        client, bucket, mutation.path, mutation.hash,
+        mutation.contentType, mutation.blob || null
+      );
+    }
     const patch = {
       [mutation.pathField || 'photo_path']: mutation.path,
       [mutation.hashField || 'photo_hash']: mutation.hash,
@@ -3850,6 +3856,34 @@ function rememberSyncedDayMutation(map, mutation) {
   for (const id of mutation.removedLocationIds || []) previous.locations.delete(String(id));
 }
 
+// Newly created locations/activities can have a queued media upload before
+// their first save-day insertion. Identify that exact dependency without
+// discarding, rewriting, or guessing the intended destination project.
+async function pendingCreationBeforeUpload(mutation) {
+  if (mutation?.type !== 'upload-image' ||
+      !['day_locations', 'activities'].includes(mutation.table) ||
+      !mutation.entityId || !mutation.tripId) return null;
+
+  const client = await tryNeon();
+  if (!client) return null;
+  const existing = await client.from(mutation.table)
+    .select('id').eq('id', mutation.entityId).maybeSingle();
+  if (existing.error) throw existing.error;
+  if (existing.data) return null;
+
+  const jobs = await offlineStore.listOutbox();
+  const headIndex = jobs.findIndex(item => item.id === mutation.id);
+  if (headIndex < 0) return null;
+  const key = mutation.table === 'day_locations' ? 'locations' : 'activities';
+  const scalar = mutation.table === 'day_locations' ? 'location' : 'activity';
+  return jobs.slice(headIndex + 1).find(item => {
+    if (String(item.tripId || '') !== String(mutation.tripId)) return false;
+    if (!['save-day','save-day-items','save-inline-activity'].includes(item.type)) return false;
+    const records = [...(item[key] || []), ...(item[scalar] ? [item[scalar]] : [])];
+    return records.some(row => String(row.id) === String(mutation.entityId));
+  }) || null;
+}
+
 async function flushOutbox() {
   if (outboxFlushPromise) return outboxFlushPromise;
 
@@ -3878,6 +3912,17 @@ async function flushOutbox() {
         const mutation = await offlineStore.peekOutbox();
         if (!mutation) return true;
         try {
+          const prerequisite = await pendingCreationBeforeUpload(mutation);
+          if (prerequisite) {
+            // Commit the missing location/activity first, keeping the media
+            // upload itself queued and untouched until the next iteration.
+            await syncMutation(prerequisite, syncedDays.get(String(prerequisite.dayId)));
+            rememberSyncedDayMutation(syncedDays, prerequisite);
+            await offlineStore.removeMutation(prerequisite.id);
+            lastOutboxError = null;
+            await refreshSyncStatus();
+            continue;
+          }
           await syncMutation(mutation, syncedDays.get(String(mutation.dayId)));
           rememberSyncedDayMutation(syncedDays, mutation);
           await offlineStore.removeMutation(mutation.id);
