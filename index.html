@@ -47,9 +47,9 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20261024-tickets15" as="style">
-  <link rel="stylesheet" href="style.css?v=20261024-tickets15" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20261024-tickets15"></noscript>
+  <link rel="preload" href="style.css?v=20261024-tickets16" as="style">
+  <link rel="stylesheet" href="style.css?v=20261024-tickets16" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20261024-tickets16"></noscript>
   <link rel="stylesheet" href="src/update-manager.css?v=20261024-home3">
   <script>
     function showViaggioStartupError(detail) {
@@ -599,6 +599,21 @@
           <button type="button" class="ticket-category-option" data-ticket-category="other" aria-pressed="false"><span class="ticket-category-symbol">▣</span><span>Outros</span></button>
         </div>
       </fieldset>
+      <section class="ticket-card-cover-editor" aria-label="Imagem de capa do card">
+        <div class="ticket-card-cover-heading"><strong>Imagem do card</strong><span>Opcional · independente do comprovante</span></div>
+        <div class="ticket-card-cover-preview" id="ticket_card_cover_preview">
+          <img id="ticket_card_cover_image" alt="Prévia da capa do card" hidden>
+          <div id="ticket_card_cover_empty" class="ticket-card-cover-empty">
+            <span aria-hidden="true">▧</span><small>Sem capa personalizada</small>
+          </div>
+        </div>
+        <div class="ticket-card-cover-actions">
+          <label class="ticket-card-cover-pick" for="ticket_card_cover_input">Escolher imagem
+            <input id="ticket_card_cover_input" type="file" accept="image/*,.heic,.heif" hidden>
+          </label>
+          <button type="button" id="ticket_card_cover_remove" hidden>Remover capa</button>
+        </div>
+      </section>
       <div class="ticket-metadata-inline">
         <label for="ticket_metadata_date">Data <small>Opcional</small>
           <input id="ticket_metadata_date" name="event_date" type="date">
@@ -632,7 +647,7 @@
       if (legacyPending > 0) {
         location.replace('./legacy-supabase.html?recover=1');
       } else {
-        await import('./experiments/neon-pilot/app/main-neon.js?v=20261024-tickets15');
+        await import('./experiments/neon-pilot/app/main-neon.js?v=20261024-tickets16');
       }
     } catch (error) {
       console.error('Não foi possível validar o estado local antes da migração Neon', error);
