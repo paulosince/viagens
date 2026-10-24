@@ -5914,8 +5914,8 @@ for (const button of document.querySelectorAll('[data-home-filter]')) button.add
 function syncTripList() {
   const now = new Date();
   const visibleTrips = state.trips
-    .filter(trip => state.homeTab === 'calendar' || Number(String(trip.start_date).slice(0, 4)) === state.selectedYear)
-    .filter(matchesHomeFilters)
+    .filter(trip => state.homeTab === 'calendar' || state.homeTab === 'tickets' || Number(String(trip.start_date).slice(0, 4)) === state.selectedYear)
+    .filter(trip => state.homeTab === 'tickets' || matchesHomeFilters(trip))
     .sort((a, b) => compareTripsForHome(a, b, now));
 
   const existingCards = new Map(
