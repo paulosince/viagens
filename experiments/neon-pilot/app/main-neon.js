@@ -1,6 +1,6 @@
-import {createNeonPreview,NEON_AUTH_URL,API_ROOTS} from './backend-neon.mjs?v=20261023-cutover1';
+import {createNeonPreview,NEON_AUTH_URL,API_ROOTS} from './backend-neon.mjs?v=20261024-usage2';
 import {activityPhotoForPreview} from './photo-source-neon.mjs?v=20261021-7photofix';
-import {usageRingsModel,applyUsageRing} from './usage-rings.mjs?v=20261023-1';
+import {usageRingsModel} from './usage-rings.mjs?v=20261024-usage2';
 import { offlineStore } from './offline-store-neon.js?v=20261021-1';
 import {
   adoptLegacyDataUrl,
@@ -333,7 +333,7 @@ const dom = {
   databaseUsage: document.querySelector('#home_database_usage'), storageUsage: document.querySelector('#home_storage_usage'),
   databaseDetail: document.querySelector('#home_database_detail'), storageDetail: document.querySelector('#home_storage_detail'), imagesDetail: document.querySelector('#home_images_detail'),
   attachmentsDetail: document.querySelector('#home_attachments_detail'), usageNote: document.querySelector('#home_usage_note'),
-  editTripsButton: document.querySelector('#edit_trips_button'), newTripButton: document.querySelector('#new_trip_button'), emptyNewTripButton: document.querySelector('#empty_new_trip_button'), sessionEmail: document.querySelector('#session_email'), syncStatus: document.querySelector('#sync_status'), tripHeading: document.querySelector('#trip_heading'), yearButton: document.querySelector('#year_selector_button'), currentYear: document.querySelector('#current_year'), yearMenu: document.querySelector('#year_menu'), yearList: document.querySelector('#year_list'),
+  editTripsButton: document.querySelector('#edit_trips_button'), newTripButton: document.querySelector('#new_trip_button'), emptyNewTripButton: document.querySelector('#empty_new_trip_button'), syncStatus: document.querySelector('#sync_status'), tripHeading: document.querySelector('#trip_heading'), yearButton: document.querySelector('#year_selector_button'), currentYear: document.querySelector('#current_year'), yearMenu: document.querySelector('#year_menu'), yearList: document.querySelector('#year_list'),
   tripList: document.querySelector('#trip_list'), homeEmpty: document.querySelector('#home_empty'), scrim: document.querySelector('#sheet_scrim'), tripEditFooter: document.querySelector('#trip_edit_footer'), deleteSelectedTrips: document.querySelector('#delete_selected_trips'), tripPage: document.querySelector('#trip_page'), closeTripPage: document.querySelector('#close_trip_page'), tripPageHero: document.querySelector('#trip_page_hero'), tripPageTitle: document.querySelector('#trip_page_title'), tripPageTitleInput: document.querySelector('#trip_page_title_input'), tripPageDates: document.querySelector('#trip_page_dates'), tripDateEditor: document.querySelector('#trip_page_date_editor'), tripStartDate: document.querySelector('#trip_page_start_date'), tripDayCount: document.querySelector('#trip_page_day_count'), tripDateDone: document.querySelector('#trip_page_date_done'), tripPageColor: document.querySelector('#trip_page_color'), tripPageCoverInput: document.querySelector('#trip_page_cover_input'), tripPageSaveStatus: document.querySelector('#trip_page_save_status'), tripPagePassengers: document.querySelector('#trip_page_passengers'), tripPagePassengerCount: document.querySelector('#trip_page_passenger_count'), tripPassengerSheet: document.querySelector('#trip_passenger_sheet'), tripPassengerSheetBody: document.querySelector('#trip_passenger_sheet_body'), tripPassengerSelf: document.querySelector('#trip_passenger_self'), tripPassengerSelfImage: document.querySelector('#trip_passenger_self_image'), tripPassengerSelfName: document.querySelector('#trip_passenger_self_name'), tripPassengerClose: document.querySelector('#close_trip_passengers'), tripPassengerMessage: document.querySelector('#trip_passenger_message'), tripDayList: document.querySelector('#trip_day_list'), tripDayMessage: document.querySelector('#trip_day_message'),
   tripTabs: document.querySelector('.trip-tabs'), tripPanels: { roteiro: document.querySelector('#trip_panel_roteiro'), orcamento: document.querySelector('#trip_panel_orcamento'), arquivos: document.querySelector('#trip_panel_arquivos') }, budgetSummary: document.querySelector('#budget_summary'), budgetStatus: document.querySelector('#budget_status'), budgetList: document.querySelector('#budget_list'), budgetPage: document.querySelector('#budget_item_page'), budgetPageTitle: document.querySelector('#budget_item_page_title'), closeBudgetPage: document.querySelector('#close_budget_item_page'), budgetEditor: document.querySelector('#budget_editor'), budgetPageMessage: document.querySelector('#budget_item_message'), budgetAdd: document.querySelector('#budget_add'), tripFilesStatus: document.querySelector('#trip_files_status'), tripFilesList: document.querySelector('#trip_files_list'), tripFilesDay: document.querySelector('#trip_files_day'), tripFilesInput: document.querySelector('#trip_files_input'),
   tripFileViewer: document.querySelector('#trip_file_viewer'), tripFileViewerTitle: document.querySelector('#trip_file_viewer_title'), tripFileViewerMedia: document.querySelector('#trip_file_viewer_media'), tripFileViewerStatus: document.querySelector('#trip_file_viewer_status'), tripFileViewerDelete: document.querySelector('#delete_trip_file_viewer'), tripFileViewerPosition: document.querySelector('#trip_file_viewer_position'), tripFileViewerPrevious: document.querySelector('#previous_trip_file_viewer'), tripFileViewerNext: document.querySelector('#next_trip_file_viewer'), closeTripFileViewer: document.querySelector('#close_trip_file_viewer'),
@@ -533,49 +533,52 @@ async function refreshWorkspaceInBackground() {
 
 // Usage is attributed to the owner of a trip, never duplicated across members.
 let usageRequest = null, usageLastUpdatedAt = 0, usageLastUserId = '';
-const usageNoteBase = 'Viagens próprias, perfil e passageiros salvos. Banco aproximado; arquivos medidos pelo Storage. Ainda não existe limite individual no beta.';
+const usageNoteBase = 'Banco: espaço do projeto pessoal, incluindo índices e histórico. Arquivos: bytes físicos no armazenamento, incluindo versões retidas. Limites configurados para este projeto.';
 
 function formatUsageBytes(value) {
   const bytes = Number(value);
-  if (!Number.isFinite(bytes) || bytes < 0) return '—';
+  if (value === null || value === undefined || !Number.isFinite(bytes) || bytes < 0) return '—';
   if (!bytes) return '0 MB';
-  if (bytes < 1048576) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-  return `${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(bytes / 1048576)} MB`;
+  if (bytes < 1000000) return `${Math.max(1, Math.round(bytes / 1000))} KB`;
+  if (bytes >= 1000000000) return `${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(bytes / 1000000000)} GB`;
+  return `${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(bytes / 1000000)} MB`;
 }
 function renderUsage(data, cached = false) {
-  if (!data || !dom.databaseUsage) return;
+  if (!data || data.measurement_version !== 2 || !dom.databaseUsage) return;
   const databaseText = formatUsageBytes(data.database_bytes);
   const filesText = formatUsageBytes(data.storage_bytes);
-  dom.databaseUsage.textContent = databaseText;
-  dom.storageUsage.textContent = filesText;
-  dom.databaseDetail.textContent = databaseText;
-  if (dom.storageDetail) dom.storageDetail.textContent = filesText;
+  dom.databaseDetail.textContent = databaseText + ' / ' + formatUsageBytes(data.database_quota_bytes);
+  if (dom.storageDetail) dom.storageDetail.textContent = filesText + ' / ' + formatUsageBytes(data.storage_quota_bytes);
   dom.imagesDetail.textContent = formatUsageBytes(data.image_bytes);
   dom.attachmentsDetail.textContent = formatUsageBytes(data.attachment_bytes);
 
   const rings = usageRingsModel(data);
-  const mode = rings?.mode === 'quota';
+
   const total = document.querySelector('#home_usage_total');
   const label = document.querySelector('#home_usage_mode');
   const dbPercent = document.querySelector('#home_database_percent');
   const filePercent = document.querySelector('#home_storage_percent');
   if (total) total.textContent = rings ? formatUsageBytes(rings.total) : '—';
-  if (label) label.textContent = mode ? 'Uso das cotas' : 'Proporção do uso';
+  if (label) label.textContent = 'Uso dos limites';
   if (dbPercent) dbPercent.textContent = rings
-    ? (mode ? Math.round(rings.databasePercent) + '% da cota' : Math.round(rings.databasePercent) + '% dos dados')
+    ? new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(rings.databasePercent) + '% do limite'
     : '—';
   if (filePercent) filePercent.textContent = rings
-    ? (mode ? Math.round(rings.filesPercent) + '% da cota' : Math.round(rings.filesPercent) + '% dos dados')
+    ? new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(rings.filesPercent) + '% do limite'
     : '—';
-  document.querySelectorAll('[data-usage-ring="database"]').forEach(el => applyUsageRing(el, rings?.databasePercent ?? 0));
-  document.querySelectorAll('[data-usage-ring="files"]').forEach(el => applyUsageRing(el, rings?.filesPercent ?? 0));
+  const percentText = value => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(value) + '%';
+  dom.databaseUsage.textContent = rings ? percentText(rings.databasePercent) : 'N/D';
+  dom.storageUsage.textContent = rings ? percentText(rings.filesPercent) : 'N/D';
+  for (const [kind, percent] of [['database', rings?.databasePercent], ['files', rings?.filesPercent]]) {
+    document.querySelectorAll(`[data-usage-bar="${kind}"]`).forEach(el => {
+      el.style.width = `${Math.min(100, percent ?? 0)}%`;
+    });
+  }
   if (dom.usageButton) dom.usageButton.setAttribute('aria-label',
     'Armazenamento: Banco ' + databaseText + ', Arquivos ' + filesText + '. Ver detalhes.');
 
   dom.usageNote.textContent = (cached ? 'Última medição salva neste aparelho. ' : '') +
-    (mode
-      ? 'Os anéis mostram o percentual das cotas atribuídas à conta.'
-      : 'Os anéis comparam Banco e Arquivos dentro do espaço medido; não mostram uma cota. ' + usageNoteBase);
+    usageNoteBase;
 }
 async function restoreCachedUsage() {
   const id = state.user?.id;
@@ -591,14 +594,25 @@ function refreshUsage({ force = false } = {}) {
   if (!force && Date.now() - usageLastUpdatedAt < 45000) return Promise.resolve();
   const promise = (async () => {
     const client = await tryNeon(3500);
-    if (!client) return;
+    if (!client) throw new Error('Medição indisponível sem conexão');
     const { data, error } = await client.rpc('viaggio_my_usage');
     if (error) throw error;
-    if (state.user?.id !== id || !Array.isArray(data) || !data[0]) return;
+    if (state.user?.id !== id) return;
+    if (!Array.isArray(data) || data.length !== 1 || data[0]?.measurement_version !== 2 || !usageRingsModel(data[0])) throw Error('Medição incompleta');
     usageLastUpdatedAt = Date.now();
     renderUsage(data[0]);
     await offlineStore.setMeta(`home_usage:${id}`, data[0]).catch(() => {});
-  })().catch(error => console.warn('Uso do armazenamento indisponível:', error)).finally(() => {
+  })().catch(error => {
+    console.warn('Uso do armazenamento indisponível:', error);
+    if (state.user?.id === id && ['…', 'N/D'].includes(dom.databaseUsage.textContent)) {
+      dom.databaseUsage.textContent = 'N/D';
+      dom.storageUsage.textContent = 'N/D';
+      dom.usageNote.textContent = 'Medição indisponível. Toque novamente para tentar atualizar.';
+      dom.usageButton.setAttribute('aria-label', 'Armazenamento: medição indisponível. Tentar novamente.');
+    } else if(state.user?.id === id) {
+      dom.usageNote.textContent = 'Não foi possível atualizar. Exibindo a última medição salva. ' + usageNoteBase;
+    }
+  }).finally(() => {
     if (usageRequest?.promise === promise) usageRequest = null;
   });
   usageRequest = { userId: id, promise };
@@ -620,6 +634,13 @@ function setSessionView(session) {
   dom.home.setAttribute('aria-hidden', String(session !== 'authenticated'));
   document.body.dataset.appReady = 'true';
   if (session === 'authenticated') {
+    if (usageLastUserId !== state.user?.id) {
+      usageLastUserId = state.user?.id; usageLastUpdatedAt = 0;
+      document.querySelectorAll('[data-usage-bar]').forEach(el => {el.style.width='0%';});
+      for (const key of ['databaseUsage','storageUsage','databaseDetail','storageDetail','imagesDetail','attachmentsDetail']) if(dom[key])dom[key].textContent='…';
+      for (const id of ['home_usage_total','home_database_percent','home_storage_percent']) { const el=document.getElementById(id); if(el)el.textContent='…'; }
+      dom.usageNote.textContent='Consultando o armazenamento…';
+    }
     restoreCachedUsage().then(() => refreshUsage({ force: true })).catch(console.warn);
   } else {
     setUsageOpen(false);
@@ -987,7 +1008,6 @@ function syncProfileUI() {
   const name = profileName(), image = profileImage(), birth = state.profile?.birth_date || '';
   setImage(dom.headerProfileImage, dom.headerProfileFallback, image, name);
   dom.profileButton.setAttribute('aria-label', `Abrir perfil de ${name}`);
-  dom.sessionEmail.textContent = state.user?.email || '';
   dom.profileEditorImage.onerror = () => { dom.profileEditorImage.onerror = null; dom.profileEditorImage.src = profilePlaceholder; };
   dom.profileEditorImage.src = image || profilePlaceholder;
   dom.profileEditorImage.alt = name;
@@ -7035,7 +7055,7 @@ dom.scrim.addEventListener('click', closeSheets);
 dom.editTripsButton.addEventListener('click', () => setEditingMode(!state.editing));
 dom.deleteSelectedTrips.addEventListener('click', softDeleteSelectedTrips);
 dom.yearButton.addEventListener('click', () => setYearMenu(document.body.dataset.yearMenu !== 'open'));
-document.addEventListener('click', event => { if (document.body.dataset.yearMenu === 'open' && !dom.tripHeading.contains(event.target)) setYearMenu(false); });
+document.addEventListener('click', event => { if (document.body.dataset.yearMenu === 'open' && !event.target.closest('.home-year-control')) setYearMenu(false); });
 dom.birthDateInput.addEventListener('input', syncAge);
 dom.logoutButton.addEventListener('click', async () => {
   const client = await tryNeon(5000);

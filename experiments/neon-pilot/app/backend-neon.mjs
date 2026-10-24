@@ -2,13 +2,14 @@
 // Transport: official @neondatabase/postgrest-js, JWTs: Managed Neon Auth.
 // IMPORTANT: these are staging APIs. Never substitute project main URLs.
 import {createNeonMediaClient} from './storage-neon.mjs';
-import {createRouter} from './router-neon.mjs';
+import {createRouter} from './router-neon.mjs?v=20261024-usage2';
 import {createNeonIdentity} from './neon-identity.mjs';
 export const API_ROOTS=Object.freeze({
   a:'https://ep-empty-pine-b8r7sa8d.apirest.c-14.us-east-1.aws.neon.tech/viaggio_lab/rest/v1',
   b:'https://ep-spring-moon-b8fi6yxc.apirest.c-14.us-east-1.aws.neon.tech/viaggio_lab/rest/v1'
 });
 export const NEON_AUTH_URL='https://ep-small-bread-b7uq0zva.neonauth.c-13.us-east-1.aws.neon.tech/viaggio_auth/auth';
+const USAGE=Object.freeze({a:'https://br-silent-band-b80nklzl-appusage.compute.c-14.us-east-1.aws.neon.tech/',b:'https://br-falling-leaf-b8xuv1d0-appusage.compute.c-14.us-east-1.aws.neon.tech/'});
 const MEDIA=Object.freeze({
  a:'https://br-silent-band-b80nklzl-appmedia.compute.c-14.us-east-1.aws.neon.tech/',
  b:'https://br-falling-leaf-b8xuv1d0-appmedia.compute.c-14.us-east-1.aws.neon.tech/'
@@ -46,7 +47,17 @@ export function createNeonPreview({authSdk,NeonPostgrestClient,fetchWithToken,en
  // old Supabase Edge Functions (Unsplash, deletion etc.) to Supabase.
  const functions={async invoke(){return {data:null,error:new Error('Serviço ainda não disponível na prévia Neon.')};}};
  const storage=createNeonMediaClient({projects,accessToken:getToken,allowMutations:enableMediaWrites===true});
- const router=createRouter({projects,auth:facade.auth,functions,storage});
+ const readUsage=async project=>{
+   const jwt=await getToken();
+   if(!jwt)throw Error('Sessão indisponível para medir armazenamento.');
+   const response=await fetch(USAGE[project.id],{headers:{authorization:'Bearer '+jwt},cache:'no-store',redirect:'error',signal:AbortSignal.timeout(30000)});
+   if(!response.ok)throw Error('Não foi possível medir o armazenamento ('+response.status+').');
+   const body=await response.json();
+   if(!Array.isArray(body.data)||body.data.length!==1||body.data[0]?.measurement_version!==2)
+     throw Error('Medição incompleta.');
+   return {data:body.data,error:null};
+ };
+ const router=createRouter({projects,auth:facade.auth,functions,storage,readUsage});
  // No user data operation succeeds unless Neon JWT is presented.
  return {...router,accessToken:facade.accessToken,provider:'neon-auth-central'};
 }

@@ -3,7 +3,7 @@ const PERSONAL = new Set(['passenger_profiles', 'saved_passengers']);
 const METHODS = new Set(['select','insert','update','upsert','delete','eq','in','is','order','limit','single','maybeSingle']);
 const MUTATIONS = new Set(['insert','update','upsert','delete']);
 const fail = message => { throw Object.assign(new Error(message), {code:'NEON_ROUTING'}); };
-export function createRouter({projects, auth, functions, storage}) {
+export function createRouter({projects, auth, functions, storage, readUsage}) {
   async function home() {
     const results = await Promise.all(projects.map(async p => {
       const r = await p.client.rpc('project_context');
@@ -89,6 +89,10 @@ export function createRouter({projects, auth, functions, storage}) {
   }
   async function rpc(name,args={}) {
     try {
+      if(name==='viaggio_my_usage'){
+        if(typeof readUsage!=='function')fail('Medição não configurada.');
+        return await readUsage(await home());
+      }
       if(args.p_trip_id)return await (await locate('trips','id',args.p_trip_id)).client.rpc(name,args);
       if(name==='restore_trip_snapshot' && args.p_snapshot_id)return await (await locate('state_snapshots','id',args.p_snapshot_id)).client.rpc(name,args);
       if(name==='claim_trip_invitations'){

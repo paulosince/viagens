@@ -47,10 +47,10 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20261023-rings1" as="style">
-  <link rel="stylesheet" href="style.css?v=20261023-rings1" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20261023-rings1"></noscript>
-  <link rel="stylesheet" href="src/update-manager.css?v=20261023-rings1">
+  <link rel="preload" href="style.css?v=20261024-usage2" as="style">
+  <link rel="stylesheet" href="style.css?v=20261024-usage2" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20261024-usage2"></noscript>
+  <link rel="stylesheet" href="src/update-manager.css?v=20261024-usage2">
   <script>
     function showViaggioStartupError(detail) {
       if (!document.body || document.body.dataset.session !== 'loading') return;
@@ -137,53 +137,42 @@
             <button id="home_chatgpt_button" class="glass-button chatgpt-header-button" hidden type="button" aria-label="Conectar o Viaggio ao ChatGPT"><img src="assets/chatgpt-mark.svg" alt="" aria-hidden="true"><span>ChatGPT</span></button>
           </div>
           <div class="header-buttons">
+            <div class="home-year-control">
+              <button id="year_selector_button" class="glass-button" type="button" aria-label="Selecionar ano" aria-expanded="false" aria-controls="year_menu"><span id="current_year">2026</span><span class="year-chevron" aria-hidden="true"></span></button>
+              <div id="year_menu" class="year-menu" aria-hidden="true"><ol id="year_list"></ol></div>
+            </div>
             <div class="home-usage-container">
               <button id="home_usage_button" class="home-usage-summary" type="button" aria-expanded="false" aria-controls="home_usage_details" aria-label="Ver distribuição do armazenamento da conta">
-                <svg class="home-quota-rings home-quota-rings--small" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
-  <circle class="home-quota-track" cx="60" cy="60" r="44"></circle>
-  <circle class="home-quota-progress home-quota-progress--database" data-usage-ring="database" cx="60" cy="60" r="44"></circle>
-  <circle class="home-quota-track" cx="60" cy="60" r="29"></circle>
-  <circle class="home-quota-progress home-quota-progress--files" data-usage-ring="files" cx="60" cy="60" r="29"></circle>
-</svg>
                 <span class="home-usage-summary-values">
-                  <span class="home-usage-row"><span><i class="home-usage-dot home-usage-dot--database"></i>Banco</span><strong id="home_database_usage">—</strong></span>
-                  <span class="home-usage-row"><span><i class="home-usage-dot home-usage-dot--files"></i>Arquivos</span><strong id="home_storage_usage">—</strong></span>
+                  <span class="home-usage-row"><span><i class="home-usage-dot home-usage-dot--database"></i>Banco</span><span class="home-usage-bar" aria-hidden="true"><i data-usage-bar="database"></i></span><strong id="home_database_usage">…</strong></span>
+                  <span class="home-usage-row"><span><i class="home-usage-dot home-usage-dot--files"></i>Arquivos</span><span class="home-usage-bar" aria-hidden="true"><i data-usage-bar="files"></i></span><strong id="home_storage_usage">…</strong></span>
                 </span>
               </button>
               <section id="home_usage_details" class="home-usage-popover" hidden aria-label="Detalhes do uso">
                 <header class="home-usage-heading">
                   <strong>Armazenamento</strong>
-                  <span id="home_usage_mode">Proporção do uso</span>
+                  <span id="home_usage_mode">Uso dos limites</span>
                 </header>
                 <div class="home-usage-chart">
-                  <svg class="home-quota-rings home-quota-rings--large" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
-  <circle class="home-quota-track" cx="60" cy="60" r="44"></circle>
-  <circle class="home-quota-progress home-quota-progress--database" data-usage-ring="database" cx="60" cy="60" r="44"></circle>
-  <circle class="home-quota-track" cx="60" cy="60" r="29"></circle>
-  <circle class="home-quota-progress home-quota-progress--files" data-usage-ring="files" cx="60" cy="60" r="29"></circle>
-</svg>
                   <span class="home-usage-chart-center"><small>Espaço usado</small><strong id="home_usage_total">—</strong></span>
                 </div>
                 <div class="home-usage-legend">
-                  <p><span><i class="home-usage-dot home-usage-dot--database"></i>Banco</span><span class="home-usage-legend-values"><b id="home_database_detail">—</b><small id="home_database_percent">—</small></span></p>
-                  <p><span><i class="home-usage-dot home-usage-dot--files"></i>Arquivos</span><span class="home-usage-legend-values"><b id="home_storage_detail">—</b><small id="home_storage_percent">—</small></span></p>
+                  <p><span><i class="home-usage-dot home-usage-dot--database"></i>Banco</span><span class="home-usage-bar" aria-hidden="true"><i data-usage-bar="database"></i></span><span class="home-usage-legend-values"><b id="home_database_detail">—</b><small id="home_database_percent">—</small></span></p>
+                  <p><span><i class="home-usage-dot home-usage-dot--files"></i>Arquivos</span><span class="home-usage-bar" aria-hidden="true"><i data-usage-bar="files"></i></span><span class="home-usage-legend-values"><b id="home_storage_detail">—</b><small id="home_storage_percent">—</small></span></p>
                 </div>
                 <div class="home-usage-breakdown">
-                  <p>Imagens <b id="home_images_detail">—</b></p>
-                  <p>Anexos <b id="home_attachments_detail">—</b></p>
+                  <p>Imagens ativas <b id="home_images_detail">—</b></p>
+                  <p>Anexos ativos <b id="home_attachments_detail">—</b></p>
                 </div>
-                <small id="home_usage_note">Banco aproximado; arquivos medidos pelo armazenamento privado. O beta ainda não possui franquias individuais.</small>
+                <small id="home_usage_note">Consultando o armazenamento do seu projeto…</small>
               </section>
             </div>
             <button id="edit_trips_button" class="glass-button" type="button">Editar</button>
           </div>
         </div>
         <div id="trip_heading" class="trip-heading">
-          <p class="home-context">Minhas viagens</p>
-          <p id="session_email" class="session-reference"></p>
+          <h1 class="home-title">Minhas viagens</h1>
           <button id="sync_status" class="sync-status" data-kind="synced" type="button" aria-live="polite">Sincronizado</button>
-          <h1 class="home-title"><button id="year_selector_button" type="button" aria-expanded="false" aria-controls="year_menu"><span id="current_year">2026</span><span class="year-chevron" aria-hidden="true"></span></button></h1>
-          <div id="year_menu" class="year-menu" aria-hidden="true"><ol id="year_list"></ol></div>
         </div>
       </header>
 
@@ -563,7 +552,7 @@
       if (legacyPending > 0) {
         location.replace('./legacy-supabase.html?recover=1');
       } else {
-        await import('./experiments/neon-pilot/app/main-neon.js?v=20261023-rings1');
+        await import('./experiments/neon-pilot/app/main-neon.js?v=20261024-usage2');
       }
     } catch (error) {
       console.error('Não foi possível validar o estado local antes da migração Neon', error);
@@ -578,6 +567,6 @@
       (retry?.parentElement || document.body).append(link);
     }
   </script>
-  <script type="module" src="src/update-manager-neon.js?v=20261023-rings1"></script>
+  <script type="module" src="src/update-manager-neon.js?v=20261024-usage2"></script>
 </body>
 </html>

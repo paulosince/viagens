@@ -2926,3 +2926,31 @@ body[data-trip-permission="viewer"] .day-view-agenda-item .day-inline-descriptio
 .home-create-fab:focus-visible{outline:3px solid #1863b6;outline-offset:3px}
 body[data-editing="true"] .home-create-fab{opacity:0;pointer-events:none;transform:translateY(24px) scale(.84)}
 @media(prefers-reduced-motion:reduce){.home-create-fab{animation:none;transition:none}}
+
+/* Home: prominent title, year control and horizontal storage meters. */
+.home-title { overflow-wrap: normal; }
+.trip-heading .sync-status { margin-top: 12px; }
+.header-actions { flex-wrap: wrap; gap: 12px; }
+.header-buttons { flex-wrap: wrap; justify-content: flex-end; }
+.home-year-control { position: relative; }
+#year_selector_button { display: inline-flex; align-items: center; gap: 9px; min-height: 48px; padding-inline: 13px; font-size: 14px; }
+.home-year-control .year-menu { left: auto; right: 0; transform-origin: top right; }
+.home-usage-summary { width: 174px; min-height: 48px; padding: 8px 10px; }
+.home-usage-summary-values { width: 100%; gap: 6px; }
+.home-usage-row { display: grid; grid-template-columns: 48px minmax(25px,1fr) 36px; gap: 6px; }
+.home-usage-row .home-usage-dot { display: none; }
+.home-usage-row strong { text-align: right; font-size: 10px; }
+.home-usage-bar { display: block; min-width: 0; height: 6px; overflow: hidden; border-radius: 99px; background: #e7edf4; }
+.home-usage-bar i { display: block; width: 0; height: 100%; border-radius: inherit; background: #2187f4; transition: width .3s ease; }
+.home-usage-bar i[data-usage-bar="files"] { background: #34c98f; }
+.home-usage-chart { width: auto; height: auto; display: block; margin: 16px 0; }
+.home-usage-chart-center { position: static; justify-items: start; }
+.home-usage-legend p { display: grid; grid-template-columns: 69px minmax(30px,1fr) auto; }
+@media(max-width: 480px) {
+  .header-actions { display: grid; grid-template-columns: auto minmax(0,1fr); align-items: start; }
+  .header-buttons { display: grid; grid-template-columns: auto auto; gap: 8px; }
+  .home-usage-container { grid-column: 1 / -1; grid-row: 2; }
+  .home-usage-summary { width: 100%; }
+  .home-usage-popover { right: 0; }
+}
+@media(prefers-reduced-motion:reduce) { .home-usage-bar i { transition: none; } }

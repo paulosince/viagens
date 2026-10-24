@@ -1,7 +1,5 @@
-// Visual model for Viaggio's two concentric storage rings.
-// The backend currently supplies usage, not individual storage limits.
-// Do not invent quota percentages: when limits are unavailable, rings show
-// each category's share of the combined measured space.
+// Independent percentages against measured project limits.
+// Missing measurements or limits must never become composition percentages.
 export function usageRingsModel(data) {
   const number = value => {
     if (value === null || value === undefined || value === '') return NaN;
@@ -15,17 +13,18 @@ export function usageRingsModel(data) {
   const fileLimit = number(data?.storage_quota_bytes);
   const hasLimits = Number.isFinite(dbLimit) && dbLimit > 0
     && Number.isFinite(fileLimit) && fileLimit > 0;
+  if (!hasLimits) return null;
   const total = database + files;
-  const clamp = ratio => Math.min(100, Math.max(0, ratio * 100));
+  const percent = ratio => Math.max(0, ratio * 100);
   return {
-    mode: hasLimits ? 'quota' : 'composition',
+    mode: 'quota',
     database,
     files,
     total,
-    databaseLimit: hasLimits ? dbLimit : null,
-    filesLimit: hasLimits ? fileLimit : null,
-    databasePercent: hasLimits ? clamp(database / dbLimit) : (total ? clamp(database / total) : 0),
-    filesPercent: hasLimits ? clamp(files / fileLimit) : (total ? clamp(files / total) : 0)
+    databaseLimit: dbLimit,
+    filesLimit: fileLimit,
+    databasePercent: percent(database / dbLimit),
+    filesPercent: percent(files / fileLimit)
   };
 }
 
