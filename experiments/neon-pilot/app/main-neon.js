@@ -5874,8 +5874,8 @@ function renderHomeCalendar(panel, trip, shownDate = null) {
     const cell = document.createElement('span'); cell.textContent = day;
     if (start && end && date >= start && date <= end) {
       cell.className = 'has-trip'; cell.title = trip.name;
-      if (date.getDay() === 0 || date.toDateString() === start.toDateString()) cell.classList.add('range-start');
-      if (date.getDay() === 6 || date.toDateString() === end.toDateString()) cell.classList.add('range-end');
+      if (day === 1 || date.getDay() === 0 || date.toDateString() === start.toDateString()) cell.classList.add('range-start');
+      if (day === new Date(year, month + 1, 0).getDate() || date.getDay() === 6 || date.toDateString() === end.toDateString()) cell.classList.add('range-end');
     }
     if (date.toDateString() === today.toDateString()) cell.setAttribute('aria-current', 'date');
     grid.append(cell);
