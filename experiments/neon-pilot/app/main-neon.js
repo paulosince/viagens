@@ -1,4 +1,4 @@
-import {createNeonPreview,NEON_AUTH_URL,API_ROOTS} from './backend-neon.mjs?v=20261023-editable1';
+import {createNeonPreview,NEON_AUTH_URL,API_ROOTS} from './backend-neon.mjs?v=20261023-cutover1';
 import {activityPhotoForPreview} from './photo-source-neon.mjs?v=20261021-7photofix';
 import { offlineStore } from './offline-store-neon.js?v=20261021-1';
 import {
@@ -15,7 +15,10 @@ import {
 // Authentication and data requests use Neon central Auth and Neon Data API only.
 const VIAGGIO_MCP_URL = '';
 const CHATGPT_PLUGIN_URL = '';
-const IS_NEON_EDITABLE = location.pathname.endsWith('/neon-editable.html');
+// The official Viaggio route uses the same validated Neon backend.
+const IS_NEON_EDITABLE = location.pathname.endsWith('/neon-editable.html')
+  || location.pathname === '/viagens/'
+  || location.pathname === '/viagens/index.html';
 const TRIP_IMAGE_BUCKET = 'trip-images';
 const PROFILE_IMAGE_BUCKET = 'profile-photos';
 const NEW_AGENDA_TITLE = 'Nova atividade';
@@ -40,7 +43,7 @@ async function ensureNeon() {
         auth:{url:NEON_AUTH_URL,adapter:SupabaseAuthAdapter()},
         dataApi:{url:API_ROOTS.a}
       });
-      const enableMediaWrites = location.pathname.endsWith('/neon-editable.html');
+      const enableMediaWrites = IS_NEON_EDITABLE;
       neonClient=createNeonPreview({authSdk,NeonPostgrestClient,fetchWithToken,enableMediaWrites});
       return neonClient;
     })
