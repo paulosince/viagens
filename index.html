@@ -284,7 +284,7 @@
           <button id="connect_chatgpt" class="chatgpt-connect-button" type="button">Abrir app ChatGPT</button>
           <button id="copy_mcp_url" class="chatgpt-copy-button" type="button">Copiar endereço da integração</button>
           <p id="chatgpt_message" class="chatgpt-message" role="status"></p>
-          <code id="chatgpt_mcp_url" class="chatgpt-endpoint">https://siabldasqinpfmxslwji.supabase.co/functions/v1/viaggio-mcp</code>
+          <code id="chatgpt_mcp_url" class="chatgpt-endpoint">Integração ChatGPT temporariamente indisponível no Neon</code>
         </section>
       </section>
 
@@ -530,7 +530,29 @@
       <button id="delete_selected_trips" type="button" disabled>Excluir selecionadas</button>
     </footer>
   </main>
-  <script type="module" src="src/main.js?v=20261018-64"></script>
-  <script type="module" src="src/update-manager.js?v=20261018-63"></script>
+  <!-- Prevent hidden loss of unsent legacy work during backend cutover. -->
+  <script type="module">
+    import { offlineStore as legacyOfflineStore } from './src/offline-store.js?v=20261007-59';
+    try {
+      const legacyPending = await legacyOfflineStore.countOutbox();
+      if (legacyPending > 0) {
+        location.replace('./legacy-supabase.html?recover=1');
+      } else {
+        await import('./experiments/neon-pilot/app/main-neon.js?v=20261023-cutover1');
+      }
+    } catch (error) {
+      console.error('Não foi possível validar o estado local antes da migração Neon', error);
+      if (typeof showViaggioStartupError === 'function')
+        showViaggioStartupError('confira o armazenamento local e a conexão');
+      const retry = document.getElementById('splash_retry');
+      if (retry) retry.hidden = false;
+      const link = document.createElement('a');
+      link.href = './legacy-supabase.html?recover=1';
+      link.textContent = 'Abrir aplicativo anterior para recuperação';
+      link.style.cssText = 'display:block;color:#fff;margin:12px auto;font-weight:700;text-align:center';
+      (retry?.parentElement || document.body).append(link);
+    }
+  </script>
+  <script type="module" src="src/update-manager-neon.js?v=20261023-cutover1"></script>
 </body>
 </html>
