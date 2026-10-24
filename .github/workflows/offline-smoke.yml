@@ -46,6 +46,7 @@ jobs:
           node --input-type=module --check < src/update-manager.js
       - name: Verify offline sync and independent agenda photos
         run: |
+          node tests/tickets-render.cjs
           node tests/offline-sync.cjs
           node tests/day-map-order.cjs
           node tests/inline-agenda.cjs
