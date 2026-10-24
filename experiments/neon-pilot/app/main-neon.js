@@ -5573,12 +5573,18 @@ function renderHomeTab(trips) {
 
 /* Design-first tickets index: only real attached files are listed.
    Filename categories are provisional; no booking is inferred from a calendar event. */
+function isTicketImageFile(file) {
+  return /^image\//i.test(String(file.mime_type || ''))
+    || /\.(?:jpe?g|png|webp|gif|heic)$/i.test(String(file.file_name || ''));
+}
+
 function ticketFileCategory(file) {
   const name = String(file.file_name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   if (/ingress|ticket|bilhete|entrada|disney|parque|psg|estadio|stadium|show|concerto/.test(name))
     return { id: 'ticket', label: 'Ingresso', symbol: '🎟', tone: 'blue' };
   if (/restaurant|restaur|bistro|bistrot|pym|jantar|almoc|mesa/.test(name))
     return { id: 'restaurant', label: 'Restaurante', symbol: '♨', tone: 'peach' };
+  if (isTicketImageFile(file)) return { id: 'other', label: 'Imagem', symbol: '▧', tone: 'blue' };
   return { id: 'other', label: 'Documento', symbol: '▤', tone: 'lilac' };
 }
 
@@ -5668,6 +5674,16 @@ function renderTicketsFeed(panel, trips) {
       const icon = document.createElement('span');
       icon.className = 'tickets-item-icon'; icon.textContent = category.symbol;
       art.append(icon);
+      if (isTicketImageFile(file) && file.signedUrl) {
+        const thumbnail = document.createElement('img');
+        thumbnail.className = 'tickets-item-thumbnail';
+        thumbnail.alt = '';
+        thumbnail.loading = 'lazy';
+        thumbnail.decoding = 'async';
+        thumbnail.onerror = () => { thumbnail.hidden = true; };
+        thumbnail.src = file.signedUrl;
+        art.append(thumbnail);
+      }
       const tag = document.createElement('small');
       tag.className = 'tickets-item-tag'; tag.textContent = category.label;
       art.append(tag);
@@ -5719,7 +5735,18 @@ function renderTicketsFeed(panel, trips) {
     const result = await client.from('day_attachments').select('*').eq('trip_id', String(trip.id)).order('created_at');
     if (result.error) throw result.error;
     if (panel.ticketsRenderToken !== token || state.homeTab !== 'tickets') return;
-    available = result.data || [];
+    const files = result.data || [];
+    available = await Promise.all(files.map(async file => {
+      if (!isTicketImageFile(file) || !file.storage_path) return file;
+      try {
+        const signed = await client.storage.from(DAY_ATTACHMENT_BUCKET).createSignedUrl(file.storage_path, 3600);
+        return { ...file, signedUrl: signed.error ? '' : (signed.data?.signedUrl || '') };
+      } catch (error) {
+        console.warn('Prévia de imagem indisponível', error);
+        return file;
+      }
+    }));
+    if (panel.ticketsRenderToken !== token || state.homeTab !== 'tickets') return;
     paint();
   }).catch(error => {
     if (panel.ticketsRenderToken !== token || state.homeTab !== 'tickets') return;
