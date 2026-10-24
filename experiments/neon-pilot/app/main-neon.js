@@ -5771,13 +5771,19 @@ function renderTicketsFeed(panel, trips) {
         '<span class="tickets-feature-overlay"></span>',
         '<span class="tickets-feature-copy"><small>✦ SUA VIAGEM</small><strong class="tickets-feature-name"></strong>',
         '<span class="tickets-feature-date"></span><span class="tickets-feature-action">Ver arquivos ↗</span></span>',
-        '<span class="tickets-feature-stub" aria-hidden="true">▣</span></button>',
+        '<span class="tickets-feature-stub" aria-hidden="true"><svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M11 12h42v12a8 8 0 0 0 0 16v12H11V40a8 8 0 0 0 0-16V12Z"/><path d="M37 17v6m0 7v4m0 7v6"/><path d="m18 33 12-11 3 1-6 12 4 4-3 3-5-4-5 2-2-2 2-5Z"/></svg></span></button>',
       '<div class="tickets-filter-row" role="group" aria-label="Filtrar documentos">',
         '<button type="button" data-ticket-filter="all" aria-pressed="true">Todos</button>',
-        '<button type="button" data-ticket-filter="ticket" aria-pressed="false">Ingressos</button>',
+        '<button type="button" data-ticket-filter="flight" aria-pressed="false">Voos</button>',
         '<button type="button" data-ticket-filter="restaurant" aria-pressed="false">Restaurantes</button>',
+        '<button type="button" data-ticket-filter="show" aria-pressed="false">Shows</button>',
+        '<button type="button" data-ticket-filter="sport" aria-pressed="false">Esportes</button>',
+        '<button type="button" data-ticket-filter="attraction" aria-pressed="false">Passeios</button>',
+        '<button type="button" data-ticket-filter="hotel" aria-pressed="false">Hotéis</button>',
+        '<button type="button" data-ticket-filter="transport" aria-pressed="false">Transportes</button>',
+        '<button type="button" data-ticket-filter="unclassified" aria-pressed="false">Identificar</button>',
         '<button type="button" data-ticket-filter="other" aria-pressed="false">Outros</button></div>',
-      '<div class="tickets-section-heading"><h2>Seus documentos</h2><span class="tickets-counter" aria-live="polite">…</span></div>',
+      '<div class="tickets-section-heading"><h2>Ingressos e reservas</h2><span class="tickets-counter" aria-live="polite">…</span></div>',
       '<p class="tickets-message" role="status">Carregando os arquivos da viagem…</p>',
       '<div class="tickets-grid"></div>',
     '</div>'
@@ -5822,14 +5828,43 @@ function renderTicketsFeed(panel, trips) {
   const counter = $('.tickets-counter');
   let selectedFilter = 'all';
   let available = [];
+  const editTicket = file => openTicketMetadataEditor(trip,file,updated => {
+    available = available.map(item=>String(item.id)===String(updated.id)?updated:item);
+    paint();
+  });
+  const openTicketFile = async file => {
+    try {
+      await openTrip(trip.id);
+      selectTripTab('arquivos');
+      await loadTripFiles(String(trip.id));
+      const all = state.tripFilesByTrip.get(String(trip.id)) || [];
+      const matching = all.find(item=>String(item.id)===String(file.id));
+      if (matching) openTripFileViewer(matching, all);
+      else setTripPanelStatus(dom.tripFilesStatus,'O arquivo não foi encontrado.');
+    } catch (error) { console.warn('Arquivo indisponível',error); }
+  };
+  const openTicketAgenda = async file => {
+    if (!file.event_date && !file.day_id) { editTicket(file); return; }
+    try {
+      await openTrip(trip.id,{forceRefresh:true});
+      const day = tripTicketDay(trip,file.event_date,state.tripDays)
+        || state.tripDays.find(item=>String(item.id)===String(file.day_id));
+      if (!day) { selectTripTab('arquivos'); return; }
+      selectTripTab('roteiro');
+      openDayPage(day.id);
+    } catch(error) { console.warn('Não foi possível abrir a agenda',error); }
+  };
   const paint = () => {
     const entries = available.filter(file => selectedFilter === 'all' || ticketFileCategory(file).id === selectedFilter);
-    counter.textContent = entries.length === 1 ? '1 arquivo' : entries.length + ' arquivos';
+    counter.textContent = entries.length === 1 ? '1 item' : entries.length + ' itens';
     grid.replaceChildren();
     for (const file of entries) {
       const category = ticketFileCategory(file);
-      const card = document.createElement('button');
-      card.type = 'button'; card.className = 'tickets-item';
+      const identified = Boolean(String(file.display_title||'').trim() && TICKET_CATEGORIES[file.item_category]);
+      const card = document.createElement('article');
+      card.className = 'tickets-item';
+      const preview = document.createElement('button');
+      preview.type = 'button'; preview.className = 'tickets-item-main';
       const art = document.createElement('span');
       art.className = 'tickets-item-art ' + category.tone;
       const icon = document.createElement('span');
@@ -5843,29 +5878,38 @@ function renderTicketsFeed(panel, trips) {
         thumbnail.decoding = 'async';
         thumbnail.onerror = () => { thumbnail.hidden = true; };
         thumbnail.src = file.signedUrl;
-        art.append(thumbnail);
+        art.prepend(thumbnail);
       }
       const tag = document.createElement('small');
-      tag.className = 'tickets-item-tag'; tag.textContent = category.label;
+      tag.className = 'tickets-item-tag';
+      tag.textContent = category.label;
       art.append(tag);
-      const details = document.createElement('span');
-      details.className = 'tickets-item-info';
-      const name = document.createElement('strong');
-      name.textContent = file.file_name || 'Arquivo';
+      const details = document.createElement('span'); details.className = 'tickets-item-info';
+      const name = document.createElement('strong'); name.textContent = ticketDisplayTitle(file);
       const subtitle = document.createElement('span');
-      subtitle.textContent = file.day_id ? 'Anexado a um dia do roteiro' : 'Documento da viagem';
-      const action = document.createElement('span');
-      action.className = 'tickets-item-link';
-      action.textContent = 'Abrir nos arquivos  ›';
-      details.append(name, subtitle, action);
-      card.append(art, details);
-      card.setAttribute('aria-label', 'Abrir arquivo: ' + (file.file_name || 'documento'));
-      card.addEventListener('click', openFiles);
+      subtitle.textContent = [
+        ticketDateLabel(file),
+        file.venue || (!identified ? 'Defina título, tipo e data' : '')
+      ].filter(Boolean).join(' · ') || 'Sem data informada';
+      details.append(name,subtitle);
+      preview.append(art,details);
+      preview.setAttribute('aria-label',(identified ? 'Abrir na agenda: ' : 'Identificar: ')+ticketDisplayTitle(file));
+      preview.addEventListener('click',()=> identified ? openTicketAgenda(file) : editTicket(file));
+      const footer = document.createElement('div'); footer.className = 'tickets-item-actions';
+      const edit = document.createElement('button');
+      edit.type = 'button'; edit.textContent = identified ? 'Editar' : 'Identificar';
+      edit.addEventListener('click',()=>editTicket(file));
+      if (!canEditTrip(trip)) edit.hidden = true;
+      const fileButton = document.createElement('button');
+      fileButton.type = 'button'; fileButton.textContent = 'Comprovante ›';
+      fileButton.addEventListener('click',()=>openTicketFile(file));
+      footer.append(edit,fileButton);
+      card.append(preview,footer);
       grid.append(card);
     }
-    message.textContent = entries.length ? '' :
-      available.length ? 'Nenhum documento nesta categoria.' :
-      'Nenhum comprovante anexado a esta viagem. Toque em + para adicionar pela seção Arquivos.';
+    message.textContent = entries.length ? '' : available.length
+      ? 'Nenhum item nesta categoria.'
+      : 'Nenhum arquivo nesta viagem. Toque em + para adicionar um comprovante.';
   };
   for (const filter of panel.querySelectorAll('[data-ticket-filter]')) {
     filter.addEventListener('click', () => {
@@ -5915,6 +5959,19 @@ function renderTicketsFeed(panel, trips) {
     message.textContent = (cached ? 'Exibindo arquivos já conhecidos. ' : '') + (error.message || 'Não foi possível consultar os documentos.');
   });
 }
+
+
+// The editor is a top-level native dialog, so it never gets clipped by the home scroll container.
+document.getElementById('ticket_metadata_form')?.addEventListener('submit',saveTicketMetadata);
+document.getElementById('ticket_metadata_date')?.addEventListener('change',refreshTicketAgendaOptions);
+document.getElementById('ticket_metadata_title')?.addEventListener('blur',refreshTicketAgendaOptions);
+for (const id of ['ticket_metadata_close','ticket_metadata_cancel']) {
+  document.getElementById(id)?.addEventListener('click',()=>{
+    document.getElementById('ticket_metadata_dialog').close();
+    ticketEditorContext=null;
+  });
+}
+document.getElementById('ticket_metadata_dialog')?.addEventListener('close',()=>{ticketEditorContext=null;});
 
 function calendarCountdown(trip, now = new Date()) {
   const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
