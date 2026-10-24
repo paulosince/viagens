@@ -1,0 +1,64 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex,nofollow"><title>Viaggio | Diagnóstico detalhado de pendências Neon</title><style>*{box-sizing:border-box}body{margin:0;background:#f4f8fc;color:#17344a;font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}main{max-width:520px;margin:0 auto;padding:48px 20px}h1{line-height:1.14;font-size:28px}p{color:#60748a}button{width:100%;padding:16px;border:0;border-radius:12px;background:#096bc1;color:white;font:inherit;font-weight:700}.card{background:#fff;border:1px solid #d9e5f0;border-radius:20px;padding:20px;margin:18px 0}.status{white-space:pre-wrap;overflow-wrap:anywhere;background:#eaf1f8;padding:14px;border-radius:12px;margin-top:15px}.warn{background:#fff0d9;color:#66460d}.pass{background:#e1f2e7;color:#126037}.fail{background:#fce8e8;color:#923636}a{color:#0866b4}</style></head><body><main><strong style="color:#096bc1">VIAGGIO · NEON · SINCRONIZAÇÃO</strong><h1>Identificar bloqueio da fila Neon</h1><p>Este diagnóstico confere em qual projeto Neon está cada destino das alterações pendentes. <b>Não modifica, apaga nem reenvia nada.</b> Não expõe IDs, fotos nem dados pessoais.</p><section class="card"><button id="check">Diagnosticar os 8 itens da fila</button><div id="result" class="status" role="status" aria-live="polite" hidden></div></section><p>Se houver alterações pendentes, volte ao <a href="./neon-editable.html">Viaggio Neon editável</a> e toque no indicador de sincronização para tentar novamente. Não limpe o cache do Safari nem exclua os dados do site enquanto houver alterações locais.</p></main><script type="module">
+import {offlineStore} from './offline-store-neon.js?v=20261023-sync2';
+import {API_ROOTS,NEON_AUTH_URL} from './backend-neon.mjs?v=20261023-sync2';
+const result=document.querySelector('#result'),btn=document.querySelector('#check');
+function show(s,kind=''){result.hidden=false;result.className='status '+kind;result.textContent=s;}
+const allowedTables=new Set(['trips','trip_days','activities','day_locations','passengers','trip_members','day_attachments','snapshot_photos','state_snapshots','change_log','budget_items','saved_passengers','passenger_profiles']);
+async function main(){
+ btn.disabled=true;show('Lendo a fila local, sem alterar os dados…');
+ try{
+ const jobs=await offlineStore.listOutbox();
+ const [{createClient,SupabaseAuthAdapter},{NeonPostgrestClient,fetchWithToken}]=await Promise.all([
+ import('https://cdn.jsdelivr.net/npm/@neondatabase/neon-js@0.9.0-beta/+esm'),
+ import('https://cdn.jsdelivr.net/npm/@neondatabase/postgrest-js@0.2.0-beta/+esm')]);
+ const auth=createClient({auth:{url:NEON_AUTH_URL,adapter:SupabaseAuthAdapter()},dataApi:{url:API_ROOTS.b}});
+ const session=await auth.auth.getSession();
+ if(session.error||!session.data?.session){show('Sessão Neon indisponível. Abra primeiro a prévia editável neste mesmo Safari. A fila local foi preservada.','warn');return;}
+ const token=async()=>{const s=await auth.auth.getSession();return s.data?.session?.access_token||null;};
+ const projects=Object.entries(API_ROOTS).map(([id,url])=>({
+ id,db:new NeonPostgrestClient({dataApiUrl:url,options:{global:{fetch:fetchWithToken(token)}}}).schema('viaggio_app')
+ }));
+ async function where(table,field,value){
+   if(!allowedTables.has(table)||!['id','trip_id','day_id','user_id'].includes(field)||typeof value!=='string'||!value)return 'sem referência';
+   const checks=await Promise.all(projects.map(async p=>{
+     try{const r=await p.db.from(table).select(field).eq(field,value).limit(1);
+       return r.error?'erro-'+p.id:(r.data?.length?p.id:null);
+     }catch{return 'erro-'+p.id}
+   }));
+   const found=checks.filter(Boolean);
+   return found.length?found.join(','):'ausente nos dois';
+ }
+ const lines=[];
+ lines.push('Itens na fila: '+jobs.length);
+ for(let i=0;i<jobs.length&&i<25;i++){
+   const m=jobs[i];
+   const trip=typeof m.tripId==='string'?await where('trips','id',m.tripId):'sem viagem';
+   let reference='não aplicável',dependent=false;
+   if(m.type==='upload-image'){
+     reference=await where(m.table,'id',String(m.entityId||''));
+     dependent=jobs.slice(i+1).some(next=>{
+       if(!['save-day','save-day-items','save-inline-activity'].includes(next.type))return false;
+       if(next.tripId!==m.tripId)return false;
+       const rows=[...(next.activities||[]),...(next.locations||[]),...(next.activity?[next.activity]:[]),...(next.location?[next.location]:[])];
+       return rows.some(row=>String(row.id)===String(m.entityId));
+     });
+   }else if(['save-day','save-day-patch','save-day-items','save-inline-activity'].includes(m.type)&&m.dayId){
+     reference=await where('trip_days','id',m.dayId);
+   }else if(m.type==='record-change'&&m.snapshotId){
+     reference='histórico';
+   }
+   const media=m.type==='upload-image'?' | cópia: '+(m.hash?'referenciada':'sem hash'):'';
+   lines.push((i+1)+'. '+String(m.type||'desconhecido').slice(0,28)
+    +(m.table?' | tabela: '+String(m.table).slice(0,28):'')
+    +' | viagem: '+trip
+    +' | destino: '+reference
+    +(m.type==='upload-image'?' | depende de gravação posterior: '+(dependent?'sim':'não'):'')+media);
+ }
+ lines.push('');
+ lines.push('Esta página não reenvia, altera ou exclui nenhum item.');
+ show(lines.join('\n'),jobs.length?'warn':'pass');
+ }catch(e){show('Erro de diagnóstico: '+String(e?.message||'desconhecido').slice(0,150),'fail')}
+ finally{btn.disabled=false}
+}
+btn.addEventListener('click',main);
+</script></body></html>
