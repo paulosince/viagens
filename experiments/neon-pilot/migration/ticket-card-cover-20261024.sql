@@ -13,7 +13,8 @@ BEGIN
         card_image_path IS NULL OR (
           split_part(card_image_path,'/',1)=trip_id::text
           AND split_part(card_image_path,'/',2)='general'
-          AND card_image_path ~ '^[0-9a-f-]+/general/card-[0-9a-f-]+\\.webp$'
+          AND split_part(card_image_path,'/',3) LIKE 'card-%.webp'
+          AND array_length(string_to_array(card_image_path,'/'),1)=3
         )
       );
   END IF;
