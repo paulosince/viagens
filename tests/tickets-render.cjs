@@ -1,0 +1,30 @@
+const fs=require('node:fs');
+const assert=require('node:assert/strict');
+
+const main=fs.readFileSync('experiments/neon-pilot/app/main-neon.js','utf8');
+const css=fs.readFileSync('style.css','utf8');
+const html=fs.readFileSync('index.html','utf8');
+const start=main.indexOf('function isTicketImageFile(');
+const end=main.indexOf('function renderTicketsFeed(');
+assert.ok(start>0 && end>start,'Ticket classifier functions must exist');
+const {isTicketImageFile,ticketFileCategory}=new Function(
+  main.slice(start,end)+'; return {isTicketImageFile,ticketFileCategory};'
+)();
+assert.equal(isTicketImageFile({file_name:'IMG_2208.jpeg',mime_type:'image/jpeg'}),true);
+assert.equal(isTicketImageFile({file_name:'IMG_2292.png'}),true);
+assert.equal(isTicketImageFile({file_name:'reserva.pdf',mime_type:'application/pdf'}),false);
+assert.deepEqual(ticketFileCategory({file_name:'IMG_2208.jpeg',mime_type:'image/jpeg'}).label,'Imagem');
+assert.equal(ticketFileCategory({file_name:'PSG.pdf'}).id,'ticket');
+assert.equal(ticketFileCategory({file_name:'Bistrot Chez Remy.pdf'}).id,'restaurant');
+assert.ok(main.includes("client.storage.from(DAY_ATTACHMENT_BUCKET).createSignedUrl(file.storage_path, 3600)"));
+assert.ok(main.includes("thumbnail.src = file.signedUrl"));
+assert.ok(main.includes("thumbnail.onerror = () => { thumbnail.hidden = true; }"));
+assert.ok(css.includes('.home-trip-shortcut.tickets-feature .tickets-feature-copy > strong'));
+assert.ok(css.includes('.home-trip-shortcut.tickets-feature .tickets-feature-date { color:#f2f7ff'));
+assert.ok(css.includes('.tickets-item-thumbnail'));
+assert.ok(css.includes('bottom:max(6px,calc(env(safe-area-inset-bottom,0px) - 28px))'));
+const navPos=html.indexOf('<div class="home-bottom">');
+assert.ok(navPos>html.indexOf('id="trip_edit_footer"') && navPos<html.indexOf('</main>'));
+assert.ok(html.includes('style.css?v=20261024-tickets12'));
+assert.ok(html.includes('main-neon.js?v=20261024-tickets12'));
+console.log('PASS tickets: classified images, private previews, contrast, dock position and PWA version');

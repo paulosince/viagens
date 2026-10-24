@@ -3129,7 +3129,7 @@ body[data-home-tab="tickets"] #home_tab_content { width:min(100%,760px); }
 .home-trip-shortcut.tickets-feature { margin:0; position:relative; isolation:isolate; width:100%; min-height:176px; border:1px solid #8fcbff88; border-radius:22px; background:linear-gradient(125deg,#0756a1,#2f8bd8); box-shadow:0 11px 23px #146abb22; overflow:hidden; display:flex; flex-direction:row; align-items:stretch; padding:0; color:white; }
 .tickets-feature-cover { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:-2; }
 .tickets-feature-cover[hidden] { display:none; }
-.tickets-feature-overlay { position:absolute; inset:0; background:linear-gradient(92deg,#082f63e8,#064b91b2 62%,#1388bf5b); z-index:-1; }
+.tickets-feature-overlay { position:absolute; inset:0; background:linear-gradient(90deg,rgba(7,24,48,.82),rgba(8,39,73,.48) 64%,rgba(11,53,91,.16)); z-index:-1; }
 .tickets-feature-copy { display:flex; flex:1; min-width:0; flex-direction:column; align-items:flex-start; padding:21px 15px 16px 19px; gap:7px; text-align:left; }
 .tickets-feature-copy small { color:#dcf5ff; font-size:10px; letter-spacing:.13em; font-weight:700; }
 .tickets-feature-name { font-size:25px; line-height:1.09; letter-spacing:-.037em; margin-top:6px; max-width:100%; overflow-wrap:anywhere; }
@@ -3146,7 +3146,7 @@ body[data-home-tab="tickets"] #home_tab_content { width:min(100%,760px); }
 .tickets-message:empty { display:none; }
 .tickets-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:11px; }
 .tickets-item { border:1px solid #e7edf5; border-radius:18px; overflow:hidden; padding:0; background:#fff; min-width:0; color:#1a344f; text-align:left; box-shadow:0 3px 11px #2444630c; }
-.tickets-item-art { height:92px; display:flex; align-items:center; justify-content:center; position:relative; }
+.tickets-item-art { height:108px; display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; }
 .tickets-item-art.blue { background:linear-gradient(135deg,#d9ecff,#a2ceff); }
 .tickets-item-art.peach { background:linear-gradient(135deg,#fff0db,#edc9ad); }
 .tickets-item-art.lilac { background:linear-gradient(135deg,#f0eaff,#cfc6f9); }
@@ -3163,3 +3163,24 @@ body[data-home-tab="tickets"] #home_tab_content { width:min(100%,760px); }
 .calendar-trip .home-calendar-grid .has-trip.range-end { border-radius:0 11px 11px 0; }
 .calendar-trip .home-calendar-grid .has-trip.range-start.range-end { border-radius:11px; }
 @media(max-width:359px) { .tickets-feature-stub { width:48px; flex-basis:48px; margin-right:12px; } .tickets-feature-name { font-size:22px; } .tickets-item-info strong { font-size:12px; } }
+
+
+/* Tickets hero must not inherit the gray shortcut-label styles. */
+.home-trip-shortcut.tickets-feature .tickets-feature-copy,
+.home-trip-shortcut.tickets-feature .tickets-feature-copy > strong,
+.home-trip-shortcut.tickets-feature .tickets-feature-copy > span { color:#fff; }
+.home-trip-shortcut.tickets-feature .tickets-feature-copy > small { color:#e4f3ff; }
+.home-trip-shortcut.tickets-feature .tickets-feature-date { color:#f2f7ff; font-size:12px; }
+.home-trip-shortcut.tickets-feature .tickets-feature-action {
+  color:#fff; font-size:12px; text-shadow:0 1px 2px rgba(0,0,0,.17);
+  background:rgba(255,255,255,.22);
+}
+.home-trip-shortcut.tickets-feature .tickets-feature-name { text-shadow:0 2px 12px rgba(0,0,0,.22); }
+.tickets-item-art .tickets-item-thumbnail { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; }
+.tickets-item-art .tickets-item-thumbnail[hidden] { display:none; }
+.tickets-item-art:has(.tickets-item-thumbnail:not([hidden])) .tickets-item-icon { display:none; }
+.tickets-item-art:has(.tickets-item-thumbnail:not([hidden])) .tickets-item-tag { background:rgba(255,255,255,.91); color:#253e56; }
+.tickets-item-art .tickets-item-tag { z-index:2; }
+.tickets-item-art .tickets-item-icon { opacity:.75; }
+/* A smaller measured gap: avoid counting the iPhone's bottom inset twice. */
+.home-bottom { bottom:max(6px,calc(env(safe-area-inset-bottom,0px) - 28px)); transform:translate3d(-50%,0,0); }
