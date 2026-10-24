@@ -1,4 +1,4 @@
-const CACHE_NAME = 'viaggio-home-v110-neon-cutover';
+const CACHE_NAME = 'viaggio-home-v111-storage-rings';
 const MEDIA_CACHE_NAME = 'viaggio-media-v1';
 const NEON_MEDIA_CACHE_NAME = 'viaggio-neon-auth-preview-media-v1';
 const SUPABASE_CLIENT = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
@@ -11,9 +11,10 @@ const OPTIONAL_ASSETS = ['./src/itinerary-pdf.mjs?v=20260927-56', './vendor/pdf-
 const APP_SHELL = [
   './',
   './index.html',
-  './style.css?v=20261018-64',
-  './experiments/neon-pilot/app/main-neon.js?v=20261023-cutover1',
+  './style.css?v=20261023-rings1',
+  './experiments/neon-pilot/app/main-neon.js?v=20261023-rings1',
   './experiments/neon-pilot/app/backend-neon.mjs?v=20261023-cutover1',
+  './experiments/neon-pilot/app/usage-rings.mjs?v=20261023-1',
   './experiments/neon-pilot/app/offline-store-neon.js?v=20261021-1',
   './experiments/neon-pilot/app/media-cache-neon.js?v=20261021-1',
   './experiments/neon-pilot/app/photo-source-neon.mjs?v=20261021-7photofix',
