@@ -47,9 +47,9 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20261024-tickets17" as="style">
-  <link rel="stylesheet" href="style.css?v=20261024-tickets17" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20261024-tickets17"></noscript>
+  <link rel="preload" href="style.css?v=20261024-tickets18" as="style">
+  <link rel="stylesheet" href="style.css?v=20261024-tickets18" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20261024-tickets18"></noscript>
   <link rel="stylesheet" href="src/update-manager.css?v=20261024-home3">
   <script>
     function showViaggioStartupError(detail) {
@@ -601,14 +601,15 @@
       </fieldset>
       <section class="ticket-card-cover-editor" aria-label="Imagem de capa do card">
         <div class="ticket-card-cover-heading"><strong>Imagem do card</strong><span>Opcional · independente do comprovante</span></div>
-        <input id="ticket_card_cover_input" class="ticket-card-cover-file-input" type="file" accept="image/*,image/heic,image/heif,.heic,.heif,.jpg,.jpeg,.png,.webp" hidden tabindex="-1">
-        <label class="ticket-card-cover-preview" id="ticket_card_cover_preview" for="ticket_card_cover_input" aria-label="Escolher ou trocar imagem de capa">
+        <label class="ticket-card-cover-preview" id="ticket_card_cover_preview" aria-label="Escolher ou trocar imagem de capa">
           <img id="ticket_card_cover_image" alt="Capa do card selecionada" hidden>
           <span id="ticket_card_cover_empty" class="ticket-card-cover-empty">
             <span aria-hidden="true">▧</span><small>Toque para escolher uma imagem</small>
           </span>
-          <span class="ticket-card-cover-tap-hint">Toque para escolher ou trocar a capa <span aria-hidden="true">✎</span></span>
+          <span class="ticket-card-cover-tap-hint"><span id="ticket_card_cover_hint">Toque para escolher ou trocar a capa</span><span aria-hidden="true">✎</span></span>
+          <input id="ticket_card_cover_input" class="ticket-card-cover-file-input" type="file" accept="image/jpeg,image/png,image/webp" aria-label="Selecionar foto para a capa do card">
         </label>
+        <p id="ticket_card_cover_feedback" class="ticket-card-cover-feedback" role="status" aria-live="polite"></p>
         <button type="button" class="ticket-card-cover-remove" id="ticket_card_cover_remove" hidden>Remover capa</button>
       </section>
       <div class="ticket-metadata-inline">
@@ -644,7 +645,7 @@
       if (legacyPending > 0) {
         location.replace('./legacy-supabase.html?recover=1');
       } else {
-        await import('./experiments/neon-pilot/app/main-neon.js?v=20261024-tickets17');
+        await import('./experiments/neon-pilot/app/main-neon.js?v=20261024-tickets18');
       }
     } catch (error) {
       console.error('Não foi possível validar o estado local antes da migração Neon', error);

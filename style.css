@@ -3464,3 +3464,75 @@ body[data-home-tab="tickets"] #home_tab_content { width:min(100%,760px); }
     width:100%;min-width:0;max-width:100%;
   }
 }
+
+
+/* Make the picker itself the hit target. Safari cannot reliably activate an
+   input hidden with display:none from a separate label in Home Screen mode. */
+.ticket-metadata-simple #ticket_card_cover_preview { position:relative; }
+.ticket-metadata-simple #ticket_card_cover_input.ticket-card-cover-file-input,
+.ticket-metadata-simple .ticket-metadata-form #ticket_card_cover_input,
+.ticket-metadata-simple input#ticket_card_cover_input[type="file"] {
+  appearance:none;
+  -webkit-appearance:none;
+  display:block!important;
+  position:absolute!important;
+  inset:0!important;
+  width:100%!important;
+  min-width:0!important;
+  max-width:100%!important;
+  height:100%!important;
+  min-height:0!important;
+  padding:0!important;
+  margin:0!important;
+  border:0!important;
+  opacity:0!important;
+  z-index:5!important;
+  font-size:16px;
+  cursor:pointer;
+  overflow:hidden;
+}
+.ticket-metadata-simple #ticket_card_cover_preview:focus-within { outline:2px solid #2183ea; outline-offset:2px; }
+.ticket-metadata-simple .ticket-card-cover-feedback { margin:-5px 0 0; padding:0 2px; min-height:0; font-size:12px; line-height:1.45; color:#57738e; }
+.ticket-metadata-simple .ticket-card-cover-feedback[data-kind="error"] { color:#b8373b; }
+.ticket-metadata-simple .ticket-card-cover-feedback:empty { display:none; }
+.ticket-metadata-simple .ticket-card-cover-tap-hint { pointer-events:none; }
+.ticket-metadata-simple .ticket-card-cover-empty { pointer-events:none; }
+
+/* EXACTLY the same category artwork as in the editor, cloned into the card. */
+.tickets-item-art .tickets-item-icon {
+  color:inherit!important;
+  padding:0!important;
+  overflow:visible;
+}
+.tickets-item-art .tickets-item-icon .ticket-category-symbol {
+  width:43px;
+  height:43px;
+  max-width:43px;
+  max-height:43px;
+  flex:0 0 43px;
+  display:grid;
+  place-items:center;
+  border-radius:13px;
+  font-size:26px;
+  line-height:1;
+  font-weight:650;
+  background:var(--category-color, #74829a);
+  color:#fff;
+}
+.tickets-item-art .tickets-item-icon .ticket-category-symbol svg {
+  display:block;
+  width:28px;
+  height:28px;
+  stroke:#fff;
+  fill:none;
+  stroke-width:2;
+}
+/* The card's selected-category square matches the pressed tile in the picker. */
+.tickets-item-art.restaurant .tickets-item-icon .ticket-category-symbol { background:#df822e; color:white; }
+.tickets-item-art.flight .tickets-item-icon .ticket-category-symbol { background:#1879f2; color:white; }
+.tickets-item-art.hotel .tickets-item-icon .ticket-category-symbol { background:#7663d8; color:white; }
+.tickets-item-art.show .tickets-item-icon .ticket-category-symbol { background:#bc4dad; color:white; }
+.tickets-item-art.sport .tickets-item-icon .ticket-category-symbol { background:#199b6f; color:white; }
+.tickets-item-art.attraction .tickets-item-icon .ticket-category-symbol { background:#bd8b18; color:white; }
+.tickets-item-art.transport .tickets-item-icon .ticket-category-symbol { background:#149ca4; color:white; }
+.tickets-item-art.other .tickets-item-icon .ticket-category-symbol { background:#728096; color:white; }
