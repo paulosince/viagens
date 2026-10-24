@@ -49,7 +49,7 @@ class Node {
 }
 
 // Deterministic fixture: avoid year-boundary failures in October/December.
-const TEST_CLOCK = new Date('2026-03-15T12:00:00Z');
+const TEST_CLOCK = new Date('2026-07-15T12:00:00Z');
 class TestDate extends Date {
   constructor(...args) { super(...(args.length ? args : [TEST_CLOCK.getTime()])); }
   static now() { return TEST_CLOCK.getTime(); }
