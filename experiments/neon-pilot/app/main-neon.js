@@ -5541,12 +5541,14 @@ function renderHomeTab(trips) {
   panel.classList.toggle('calendar-feed', tab === 'calendar');
   panel.onscroll = null;
   panel.calendarRenderToken = null;
+  panel.ticketsRenderToken = null;
   panel.calendarResizeObserver?.disconnect();
   panel.hidden = tab === 'trips';
   dom.tripList.hidden = tab !== 'trips';
   if (tab === 'trips') return;
   panel.replaceChildren();
   if (tab === 'calendar') { renderCalendarFeed(panel, trips); return; }
+  if (tab === 'tickets') { renderTicketsFeed(panel, trips); return; }
   const intro = document.createElement('p'); intro.className = 'home-tab-intro';
   intro.textContent = tab === 'calendar' ? 'Datas e contagens regressivas das suas viagens.' : tab === 'tickets' ? 'Escolha uma viagem para abrir tickets, comprovantes e documentos.' : 'Escolha uma viagem para acompanhar valores previstos e gastos.';
   panel.append(intro);
@@ -5566,6 +5568,164 @@ function renderHomeTab(trips) {
     panel.append(button);
   }
   if (!trips.length) { const empty = document.createElement('p'); empty.textContent = 'Nenhuma viagem encontrada para este ano e filtro.'; panel.append(empty); }
+}
+
+
+/* Design-first tickets index: only real attached files are listed.
+   Filename categories are provisional; no booking is inferred from a calendar event. */
+function ticketFileCategory(file) {
+  const name = String(file.file_name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  if (/ingress|ticket|bilhete|entrada|disney|parque|psg|estadio|stadium|show|concerto/.test(name))
+    return { id: 'ticket', label: 'Ingresso', symbol: '🎟', tone: 'blue' };
+  if (/restaurant|restaur|bistro|bistrot|pym|jantar|almoc|mesa/.test(name))
+    return { id: 'restaurant', label: 'Restaurante', symbol: '♨', tone: 'peach' };
+  return { id: 'other', label: 'Documento', symbol: '▤', tone: 'lilac' };
+}
+
+function renderTicketsFeed(panel, trips) {
+  const trip = trips.find(item => String(item.id) === state.ticketSelectedTripId) || trips[0];
+  if (!trip) {
+    panel.innerHTML = '<div class="tickets-screen"><h1>Tickets e reservas</h1><p class="tickets-empty">Nenhuma viagem encontrada. Confira a aba Viagens.</p></div>';
+    return;
+  }
+  const token = {};
+  panel.ticketsRenderToken = token;
+  state.ticketSelectedTripId = String(trip.id);
+  panel.setAttribute('aria-label', 'Tickets e reservas das viagens');
+  panel.innerHTML = [
+    '<div class="tickets-screen">',
+      '<div class="tickets-toolbar"><img src="assets/splash-plane.png" alt="Viaggio"><span>Tickets</span>',
+      '<button type="button" class="tickets-add" aria-label="Adicionar comprovante" title="Adicionar comprovante">+</button></div>',
+      '<h1>Tickets e reservas</h1>',
+      '<p class="tickets-caption">Seus documentos de viagem em um só lugar.</p>',
+      '<label class="tickets-trip-picker"><span>Viagem</span><select aria-label="Selecionar viagem dos tickets"></select><span aria-hidden="true">⌄</span></label>',
+      '<button type="button" class="home-trip-shortcut tickets-feature">',
+        '<img class="tickets-feature-cover" alt="" hidden>',
+        '<span class="tickets-feature-overlay"></span>',
+        '<span class="tickets-feature-copy"><small>✦ SUA VIAGEM</small><strong class="tickets-feature-name"></strong>',
+        '<span class="tickets-feature-date"></span><span class="tickets-feature-action">Ver arquivos ↗</span></span>',
+        '<span class="tickets-feature-stub" aria-hidden="true">▣</span></button>',
+      '<div class="tickets-filter-row" role="group" aria-label="Filtrar documentos">',
+        '<button type="button" data-ticket-filter="all" aria-pressed="true">Todos</button>',
+        '<button type="button" data-ticket-filter="ticket" aria-pressed="false">Ingressos</button>',
+        '<button type="button" data-ticket-filter="restaurant" aria-pressed="false">Restaurantes</button>',
+        '<button type="button" data-ticket-filter="other" aria-pressed="false">Outros</button></div>',
+      '<div class="tickets-section-heading"><h2>Seus documentos</h2><span class="tickets-counter" aria-live="polite">…</span></div>',
+      '<p class="tickets-message" role="status">Carregando os arquivos da viagem…</p>',
+      '<div class="tickets-grid"></div>',
+    '</div>'
+  ].join('');
+  const $ = selector => panel.querySelector(selector);
+  const picker = $('.tickets-trip-picker select');
+  for (const item of trips) {
+    const option = document.createElement('option');
+    option.value = String(item.id);
+    option.textContent = item.name || 'Viagem';
+    picker.append(option);
+  }
+  picker.value = String(trip.id);
+  picker.addEventListener('change', () => {
+    state.ticketSelectedTripId = picker.value;
+    renderTicketsFeed(panel, trips);
+  });
+  const openFiles = () => {
+    const loading = openTrip(trip.id);
+    selectTripTab('arquivos');
+    Promise.resolve(loading).catch(error => {
+      const feedback = panel.querySelector('.tickets-message');
+      if (feedback) feedback.textContent = error.message || 'Não foi possível abrir os arquivos.';
+    });
+  };
+  $('.tickets-add').addEventListener('click', openFiles);
+  $('.tickets-feature').addEventListener('click', openFiles);
+  $('.tickets-feature-name').textContent = trip.name || 'Viagem';
+  const dateText = value => value
+    ? new Intl.DateTimeFormat('pt-BR', { day:'numeric', month:'short', year:'numeric' }).format(new Date(value + 'T12:00:00'))
+    : '';
+  $('.tickets-feature-date').textContent =
+    [dateText(trip.start_date), dateText(tripEndDate(trip))].filter(Boolean).join(' — ');
+  const image = $('.tickets-feature-cover');
+  if (trip.cover_url) {
+    image.src = trip.cover_url;
+    image.hidden = false;
+    image.onerror = () => { image.hidden = true; };
+  }
+  const message = $('.tickets-message');
+  const grid = $('.tickets-grid');
+  const counter = $('.tickets-counter');
+  let selectedFilter = 'all';
+  let available = [];
+  const paint = () => {
+    const entries = available.filter(file => selectedFilter === 'all' || ticketFileCategory(file).id === selectedFilter);
+    counter.textContent = entries.length === 1 ? '1 arquivo' : entries.length + ' arquivos';
+    grid.replaceChildren();
+    for (const file of entries) {
+      const category = ticketFileCategory(file);
+      const card = document.createElement('button');
+      card.type = 'button'; card.className = 'tickets-item';
+      const art = document.createElement('span');
+      art.className = 'tickets-item-art ' + category.tone;
+      const icon = document.createElement('span');
+      icon.className = 'tickets-item-icon'; icon.textContent = category.symbol;
+      art.append(icon);
+      const tag = document.createElement('small');
+      tag.className = 'tickets-item-tag'; tag.textContent = category.label;
+      art.append(tag);
+      const details = document.createElement('span');
+      details.className = 'tickets-item-info';
+      const name = document.createElement('strong');
+      name.textContent = file.file_name || 'Arquivo';
+      const subtitle = document.createElement('span');
+      subtitle.textContent = file.day_id ? 'Anexado a um dia do roteiro' : 'Documento da viagem';
+      const action = document.createElement('span');
+      action.className = 'tickets-item-link';
+      action.textContent = 'Abrir nos arquivos  ›';
+      details.append(name, subtitle, action);
+      card.append(art, details);
+      card.setAttribute('aria-label', 'Abrir arquivo: ' + (file.file_name || 'documento'));
+      card.addEventListener('click', openFiles);
+      grid.append(card);
+    }
+    message.textContent = entries.length ? '' :
+      available.length ? 'Nenhum documento nesta categoria.' :
+      'Nenhum comprovante anexado a esta viagem. Toque em + para adicionar pela seção Arquivos.';
+  };
+  for (const filter of panel.querySelectorAll('[data-ticket-filter]')) {
+    filter.addEventListener('click', () => {
+      selectedFilter = filter.dataset.ticketFilter;
+      for (const button of panel.querySelectorAll('[data-ticket-filter]'))
+        button.setAttribute('aria-pressed', String(button === filter));
+      paint();
+    });
+  }
+  const cached = state.tripFilesByTrip.get(String(trip.id));
+  if (cached) { available = cached; paint(); }
+  if (!navigator.onLine) {
+    if (!cached) {
+      counter.textContent = 'Offline';
+      message.textContent = 'Conecte-se para carregar documentos ainda não vistos neste aparelho.';
+    }
+    return;
+  }
+  if (typeof tryNeon !== 'function') {
+    if (!cached) {
+      counter.textContent = '—';
+      message.textContent = 'Documentos indisponíveis nesta prévia.';
+    }
+    return;
+  }
+  tryNeon(5000).then(async client => {
+    if (!client) throw new Error('Conecte-se para consultar os documentos.');
+    const result = await client.from('day_attachments').select('*').eq('trip_id', String(trip.id)).order('created_at');
+    if (result.error) throw result.error;
+    if (panel.ticketsRenderToken !== token || state.homeTab !== 'tickets') return;
+    available = result.data || [];
+    paint();
+  }).catch(error => {
+    if (panel.ticketsRenderToken !== token || state.homeTab !== 'tickets') return;
+    if (!cached) counter.textContent = '—';
+    message.textContent = (cached ? 'Exibindo arquivos já conhecidos. ' : '') + (error.message || 'Não foi possível consultar os documentos.');
+  });
 }
 
 function calendarCountdown(trip, now = new Date()) {
@@ -5712,7 +5872,11 @@ function renderHomeCalendar(panel, trip, shownDate = null) {
   for (let day = 1; day <= new Date(year, month + 1, 0).getDate(); day++) {
     const date = new Date(year, month, day);
     const cell = document.createElement('span'); cell.textContent = day;
-    if (start && end && date >= start && date <= end) { cell.className = 'has-trip'; cell.title = trip.name; }
+    if (start && end && date >= start && date <= end) {
+      cell.className = 'has-trip'; cell.title = trip.name;
+      if (day === 1 || date.getDay() === 0 || date.toDateString() === start.toDateString()) cell.classList.add('range-start');
+      if (day === new Date(year, month + 1, 0).getDate() || date.getDay() === 6 || date.toDateString() === end.toDateString()) cell.classList.add('range-end');
+    }
     if (date.toDateString() === today.toDateString()) cell.setAttribute('aria-current', 'date');
     grid.append(cell);
   }
@@ -5750,8 +5914,8 @@ for (const button of document.querySelectorAll('[data-home-filter]')) button.add
 function syncTripList() {
   const now = new Date();
   const visibleTrips = state.trips
-    .filter(trip => state.homeTab === 'calendar' || Number(String(trip.start_date).slice(0, 4)) === state.selectedYear)
-    .filter(matchesHomeFilters)
+    .filter(trip => state.homeTab === 'calendar' || state.homeTab === 'tickets' || Number(String(trip.start_date).slice(0, 4)) === state.selectedYear)
+    .filter(trip => state.homeTab === 'tickets' || matchesHomeFilters(trip))
     .sort((a, b) => compareTripsForHome(a, b, now));
 
   const existingCards = new Map(

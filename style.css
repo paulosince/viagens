@@ -3109,3 +3109,57 @@ body[data-home-tab="calendar"] #home_tab_content { scroll-snap-type:none; }
 .day-agenda-heading .day-inline-title { flex:1; min-width:0; }
 .activity-favorite { flex:0 0 44px; border:0; background:transparent; color:#777; font-size:25px; width:44px; height:44px; padding:0; }
 .activity-favorite[aria-pressed="true"] { color:#e4a900; }
+
+
+/* Tickets share the light iOS shell; attached documents are the source of truth. */
+body[data-home-tab="tickets"] .home-header,
+body[data-home-tab="tickets"] .home-discovery { display:none; }
+body[data-home-tab="tickets"] #home_tab_content { width:min(100%,760px); }
+.tickets-screen { padding-bottom:24px; }
+.tickets-toolbar { display:flex; align-items:center; gap:10px; margin-bottom:20px; min-height:58px; }
+.tickets-toolbar img { width:76px; height:58px; object-fit:contain; }
+.tickets-toolbar>span { font-size:19px; font-weight:650; letter-spacing:-.025em; }
+.tickets-add { margin-left:auto; border:0; border-radius:50%; width:48px; height:48px; display:grid; place-items:center; background:#007aff; color:white; font-size:32px; font-weight:300; box-shadow:0 6px 16px #007aff2b; }
+.tickets-screen>h1 { margin:0 0 7px; font-size:clamp(30px,8vw,38px); line-height:1.1; letter-spacing:-.044em; }
+.tickets-caption { margin:0 0 18px; color:#738196; font-size:14px; line-height:1.35; }
+.tickets-trip-picker { display:flex; align-items:center; gap:8px; width:max-content; max-width:100%; padding:8px 12px; border:1px solid #dde4ed; border-radius:22px; background:#ffffffde; color:#718198; font-size:12px; margin-bottom:16px; }
+.tickets-trip-picker span:first-child { font-weight:650; }
+.tickets-trip-picker select { min-width:0; max-width:200px; border:0; background:transparent; appearance:none; -webkit-appearance:none; outline-offset:5px; font-size:12px; font-weight:700; color:#1b3656; }
+.tickets-trip-picker span:last-child { color:#287cef; font-size:17px; }
+.home-trip-shortcut.tickets-feature { margin:0; position:relative; isolation:isolate; width:100%; min-height:176px; border:1px solid #8fcbff88; border-radius:22px; background:linear-gradient(125deg,#0756a1,#2f8bd8); box-shadow:0 11px 23px #146abb22; overflow:hidden; display:flex; flex-direction:row; align-items:stretch; padding:0; color:white; }
+.tickets-feature-cover { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:-2; }
+.tickets-feature-cover[hidden] { display:none; }
+.tickets-feature-overlay { position:absolute; inset:0; background:linear-gradient(92deg,#082f63e8,#064b91b2 62%,#1388bf5b); z-index:-1; }
+.tickets-feature-copy { display:flex; flex:1; min-width:0; flex-direction:column; align-items:flex-start; padding:21px 15px 16px 19px; gap:7px; text-align:left; }
+.tickets-feature-copy small { color:#dcf5ff; font-size:10px; letter-spacing:.13em; font-weight:700; }
+.tickets-feature-name { font-size:25px; line-height:1.09; letter-spacing:-.037em; margin-top:6px; max-width:100%; overflow-wrap:anywhere; }
+.tickets-feature-date { font-size:11px; line-height:1.4; color:#eef7ff; }
+.tickets-feature-action { margin-top:auto; padding:8px 12px; background:#ffffff36; border:1px solid #ffffff66; border-radius:999px; font-size:11px; font-weight:650; }
+.tickets-feature-stub { align-self:center; display:grid; place-items:center; width:64px; height:98px; margin-right:20px; flex:0 0 64px; border:1px dashed #ffffffab; background:#ffffff25; border-radius:14px; transform:rotate(9deg); font-size:40px; color:white; }
+.tickets-filter-row { display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; padding:20px 0 21px; }
+.tickets-filter-row button { flex:0 0 auto; min-height:34px; background:#fff; color:#61738b; border:1px solid #e3e8f0; border-radius:999px; padding:8px 13px; font-size:12px; }
+.tickets-filter-row button[aria-pressed="true"] { background:#203c5e; color:#fff; border-color:#203c5e; font-weight:650; }
+.tickets-section-heading { display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-bottom:14px; }
+.tickets-section-heading h2 { margin:0; font-size:18px; letter-spacing:-.025em; }
+.tickets-counter { flex:0 0 auto; color:#8594a7; font-size:11px; }
+.tickets-message { font-size:12px; line-height:1.6; color:#718298; margin:8px 0 16px; }
+.tickets-message:empty { display:none; }
+.tickets-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:11px; }
+.tickets-item { border:1px solid #e7edf5; border-radius:18px; overflow:hidden; padding:0; background:#fff; min-width:0; color:#1a344f; text-align:left; box-shadow:0 3px 11px #2444630c; }
+.tickets-item-art { height:92px; display:flex; align-items:center; justify-content:center; position:relative; }
+.tickets-item-art.blue { background:linear-gradient(135deg,#d9ecff,#a2ceff); }
+.tickets-item-art.peach { background:linear-gradient(135deg,#fff0db,#edc9ad); }
+.tickets-item-art.lilac { background:linear-gradient(135deg,#f0eaff,#cfc6f9); }
+.tickets-item-icon { font-size:40px; font-weight:300; }
+.tickets-item-tag { position:absolute; top:9px; left:9px; padding:5px 7px; border-radius:7px; color:#456079; background:#ffffffc9; font-size:9px; font-weight:700; }
+.tickets-item-info { display:flex; flex-direction:column; padding:11px 10px 12px; min-height:108px; }
+.tickets-item-info strong { font-size:13px; line-height:1.24; overflow-wrap:anywhere; }
+.tickets-item-info>span:not(.tickets-item-link) { color:#8390a2; font-size:10px; margin-top:7px; line-height:1.4; }
+.tickets-item-link { color:#1373da; margin-top:auto; padding-top:12px; font-size:10px; font-weight:650; }
+.tickets-empty { font-size:14px; color:#7b8a9d; }
+/* Keep journey spans continuous, with rounded caps at each week boundary. */
+.calendar-trip .home-calendar-grid .has-trip { border-radius:0; }
+.calendar-trip .home-calendar-grid .has-trip.range-start { border-radius:11px 0 0 11px; }
+.calendar-trip .home-calendar-grid .has-trip.range-end { border-radius:0 11px 11px 0; }
+.calendar-trip .home-calendar-grid .has-trip.range-start.range-end { border-radius:11px; }
+@media(max-width:359px) { .tickets-feature-stub { width:48px; flex-basis:48px; margin-right:12px; } .tickets-feature-name { font-size:22px; } .tickets-item-info strong { font-size:12px; } }
