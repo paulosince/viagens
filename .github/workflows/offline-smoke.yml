@@ -8,6 +8,8 @@ on:
       - 'style.css'
       - 'sw.js'
       - 'src/**'
+      - 'experiments/neon-pilot/app/**'
+      - 'legacy-supabase.html'
       - 'tests/**'
       - 'supabase/migrations/**'
   pull_request:
@@ -16,6 +18,8 @@ on:
       - 'style.css'
       - 'sw.js'
       - 'src/**'
+      - 'experiments/neon-pilot/app/**'
+      - 'legacy-supabase.html'
       - 'tests/**'
       - 'supabase/migrations/**'
   workflow_dispatch:
@@ -31,6 +35,11 @@ jobs:
       - name: Parse JavaScript
         run: |
           node --input-type=module --check < src/main.js
+          node --input-type=module --check < experiments/neon-pilot/app/main-neon.js
+          node --input-type=module --check < experiments/neon-pilot/app/backend-neon.mjs
+          node --input-type=module --check < experiments/neon-pilot/app/storage-neon.mjs
+          node --input-type=module --check < experiments/neon-pilot/app/offline-store-neon.js
+          node --input-type=module --check < src/update-manager-neon.js
           node --input-type=module --check < src/offline-store.js
           node --check sw.js
           node --input-type=module --check < src/update-manager.js
@@ -44,11 +53,17 @@ jobs:
           node tests/saved-passengers.cjs
           node tests/shared-owner-photos.cjs
           node tests/trip-sections.cjs
+          node tests/neon-outbox.cjs
       - name: Verify offline app shell
         run: |
           test -f index.html
           test -f style.css
           test -f src/main.js
+          test -f experiments/neon-pilot/app/main-neon.js
+          test -f experiments/neon-pilot/app/backend-neon.mjs
+          test -f experiments/neon-pilot/app/offline-store-neon.js
+          test -f src/update-manager-neon.js
+          test -f legacy-supabase.html
           test -f src/offline-store.js
           test -f src/update-manager.js
           test -f src/update-manager.css
