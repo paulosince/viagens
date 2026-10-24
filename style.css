@@ -3225,3 +3225,56 @@ body[data-home-tab="tickets"] #home_tab_content { width:min(100%,760px); }
 .ticket-metadata-actions button:disabled { opacity:.55; }
 /* Give expanded mobile forms headroom for the on-screen keyboard. */
 @media(max-width:359px) { .ticket-metadata-form { padding-inline:14px; } .tickets-item-actions button { font-size:10px; } }
+
+
+/* Compact ticket metadata sheet — title, colorful category icons, optional date/time. */
+.ticket-metadata-simple .ticket-metadata-form { gap:15px; padding:12px 18px max(24px,env(safe-area-inset-bottom,0px)); }
+.ticket-metadata-simple .ticket-metadata-header { margin-bottom:2px; }
+.ticket-metadata-simple .ticket-metadata-header h2 { font-size:20px; }
+.ticket-metadata-simple .ticket-metadata-form label { gap:7px; font-size:13px; color:#34516c; }
+.ticket-metadata-simple .ticket-metadata-form label small { display:inline; font-size:10px; font-weight:500; color:#8a98a9; }
+.ticket-metadata-simple .ticket-metadata-form label input { margin-top:0; }
+.ticket-metadata-simple .ticket-category-options { min-width:0; margin:0; padding:0; border:none; }
+.ticket-metadata-simple .ticket-category-options legend { margin:0 0 9px; padding:0; font-size:13px; font-weight:650; color:#34516c; }
+.ticket-metadata-simple .ticket-category-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:9px; }
+.ticket-metadata-simple .ticket-category-option { --category-color:#747f98; --category-soft:#f0f2f6; min-width:0; min-height:77px; display:flex; flex-direction:column; justify-content:center; align-items:center; gap:7px; padding:9px 3px; border:1.5px solid #e5eaf1; border-radius:15px; background:#fff; color:#607086; font-size:10px; line-height:1.2; font-weight:650; white-space:normal; text-align:center; cursor:pointer; transition:border-color .16s,background .16s,transform .16s; }
+.ticket-metadata-simple .ticket-category-symbol { display:grid; place-items:center; width:35px; height:35px; border-radius:11px; background:var(--category-soft); color:var(--category-color); font-size:23px; line-height:1; font-weight:600; }
+.ticket-metadata-simple .ticket-category-option[aria-pressed="true"] { border:2px solid var(--category-color); background:var(--category-soft); color:#203249; box-shadow:0 2px 9px #17375c0d; }
+.ticket-metadata-simple .ticket-category-option:focus-visible { outline:2px solid var(--category-color); outline-offset:2px; }
+.ticket-metadata-simple .ticket-category-option[aria-pressed="true"] .ticket-category-symbol { color:#fff; background:var(--category-color); }
+.ticket-category-option[data-ticket-category="flight"],.tickets-item-art.flight { --category-color:#1879f2; --category-soft:#ddecff; }
+.ticket-category-option[data-ticket-category="hotel"],.tickets-item-art.hotel { --category-color:#7663d8; --category-soft:#ede7ff; }
+.ticket-category-option[data-ticket-category="restaurant"],.tickets-item-art.restaurant { --category-color:#df822e; --category-soft:#ffebd8; }
+.ticket-category-option[data-ticket-category="show"],.tickets-item-art.show { --category-color:#bc4dad; --category-soft:#fbe5f5; }
+.ticket-category-option[data-ticket-category="sport"],.tickets-item-art.sport { --category-color:#199b6f; --category-soft:#ddf7e9; }
+.ticket-category-option[data-ticket-category="attraction"],.tickets-item-art.attraction { --category-color:#bd8b18; --category-soft:#fff5d2; }
+.ticket-category-option[data-ticket-category="transport"],.tickets-item-art.transport { --category-color:#149ca4; --category-soft:#ddf6f6; }
+.ticket-category-option[data-ticket-category="other"],.tickets-item-art.other { --category-color:#728096; --category-soft:#edf1f6; }
+.tickets-item-art.flight,.tickets-item-art.hotel,.tickets-item-art.restaurant,.tickets-item-art.show,.tickets-item-art.sport,.tickets-item-art.attraction,.tickets-item-art.transport,.tickets-item-art.other { background:var(--category-soft); }
+.tickets-item-art.flight .tickets-item-icon,.tickets-item-art.hotel .tickets-item-icon,.tickets-item-art.restaurant .tickets-item-icon,.tickets-item-art.show .tickets-item-icon,.tickets-item-art.sport .tickets-item-icon,.tickets-item-art.attraction .tickets-item-icon,.tickets-item-art.transport .tickets-item-icon,.tickets-item-art.other .tickets-item-icon { color:var(--category-color); }
+.ticket-metadata-simple .ticket-metadata-inline { gap:10px; }
+.ticket-metadata-simple .ticket-metadata-inline label { min-width:0; }
+.ticket-metadata-simple .ticket-metadata-inline input { font-size:14px; padding-inline:7px; }
+.ticket-metadata-simple .ticket-metadata-error:empty { display:none; }
+.ticket-metadata-simple .ticket-metadata-actions { padding-top:3px; }
+@media(max-width:360px) { .ticket-metadata-simple .ticket-category-grid { gap:6px; } .ticket-metadata-simple .ticket-category-option { font-size:9px; min-height:73px; padding-inline:1px; } }
+
+
+/* Tickets are surfaced on their scheduled day without creating duplicate agenda activities. */
+.day-ticket-reservations { display:grid; gap:8px; margin:10px 0 18px; }
+.day-ticket-reservations[hidden] { display:none!important; }
+.day-ticket-reservations h3 { margin:0 0 2px; color:#59718b; font-size:11px; text-transform:uppercase; letter-spacing:.08em; font-weight:750; }
+.day-ticket-entry { --category-color:#728096; --category-soft:#edf1f6; width:100%; min-height:59px; border:1px solid #e1e9f2; border-radius:14px; display:flex; align-items:center; gap:11px; padding:9px 12px; background:rgba(255,255,255,.9); text-align:left; color:#152b43; }
+.day-ticket-entry.flight { --category-color:#1879f2; --category-soft:#ddecff; }
+.day-ticket-entry.hotel { --category-color:#7663d8; --category-soft:#ede7ff; }
+.day-ticket-entry.restaurant { --category-color:#df822e; --category-soft:#ffebd8; }
+.day-ticket-entry.show { --category-color:#bc4dad; --category-soft:#fbe5f5; }
+.day-ticket-entry.sport { --category-color:#199b6f; --category-soft:#ddf7e9; }
+.day-ticket-entry.attraction { --category-color:#bd8b18; --category-soft:#fff5d2; }
+.day-ticket-entry.transport { --category-color:#149ca4; --category-soft:#ddf6f6; }
+.day-ticket-entry.other { --category-color:#728096; --category-soft:#edf1f6; }
+.day-ticket-entry-icon { flex:0 0 39px; display:grid; place-items:center; height:39px; border-radius:11px; background:var(--category-soft); color:var(--category-color); font-size:24px; }
+.day-ticket-entry-copy { display:flex; flex:1; min-width:0; flex-direction:column; gap:3px; }
+.day-ticket-entry-copy strong { font-size:13px; line-height:1.25; overflow-wrap:anywhere; }
+.day-ticket-entry-copy small { font-size:11px; color:#7a8b9e; }
+.day-ticket-entry-arrow { color:#8eaccc; font-size:22px; }

@@ -47,9 +47,9 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20261024-tickets13" as="style">
-  <link rel="stylesheet" href="style.css?v=20261024-tickets13" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20261024-tickets13"></noscript>
+  <link rel="preload" href="style.css?v=20261024-tickets14" as="style">
+  <link rel="stylesheet" href="style.css?v=20261024-tickets14" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20261024-tickets14"></noscript>
   <link rel="stylesheet" href="src/update-manager.css?v=20261024-home3">
   <script>
     function showViaggioStartupError(detail) {
@@ -455,6 +455,7 @@
         <button id="add_day_page_activity" class="day-page-add" type="button" aria-label="Adicionar item à agenda" data-stuck="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 4v16M4 12h16"/></svg></button>
         <section class="day-view-section">
           <h2>Agenda</h2>
+          <div id="day_ticket_reservations" class="day-ticket-reservations" aria-label="Ingressos e reservas deste dia" hidden></div>
           <ol id="day_page_agenda" class="day-view-agenda"></ol>
           <p id="day_page_empty" class="day-view-empty"></p>
         </section>
@@ -564,45 +565,42 @@
 </nav>
       </div>
   </main>
-  <dialog id="ticket_metadata_dialog" class="ticket-metadata-dialog" aria-labelledby="ticket_metadata_heading">
+  <dialog id="ticket_metadata_dialog" class="ticket-metadata-dialog ticket-metadata-simple" aria-labelledby="ticket_metadata_heading">
     <form id="ticket_metadata_form" class="ticket-metadata-form">
       <div class="ticket-metadata-handle" aria-hidden="true"></div>
       <header class="ticket-metadata-header">
-        <h2 id="ticket_metadata_heading">Detalhes do ingresso ou reserva</h2>
+        <h2 id="ticket_metadata_heading">Ingresso ou reserva</h2>
         <button id="ticket_metadata_close" type="button" aria-label="Fechar">×</button>
       </header>
-      <p id="ticket_metadata_original" class="ticket-metadata-original"></p>
-      <label>Nome do ingresso ou reserva
+      <label for="ticket_metadata_title">Título
         <input name="display_title" id="ticket_metadata_title" maxlength="120" placeholder="Ex.: Reserva no Doca de Santo" required>
       </label>
-      <label>Tipo
-        <select name="item_category" id="ticket_metadata_category" required>
-          <option value="">Escolha a categoria</option>
-          <option value="flight">Voo</option>
-          <option value="hotel">Hospedagem</option>
-          <option value="restaurant">Restaurante</option>
-          <option value="show">Show ou espetáculo</option>
-          <option value="sport">Esporte</option>
-          <option value="attraction">Passeio ou atração</option>
-          <option value="transport">Transporte</option>
-          <option value="other">Outro</option>
-        </select>
-      </label>
+      <fieldset class="ticket-category-options">
+        <legend>Categoria</legend>
+        <input type="hidden" name="item_category" id="ticket_metadata_category" value="">
+        <div class="ticket-category-grid" role="group" aria-label="Escolha a categoria">
+          <button type="button" class="ticket-category-option" data-ticket-category="flight" aria-pressed="false"><span class="ticket-category-symbol">✈</span><span>Voo</span></button>
+          <button type="button" class="ticket-category-option" data-ticket-category="hotel" aria-pressed="false"><span class="ticket-category-symbol">▤</span><span>Hotel</span></button>
+          <button type="button" class="ticket-category-option" data-ticket-category="restaurant" aria-pressed="false"><span class="ticket-category-symbol">♨</span><span>Restaurante</span></button>
+          <button type="button" class="ticket-category-option" data-ticket-category="show" aria-pressed="false"><span class="ticket-category-symbol">♫</span><span>Show</span></button>
+          <button type="button" class="ticket-category-option" data-ticket-category="sport" aria-pressed="false"><span class="ticket-category-symbol">⚽</span><span>Esporte</span></button>
+          <button type="button" class="ticket-category-option" data-ticket-category="attraction" aria-pressed="false"><span class="ticket-category-symbol">★</span><span>Passeio</span></button>
+          <button type="button" class="ticket-category-option" data-ticket-category="transport" aria-pressed="false"><span class="ticket-category-symbol">⇄</span><span>Transporte</span></button>
+          <button type="button" class="ticket-category-option" data-ticket-category="other" aria-pressed="false"><span class="ticket-category-symbol">▣</span><span>Outros</span></button>
+        </div>
+      </fieldset>
       <div class="ticket-metadata-inline">
-        <label>Data<input id="ticket_metadata_date" name="event_date" type="date"></label>
-        <label>Horário<input id="ticket_metadata_time" name="event_time" type="time"></label>
+        <label for="ticket_metadata_date">Data <small>Opcional</small>
+          <input id="ticket_metadata_date" name="event_date" type="date">
+        </label>
+        <label for="ticket_metadata_time">Horário <small>Opcional</small>
+          <input id="ticket_metadata_time" name="event_time" type="time">
+        </label>
       </div>
-      <label>Local ou estabelecimento
-        <input id="ticket_metadata_venue" name="venue" maxlength="160" placeholder="Ex.: Disneyland Paris">
-      </label>
-      <label>Vincular à agenda do dia
-        <select id="ticket_metadata_agenda" name="agenda_mode"><option value="none">Sem vínculo com a agenda</option></select>
-      </label>
-      <p class="ticket-metadata-hint" id="ticket_metadata_hint">Selecione uma data para adicionar ou vincular ao roteiro.</p>
       <p class="ticket-metadata-error" id="ticket_metadata_error" role="status" aria-live="polite"></p>
       <div class="ticket-metadata-actions">
         <button type="button" id="ticket_metadata_cancel">Cancelar</button>
-        <button type="submit" id="ticket_metadata_save">Salvar detalhes</button>
+        <button type="submit" id="ticket_metadata_save">Salvar</button>
       </div>
     </form>
   </dialog>
@@ -614,7 +612,7 @@
       if (legacyPending > 0) {
         location.replace('./legacy-supabase.html?recover=1');
       } else {
-        await import('./experiments/neon-pilot/app/main-neon.js?v=20261024-tickets13');
+        await import('./experiments/neon-pilot/app/main-neon.js?v=20261024-tickets14');
       }
     } catch (error) {
       console.error('Não foi possível validar o estado local antes da migração Neon', error);
