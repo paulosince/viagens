@@ -47,9 +47,9 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20261024-glass6" as="style">
-  <link rel="stylesheet" href="style.css?v=20261024-glass6" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20261024-glass6"></noscript>
+  <link rel="preload" href="style.css?v=20261024-tabs7" as="style">
+  <link rel="stylesheet" href="style.css?v=20261024-tabs7" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20261024-tabs7"></noscript>
   <link rel="stylesheet" href="src/update-manager.css?v=20261024-home3">
   <script>
     function showViaggioStartupError(detail) {
@@ -164,7 +164,7 @@
 
       <div class="home-bottom">
         <button id="sync_status" class="sync-status" data-kind="synced" type="button" aria-live="polite">Sincronizado</button>
-        <nav class="home-tabs" aria-label="Navegação principal"><button class="home-nav-item" type="button" data-home-tab="trips" aria-current="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2 7 7 5v2l-8-3v5l2 2-3-1-3 1 2-2v-5l-8 3v-2l7-5 2-7Z"/></svg><span class="home-nav-label">Viagens</span></button>
+        <nav class="home-tabs" aria-label="Navegação principal"><span class="home-tab-indicator" aria-hidden="true"></span><button class="home-nav-item" type="button" data-home-tab="trips" aria-current="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2 7 7 5v2l-8-3v5l2 2-3-1-3 1 2-2v-5l-8 3v-2l7-5 2-7Z"/></svg><span class="home-nav-label">Viagens</span></button>
           <button class="home-nav-item" type="button" data-home-tab="calendar" aria-current="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 2v6M17 2v6M3 11h18"/></svg><span class="home-nav-label">Calendário</span></button>
           <button class="home-nav-item" type="button" data-home-tab="tickets" aria-current="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v5a2 2 0 0 0 0 4v5H3v-5a2 2 0 0 0 0-4V5Z"/><path d="M15 7v2m0 3v1m0 3v1"/></svg><span class="home-nav-label">Tickets</span></button>
           <button class="home-nav-item" type="button" data-home-tab="budgets" aria-current="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6V4h14v3M4 7h16v14H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2"/><path d="M20 11h-6v6h6"/></svg><span class="home-nav-label">Orçamentos</span></button>            <button id="profile_button" class="profile-button home-nav-item" data-home-tab="profile" type="button" aria-label="Abrir perfil">
@@ -569,7 +569,7 @@
       if (legacyPending > 0) {
         location.replace('./legacy-supabase.html?recover=1');
       } else {
-        await import('./experiments/neon-pilot/app/main-neon.js?v=20261024-glass6');
+        await import('./experiments/neon-pilot/app/main-neon.js?v=20261024-tabs7');
       }
     } catch (error) {
       console.error('Não foi possível validar o estado local antes da migração Neon', error);
