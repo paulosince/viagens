@@ -47,9 +47,9 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20261024-home3" as="style">
-  <link rel="stylesheet" href="style.css?v=20261024-home3" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20261024-home3"></noscript>
+  <link rel="preload" href="style.css?v=20261024-header4" as="style">
+  <link rel="stylesheet" href="style.css?v=20261024-header4" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20261024-header4"></noscript>
   <link rel="stylesheet" href="src/update-manager.css?v=20261024-home3">
   <script>
     function showViaggioStartupError(detail) {
@@ -139,10 +139,6 @@
           </div>
           <button id="sync_status" class="sync-status" data-kind="synced" type="button" aria-live="polite">Sincronizado</button></div>
           <div class="header-buttons">
-            <div class="home-year-control">
-              <button id="year_selector_button" class="glass-button" type="button" aria-label="Selecionar ano" aria-expanded="false" aria-controls="year_menu"><span id="current_year">2026</span><span class="year-chevron" aria-hidden="true"></span></button>
-              <div id="year_menu" class="year-menu" aria-hidden="true"><ol id="year_list"></ol></div>
-            </div>
             <div class="home-usage-container">
               <button id="home_usage_button" class="home-usage-summary" type="button" aria-expanded="false" aria-controls="home_usage_details" aria-label="Ver distribuição do armazenamento da conta">
                 <span class="home-usage-label">Armazenamento</span>
@@ -175,6 +171,10 @@
         </div>
         <div id="trip_heading" class="trip-heading">
           <h1 class="home-title">Minhas viagens</h1>
+            <div class="home-year-control">
+              <button id="year_selector_button" class="glass-button" type="button" aria-label="Selecionar ano" aria-expanded="false" aria-controls="year_menu"><span id="current_year">2026</span><span class="year-chevron" aria-hidden="true"></span></button>
+              <div id="year_menu" class="year-menu" aria-hidden="true"><ol id="year_list"></ol></div>
+            </div>
         </div>
       </header>
 
@@ -554,7 +554,7 @@
       if (legacyPending > 0) {
         location.replace('./legacy-supabase.html?recover=1');
       } else {
-        await import('./experiments/neon-pilot/app/main-neon.js?v=20261024-login1');
+        await import('./experiments/neon-pilot/app/main-neon.js?v=20261024-header4');
       }
     } catch (error) {
       console.error('Não foi possível validar o estado local antes da migração Neon', error);

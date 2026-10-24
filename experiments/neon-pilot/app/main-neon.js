@@ -5485,7 +5485,7 @@ function createTripSection(group, text) {
   const chevron = document.createElement('span');
   chevron.className = 'trip-section-chevron';
   chevron.setAttribute('aria-hidden', 'true');
-  button.append(label, count, divider, chevron);
+  button.append(label, divider, count, chevron);
   heading.append(button);
   if (group === 'upcoming') {
     dom.editTripsButton.hidden = false;
@@ -7416,6 +7416,8 @@ if (homeHeader) {
       homeHeader.querySelector('.home-title')?.setAttribute('aria-hidden', String(compact));
       const controls = homeHeader.querySelector('.header-actions');
       if (controls) controls.inert = compact;
+      const heading = homeHeader.querySelector('.trip-heading');
+      if (heading) heading.inert = compact;
       if (compact) { setYearMenu(false); setUsageOpen(false); }
     }
   };

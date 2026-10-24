@@ -2962,20 +2962,23 @@ body[data-editing="true"] .home-create-fab{opacity:0;pointer-events:none;transfo
 .home-profile-area .sync-status { max-width: 145px; margin: 0; font-size: 10px; line-height: 1.4; }
 .home-profile-area .sync-status::before { flex-shrink: 0; }
 .home-header .header-actions { display: grid; grid-template-columns: minmax(100px,1fr) auto; align-items: start; gap: 14px; }
-.home-header .header-buttons { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+.home-header .header-buttons { display: flex; flex-direction: row; flex-wrap: nowrap; align-items: flex-start; gap: 10px; }
 .home-header .home-usage-summary { display: flex; flex-direction: column; align-items: stretch; gap: 8px; width: 164px; padding: 11px 12px; }
 .home-usage-label { font-size: 11px; font-weight: 650; color: var(--text); }
 .home-header .home-usage-row { grid-template-columns: 18px minmax(40px,1fr) 38px; gap: 8px; }
 .home-header .home-usage-icon svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
 .home-header .home-usage-row:first-child .home-usage-icon { color: #2187f4; }
 .home-header .home-usage-row:last-child .home-usage-icon { color: #249f77; }
-.home-header .trip-heading { margin: 26px 0 12px; }
+.home-header .trip-heading { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; margin: 26px 0 12px; }
+.home-header .trip-heading .home-year-control .year-menu { left: 0; right: auto; transform-origin: top left; }
 .home-compact-title { position: absolute; left: -18px; right: -18px; bottom: 0; height: calc(44px + env(safe-area-inset-top)); padding-top: env(safe-area-inset-top); display: grid; place-items: center; font-size: 17px; font-weight: 650; letter-spacing: -.02em; background: rgba(242,242,247,.92); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-bottom: 1px solid rgba(60,60,67,.12); opacity: 0; pointer-events: none; transition: opacity .18s ease; }
 .home-header[data-compact="true"] .home-compact-title { opacity: 1; }
 .home-header[data-compact="true"] .header-actions, .home-header[data-compact="true"] .trip-heading { visibility: hidden; pointer-events: none; }
 .home-header .home-usage-popover { right: 0; }
-.trip-section-title { display: flex; align-items: center; gap: 12px; }
-.trip-section-title .trip-section-toggle { flex: 1; min-width: 0; }
+.trip-section-title { display: grid; grid-template-columns: minmax(0, 1fr); row-gap: 0; }
+.trip-section-title .trip-section-toggle { display: grid; grid-template-columns: auto minmax(0, 1fr) auto 44px; min-width: 0; }
+.trip-section-title .trip-section-chevron { justify-self: center; margin-right: 0; }
+.trip-section-title .trip-edit-text { justify-self: end; min-width: 44px; padding: 0; text-align: center; }
 .trip-edit-text { flex: 0 0 auto; border: 0; background: none; box-shadow: none; color: var(--ios-blue); font-size: 13px; font-weight: 500; padding: 10px 0 10px 6px; min-height: 44px; cursor: pointer; }
 .trip-edit-text[hidden] { display: none; }
 @media(max-width:370px) { .home-header .home-usage-summary { width: 150px; } .home-profile-area .sync-status { max-width: 120px; } .trip-section-toggle { gap: 8px; font-size: 16px; } }
