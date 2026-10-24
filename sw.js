@@ -1,17 +1,30 @@
-const CACHE_NAME = 'viaggio-home-v109-account-usage';
+const CACHE_NAME = 'viaggio-home-v110-neon-cutover';
 const MEDIA_CACHE_NAME = 'viaggio-media-v1';
+const NEON_MEDIA_CACHE_NAME = 'viaggio-neon-auth-preview-media-v1';
 const SUPABASE_CLIENT = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const LEAFLET_CSS = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css';
 const LEAFLET_JS = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js';
-const EXTERNAL_ASSETS = [SUPABASE_CLIENT, LEAFLET_CSS, LEAFLET_JS];
+const NEON_AUTH_SDK = 'https://cdn.jsdelivr.net/npm/@neondatabase/neon-js@0.9.0-beta/+esm';
+const NEON_DATA_SDK = 'https://cdn.jsdelivr.net/npm/@neondatabase/postgrest-js@0.2.0-beta/+esm';
+const EXTERNAL_ASSETS = [SUPABASE_CLIENT, NEON_AUTH_SDK, NEON_DATA_SDK, LEAFLET_CSS, LEAFLET_JS];
 const OPTIONAL_ASSETS = ['./src/itinerary-pdf.mjs?v=20260927-56', './vendor/pdf-lib.min.mjs'];
 const APP_SHELL = [
   './',
   './index.html',
   './style.css?v=20261018-64',
-  './src/main.js?v=20261018-64',
+  './experiments/neon-pilot/app/main-neon.js?v=20261023-cutover1',
+  './experiments/neon-pilot/app/backend-neon.mjs?v=20261023-cutover1',
+  './experiments/neon-pilot/app/offline-store-neon.js?v=20261021-1',
+  './experiments/neon-pilot/app/media-cache-neon.js?v=20261021-1',
+  './experiments/neon-pilot/app/photo-source-neon.mjs?v=20261021-7photofix',
+  './experiments/neon-pilot/app/storage-neon.mjs',
+  './experiments/neon-pilot/app/router-neon.mjs',
+  './experiments/neon-pilot/app/neon-identity.mjs',
   './src/offline-store.js?v=20261007-59',
+  './legacy-supabase.html',
+  './src/main.js?v=20261018-64',
   './src/media-cache.js?v=20261007-62',
+  './src/update-manager-neon.js?v=20261023-cutover1',
   './src/update-manager.js?v=20261018-63',
   './src/update-manager.css?v=20261018-63',
   './manifest.webmanifest',
@@ -42,7 +55,7 @@ self.addEventListener('message', event => {
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(key => key !== CACHE_NAME && key !== MEDIA_CACHE_NAME).map(key => caches.delete(key))))
+      .then(keys => Promise.all(keys.filter(key => key !== CACHE_NAME && key !== MEDIA_CACHE_NAME && key !== NEON_MEDIA_CACHE_NAME && !(key.startsWith('viaggio-') && key.includes('media'))).map(key => caches.delete(key))))
       .then(() => self.clients.claim())
   );
 });
