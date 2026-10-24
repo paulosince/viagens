@@ -7,8 +7,8 @@ const html=fs.readFileSync('index.html','utf8');
 const start=main.indexOf('function isTicketImageFile(');
 const end=main.indexOf('function renderTicketsFeed(');
 assert.ok(start>0 && end>start,'Ticket classifier functions must exist');
-const {isTicketImageFile,ticketFileCategory}=new Function(
-  main.slice(start,end)+'; return {isTicketImageFile,ticketFileCategory};'
+const {isTicketImageFile,ticketFileCategory,ticketSaveFeedback,ticketSaveIsNetworkError}=new Function(
+  main.slice(start,end)+'; return {isTicketImageFile,ticketFileCategory,ticketSaveFeedback,ticketSaveIsNetworkError};'
 )();
 assert.equal(isTicketImageFile({file_name:'IMG_2208.jpeg',mime_type:'image/jpeg'}),true);
 assert.equal(isTicketImageFile({file_name:'IMG_2292.png'}),true);
@@ -17,6 +17,14 @@ assert.equal(ticketFileCategory({file_name:'IMG_2208.jpeg',mime_type:'image/jpeg
 assert.equal(ticketFileCategory({file_name:'PSG.pdf'}).id,'unclassified');
 assert.equal(ticketFileCategory({file_name:'PSG.pdf',item_category:'sport'}).label,'Esporte');
 assert.equal(ticketFileCategory({file_name:'Bistrot Chez Remy.pdf',item_category:'restaurant'}).label,'Restaurante');
+assert.ok(ticketSaveFeedback(new TypeError('Load failed')).includes('conexão'));
+assert.ok(!ticketSaveFeedback(new TypeError('Load failed')).includes('TypeError'));
+assert.equal(ticketSaveIsNetworkError(new TypeError('Load failed')),true);
+assert.equal(ticketSaveIsNetworkError(new Error('permission denied')),false);
+assert.ok(main.includes('async function renderTicketEditorPreview(file)'));
+assert.ok(main.includes("renderTicketEditorPreview(file).catch"));
+assert.ok(main.includes('async function updateTicketDetailsSafely('));
+assert.ok(main.includes('function openTicketImageViewer()'));
 assert.ok(main.includes("const openTicketAgenda = async file =>"));
 assert.ok(main.includes("function saveTicketMetadata(event)"));
 assert.ok(main.includes("const patch = { display_title, item_category, event_date, event_time };"));
@@ -34,8 +42,8 @@ assert.ok(css.includes('.tickets-item-thumbnail'));
 assert.ok(css.includes('bottom:max(11px,calc(env(safe-area-inset-bottom,0px) - 21px))'));
 const navPos=html.indexOf('<div class="home-bottom">');
 assert.ok(navPos>html.indexOf('id="trip_edit_footer"') && navPos<html.indexOf('</main>'));
-assert.ok(html.includes('style.css?v=20261024-tickets14'));
-assert.ok(html.includes('main-neon.js?v=20261024-tickets14'));
+assert.ok(html.includes('style.css?v=20261024-tickets15'));
+assert.ok(html.includes('main-neon.js?v=20261024-tickets15'));
 assert.ok(html.includes('ticket_metadata_dialog'));
 assert.ok(!html.includes('ticket_metadata_agenda'));
 assert.ok(!html.includes('ticket_metadata_venue'));
@@ -45,4 +53,11 @@ assert.ok(html.includes('name="event_date" type="date"'));
 assert.ok(html.includes('name="event_time" type="time"'));
 assert.ok(css.includes('.ticket-metadata-simple .ticket-category-grid'));
 assert.ok(html.includes('id="day_ticket_reservations"'));
-console.log('PASS tickets: 3-field editor, colorful icons, optional date/time, real-file preview and automatic day index');
+assert.ok(html.includes('id="ticket_editor_preview_image"'));
+assert.ok(html.includes('id="ticket_image_dialog"'));
+assert.ok(html.includes('id="ticket_image_zoom"'));
+assert.ok(css.includes('@media(max-width:600px)'));
+assert.ok(css.includes('.ticket-metadata-simple .ticket-metadata-inline { display:flex; flex-direction:column'));
+assert.ok(css.includes('.ticket-editor-preview-open img'));
+assert.ok(css.includes('.ticket-image-dialog.is-zoomed'));
+console.log('PASS tickets: safe errors, preview/zoom, date/time layout, and original metadata behavior');
