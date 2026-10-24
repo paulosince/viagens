@@ -5579,14 +5579,14 @@ function isTicketImageFile(file) {
 }
 
 const TICKET_CATEGORIES = Object.freeze({
-  flight: { id:'flight', label:'Voo', symbol:'✈', tone:'blue' },
-  hotel: { id:'hotel', label:'Hospedagem', symbol:'▤', tone:'lilac' },
-  restaurant: { id:'restaurant', label:'Restaurante', symbol:'♨', tone:'peach' },
-  show: { id:'show', label:'Show', symbol:'♫', tone:'lilac' },
-  sport: { id:'sport', label:'Esporte', symbol:'⚽', tone:'blue' },
-  attraction: { id:'attraction', label:'Passeio', symbol:'★', tone:'blue' },
-  transport: { id:'transport', label:'Transporte', symbol:'⇄', tone:'blue' },
-  other: { id:'other', label:'Outro', symbol:'▣', tone:'lilac' }
+  flight: { id:'flight', label:'Voo', symbol:'✈', tone:'flight' },
+  hotel: { id:'hotel', label:'Hospedagem', symbol:'▤', tone:'hotel' },
+  restaurant: { id:'restaurant', label:'Restaurante', symbol:'♨', tone:'restaurant' },
+  show: { id:'show', label:'Show', symbol:'♫', tone:'show' },
+  sport: { id:'sport', label:'Esporte', symbol:'⚽', tone:'sport' },
+  attraction: { id:'attraction', label:'Passeio', symbol:'★', tone:'attraction' },
+  transport: { id:'transport', label:'Transporte', symbol:'⇄', tone:'transport' },
+  other: { id:'other', label:'Outro', symbol:'▣', tone:'other' }
 });
 function ticketFileCategory(file) {
   return TICKET_CATEGORIES[file?.item_category] ||
