@@ -47,9 +47,9 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20261024-tickets14" as="style">
-  <link rel="stylesheet" href="style.css?v=20261024-tickets14" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20261024-tickets14"></noscript>
+  <link rel="preload" href="style.css?v=20261024-tickets15" as="style">
+  <link rel="stylesheet" href="style.css?v=20261024-tickets15" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20261024-tickets15"></noscript>
   <link rel="stylesheet" href="src/update-manager.css?v=20261024-home3">
   <script>
     function showViaggioStartupError(detail) {
@@ -572,6 +572,16 @@
         <h2 id="ticket_metadata_heading">Ingresso ou reserva</h2>
         <button id="ticket_metadata_close" type="button" aria-label="Fechar">×</button>
       </header>
+      <div class="ticket-editor-preview" id="ticket_editor_preview">
+        <button class="ticket-editor-preview-open" id="ticket_editor_preview_open" type="button" aria-label="Ampliar imagem do comprovante" hidden>
+          <img id="ticket_editor_preview_image" alt="Imagem do comprovante anexado" loading="eager">
+          <span class="ticket-editor-preview-caption"><span id="ticket_editor_preview_filename"></span><span>Ampliar <span aria-hidden="true">↗</span></span></span>
+        </button>
+        <div id="ticket_editor_preview_fallback" class="ticket-editor-preview-fallback" role="status">
+          <span class="ticket-editor-preview-symbol" aria-hidden="true">▤</span>
+          <span id="ticket_editor_preview_message">Comprovante anexado</span>
+        </div>
+      </div>
       <label for="ticket_metadata_title">Título
         <input name="display_title" id="ticket_metadata_title" maxlength="120" placeholder="Ex.: Reserva no Doca de Santo" required>
       </label>
@@ -604,6 +614,16 @@
       </div>
     </form>
   </dialog>
+  <dialog id="ticket_image_dialog" class="ticket-image-dialog" aria-label="Visualizar o comprovante">
+    <div class="ticket-image-toolbar">
+      <span>Comprovante</span>
+      <div>
+        <button id="ticket_image_zoom" type="button" aria-label="Ampliar imagem">Ampliar</button>
+        <button id="ticket_image_close" type="button" aria-label="Fechar imagem">Fechar</button>
+      </div>
+    </div>
+    <div id="ticket_image_scroller" class="ticket-image-scroller"><img id="ticket_image_full" alt="Comprovante ampliado"></div>
+  </dialog>
   <!-- Prevent hidden loss of unsent legacy work during backend cutover. -->
   <script type="module">
     import { offlineStore as legacyOfflineStore } from './src/offline-store.js?v=20261007-59';
@@ -612,7 +632,7 @@
       if (legacyPending > 0) {
         location.replace('./legacy-supabase.html?recover=1');
       } else {
-        await import('./experiments/neon-pilot/app/main-neon.js?v=20261024-tickets14');
+        await import('./experiments/neon-pilot/app/main-neon.js?v=20261024-tickets15');
       }
     } catch (error) {
       console.error('Não foi possível validar o estado local antes da migração Neon', error);
