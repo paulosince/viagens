@@ -2379,11 +2379,12 @@ async function storeTripAttachment(client, tripId, dayId, file) {
   const inserted = await client.from('day_attachments').insert({
     trip_id: tripId, day_id: dayId, storage_path: path, file_name: file.name.slice(0, 180),
     mime_type: accepted.type, size_bytes: file.size
-  });
+  }).select('*').single();
   if (inserted.error) {
     await client.storage.from(DAY_ATTACHMENT_BUCKET).remove([path]);
     throw inserted.error;
   }
+  return inserted.data;
 }
 
 function setDayAttachmentStatus(message, kind = 'info') {
@@ -2418,7 +2419,7 @@ function renderDayAttachments(dayId) {
     }
     const name = document.createElement('span');
     name.className = 'day-attachment-name';
-    name.textContent = attachment.file_name;
+    name.textContent = attachment.display_title || attachment.file_name;
     const size = document.createElement('small');
     size.textContent = (attachment.size_bytes / 1024 / 1024).toFixed(1) + ' MB';
     name.append(size);
@@ -4768,7 +4769,7 @@ function showTripFileViewerIndex(index, { syncHistory = true } = {}) {
   tripFileViewerState.index = Math.max(0, Math.min(index, entries.length - 1));
   const file = entries[tripFileViewerState.index];
   clearTripFileViewerMedia();
-  dom.tripFileViewerTitle.textContent = file.mime_type?.startsWith('image/') ? 'Foto' : file.file_name;
+  dom.tripFileViewerTitle.textContent = file.display_title || (file.mime_type?.startsWith('image/') ? 'Foto' : file.file_name);
   dom.tripFileViewerStatus.textContent = tripFileSize(file);
   dom.tripFileViewerDelete.hidden = !canEditActiveTrip();
   dom.tripFileViewerDelete.disabled = false;
@@ -4948,7 +4949,7 @@ function renderTripFileDeck(tripId, day, entries) {
     if (card.dataset.kind === 'document') {
       const caption = document.createElement('span');
       caption.className = 'trip-file-card-caption';
-      const name = document.createElement('strong'); name.textContent = file.file_name;
+      const name = document.createElement('strong'); name.textContent = file.display_title || file.file_name;
       const size = document.createElement('small'); size.textContent = tripFileSize(file);
       caption.append(name, size);
       link.append(caption);
@@ -5571,21 +5572,182 @@ function renderHomeTab(trips) {
 }
 
 
-/* Design-first tickets index: only real attached files are listed.
-   Filename categories are provisional; no booking is inferred from a calendar event. */
+/* Ticket categories are explicit user metadata, never guesses from an iPhone filename. */
 function isTicketImageFile(file) {
   return /^image\//i.test(String(file.mime_type || ''))
-    || /\.(?:jpe?g|png|webp|gif|heic)$/i.test(String(file.file_name || ''));
+    || /\.(?:jpe?g|png|webp|gif|heic|heif)$/i.test(String(file.file_name || ''));
 }
 
+const TICKET_CATEGORIES = Object.freeze({
+  flight: { id:'flight', label:'Voo', symbol:'✈', tone:'blue' },
+  hotel: { id:'hotel', label:'Hospedagem', symbol:'▤', tone:'lilac' },
+  restaurant: { id:'restaurant', label:'Restaurante', symbol:'♨', tone:'peach' },
+  show: { id:'show', label:'Show', symbol:'♫', tone:'lilac' },
+  sport: { id:'sport', label:'Esporte', symbol:'⚽', tone:'blue' },
+  attraction: { id:'attraction', label:'Passeio', symbol:'★', tone:'blue' },
+  transport: { id:'transport', label:'Transporte', symbol:'⇄', tone:'blue' },
+  other: { id:'other', label:'Outro', symbol:'▣', tone:'lilac' }
+});
 function ticketFileCategory(file) {
-  const name = String(file.file_name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-  if (/ingress|ticket|bilhete|entrada|disney|parque|psg|estadio|stadium|show|concerto/.test(name))
-    return { id: 'ticket', label: 'Ingresso', symbol: '🎟', tone: 'blue' };
-  if (/restaurant|restaur|bistro|bistrot|pym|jantar|almoc|mesa/.test(name))
-    return { id: 'restaurant', label: 'Restaurante', symbol: '♨', tone: 'peach' };
-  if (isTicketImageFile(file)) return { id: 'other', label: 'Imagem', symbol: '▧', tone: 'blue' };
-  return { id: 'other', label: 'Documento', symbol: '▤', tone: 'lilac' };
+  return TICKET_CATEGORIES[file?.item_category] ||
+    { id:'unclassified', label:'Classificar', symbol:'＋', tone:'lilac' };
+}
+function ticketDisplayTitle(file) {
+  return String(file?.display_title || '').trim() || 'Identificar este item';
+}
+function ticketDateLabel(file) {
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(String(file?.event_date || ''))
+    ? new Intl.DateTimeFormat('pt-BR',{ day:'numeric', month:'short' }).format(new Date(file.event_date+'T12:00:00'))
+    : '';
+  const time = String(file?.event_time || '').slice(0,5);
+  return [date,time].filter(Boolean).join(' · ');
+}
+function tripTicketDay(trip, date, days = []) {
+  if (!date) return null;
+  return days.find(day => !dayIsHidden(day) && !dayDeletedAt(day)
+    && derivedDayDate(day,trip) === date) || null;
+}
+
+let ticketEditorContext = null;
+async function openTicketMetadataEditor(trip, file, onSaved) {
+  if (!canEditTrip(trip)) return;
+  const dialog = document.getElementById('ticket_metadata_dialog');
+  const form = document.getElementById('ticket_metadata_form');
+  const hint = document.getElementById('ticket_metadata_hint');
+  const error = document.getElementById('ticket_metadata_error');
+  form.reset();
+  error.textContent = '';
+  ticketEditorContext = { trip, file, onSaved, days:[], activitiesByDay:new Map() };
+  form.elements.display_title.value = file.display_title || '';
+  form.elements.item_category.value = file.item_category || '';
+  form.elements.event_date.value = file.event_date || '';
+  form.elements.event_time.value = String(file.event_time || '').slice(0,5);
+  form.elements.venue.value = file.venue || '';
+  document.getElementById('ticket_metadata_original').textContent =
+    'Arquivo original: ' + (file.file_name || 'documento');
+  hint.textContent = 'Carregando os dias e as atividades da viagem…';
+  dialog.showModal();
+  document.getElementById('ticket_metadata_title').focus({ preventScroll:true });
+  try {
+    const key = String(trip.id);
+    const data = state.tripDataCache.get(key)
+      || await fetchTripData(key, { preferLocal:true })
+      || await fetchTripData(key);
+    if (ticketEditorContext?.file.id !== file.id) return;
+    ticketEditorContext.days = data?.days || [];
+    ticketEditorContext.activitiesByDay = data?.activitiesByDay || new Map();
+    const attachedDay = ticketEditorContext.days.find(day => String(day.id) === String(file.day_id));
+    if (!form.elements.event_date.value && attachedDay)
+      form.elements.event_date.value = derivedDayDate(attachedDay,trip);
+    refreshTicketAgendaOptions();
+  } catch (e) {
+    hint.textContent = 'Os dias da viagem não puderam ser consultados. Os dados do cartão ainda podem ser salvos.';
+  }
+}
+function refreshTicketAgendaOptions() {
+  const ctx = ticketEditorContext;
+  if (!ctx) return;
+  const form = document.getElementById('ticket_metadata_form');
+  const select = form.elements.agenda_mode;
+  const hint = document.getElementById('ticket_metadata_hint');
+  const date = form.elements.event_date.value;
+  const day = tripTicketDay(ctx.trip, date, ctx.days);
+  select.replaceChildren(new Option('Somente neste cartão e nos arquivos','none'));
+  if (!day) {
+    select.value = 'none';
+    hint.textContent = date
+      ? 'Essa data não corresponde a um dia do roteiro. O cartão será salvo sem criar uma atividade.'
+      : 'Selecione uma data da viagem para vincular o cartão ao roteiro.';
+    return;
+  }
+  select.add(new Option('Criar atividade na agenda deste dia','create'));
+  const activities = ctx.activitiesByDay.get(String(day.id)) || [];
+  for (const activity of activities) {
+    select.add(new Option('Vincular existente: ' + String(activity.title || 'Atividade'), 'link:' + activity.id));
+  }
+  const already = ctx.file.activity_id && activities.some(a => String(a.id)===String(ctx.file.activity_id))
+    ? 'link:' + ctx.file.activity_id : null;
+  const title = form.elements.display_title.value.trim().toLocaleLowerCase('pt-BR');
+  const sameTitle = title && activities.find(a=>String(a.title||'').trim().toLocaleLowerCase('pt-BR')===title);
+  select.value = already || (sameTitle ? 'link:' + sameTitle.id : 'create');
+  hint.textContent = 'O vínculo aparece na agenda deste dia. Se a atividade já existe, selecione-a para evitar duplicações.';
+}
+async function saveTicketMetadata(event) {
+  event.preventDefault();
+  const ctx = ticketEditorContext;
+  if (!ctx) return;
+  const form = document.getElementById('ticket_metadata_form');
+  if (!form.reportValidity()) return;
+  const save = document.getElementById('ticket_metadata_save');
+  const error = document.getElementById('ticket_metadata_error');
+  const title = form.elements.display_title.value.trim();
+  const category = form.elements.item_category.value;
+  const date = form.elements.event_date.value || null;
+  const time = form.elements.event_time.value || null;
+  const venue = form.elements.venue.value.trim();
+  const mode = form.elements.agenda_mode.value;
+  if (!title || !TICKET_CATEGORIES[category]) { error.textContent='Informe um nome e uma categoria.'; return; }
+  const day = tripTicketDay(ctx.trip,date,ctx.days);
+  if (mode !== 'none' && !day) { error.textContent='Selecione um dia válido para vincular à agenda.'; return; }
+  save.disabled = true;
+  save.textContent = 'Salvando…';
+  error.textContent = '';
+  let newlyCreated = null;
+  try {
+    const client = await tryNeon(7000);
+    if (!client) throw new Error('É necessário estar conectado para salvar os detalhes.');
+    let activityId = null;
+    if (mode.startsWith('link:')) {
+      activityId = mode.slice(5);
+      const exists = (ctx.activitiesByDay.get(String(day.id)) || [])
+        .some(a=>String(a.id)===activityId);
+      if (!exists) throw new Error('A atividade escolhida não pertence ao dia selecionado.');
+    } else if (mode === 'create') {
+      const list = ctx.activitiesByDay.get(String(day.id)) || [];
+      const row = {
+        id:crypto.randomUUID(),
+        day_id:day.id,
+        title,
+        period: periodFromTime(time || '09:00'),
+        position: list.reduce((max,a)=>Math.max(max,Number(a.position)||0),-1)+1,
+        start_time:time ? time+':00' : null,
+        place_name:venue || null,
+        ticket_required: category !== 'other'
+      };
+      const inserted = await client.from('activities').insert(row).select('id').single();
+      if (inserted.error) throw inserted.error;
+      newlyCreated = inserted.data?.id || row.id;
+      activityId = newlyCreated;
+    }
+    const patch = {
+      display_title:title, item_category:category, event_date:date, event_time:time,
+      venue:venue || null, activity_id:activityId
+    };
+    const updated = await client.from('day_attachments')
+      .update(patch).eq('id',ctx.file.id).eq('trip_id',ctx.trip.id).select().single();
+    if (updated.error) throw updated.error;
+    const updatedFile = { ...ctx.file, ...updated.data };
+    const key=String(ctx.trip.id);
+    const old = state.tripFilesByTrip.get(key);
+    if (old) state.tripFilesByTrip.set(key,old.map(f=>String(f.id)===String(updatedFile.id)
+      ? {...f,...updatedFile,signedUrl:f.signedUrl || updatedFile.signedUrl} : f));
+    state.tripDataCache.delete(key);
+    document.getElementById('ticket_metadata_dialog').close();
+    ticketEditorContext = null;
+    ctx.onSaved?.(updatedFile);
+  } catch (e) {
+    if (newlyCreated) {
+      try {
+        const client=await tryNeon(5000);
+        const removed=await client?.from('activities').delete().eq('id',newlyCreated);
+        if (removed?.error) console.warn('Não foi possível desfazer a atividade temporária',removed.error);
+      } catch (cleanup) { console.warn('Falha ao desfazer atividade temporária',cleanup); }
+    }
+    error.textContent=e.message || 'Não foi possível salvar.';
+  } finally {
+    save.disabled=false;
+    save.textContent='Salvar detalhes';
+  }
 }
 
 function renderTicketsFeed(panel, trips) {
@@ -5601,7 +5763,8 @@ function renderTicketsFeed(panel, trips) {
   panel.innerHTML = [
     '<div class="tickets-screen">',
       '<div class="tickets-toolbar"><img src="assets/splash-plane.png" alt="Viaggio"><span>Tickets</span>',
-      '<button type="button" class="tickets-add" aria-label="Adicionar comprovante" title="Adicionar comprovante">+</button></div>',
+      '<button type="button" class="tickets-add" aria-label="Adicionar ingresso ou reserva" title="Adicionar ingresso ou reserva">+</button>',
+      '<input type="file" class="tickets-add-file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.pdf,.doc,.docx" hidden></div>',
       '<h1>Tickets e reservas</h1>',
       '<p class="tickets-caption">Seus documentos de viagem em um só lugar.</p>',
       '<label class="tickets-trip-picker"><span>Viagem</span><select aria-label="Selecionar viagem dos tickets"></select><span aria-hidden="true">⌄</span></label>',
@@ -5610,13 +5773,19 @@ function renderTicketsFeed(panel, trips) {
         '<span class="tickets-feature-overlay"></span>',
         '<span class="tickets-feature-copy"><small>✦ SUA VIAGEM</small><strong class="tickets-feature-name"></strong>',
         '<span class="tickets-feature-date"></span><span class="tickets-feature-action">Ver arquivos ↗</span></span>',
-        '<span class="tickets-feature-stub" aria-hidden="true">▣</span></button>',
+        '<span class="tickets-feature-stub" aria-hidden="true"><svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M11 12h42v12a8 8 0 0 0 0 16v12H11V40a8 8 0 0 0 0-16V12Z"/><path d="M37 17v6m0 7v4m0 7v6"/><path d="m18 33 12-11 3 1-6 12 4 4-3 3-5-4-5 2-2-2 2-5Z"/></svg></span></button>',
       '<div class="tickets-filter-row" role="group" aria-label="Filtrar documentos">',
         '<button type="button" data-ticket-filter="all" aria-pressed="true">Todos</button>',
-        '<button type="button" data-ticket-filter="ticket" aria-pressed="false">Ingressos</button>',
+        '<button type="button" data-ticket-filter="flight" aria-pressed="false">Voos</button>',
         '<button type="button" data-ticket-filter="restaurant" aria-pressed="false">Restaurantes</button>',
+        '<button type="button" data-ticket-filter="show" aria-pressed="false">Shows</button>',
+        '<button type="button" data-ticket-filter="sport" aria-pressed="false">Esportes</button>',
+        '<button type="button" data-ticket-filter="attraction" aria-pressed="false">Passeios</button>',
+        '<button type="button" data-ticket-filter="hotel" aria-pressed="false">Hotéis</button>',
+        '<button type="button" data-ticket-filter="transport" aria-pressed="false">Transportes</button>',
+        '<button type="button" data-ticket-filter="unclassified" aria-pressed="false">Identificar</button>',
         '<button type="button" data-ticket-filter="other" aria-pressed="false">Outros</button></div>',
-      '<div class="tickets-section-heading"><h2>Seus documentos</h2><span class="tickets-counter" aria-live="polite">…</span></div>',
+      '<div class="tickets-section-heading"><h2>Ingressos e reservas</h2><span class="tickets-counter" aria-live="polite">…</span></div>',
       '<p class="tickets-message" role="status">Carregando os arquivos da viagem…</p>',
       '<div class="tickets-grid"></div>',
     '</div>'
@@ -5642,7 +5811,39 @@ function renderTicketsFeed(panel, trips) {
       if (feedback) feedback.textContent = error.message || 'Não foi possível abrir os arquivos.';
     });
   };
-  $('.tickets-add').addEventListener('click', openFiles);
+  const addFile = $('.tickets-add-file');
+  const addButton = $('.tickets-add');
+  if (!canEditTrip(trip)) addButton.hidden = true;
+  addButton.addEventListener('click',()=>{
+    if (!canEditTrip(trip)) return;
+    addFile.click();
+  });
+  addFile.addEventListener('change',async()=>{
+    const file = addFile.files?.[0];
+    addFile.value = '';
+    if (!file) return;
+    addButton.disabled = true;
+    try {
+      const client=await tryNeon(7000);
+      if (!client) throw new Error('Conecte-se para adicionar o comprovante.');
+      const created=await storeTripAttachment(client,trip.id,null,file);
+      let signedUrl='';
+      if (isTicketImageFile(created)) {
+        const result=await client.storage.from(DAY_ATTACHMENT_BUCKET).createSignedUrl(created.storage_path,3600);
+        signedUrl=result.error ? '' : result.data?.signedUrl || '';
+      }
+      if (panel.ticketsRenderToken!==token) return;
+      const entry={...created,signedUrl};
+      available.unshift(entry);
+      paint();
+      openTicketMetadataEditor(trip,entry,updated=>{
+        available=available.map(item=>String(item.id)===String(updated.id)?{...item,...updated}:item);
+        paint();
+      });
+    } catch(error) {
+      message.textContent=error.message||'Não foi possível adicionar o comprovante.';
+    } finally { addButton.disabled=false; }
+  });
   $('.tickets-feature').addEventListener('click', openFiles);
   $('.tickets-feature-name').textContent = trip.name || 'Viagem';
   const dateText = value => value
@@ -5661,14 +5862,43 @@ function renderTicketsFeed(panel, trips) {
   const counter = $('.tickets-counter');
   let selectedFilter = 'all';
   let available = [];
+  const editTicket = file => openTicketMetadataEditor(trip,file,updated => {
+    available = available.map(item=>String(item.id)===String(updated.id)?updated:item);
+    paint();
+  });
+  const openTicketFile = async file => {
+    try {
+      await openTrip(trip.id);
+      selectTripTab('arquivos');
+      await loadTripFiles(String(trip.id));
+      const all = state.tripFilesByTrip.get(String(trip.id)) || [];
+      const matching = all.find(item=>String(item.id)===String(file.id));
+      if (matching) openTripFileViewer(matching, all);
+      else setTripPanelStatus(dom.tripFilesStatus,'O arquivo não foi encontrado.');
+    } catch (error) { console.warn('Arquivo indisponível',error); }
+  };
+  const openTicketAgenda = async file => {
+    if (!file.event_date && !file.day_id) { editTicket(file); return; }
+    try {
+      await openTrip(trip.id,{forceRefresh:true});
+      const day = tripTicketDay(trip,file.event_date,state.tripDays)
+        || state.tripDays.find(item=>String(item.id)===String(file.day_id));
+      if (!day) { selectTripTab('arquivos'); return; }
+      selectTripTab('roteiro');
+      openDayPage(day.id);
+    } catch(error) { console.warn('Não foi possível abrir a agenda',error); }
+  };
   const paint = () => {
     const entries = available.filter(file => selectedFilter === 'all' || ticketFileCategory(file).id === selectedFilter);
-    counter.textContent = entries.length === 1 ? '1 arquivo' : entries.length + ' arquivos';
+    counter.textContent = entries.length === 1 ? '1 item' : entries.length + ' itens';
     grid.replaceChildren();
     for (const file of entries) {
       const category = ticketFileCategory(file);
-      const card = document.createElement('button');
-      card.type = 'button'; card.className = 'tickets-item';
+      const identified = Boolean(String(file.display_title||'').trim() && TICKET_CATEGORIES[file.item_category]);
+      const card = document.createElement('article');
+      card.className = 'tickets-item';
+      const preview = document.createElement('button');
+      preview.type = 'button'; preview.className = 'tickets-item-main';
       const art = document.createElement('span');
       art.className = 'tickets-item-art ' + category.tone;
       const icon = document.createElement('span');
@@ -5682,29 +5912,38 @@ function renderTicketsFeed(panel, trips) {
         thumbnail.decoding = 'async';
         thumbnail.onerror = () => { thumbnail.hidden = true; };
         thumbnail.src = file.signedUrl;
-        art.append(thumbnail);
+        art.prepend(thumbnail);
       }
       const tag = document.createElement('small');
-      tag.className = 'tickets-item-tag'; tag.textContent = category.label;
+      tag.className = 'tickets-item-tag';
+      tag.textContent = category.label;
       art.append(tag);
-      const details = document.createElement('span');
-      details.className = 'tickets-item-info';
-      const name = document.createElement('strong');
-      name.textContent = file.file_name || 'Arquivo';
+      const details = document.createElement('span'); details.className = 'tickets-item-info';
+      const name = document.createElement('strong'); name.textContent = ticketDisplayTitle(file);
       const subtitle = document.createElement('span');
-      subtitle.textContent = file.day_id ? 'Anexado a um dia do roteiro' : 'Documento da viagem';
-      const action = document.createElement('span');
-      action.className = 'tickets-item-link';
-      action.textContent = 'Abrir nos arquivos  ›';
-      details.append(name, subtitle, action);
-      card.append(art, details);
-      card.setAttribute('aria-label', 'Abrir arquivo: ' + (file.file_name || 'documento'));
-      card.addEventListener('click', openFiles);
+      subtitle.textContent = [
+        ticketDateLabel(file),
+        file.venue || (!identified ? 'Defina título, tipo e data' : '')
+      ].filter(Boolean).join(' · ') || 'Sem data informada';
+      details.append(name,subtitle);
+      preview.append(art,details);
+      preview.setAttribute('aria-label',(identified ? 'Abrir na agenda: ' : 'Identificar: ')+ticketDisplayTitle(file));
+      preview.addEventListener('click',()=> { if (!canEditTrip(trip) && !identified) openTicketFile(file); else if (identified) openTicketAgenda(file); else editTicket(file); });
+      const footer = document.createElement('div'); footer.className = 'tickets-item-actions';
+      const edit = document.createElement('button');
+      edit.type = 'button'; edit.textContent = identified ? 'Editar' : 'Identificar';
+      edit.addEventListener('click',()=>editTicket(file));
+      if (!canEditTrip(trip)) edit.hidden = true;
+      const fileButton = document.createElement('button');
+      fileButton.type = 'button'; fileButton.textContent = 'Comprovante ›';
+      fileButton.addEventListener('click',()=>openTicketFile(file));
+      footer.append(edit,fileButton);
+      card.append(preview,footer);
       grid.append(card);
     }
-    message.textContent = entries.length ? '' :
-      available.length ? 'Nenhum documento nesta categoria.' :
-      'Nenhum comprovante anexado a esta viagem. Toque em + para adicionar pela seção Arquivos.';
+    message.textContent = entries.length ? '' : available.length
+      ? 'Nenhum item nesta categoria.'
+      : 'Nenhum arquivo nesta viagem. Toque em + para adicionar um comprovante.';
   };
   for (const filter of panel.querySelectorAll('[data-ticket-filter]')) {
     filter.addEventListener('click', () => {
@@ -5754,6 +5993,19 @@ function renderTicketsFeed(panel, trips) {
     message.textContent = (cached ? 'Exibindo arquivos já conhecidos. ' : '') + (error.message || 'Não foi possível consultar os documentos.');
   });
 }
+
+
+// The editor is a top-level native dialog, so it never gets clipped by the home scroll container.
+document.getElementById('ticket_metadata_form')?.addEventListener('submit',saveTicketMetadata);
+document.getElementById('ticket_metadata_date')?.addEventListener('change',refreshTicketAgendaOptions);
+document.getElementById('ticket_metadata_title')?.addEventListener('blur',refreshTicketAgendaOptions);
+for (const id of ['ticket_metadata_close','ticket_metadata_cancel']) {
+  document.getElementById(id)?.addEventListener('click',()=>{
+    document.getElementById('ticket_metadata_dialog').close();
+    ticketEditorContext=null;
+  });
+}
+document.getElementById('ticket_metadata_dialog')?.addEventListener('close',()=>{ticketEditorContext=null;});
 
 function calendarCountdown(trip, now = new Date()) {
   const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
