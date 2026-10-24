@@ -26,7 +26,7 @@ const APP_SHELL = [
   './src/media-cache.js?v=20261007-62',
   './src/update-manager-neon.js?v=20261023-cutover1',
   './src/update-manager.js?v=20261018-63',
-  './src/update-manager.css?v=20261018-63',
+  './src/update-manager.css?v=20261023-cutover1',
   './manifest.webmanifest',
   './assets/app-icon.svg',
   './assets/avatar-placeholder.svg',
