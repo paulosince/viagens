@@ -7203,6 +7203,9 @@ function setAuthMode(mode) {
   dom.signupForm.setAttribute('aria-hidden', String(!signup));
   dom.authForm.inert = signup;
   dom.signupForm.inert = !signup;
+  // Keep inactive password fields out of Safari's credential detection.
+  for (const input of dom.authForm.querySelectorAll('input')) input.disabled = signup;
+  for (const input of dom.signupForm.querySelectorAll('input')) input.disabled = !signup;
   dom.authMessage.textContent = '';
   dom.signupMessage.textContent = '';
 }

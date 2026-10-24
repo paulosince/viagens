@@ -1,4 +1,4 @@
-const CACHE_NAME = 'viaggio-home-v114-sticky-usage';
+const CACHE_NAME = 'viaggio-home-v115-login-repair';
 const MEDIA_CACHE_NAME = 'viaggio-media-v1';
 const NEON_MEDIA_CACHE_NAME = 'viaggio-neon-auth-preview-media-v1';
 const SUPABASE_CLIENT = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
@@ -12,7 +12,7 @@ const APP_SHELL = [
   './',
   './index.html',
   './style.css?v=20261024-home3',
-  './experiments/neon-pilot/app/main-neon.js?v=20261024-home3',
+  './experiments/neon-pilot/app/main-neon.js?v=20261024-login1',
   './experiments/neon-pilot/app/backend-neon.mjs?v=20261024-home3',
   './experiments/neon-pilot/app/usage-rings.mjs?v=20261024-home3',
   './experiments/neon-pilot/app/offline-store-neon.js?v=20261021-1',

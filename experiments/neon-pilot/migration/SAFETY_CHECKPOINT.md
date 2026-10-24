@@ -76,3 +76,11 @@ After that: implement relational schema and row-level authorization, validate fa
 - O `backend-neon.mjs` passou a aceitar `enableMediaWrites` (padrão `false`). O `main-neon.js` habilita escrita de mídia somente quando `location.pathname` termina em `/neon-editable.html`, mantendo as demais prévias em modo protegido.
 - Criado `experiments/neon-pilot/app/neon-editable.html` em GitHub Pages (run 40036677887 **success**). O app Neon editável é uma prévia **separada da produção**; mudanças nela são persistidas no Neon e NÃO replicam automaticamente para o Supabase.
 - **Gate 4 ainda aberto:** validar navegação e criação/edição do roteiro na página editável com a conta real; conferir se a escrita persiste após recarregamento; não realizar cutover do `index.html` raiz sem essa verificação. Permanece restrição: melhorias de busca Unsplash, compartilhamento e sincronização offline ainda não possuem testes completos no Neon.
+
+## Login incident — 24/10/2026
+
+The live A/B Data APIs had reverted to `db_schemas=["public"]` (observed after the usage configuration refresh). `project_context()` exists in `viaggio_app` on both branches, so the login identity lookup failed. Restored and read back the full known configuration on both APIs: schemas `public,viaggio_collab,viaggio_app`; anonymous role `anonymous`; max rows `1000`; aggregates `false`; JWT role claim `.role`; OpenAPI `disabled`; CORS `https://paulosince.github.io`. No user data, credentials or RLS policies changed.
+
+Treat `update_data_api` as a replacement of configuration: never send an empty or partial refresh. Always preserve the full configuration and read it back. An SQL-only function test or mocked router test cannot verify API schema exposure. A real-user authenticated HTTP check remains required for end-to-end confirmation.
+
+Login form: identify the email as `username` for password autofill and disable inactive form inputs, including hidden new-password inputs on first load. Release `viaggio-home-v115-login-repair`. Local regression checks: 25 passing tests covering auth-mode switching, entry-module cache consistency, routing and usage; Neon outbox recovery also passes. Safari autofill and the user's authenticated login require device confirmation.

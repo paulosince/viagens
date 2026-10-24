@@ -98,7 +98,7 @@
         <p id="auth_intro" class="auth-intro">Suas viagens começam muito antes do embarque.</p>
         <form id="auth_form" class="auth-form" aria-hidden="false">
           <label class="visually-hidden" for="auth_email">E-mail</label>
-          <input id="auth_email" name="email" type="email" autocomplete="email" placeholder="E-mail" required>
+          <input id="auth_email" name="email" type="email" autocomplete="username" placeholder="E-mail" required>
           <label class="visually-hidden" for="auth_password">Senha</label>
           <input id="auth_password" name="password" type="password" autocomplete="current-password" placeholder="Senha" required>
           <button class="auth-submit" type="submit">Entrar</button>
@@ -110,15 +110,15 @@
             <span class="signup-photo-preview"><img id="signup_photo_preview" alt="" hidden><span id="signup_photo_placeholder" aria-hidden="true">＋</span></span>
             <span>Adicionar foto <small>Opcional · será salva ao entrar neste aparelho</small></span>
           </label>
-          <input id="signup_photo" class="visually-hidden" name="photo" type="file" accept="image/*">
+          <input disabled id="signup_photo" class="visually-hidden" name="photo" type="file" accept="image/*">
           <label class="visually-hidden" for="signup_name">Seu nome</label>
-          <input id="signup_name" name="name" type="text" autocomplete="name" placeholder="Seu nome" maxlength="120" required>
+          <input disabled id="signup_name" name="name" type="text" autocomplete="name" placeholder="Seu nome" maxlength="120" required>
           <label class="visually-hidden" for="signup_email">E-mail</label>
-          <input id="signup_email" name="email" type="email" autocomplete="email" placeholder="E-mail" required>
+          <input disabled id="signup_email" name="email" type="email" autocomplete="email" placeholder="E-mail" required>
           <label class="visually-hidden" for="signup_password">Senha</label>
-          <input id="signup_password" name="password" type="password" autocomplete="new-password" placeholder="Senha · pelo menos 6 caracteres" minlength="6" required>
+          <input disabled id="signup_password" name="password" type="password" autocomplete="new-password" placeholder="Senha · pelo menos 6 caracteres" minlength="6" required>
           <label class="visually-hidden" for="signup_confirm_password">Confirmar senha</label>
-          <input id="signup_confirm_password" name="confirm_password" type="password" autocomplete="new-password" placeholder="Confirme sua senha" minlength="6" required>
+          <input disabled id="signup_confirm_password" name="confirm_password" type="password" autocomplete="new-password" placeholder="Confirme sua senha" minlength="6" required>
           <button class="auth-submit" type="submit">Criar minha conta</button>
           <p id="signup_message" class="auth-message" role="status" aria-live="polite"></p>
           <p class="auth-switch">Já tem conta? <button id="show_login" type="button">Entrar</button></p>
@@ -554,7 +554,7 @@
       if (legacyPending > 0) {
         location.replace('./legacy-supabase.html?recover=1');
       } else {
-        await import('./experiments/neon-pilot/app/main-neon.js?v=20261024-home3');
+        await import('./experiments/neon-pilot/app/main-neon.js?v=20261024-login1');
       }
     } catch (error) {
       console.error('Não foi possível validar o estado local antes da migração Neon', error);
