@@ -5681,6 +5681,97 @@ function tripTicketDay(trip, date, days = []) {
 }
 
 let ticketEditorContext = null;
+let ticketPreviewRequest = 0;
+
+function ticketSaveFeedback(cause) {
+  const message = String(cause?.message || '');
+  const code = String(cause?.code || '');
+  if (/load failed|failed to fetch|networkerror|network request|network.*fail|fetch.*fail|timeout|aborterror|connection.*closed/i.test(message)
+    || /^(ETIMEDOUT|ECONNRESET|ENETUNREACH|ENOTFOUND)$/i.test(code))
+    return 'Não foi possível conectar para salvar. Confira sua conexão e tente novamente. Os dados continuam preenchidos.';
+  if (/schema cache|could not find.*column|PGRST\d+/i.test(message+code))
+    return 'Não foi possível atualizar os dados agora. Feche e abra o aplicativo e tente novamente.';
+  if (/permission|not authorized|unauthorized|forbidden|row-level security|42501|403/i.test(message+code))
+    return 'Você não tem permissão para alterar este arquivo.';
+  return 'Não foi possível salvar neste momento. Tente novamente. Seus dados continuam preenchidos.';
+}
+function ticketSaveIsNetworkError(error) {
+  const msg = String(error?.message || '');
+  return /load failed|failed to fetch|networkerror|network request|fetch.*fail|timeout|aborterror/i.test(msg);
+}
+async function updateTicketDetailsSafely(client,context,patch) {
+  // A retry is safe: PATCH of these four fields is idempotent.
+  for (let attempt=0;attempt<2;attempt++) {
+    try {
+      const response = await client.from('day_attachments')
+        .update(patch).eq('id',context.file.id).eq('trip_id',context.trip.id)
+        .select('*').single();
+      if (response.error) throw response.error;
+      return response.data;
+    } catch(error) {
+      if(attempt>0 || !navigator.onLine || !ticketSaveIsNetworkError(error)) throw error;
+      document.getElementById('ticket_metadata_save').textContent = 'Reconectando…';
+      await new Promise(resolve=>setTimeout(resolve,850));
+    }
+  }
+}
+
+async function renderTicketEditorPreview(file) {
+  const request = ++ticketPreviewRequest;
+  const image = document.getElementById('ticket_editor_preview_image');
+  const open = document.getElementById('ticket_editor_preview_open');
+  const fallback = document.getElementById('ticket_editor_preview_fallback');
+  const message = document.getElementById('ticket_editor_preview_message');
+  const filename = document.getElementById('ticket_editor_preview_filename');
+  if(!image || !open || !fallback) return;
+  image.removeAttribute('src');
+  image.onload = null;
+  image.onerror = null;
+  filename.textContent = file.file_name || 'Imagem anexada';
+  open.hidden = true;
+  fallback.hidden = false;
+  message.textContent = isTicketImageFile(file) ? 'Carregando o comprovante…' : 'Documento anexado: ' + (file.file_name || 'comprovante');
+  if (!isTicketImageFile(file)) return;
+  const isCurrent = () => ticketPreviewRequest === request && ticketEditorContext?.file.id === file.id;
+  const showFallback = text => {if (isCurrent()) {open.hidden = true; fallback.hidden = false; message.textContent = text;}};
+  async function signedUrl() {
+    const client = await tryNeon(5500);
+    if(!client) return '';
+    const result = await client.storage.from(DAY_ATTACHMENT_BUCKET).createSignedUrl(file.storage_path,3600);
+    if(result.error) return '';
+    return result.data?.signedUrl || '';
+  }
+  async function load(url,allowRefresh) {
+    if (!isCurrent()) return;
+    if (!url) {showFallback('Não foi possível exibir a imagem agora. Você ainda pode editar as informações.');return;}
+    image.onload = () => {if (isCurrent()) {open.hidden=false; fallback.hidden=true;}};
+    image.onerror = async () => {
+      if (!isCurrent()) return;
+      if(allowRefresh && navigator.onLine) {
+        try {await load(await signedUrl(), false);return;} catch {/* leave fallback visible */}
+      }
+      showFallback('Imagem indisponível no momento. As informações continuam editáveis.');
+    };
+    image.src=url;
+  }
+  try {
+    const url=file.signedUrl || (navigator.onLine ? await signedUrl() : '');
+    if(isCurrent()) await load(url,Boolean(file.signedUrl));
+  } catch(error) {
+    console.warn('Não foi possível carregar a prévia do comprovante',error);
+    showFallback('Imagem indisponível no momento. As informações continuam editáveis.');
+  }
+}
+function openTicketImageViewer() {
+  const preview = document.getElementById('ticket_editor_preview_image');
+  if(!preview?.complete || !preview.naturalWidth) return;
+  const dialog=document.getElementById('ticket_image_dialog');
+  const full=document.getElementById('ticket_image_full');
+  full.src=preview.currentSrc||preview.src;
+  dialog.classList.remove('is-zoomed');
+  document.getElementById('ticket_image_zoom').textContent='Ampliar';
+  dialog.showModal();
+}
 
 function selectTicketCategory(category) {
   const selected = TICKET_CATEGORIES[category] ? category : '';
@@ -5704,6 +5795,7 @@ function openTicketMetadataEditor(trip, file, onSaved) {
   form.elements.event_time.value = String(file.event_time || '').slice(0, 5);
   document.getElementById('ticket_metadata_error').textContent = '';
   dialog.showModal();
+  renderTicketEditorPreview(file).catch(error => console.warn('Prévia do comprovante indisponível',error));
   // Don't automatically open the keyboard and hide the entire sheet on iOS.
 }
 
@@ -5728,14 +5820,8 @@ async function saveTicketMetadata(event) {
     if (!client) throw new Error('Conecte-se para salvar.');
     // Only presentation fields are changed. Existing documents and activity links stay intact.
     const patch = { display_title, item_category, event_date, event_time };
-    const response = await client.from('day_attachments')
-      .update(patch)
-      .eq('id', context.file.id)
-      .eq('trip_id', context.trip.id)
-      .select('*')
-      .single();
-    if (response.error) throw response.error;
-    const saved = { ...context.file, ...response.data };
+    const updatedFile = await updateTicketDetailsSafely(client,context,patch);
+    const saved = { ...context.file, ...updatedFile };
     const key = String(context.trip.id);
     const cached = state.tripFilesByTrip.get(key);
     if (cached) state.tripFilesByTrip.set(key, cached.map(item=>
@@ -5744,7 +5830,7 @@ async function saveTicketMetadata(event) {
     context.onSaved?.(saved);
   } catch (cause) {
     console.warn('Falha ao salvar metadados do comprovante', cause);
-    error.textContent = cause.message || 'Não foi possível salvar.';
+    error.textContent = ticketSaveFeedback(cause);
   } finally {
     save.disabled = false;
     save.textContent = 'Salvar';
@@ -5752,6 +5838,9 @@ async function saveTicketMetadata(event) {
 }
 
 function dialogCloseTicketMetadata() {
+  ++ticketPreviewRequest;
+  const lightbox = document.getElementById('ticket_image_dialog');
+  if(lightbox?.open) lightbox.close();
   const dialog = document.getElementById('ticket_metadata_dialog');
   if (dialog?.open) dialog.close();
   ticketEditorContext = null;
@@ -6014,7 +6103,17 @@ for (const id of ['ticket_metadata_close', 'ticket_metadata_cancel']) {
   document.getElementById(id)?.addEventListener('click', dialogCloseTicketMetadata);
 }
 document.getElementById('ticket_metadata_dialog')?.addEventListener('close', () => {
+  ++ticketPreviewRequest;
+  const viewer = document.getElementById('ticket_image_dialog');
+  if (viewer?.open) viewer.close();
   ticketEditorContext = null;
+});
+document.getElementById('ticket_editor_preview_open')?.addEventListener('click',openTicketImageViewer);
+document.getElementById('ticket_image_close')?.addEventListener('click',()=>document.getElementById('ticket_image_dialog').close());
+document.getElementById('ticket_image_zoom')?.addEventListener('click',()=>{
+  const dialog=document.getElementById('ticket_image_dialog');
+  const zoom=dialog.classList.toggle('is-zoomed');
+  document.getElementById('ticket_image_zoom').textContent=zoom?'Reduzir':'Ampliar';
 });
 
 function calendarCountdown(trip, now = new Date()) {
