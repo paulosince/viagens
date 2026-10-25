@@ -3498,46 +3498,6 @@ body[data-home-tab="tickets"] #home_tab_content { width:min(100%,760px); }
 .ticket-metadata-simple .ticket-card-cover-tap-hint { pointer-events:none; }
 .ticket-metadata-simple .ticket-card-cover-empty { pointer-events:none; }
 
-/* EXACTLY the same category artwork as in the editor, cloned into the card. */
-.tickets-item-art .tickets-item-icon {
-  color:inherit!important;
-  padding:0!important;
-  overflow:visible;
-}
-.tickets-item-art .tickets-item-icon .ticket-category-symbol {
-  width:43px;
-  height:43px;
-  max-width:43px;
-  max-height:43px;
-  flex:0 0 43px;
-  display:grid;
-  place-items:center;
-  border-radius:13px;
-  font-size:26px;
-  line-height:1;
-  font-weight:650;
-  background:var(--category-color, #74829a);
-  color:#fff;
-}
-.tickets-item-art .tickets-item-icon .ticket-category-symbol svg {
-  display:block;
-  width:28px;
-  height:28px;
-  stroke:#fff;
-  fill:none;
-  stroke-width:2;
-}
-/* The card's selected-category square matches the pressed tile in the picker. */
-.tickets-item-art.restaurant .tickets-item-icon .ticket-category-symbol { background:#df822e; color:white; }
-.tickets-item-art.flight .tickets-item-icon .ticket-category-symbol { background:#1879f2; color:white; }
-.tickets-item-art.hotel .tickets-item-icon .ticket-category-symbol { background:#7663d8; color:white; }
-.tickets-item-art.show .tickets-item-icon .ticket-category-symbol { background:#bc4dad; color:white; }
-.tickets-item-art.sport .tickets-item-icon .ticket-category-symbol { background:#199b6f; color:white; }
-.tickets-item-art.attraction .tickets-item-icon .ticket-category-symbol { background:#bd8b18; color:white; }
-.tickets-item-art.transport .tickets-item-icon .ticket-category-symbol { background:#149ca4; color:white; }
-.tickets-item-art.other .tickets-item-icon .ticket-category-symbol { background:#728096; color:white; }
-
-
 /* Viaggio ticket icon system: one circular motif, one stable category color.
    Never put a colored square inside the floating white circle. */
 .ticket-metadata-simple .ticket-category-option .ticket-category-symbol,
@@ -3551,6 +3511,10 @@ body[data-home-tab="tickets"] #home_tab_content { width:min(100%,760px); }
   border-radius:50%!important;
   background:var(--category-soft)!important;
   color:var(--category-color)!important;
+  font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;
+  font-size:25px;
+  font-weight:400;
+  line-height:1;
 }
 .ticket-metadata-simple .ticket-category-symbol svg {
   width:25px;
@@ -3598,7 +3562,10 @@ body[data-home-tab="tickets"] #home_tab_content { width:min(100%,760px); }
   border-radius:50%!important;
   background:transparent!important;
   color:var(--category-color)!important;
-  font-size:25px;
+  font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;
+  font-size:28px;
+  font-weight:400;
+  line-height:1;
 }
 .tickets-item-art .tickets-item-icon .ticket-category-symbol svg {
   width:30px;

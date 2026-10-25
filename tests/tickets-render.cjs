@@ -60,8 +60,8 @@ assert.ok(css.includes('.tickets-item-thumbnail'));
 assert.ok(css.includes('bottom:max(11px,calc(env(safe-area-inset-bottom,0px) - 21px))'));
 const navPos=html.indexOf('<div class="home-bottom">');
 assert.ok(navPos>html.indexOf('id="trip_edit_footer"') && navPos<html.indexOf('</main>'));
-assert.ok(html.includes('style.css?v=20261024-tickets20'));
-assert.ok(html.includes('main-neon.js?v=20261024-tickets20'));
+assert.ok(html.includes('style.css?v=20261024-tickets21'));
+assert.ok(html.includes('main-neon.js?v=20261024-tickets21'));
 assert.ok(html.includes('ticket_metadata_dialog'));
 assert.ok(!html.includes('ticket_metadata_agenda'));
 assert.ok(!html.includes('ticket_metadata_venue'));
@@ -99,10 +99,20 @@ assert.ok(main.includes("const media=ticketCoverUploadInfo(context.coverBlob);")
 assert.ok(main.includes("contentType:media.mime,upsert:false"));
 assert.ok(!main.includes("contentType:'image/webp',upsert:false"));
 assert.ok(main.includes("const limit=DAY_ATTACHMENT_MAX_BYTES"));
-const iconNames=['flight','hotel','restaurant','show','sport','attraction','transport','other'];
-for(const name of iconNames) assertReady=true; // no-op
-assert.ok((html.match(/class="ticket-category-symbol"><svg/g)||[]).length===8, 'Eight SVG icon definitions');
+const categoryEmojis={flight:'✈️',hotel:'🏨',restaurant:'🍽️',sport:'⚽️',attraction:'🎡',transport:'🚆',other:'🗂️'};
+for (const [category,emoji] of Object.entries(categoryEmojis)) {
+  const tile=new RegExp('data-ticket-category="'+category+'"[^>]*><span class="ticket-category-symbol">([^<]+)<\\/span>');
+  const match=html.match(tile);
+  assert.ok(match,'Category tile '+category+' must exist with emoji');
+  assert.equal(match[1],emoji,'Use the chosen full-color emoji in '+category);
+  assert.ok(main.includes("id:'"+category+"'")&&main.includes("symbol:'"+emoji+"'"),
+    'Category fallback/icon must use the same emoji for '+category);
+}
+assert.equal((html.match(/class="ticket-category-symbol"><svg/g)||[]).length,1,
+  'Keep the approved musical-note SVG and replace other category SVGs with emoji');
 assert.ok(css.includes('border-radius:50%!important'));
+assert.ok(css.includes('Apple Color Emoji'));
+assert.ok(!css.includes("The card's selected-category square"));
 const migration=fs.readFileSync('experiments/neon-pilot/migration/ticket-cover-native-formats-20261024.sql','utf8');
 assert.ok(migration.includes("right(card_image_path,4)='.jpg'"));
 assert.ok(migration.includes("right(card_image_path,5)='.webp'"));

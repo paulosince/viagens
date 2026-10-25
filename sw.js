@@ -1,4 +1,4 @@
-const CACHE_NAME = 'viaggio-home-v132-round-icons-native-photos';
+const CACHE_NAME = 'viaggio-home-v133-ticket-emoji';
 const MEDIA_CACHE_NAME = 'viaggio-media-v1';
 const NEON_MEDIA_CACHE_NAME = 'viaggio-neon-auth-preview-media-v1';
 const SUPABASE_CLIENT = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
@@ -11,8 +11,8 @@ const OPTIONAL_ASSETS = ['./src/itinerary-pdf.mjs?v=20260927-56', './vendor/pdf-
 const APP_SHELL = [
   './',
   './index.html',
-  './style.css?v=20261024-tickets20',
-  './experiments/neon-pilot/app/main-neon.js?v=20261024-tickets20',
+  './style.css?v=20261024-tickets21',
+  './experiments/neon-pilot/app/main-neon.js?v=20261024-tickets21',
   './experiments/neon-pilot/app/backend-neon.mjs?v=20261024-home3',
   './experiments/neon-pilot/app/usage-rings.mjs?v=20261024-home3',
   './experiments/neon-pilot/app/offline-store-neon.js?v=20261021-1',
