@@ -1,0 +1,87 @@
+name: Viaggio Step 04 - signed JWT federation smoke preparation
+on:
+  pull_request:
+    branches:
+      - migration/neon-app-20261019
+    paths:
+      - 'experiments/neon-pilot/app/federation-live*'
+      - 'experiments/neon-pilot/app/auth-neon-smoke.html'
+      - '.github/workflows/viaggio-auth4-live-check.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  read-only-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Run offline authorization simulator tests
+        run: |
+          node --check experiments/neon-pilot/app/federation-live.mjs
+          node --check experiments/neon-pilot/app/federation-live.test.mjs
+          node --test experiments/neon-pilot/app/federation-live.test.mjs
+          grep -Fq '/passenger_profiles?select=user_id&limit=5' experiments/neon-pilot/app/federation-live.mjs
+      - name: Check browser OTP flow syntax and no token persistence
+        run: |
+          node <<'JS'
+          const fs=require('node:fs');
+          const assert=require('node:assert/strict');
+          const html=fs.readFileSync('experiments/neon-pilot/app/auth-neon-smoke.html','utf8');
+          const script=html.match(/<script type="module">([\s\S]*?)<\/script>/);
+          assert.ok(script);
+          assert.match(script[1],/testSignedFederation\(\{token\}\)/);
+          assert.match(script[1],/email-otp\/send-verification-otp/);
+          assert.match(script[1],/sign-in\/email-otp/);
+          assert.doesNotMatch(html,/localStorage|sessionStorage|console\.log\(token|sb_secret_/);
+          fs.writeFileSync('/tmp/viaggio-auth4-screen.mjs',script[1]);
+          JS
+          node --check /tmp/viaggio-auth4-screen.mjs
+      - name: Validate live staging API rejects forged JWT without credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          for base in \
+           'https://ep-empty-pine-b8r7sa8d.apirest.c-14.us-east-1.aws.neon.tech/viaggio_lab/rest/v1' \
+           'https://ep-spring-moon-b8fi6yxc.apirest.c-14.us-east-1.aws.neon.tech/viaggio_lab/rest/v1'; do
+            status=$(curl -sS --max-time 20 -o /tmp/forged -w '%{http_code}' \
+             -H 'Origin: https://paulosince.github.io' \
+             -H 'Accept-Profile: viaggio_app' -H 'Authorization: Bearer eyJhbGciOiJFZERTQSJ9.eyJzdWIiOiJhYWFhYWFhYS1hYWFhLTRhYWEtOGFhYS1hYWFhYWFhYWFhYWFhYWEiLCJyb2xlIjoiYXV0aGVudGljYXRlZCJ9.YWJj' \
+             "$base/trips?select=id&limit=1")
+            echo "invalid_jwt_http=$status"
+            test "$status" = 400 -o "$status" = 401 -o "$status" = 403
+            status=$(curl -sS --max-time 20 -o /tmp/anonymous -w '%{http_code}' \
+             -H 'Origin: https://paulosince.github.io' -H 'Accept-Profile: viaggio_app' \
+             "$base/trips?select=id&limit=1")
+            echo "anonymous_http=$status"
+            if test "$status" = 200; then test "$(cat /tmp/anonymous)" = '[]'; else test "$status" = 400 -o "$status" = 401 -o "$status" = 403; fi
+          done
+          echo 'PASS: both Neon staging APIs reject forged tokens and expose no anonymous trips'
+      - name: Verify browser CORS for signed Neon API queries and published page
+        shell: bash
+        run: |
+          set -euo pipefail
+          for base in \
+           'https://ep-empty-pine-b8r7sa8d.apirest.c-14.us-east-1.aws.neon.tech/viaggio_lab/rest/v1' \
+           'https://ep-spring-moon-b8fi6yxc.apirest.c-14.us-east-1.aws.neon.tech/viaggio_lab/rest/v1'; do
+            status=$(curl -sS -X OPTIONS --max-time 20 -D /tmp/headers -o /tmp/preflight -w '%{http_code}' \
+             -H 'Origin: https://paulosince.github.io' \
+             -H 'Access-Control-Request-Method: POST' \
+             -H 'Access-Control-Request-Headers: authorization,accept-profile,content-profile,content-type' \
+             "$base/rpc/project_context")
+            echo "preflight=$status"
+            grep -iE "^HTTP/|^access-control-|^vary:" /tmp/headers || true
+            test "$status" = 200 -o "$status" = 204
+            grep -Eiq '^access-control-allow-origin: (\\*|https://paulosince\\.github\\.io)' /tmp/headers
+          done
+          SITE='https://paulosince.github.io/viagens/experiments/neon-pilot/app'
+          for file in auth-neon-smoke.html federation-live.mjs; do
+            status=$(curl -sS -L --max-time 30 -w '%{http_code}' -o /tmp/site "$SITE/$file")
+            echo "page=$file http=$status"
+            test "$status" = 200
+          done
+          echo 'PASS: browser preflight and test page published'
+
