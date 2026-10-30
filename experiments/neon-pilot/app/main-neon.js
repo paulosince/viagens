@@ -4479,17 +4479,64 @@ function summarizeTripBudget(items) {
   return totals;
 }
 
+function budgetDisplayTotals(totals, rate) {
+  const result = new Map(totals);
+  const validRate = Number.isFinite(rate) && rate > 0;
+  for (const currency of ['BRL', 'EUR']) {
+    const other = currency === 'BRL' ? 'EUR' : 'BRL';
+    const native = totals.get(currency);
+    const foreign = totals.get(other);
+    const amount = { planned: 0, paid: 0, toBuy: 0, paidEstimate: !!(native?.paidEstimate || foreign?.paidEstimate), converted: !!foreign && validRate };
+    for (const key of ['planned', 'paid', 'toBuy']) {
+      amount[key] = foreign && !validRate ? null : (native?.[key] || 0) + (foreign?.[key] || 0) * (currency === 'BRL' ? rate : 1 / (rate || 1));
+    }
+    result.set(currency, amount);
+  }
+  return result;
+}
+
 function renderTripBudget(tripId) {
   if (String(state.activeTripId) !== String(tripId)) return;
   const items = state.budgetByTrip.get(String(tripId)) || [];
   const totals = summarizeTripBudget(items);
   dom.budgetSummary.replaceChildren();
-  for (const [currency, amounts] of totals) {
-    for (const [label, value] of [['Previsto', amounts.planned], [amounts.paidEstimate ? 'Pago · inclui estimativas' : 'Pago', amounts.paid], ['Ainda previsto', amounts.toBuy]]) {
+  // Conversion is a planning equivalent; original expense amounts remain unchanged.
+  const rateKey = `viaggio:budget-eur-brl:${tripId}`;
+  let rate = 0;
+  try { rate = Number(localStorage.getItem(rateKey)) || 0; } catch {}
+  const fx = document.createElement('label');
+  fx.className = 'budget-summary-card';
+  const fxTitle = document.createElement('small');
+  fxTitle.textContent = 'Cotação de planejamento · €1 em R$';
+  const rateInput = document.createElement('input');
+  rateInput.type = 'text'; rateInput.inputMode = 'decimal';
+  rateInput.placeholder = 'Informe a cotação';
+  rateInput.value = rate > 0 ? String(rate).replace('.', ',') : '';
+  rateInput.setAttribute('aria-label', 'Cotação de um euro em reais');
+  const fxNote = document.createElement('small');
+  fxNote.textContent = 'Equivalência estimada. Cotação salva neste dispositivo.';
+  fx.append(fxTitle, rateInput, fxNote);
+  dom.budgetSummary.append(fx);
+  rateInput.addEventListener('change', () => {
+    const next = Number(rateInput.value.trim().replace(',', '.'));
+    if (!Number.isFinite(next) || next <= 0) {
+      rateInput.setCustomValidity('Informe uma cotação maior que zero.');
+      rateInput.reportValidity(); return;
+    }
+    rateInput.setCustomValidity('');
+    try { localStorage.setItem(rateKey, String(next)); }
+    catch { fxNote.textContent = 'Não foi possível salvar a cotação neste dispositivo.'; return; }
+    renderTripBudget(tripId);
+  });
+  const displayTotals = budgetDisplayTotals(totals, rate);
+  for (const [currency, amounts] of displayTotals) {
+    for (const [label, value] of [['Previsto', amounts.planned], [amounts.paidEstimate ? 'Pago · inclui estimativas' : 'Pago', amounts.paid], ['Não pago', amounts.toBuy]]) {
       const card = document.createElement('div'); card.className = 'budget-summary-card';
       const caption = document.createElement('small'); caption.textContent = `${label} · ${currency}`;
-      const money = document.createElement('strong'); money.textContent = tripMoney(value, currency);
-      card.append(caption, money); dom.budgetSummary.append(card);
+      const money = document.createElement('strong'); money.textContent = value == null ? '—' : tripMoney(value, currency);
+      const note = document.createElement('small');
+      note.textContent = value == null ? 'Informe a cotação para converter.' : amounts.converted ? 'Inclui conversão estimada' : '';
+      card.append(caption, money, note); dom.budgetSummary.append(card);
     }
   }
   dom.budgetList.replaceChildren();
