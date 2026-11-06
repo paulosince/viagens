@@ -4360,6 +4360,19 @@ async function fetchTripData(tripId, { preferLocal = false } = {}) {
       if (days.length) {
         ({ activities, locations } = await loadDayRecords(client, days.map(day => day.id)));
       }
+      // Preserve local-only itinerary entries when a remote import is incomplete.
+      // Do not upload or delete either side automatically: a local-only item may
+      // be an unsynced legacy reservation, while a remote-only item may be new.
+      const dayIds = new Set(days.map(day => String(day.id)));
+      const remoteActivityIds = new Set(activities.map(item => String(item.id)));
+      const remoteLocationIds = new Set(locations.map(item => String(item.id)));
+      const localOnlyActivities = (localBefore.activities || []).filter(item => dayIds.has(String(item.day_id)) && !remoteActivityIds.has(String(item.id)));
+      const localOnlyLocations = (localBefore.locations || []).filter(item => dayIds.has(String(item.day_id)) && !remoteLocationIds.has(String(item.id)));
+      if (localOnlyActivities.length || localOnlyLocations.length) {
+        console.warn('Agenda local e Neon divergentes: preservando registros locais sem enviá-los ao servidor.', {activities: localOnlyActivities.length, locations: localOnlyLocations.length});
+        activities.push(...localOnlyActivities);
+        locations.push(...localOnlyLocations);
+      }
       await adoptLegacyTripMedia(days, activities, locations, localBefore);
       await offlineStore.replaceTripData(key, days, activities, locations);
       await hydrateTripMedia(days, activities, locations, client);
@@ -4369,7 +4382,7 @@ async function fetchTripData(tripId, { preferLocal = false } = {}) {
         locationsByDay: groupByDay(locations),
         loadedAt: Date.now(),
         version: Date.now(),
-        remoteVerified: true
+        remoteVerified: !localOnlyActivities.length && !localOnlyLocations.length
       };
       state.tripDataCache.set(key, data);
       refreshSyncStatus().catch(console.warn);
