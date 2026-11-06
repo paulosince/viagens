@@ -142,10 +142,28 @@ async function adoptLegacyTripMedia(days, activities, locations, localData) {
   for (const location of locations || []) await adoptLegacyManagedMedia(location, localLocations.get(String(location.id)));
 }
 
+// Managed images may require authenticated network downloads. Hydrate in a
+// bounded pool rather than serially: a single slow image must not hold back
+// all the other photos or the entire itinerary. Never mutate media references.
 async function hydrateTripMedia(days, activities, locations, client = null) {
-  for (const day of days || []) await hydrateManagedMedia(day, {}, client);
-  for (const activity of activities || []) await hydrateManagedMedia(activity, {}, client);
-  for (const location of locations || []) await hydrateManagedMedia(location, {}, client);
+  const records = [...(days || []), ...(activities || []), ...(locations || [])];
+  const managed = records.filter(record => record?.photo_path && record?.photo_hash);
+  let next = 0;
+  let unavailable = 0;
+  const worker = async () => {
+    while (next < managed.length) {
+      const record = managed[next++];
+      await hydrateManagedMedia(record, {}, client);
+      if (!record.photo_url) unavailable++;
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(4, managed.length) }, () => worker()));
+  if (unavailable) {
+    console.warn('[Viaggio mídia] Fotos gerenciadas indisponíveis nesta sessão', {
+      unavailable, total: managed.length, offline: !client,
+      note: 'Os arquivos e hashes no Neon não foram modificados.'
+    });
+  }
 }
 
 async function cacheManagedMedia(record, {
