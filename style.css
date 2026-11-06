@@ -3638,3 +3638,35 @@ body[data-home-tab="tickets"] #home_tab_content { width:min(100%,760px); }
 .day-view-agenda-item[data-has-google-maps="false"] > .day-inline-favorite-rail { grid-row: 3; }
 .day-view-agenda-item > .day-inline-save-status { grid-row: 5; }
 .day-view-agenda-item[data-has-photo="true"] > .day-inline-camera { display: none; }
+
+/* 2026-11-06: stable icon spacing, independent of card description/photo height. */
+.day-view-agenda-item { align-content: start; }
+.day-view-agenda-item > .day-inline-icon-rail {
+  grid-column: 1; grid-row: 2 / span 4;
+  align-self: start; justify-self: start;
+  display: flex; flex-direction: column; align-items: flex-start;
+  gap: 12px; margin: 7px 0 0 -4px;
+  width: 58px; min-height: 0;
+}
+.day-view-agenda-item > .day-inline-icon-rail > .day-view-pin,
+.day-view-agenda-item > .day-inline-icon-rail > .day-inline-google-maps,
+.day-view-agenda-item > .day-inline-icon-rail > .day-inline-favorite-rail {
+  position: relative; grid-column: auto; grid-row: auto;
+  align-self: auto; justify-self: auto; flex: 0 0 auto;
+  margin: 0; left: auto; right: auto; top: auto; bottom: auto;
+}
+.day-view-agenda-item > .day-inline-icon-rail > .day-inline-favorite-rail {
+  display: grid; place-items: center; width: 46px; height: 46px;
+  background: rgba(245,245,250,.92); border-radius: 50%; font-size: 30px;
+}
+.day-view-agenda-item > .day-inline-icon-rail > .day-view-pin { width: 50px; height: 50px; }
+.day-view-agenda-item > .day-inline-icon-rail > .day-inline-google-maps { width: 46px; height: 46px; }
+.day-view-agenda-item > .day-view-agenda-copy { grid-column: 2; grid-row: 1 / span 5; }
+.day-view-agenda-item .day-view-agenda-copy > .day-inline-camera-no-photo {
+  position: relative; display: grid; place-items: center;
+  left: auto; right: auto; top: auto; bottom: auto;
+  width: 44px; height: 44px; margin: 16px 0 0 0;
+  background: rgba(238,246,255,.92); border-radius: 50%;
+  backdrop-filter: blur(12px) saturate(145%);
+  -webkit-backdrop-filter: blur(12px) saturate(145%);
+}
