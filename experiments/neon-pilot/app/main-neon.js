@@ -4274,15 +4274,23 @@ function groupByDay(records = []) {
 // the offline copy once every smaller batch has completed successfully.
 async function loadDayRecords(client, dayIds) {
   const activities = [], locations = [];
-  for (let index = 0; index < dayIds.length; index += 1) {
-    const ids = dayIds.slice(index, index + 1);
-    const [activityResult, locationResult] = await Promise.all([
-      client.from('activities').select('*').in('day_id', ids).order('position'),
-      client.from('day_locations').select('*').in('day_id', ids).order('position')
-    ]);
-    if (activityResult.error || locationResult.error) throw activityResult.error || locationResult.error;
-    activities.push(...(activityResult.data || []).map(normalizeActivityRecord));
-    locations.push(...(locationResult.data || []));
+  // Query days individually to limit photo payloads, but run at most
+  // three in parallel so a long trip does not stay on stale IndexedDB.
+  for (let index = 0; index < dayIds.length; index += 3) {
+    const batch = dayIds.slice(index, index + 3);
+    const results = await Promise.all(batch.map(async dayId => {
+      const ids = [dayId];
+      const [activityResult, locationResult] = await Promise.all([
+        client.from('activities').select('*').in('day_id', ids).order('position'),
+        client.from('day_locations').select('*').in('day_id', ids).order('position')
+      ]);
+      if (activityResult.error || locationResult.error) throw activityResult.error || locationResult.error;
+      return { activities: (activityResult.data || []).map(normalizeActivityRecord), locations: locationResult.data || [] };
+    }));
+    for (const result of results) {
+      activities.push(...result.activities);
+      locations.push(...result.locations);
+    }
   }
   return { activities, locations };
 }
