@@ -706,12 +706,18 @@ async function refreshSyncStatus() {
 
   // An empty outbox proves uploads completed, not that the cached itinerary
   // matches the remote Neon state. Never advertise a verified sync here.
+  const activeData = state.activeTripId ? state.tripDataCache.get(String(state.activeTripId)) : null;
   const cachedTrips = [...state.tripDataCache.values()];
-  const remoteVerified = cachedTrips.length > 0 && cachedTrips.every(data => data.remoteVerified === true);
+  const remoteVerified = activeData
+    ? activeData.remoteVerified === true
+    : cachedTrips.length > 0 && cachedTrips.every(data => data.remoteVerified === true);
   dom.syncStatus.dataset.kind = remoteVerified ? 'synced' : 'pending';
   dom.syncStatus.textContent = remoteVerified
     ? 'Agenda conferida no Neon · disponível offline'
-    : 'Cópia offline disponível · agenda ainda não conferida';
+    : activeData?.remoteError
+      ? 'Falha ao consultar agenda · toque para tentar novamente'
+      : 'Cópia offline disponível · toque para conferir no Neon';
+  dom.syncStatus.title = activeData?.remoteError || '';
 }
 
 
@@ -4391,14 +4397,16 @@ async function fetchTripData(tripId, { preferLocal = false } = {}) {
       const local = await offlineStore.loadTripData(key);
       if (!local.days.length) throw remoteError;
       await hydrateTripMedia(local.days, local.activities, local.locations, null);
+      console.warn('Consulta remota da agenda falhou; exibindo cópia local.', remoteError);
       const data = {
         days: local.days,
         activitiesByDay: groupByDay(local.activities),
         locationsByDay: groupByDay(local.locations),
-        loadedAt: Date.now(),
+        loadedAt: 0, // Never consider a failed remote read fresh for 60 seconds.
         version: Date.now(),
         offline: true,
-        remoteVerified: false
+        remoteVerified: false,
+        remoteError: String(remoteError?.message || remoteError)
       };
       state.tripDataCache.set(key, data);
       refreshSyncStatus().catch(console.warn);
@@ -5433,7 +5441,9 @@ async function openTrip(tripId, { pushHistory = true, forceRefresh = false } = {
     const data = await fetchTripData(trip.id);
     if (state.activeTripId !== key) return;
     applyTripData(data);
-    dom.tripDayMessage.textContent = '';
+    dom.tripDayMessage.textContent = data.remoteError
+      ? 'Atenção: exibindo a agenda salva neste aparelho; não foi possível confirmar os dados no Neon. Toque no indicador de sincronização para tentar novamente.'
+      : '';
     if (state.activeDayId && data.days.some(day => String(day.id) === String(state.activeDayId))) openDayPage(state.activeDayId, { pushHistory: false });
   } catch (error) {
     if (state.activeTripId === key && !state.tripDataCache.get(key)?.days?.length) dom.tripDayMessage.textContent = error.message;
@@ -8581,8 +8591,27 @@ document.addEventListener('visibilitychange', () => {
     refreshChatgptConnection().catch(console.warn);
   }
 });
-dom.syncStatus.addEventListener('click', () => {
-  flushOutbox().catch(error => console.warn('Fila local aguardando sincronização', error));
+dom.syncStatus.addEventListener('click', async () => {
+  try {
+    const synced = await flushOutbox();
+    if (!synced) return;
+    if (state.activeTripId) {
+      const id = String(state.activeTripId);
+      state.tripDataCache.delete(id);
+      await openTrip(id, { pushHistory: false, forceRefresh: true });
+    } else {
+      await loadTrips({ allowLocalFallback: false });
+      await cacheCompleteWorkspace();
+    }
+    await refreshSyncStatus();
+  } catch (error) {
+    console.warn('Falha ao conferir agenda no Neon', error);
+    if (dom.syncStatus) {
+      dom.syncStatus.dataset.kind = 'pending';
+      dom.syncStatus.textContent = 'Falha ao conferir agenda · toque para tentar novamente';
+      dom.syncStatus.title = String(error?.message || error);
+    }
+  }
 });
 window.addEventListener('online', () => {
   refreshSyncStatus().catch(console.warn);
