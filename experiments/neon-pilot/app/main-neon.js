@@ -3406,11 +3406,11 @@ async function removeDayAgendaActivity(day, activity, button) {
       await refreshSyncStatus();
       if (state.activeDayId === dayId) openDayPage(day.id, { pushHistory: false });
     });
-    await recordChange({
+    recordChange({
       tripId, entityType: 'activity', entityId: activity.id,
       action: 'delete', summary: 'Atividade “' + (activity.title || 'Atividade') + '” excluída da agenda',
       beforeState: { title: activity.title, start_time: activity.start_time }
-    });
+    }).catch(error => console.warn('Histórico da exclusão não registrado', error));
     flushOutbox().catch(error => console.warn('Exclusão aguardando sincronização', error));
   } catch (error) {
     button.disabled = false;
