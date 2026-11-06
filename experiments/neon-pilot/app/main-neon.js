@@ -3560,12 +3560,11 @@ function renderDayPageAgenda(day, activities, locations) {
       photo.className = 'day-view-place-photo';
       photo.style.backgroundImage = 'url("' + String(photoUrl).replaceAll('"', '%22') + '")';
 
-      photoShell.append(photo, camera);
+      photoShell.append(photo);
       item.append(photoShell);
-    } else {
-      camera.classList.add('day-inline-camera-empty');
-      item.append(camera);
     }
+    // Camera always occupies the bottom-left corner of the agenda card.
+    item.append(camera);
 
     dom.dayPageAgenda.append(item);
   }
