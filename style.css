@@ -3616,3 +3616,25 @@ body[data-home-tab="tickets"] #home_tab_content { width:min(100%,760px); }
 .agenda-delete-cancel { background: white; color: #007aff; }
 @keyframes agenda-delete-rise { from { transform: translateY(100%); } to { transform: translateY(0); } }
 @media(prefers-reduced-motion:reduce) { .agenda-delete-sheet { animation: none; } }
+
+/* Agenda controls (2026-11-06): camera over the image; favorite in left rail. */
+.day-view-agenda-item .day-view-photo-shell { position: relative; overflow: hidden; }
+.day-view-agenda-item .day-view-photo-shell > .day-inline-camera {
+  position: absolute; right: 10px; bottom: 10px; left: auto; top: auto;
+  z-index: 2; width: 42px; height: 42px;
+  display: grid; place-items: center;
+  color: #007aff; background: rgba(248,250,255,.57);
+  border: 1px solid rgba(255,255,255,.5);
+  backdrop-filter: blur(15px) saturate(165%);
+  -webkit-backdrop-filter: blur(15px) saturate(165%);
+  box-shadow: 0 2px 10px rgba(0,0,0,.15);
+}
+.day-view-agenda-item > .day-inline-favorite-rail {
+  grid-column: 1; grid-row: 4; justify-self: start; align-self: start;
+  width: 46px; height: 46px; margin: 8px 0 0 -4px;
+  display: grid; place-items: center; border-radius: 50%;
+  background: rgba(245,245,250,.92); font-size: 30px;
+}
+.day-view-agenda-item[data-has-google-maps="false"] > .day-inline-favorite-rail { grid-row: 3; }
+.day-view-agenda-item > .day-inline-save-status { grid-row: 5; }
+.day-view-agenda-item[data-has-photo="true"] > .day-inline-camera { display: none; }
