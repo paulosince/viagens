@@ -16,7 +16,7 @@ async function scenario({file,bitmapFailure=false,webpFailure=false,jpegFailure=
     set src(value){assert.equal(value,'blob:iphone-original');queueMicrotask(()=>this.onload?.());}
   }
   const canvas={width:0,height:0,getContext:()=>({drawImage:()=>{drew=true;}})};
-  const make=new Function('createImageBitmap','URL','Image','document','canvasBlob','DAY_ATTACHMENT_MAX_BYTES',
+  const make=new Function('createImageBitmap','URL','Image','document','canvasBlob','TICKET_COVER_MAX_BYTES',
     body+';return {prepareTicketCardCover,ticketCoverUploadInfo};')(
     async()=>{bitmapCalls++;if(bitmapFailure)throw new Error('WebKit cannot decode bitmap');
       return {width:3024,height:4032,close:()=>{closed=true;}};},

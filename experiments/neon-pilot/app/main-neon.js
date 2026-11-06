@@ -2344,7 +2344,8 @@ function updateAgendaAddStickyState() {
 }
 
 const DAY_ATTACHMENT_BUCKET = 'day-attachments';
-const DAY_ATTACHMENT_MAX_BYTES = 6 * 1024 * 1024;
+const DAY_ATTACHMENT_MAX_BYTES = 20 * 1024 * 1024;
+const TICKET_COVER_MAX_BYTES = 6 * 1024 * 1024;
 const DAY_ATTACHMENT_TYPES = {
   jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp',
   heic: 'image/heic', heif: 'image/heif', pdf: 'application/pdf',
@@ -2369,7 +2370,7 @@ function dayAttachmentPath(tripId, dayId, extension) {
 async function storeTripAttachment(client, tripId, dayId, file) {
   const accepted = dayAttachmentType(file);
   if (!accepted || !file.size || file.size > DAY_ATTACHMENT_MAX_BYTES) {
-    throw new Error('Use fotos, PDF ou Word de até 6 MB: ' + file.name);
+    throw new Error('Use fotos, PDF ou Word de até 20 MB: ' + file.name);
   }
   const path = dayAttachmentPath(tripId, dayId, accepted.extension);
   const uploaded = await client.storage.from(DAY_ATTACHMENT_BUCKET).upload(path, file, {
@@ -5823,10 +5824,10 @@ function ticketCoverUploadInfo(blob) {
 
 // Native JPEG/PNG/WebP from iOS Photos are valid card covers. An earlier
 // implementation required Safari to encode WebP first, dropping valid photos
-// when canvas.toBlob failed. Preserve these bytes when within the 6MB limit.
+// when canvas.toBlob failed. Preserve these bytes when within the 6MB cover limit.
 async function prepareTicketCardCover(file) {
   const mime=ticketCoverMime(file);
-  const limit=DAY_ATTACHMENT_MAX_BYTES;  // Same limit already used by private storage.
+  const limit=TICKET_COVER_MAX_BYTES; // Cover art remains small; attachments have a separate limit.
   if(['image/jpeg','image/png','image/webp'].includes(mime) && file.size>0 && file.size<=limit)
     return file;
 
@@ -5922,7 +5923,7 @@ async function selectTicketCardCoverFile(file) {
   try {
     const blob=await prepareTicketCardCover(file);
     if(ticketEditorContext!==context || request!==ticketCardCoverRequest) return;
-    if(!blob?.size || blob.size>DAY_ATTACHMENT_MAX_BYTES) throw new Error('IMAGE_TOO_LARGE');
+    if(!blob?.size || blob.size>TICKET_COVER_MAX_BYTES) throw new Error('IMAGE_TOO_LARGE');
     const ready=URL.createObjectURL(blob);
     if(context.coverDraftUrl) URL.revokeObjectURL(context.coverDraftUrl);
     context.coverDraftUrl=ready;
