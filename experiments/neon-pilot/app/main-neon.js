@@ -3333,6 +3333,92 @@ async function addInlineDayActivity() {
   }
 }
 
+// The bottom sheet is mounted outside the page transition so it remains
+// reachable on iOS, and no data is changed until the user confirms.
+function confirmAgendaActivityRemoval(activity) {
+  return new Promise(resolve => {
+    const backdrop = document.createElement('div');
+    backdrop.className = 'agenda-delete-backdrop';
+    const sheet = document.createElement('section');
+    sheet.className = 'agenda-delete-sheet';
+    sheet.setAttribute('role', 'dialog');
+    sheet.setAttribute('aria-modal', 'true');
+    sheet.setAttribute('aria-labelledby', 'agenda-delete-title');
+    const heading = document.createElement('h2');
+    heading.id = 'agenda-delete-title';
+    heading.textContent = 'Excluir atividade?';
+    const description = document.createElement('p');
+    description.textContent = '“' + (activity.title || 'Atividade') + '” será removida da agenda. Esta ação não pode ser desfeita.';
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'agenda-delete-confirm';
+    remove.textContent = 'Excluir atividade';
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'agenda-delete-cancel';
+    cancel.textContent = 'Cancelar';
+    let settled = false;
+    const finish = confirmed => {
+      if (settled) return;
+      settled = true;
+      document.removeEventListener('keydown', onKey);
+      backdrop.remove();
+      resolve(confirmed);
+    };
+    const onKey = event => {
+      if (event.key === 'Escape') finish(false);
+      if (event.key === 'Tab') {
+        const controls = [remove, cancel];
+        const next = controls.indexOf(document.activeElement) === 0 ? cancel : remove;
+        event.preventDefault();
+        next.focus();
+      }
+    };
+    remove.addEventListener('click', () => finish(true));
+    cancel.addEventListener('click', () => finish(false));
+    backdrop.addEventListener('click', event => { if (event.target === backdrop) finish(false); });
+    sheet.append(heading, description, remove, cancel);
+    backdrop.append(sheet);
+    document.body.append(backdrop);
+    document.addEventListener('keydown', onKey);
+    cancel.focus({ preventScroll: true });
+  });
+}
+
+async function removeDayAgendaActivity(day, activity, button) {
+  if (!canEditActiveTrip() || button.disabled) return;
+  if (!await confirmAgendaActivityRemoval(activity)) return;
+  button.disabled = true;
+  const dayId = String(day.id);
+  const tripId = String(day.trip_id || state.activeTripId);
+  try {
+    await queueDaySave(dayId, async () => {
+      const current = cloneDayRecords(day);
+      const remaining = current.activities.filter(item => String(item.id) !== String(activity.id));
+      if (remaining.length === current.activities.length) return;
+      const latestDay = state.tripDays.find(item => String(item.id) === dayId) || day;
+      await offlineStore.saveDayBundle(latestDay, remaining, current.locations);
+      await offlineStore.enqueueMutation({
+        type: 'save-day-items', tripId, dayId: day.id,
+        activities: [], locations: [], removedActivityIds: [activity.id], removedLocationIds: []
+      });
+      updateInlineDayState(latestDay, remaining, current.locations);
+      await refreshSyncStatus();
+      if (state.activeDayId === dayId) openDayPage(day.id, { pushHistory: false });
+    });
+    recordChange({
+      tripId, entityType: 'activity', entityId: activity.id,
+      action: 'delete', summary: 'Atividade “' + (activity.title || 'Atividade') + '” excluída da agenda',
+      beforeState: { title: activity.title, start_time: activity.start_time }
+    }).catch(error => console.warn('Histórico da exclusão não registrado', error));
+    flushOutbox().catch(error => console.warn('Exclusão aguardando sincronização', error));
+  } catch (error) {
+    button.disabled = false;
+    console.warn('Falha ao excluir atividade', error);
+    window.alert('Não foi possível excluir a atividade. Tente novamente.');
+  }
+}
+
 function renderDayPageAgenda(day, activities, locations) {
   dom.dayPageAgenda.replaceChildren();
   const ordered = orderedDayActivities(activities);
@@ -3416,6 +3502,17 @@ function renderDayPageAgenda(day, activities, locations) {
     if (googleMapsLink) item.append(googleMapsLink);
     item.append(saveStatus, copy);
 
+    if (canEditActiveTrip()) {
+      const trash = document.createElement('button');
+      trash.type = 'button';
+      trash.className = 'day-inline-delete';
+      trash.setAttribute('aria-label', 'Excluir atividade: ' + (activity.title || 'Atividade'));
+      trash.title = 'Excluir atividade';
+      trash.innerHTML = '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m5 4v7m4-7v7"/></svg>';
+      trash.addEventListener('click', () => removeDayAgendaActivity(day, activity, trash));
+      item.append(trash);
+    }
+
     const file = document.createElement('input');
     file.type = 'file';
     file.accept = 'image/*';
@@ -3463,12 +3560,11 @@ function renderDayPageAgenda(day, activities, locations) {
       photo.className = 'day-view-place-photo';
       photo.style.backgroundImage = 'url("' + String(photoUrl).replaceAll('"', '%22') + '")';
 
-      photoShell.append(photo, camera);
+      photoShell.append(photo);
       item.append(photoShell);
-    } else {
-      camera.classList.add('day-inline-camera-empty');
-      item.append(camera);
     }
+    // Camera always occupies the bottom-left corner of the agenda card.
+    item.append(camera);
 
     dom.dayPageAgenda.append(item);
   }

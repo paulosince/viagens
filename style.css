@@ -3574,3 +3574,45 @@ body[data-home-tab="tickets"] #home_tab_content { width:min(100%,760px); }
   stroke:currentColor!important;
   stroke-width:2;
 }
+
+/* Agenda: per-card controls. Keep camera at lower left and destructive action
+   at upper right, independently of whether the activity has a cover photo. */
+.day-view-agenda-item { padding-bottom: 64px; }
+.day-view-agenda-item > .day-inline-camera {
+  position: absolute; left: 14px; bottom: 12px; right: auto; top: auto;
+  grid-column: auto; grid-row: auto; margin: 0;
+  width: 42px; height: 42px; z-index: 2;
+  background: rgba(238,246,255,.94);
+}
+.day-view-agenda-item > .day-inline-camera .day-photo-icon { width: 21px; height: 21px; }
+.day-view-agenda-item > .day-inline-delete {
+  position: absolute; top: 10px; right: 10px; z-index: 3;
+  display: grid; place-items: center; width: 42px; height: 42px;
+  border: 0; border-radius: 50%; color: #b54242;
+  background: rgba(255,238,238,.94); cursor: pointer;
+}
+.day-view-agenda-item > .day-inline-delete:active { background: #ffdad8; }
+.day-view-agenda-item > .day-inline-delete:focus-visible,
+.day-view-agenda-item > .day-inline-camera:focus-within { outline: 3px solid #007aff; outline-offset: 2px; }
+.day-view-agenda-item .day-view-photo-shell { margin-top: 48px; }
+.day-view-agenda-item[data-has-photo="false"] .day-view-agenda-copy { padding-right: 8px; }
+.agenda-delete-backdrop {
+  position: fixed; inset: 0; z-index: 100000; display: flex;
+  align-items: flex-end; justify-content: center;
+  background: rgba(12,20,33,.48); backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.agenda-delete-sheet {
+  width: 100%; max-width: 640px; box-sizing: border-box;
+  padding: 24px 20px calc(22px + env(safe-area-inset-bottom));
+  border-radius: 26px 26px 0 0; background: #f2f2f7;
+  box-shadow: 0 -14px 40px rgba(0,0,0,.17);
+  animation: agenda-delete-rise .28s cubic-bezier(.22,.61,.36,1) both;
+}
+.agenda-delete-sheet h2 { margin: 0 0 10px; text-align: center; font-size: 20px; color: #1c1c1e; }
+.agenda-delete-sheet p { margin: 0 0 24px; color: #63636a; text-align: center; font-size: 15px; line-height: 1.5; }
+.agenda-delete-sheet button { display: block; width: 100%; min-height: 52px; border: 0; border-radius: 14px; font: inherit; font-weight: 700; }
+.agenda-delete-confirm { background: #ff3b30; color: white; margin-bottom: 10px; }
+.agenda-delete-cancel { background: white; color: #007aff; }
+@keyframes agenda-delete-rise { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@media(prefers-reduced-motion:reduce) { .agenda-delete-sheet { animation: none; } }
