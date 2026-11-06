@@ -56,3 +56,9 @@ Nenhuma chamada Cloudflare aparece na implementação de persistência examinada
 ## Limitações
 
 Acesso administrativo ao banco permite verificar registros, mas **não reproduz a RLS e a sessão JWT do iPhone**. O diagnóstico de falha silenciosa é demonstrado pelo código; a razão exata da falha remota no aparelho só pode ser confirmada com a resposta HTTP/erro correspondente. Não apagar IndexedDB, nem fazer migração destrutiva.
+
+## Causa adicional identificada: bloqueio total de leitura por outbox
+
+Em `fetchTripData`, a condição `hasPendingForTrip(tripId)` fazia retorno antecipado com **apenas dados do IndexedDB**. Assim, uma única alteração local pendente impedia indefinidamente a leitura de qualquer atividade nova do Neon, inclusive as inseridas diretamente no banco. O clique no indicador também retornava antes da leitura quando `flushOutbox` falhava. Isso é uma falha lógica confirmada no código; não há acesso à fila real do iPhone para afirmar que ela está pendente neste caso.
+
+Correção: consultar Neon mesmo com outbox pendente; preservar alterações locais para IDs afetados por mutações pendentes; respeitar IDs de exclusão da fila; incorporar registros remotos novos; continuar exibindo estado pendente até a fila ser enviada. O botão de sincronização também consulta o servidor mesmo que o envio de alterações locais falhe. Não limpar a fila e não sobrescrever exclusões locais pendentes.
