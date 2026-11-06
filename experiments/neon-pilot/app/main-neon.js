@@ -704,8 +704,14 @@ async function refreshSyncStatus() {
     return;
   }
 
-  dom.syncStatus.dataset.kind = 'synced';
-  dom.syncStatus.textContent = 'Sincronizado · disponível offline';
+  // An empty outbox proves uploads completed, not that the cached itinerary
+  // matches the remote Neon state. Never advertise a verified sync here.
+  const cachedTrips = [...state.tripDataCache.values()];
+  const remoteVerified = cachedTrips.length > 0 && cachedTrips.every(data => data.remoteVerified === true);
+  dom.syncStatus.dataset.kind = remoteVerified ? 'synced' : 'pending';
+  dom.syncStatus.textContent = remoteVerified
+    ? 'Agenda conferida no Neon · disponível offline'
+    : 'Cópia offline disponível · agenda ainda não conferida';
 }
 
 
@@ -4330,6 +4336,7 @@ async function fetchTripData(tripId, { preferLocal = false } = {}) {
           offline: true
         };
         state.tripDataCache.set(key, data);
+        refreshSyncStatus().catch(console.warn);
         return data;
       }
     }
@@ -4353,9 +4360,11 @@ async function fetchTripData(tripId, { preferLocal = false } = {}) {
         activitiesByDay: groupByDay(activities),
         locationsByDay: groupByDay(locations),
         loadedAt: Date.now(),
-        version: Date.now()
+        version: Date.now(),
+        remoteVerified: true
       };
       state.tripDataCache.set(key, data);
+      refreshSyncStatus().catch(console.warn);
       return data;
     } catch (remoteError) {
       const local = await offlineStore.loadTripData(key);
@@ -4367,9 +4376,11 @@ async function fetchTripData(tripId, { preferLocal = false } = {}) {
         locationsByDay: groupByDay(local.locations),
         loadedAt: Date.now(),
         version: Date.now(),
-        offline: true
+        offline: true,
+        remoteVerified: false
       };
       state.tripDataCache.set(key, data);
+      refreshSyncStatus().catch(console.warn);
       return data;
     }
   })().finally(() => state.tripDataLoads.delete(key));
