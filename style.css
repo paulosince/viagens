@@ -3670,3 +3670,14 @@ body[data-home-tab="tickets"] #home_tab_content { width:min(100%,760px); }
   backdrop-filter: blur(12px) saturate(145%);
   -webkit-backdrop-filter: blur(12px) saturate(145%);
 }
+
+@media (max-width: 600px) {
+  .day-view-agenda-item > .day-view-agenda-copy,
+  .day-view-agenda-item[data-has-google-maps="true"] > .day-view-agenda-copy {
+    grid-column: 2 / -1; grid-row: 1 / span 2;
+  }
+  .day-view-agenda-item > .day-view-photo-shell,
+  .day-view-agenda-item[data-has-google-maps="true"] > .day-view-photo-shell {
+    grid-column: 2 / -1; grid-row: 3;
+  }
+}
