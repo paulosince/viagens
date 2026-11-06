@@ -8596,8 +8596,7 @@ document.addEventListener('visibilitychange', () => {
 });
 dom.syncStatus.addEventListener('click', async () => {
   try {
-    const synced = await flushOutbox();
-    if (!synced) return;
+    await flushOutbox(); // Even if upload fails, read remote; reconcile pending edits by ID.
     if (state.activeTripId) {
       const id = String(state.activeTripId);
       state.tripDataCache.delete(id);
