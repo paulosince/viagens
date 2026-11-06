@@ -62,3 +62,13 @@ Acesso administrativo ao banco permite verificar registros, mas **não reproduz 
 Em `fetchTripData`, a condição `hasPendingForTrip(tripId)` fazia retorno antecipado com **apenas dados do IndexedDB**. Assim, uma única alteração local pendente impedia indefinidamente a leitura de qualquer atividade nova do Neon, inclusive as inseridas diretamente no banco. O clique no indicador também retornava antes da leitura quando `flushOutbox` falhava. Isso é uma falha lógica confirmada no código; não há acesso à fila real do iPhone para afirmar que ela está pendente neste caso.
 
 Correção: consultar Neon mesmo com outbox pendente; preservar alterações locais para IDs afetados por mutações pendentes; respeitar IDs de exclusão da fila; incorporar registros remotos novos; continuar exibindo estado pendente até a fila ser enviada. O botão de sincronização também consulta o servidor mesmo que o envio de alterações locais falhe. Não limpar a fila e não sobrescrever exclusões locais pendentes.
+
+## 2026-11-06 — CAUSA RAIZ CONFIRMADA: BRANCH NEON INCORRETA
+
+A API de produção em `backend-neon.mjs` utiliza o endpoint `ep-empty-pine-b8r7sa8d` do projeto `fragrant-credit-68065034`, que corresponde à branch **`br-silent-band-b80nklzl`**, denominada `auth-federation-validation-20261020`. As gravações iniciais das três atividades foram feitas por SQL na branch padrão **`br-dawn-bread-b83r0ztn`** (`main`), que NÃO alimenta a aplicação.
+
+Evidência discriminante: o almoço `Almoço econômico — Montmartre · €65 / 5` às 13h está na branch de produção e na captura do usuário, mas não na branch main. Inversamente, as três novas atividades estavam apenas na main. Isso confirma a causa do desaparecimento; as hipóteses anteriores de cache e outbox eram problemas possíveis de código, mas não explicavam a divergência principal.
+
+**Reparo executado diretamente na branch ativa**, database `viaggio_lab`, schema `viaggio_app`, com inserção idempotente de três IDs originais, sem UPDATE/DELETE: outlet 25/11 às 10h (`243d00de-4670-4f31-a837-759da09c9920`), Boris Lumé 25/11 às 16h (`183355e5-0785-4cbd-956c-d476bbb996ab`) e Notre-Dame 26/11 às 08h30 (`cfc110de-e48e-4b59-9440-170aed939184`). Consulta de confirmação mostrou sete atividades em 25/11 e oito em 26/11, com almoço, lanche, Montmartre, jogo e demais compromissos preservados.
+
+**Regra obrigatória para manutenção futura:** qualquer SQL que altere dados do Viaggio deve informar explicitamente `project_id`, `branch_id` e `database_name` e verificar a correspondência com o endpoint `API_ROOTS`. Nunca presumir que a branch padrão Neon seja a branch usada pelo aplicativo. A confirmação no iPhone ainda é necessária para encerrar o incidente.
