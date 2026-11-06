@@ -6857,6 +6857,13 @@ async function cacheCompleteWorkspace() {
     const activities = allActivities.filter(activity => ids.has(String(activity.day_id)));
     const locations = allLocations.filter(location => ids.has(String(location.day_id)));
     const localBefore = await offlineStore.loadTripData(String(trip.id)).catch(() => ({ days: [], activities: [], locations: [] }));
+    // Background snapshot must not erase local-only entries either.
+    const remoteActivityIds = new Set(activities.map(item => String(item.id)));
+    const remoteLocationIds = new Set(locations.map(item => String(item.id)));
+    const localOnlyActivities = (localBefore.activities || []).filter(item => ids.has(String(item.day_id)) && !remoteActivityIds.has(String(item.id)));
+    const localOnlyLocations = (localBefore.locations || []).filter(item => ids.has(String(item.day_id)) && !remoteLocationIds.has(String(item.id)));
+    activities.push(...localOnlyActivities);
+    locations.push(...localOnlyLocations);
     await adoptLegacyTripMedia(days, activities, locations, localBefore);
     await offlineStore.replaceTripData(String(trip.id), days, activities, locations);
     await cacheTripMedia(days, activities, locations, client);
