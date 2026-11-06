@@ -30,7 +30,7 @@ assert.equal(context.dayAttachmentPath('trip', null, 'pdf'), 'trip/general/file-
     } },
     from(table) {
       assert.equal(table, 'day_attachments');
-      return { async insert(row) { inserted.push(row); return { error: null }; } };
+      return { insert(row) { inserted.push(row); return { error: null, select() { return { single: async () => ({ data: row, error: null }) }; } }; } };
     }
   };
   const file = { name: 'Passagem.pdf', size: 1024, type: 'application/pdf' };
