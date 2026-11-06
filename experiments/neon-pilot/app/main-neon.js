@@ -4336,24 +4336,10 @@ async function fetchTripData(tripId, { preferLocal = false } = {}) {
   }
   if (state.tripDataLoads.has(key)) return state.tripDataLoads.get(key);
   const load = (async () => {
+    // A pending outbox must not suppress ALL remote reads. That prevented
+    // server-side itinerary additions from ever reaching a device with one
+    // unrelated pending edit. Read remote and reconcile below instead.
     const pendingLocalChanges = await offlineStore.hasPendingForTrip(key);
-    if (pendingLocalChanges) {
-      const local = await offlineStore.loadTripData(key);
-      if (local.days.length) {
-        await hydrateTripMedia(local.days, local.activities, local.locations, null);
-        const data = {
-          days: local.days,
-          activitiesByDay: groupByDay(local.activities),
-          locationsByDay: groupByDay(local.locations),
-          loadedAt: Date.now(),
-          version: Date.now(),
-          offline: true
-        };
-        state.tripDataCache.set(key, data);
-        refreshSyncStatus().catch(console.warn);
-        return data;
-      }
-    }
     try {
       const client = await tryNeon();
       if (!client) throw new Error('Backend indisponível.');
@@ -4365,6 +4351,23 @@ async function fetchTripData(tripId, { preferLocal = false } = {}) {
       let activities = [], locations = [];
       if (days.length) {
         ({ activities, locations } = await loadDayRecords(client, days.map(day => day.id)));
+      }
+      // Preserve edits awaiting upload. The outbox is authoritative for these
+      // IDs; remote-only records are still added to the visible agenda.
+      if (pendingLocalChanges) {
+        const queued = (await offlineStore.listOutbox()).filter(item => String(item.tripId || '') === key);
+        const removedActivityIds = new Set(queued.flatMap(item => item.removedActivityIds || []).map(String));
+        const removedLocationIds = new Set(queued.flatMap(item => item.removedLocationIds || []).map(String));
+        const touchedActivityIds = new Set(queued.flatMap(item => [item.activity?.id, ...(item.activities || []).map(a => a.id)]).filter(Boolean).map(String));
+        const touchedLocationIds = new Set(queued.flatMap(item => [item.location?.id, ...(item.locations || []).map(a => a.id)]).filter(Boolean).map(String));
+        const localActivities = new Map((localBefore.activities || []).map(a => [String(a.id), a]));
+        const localLocations = new Map((localBefore.locations || []).map(a => [String(a.id), a]));
+        activities = activities.filter(a => !removedActivityIds.has(String(a.id))).map(a => touchedActivityIds.has(String(a.id)) ? (localActivities.get(String(a.id)) || a) : a);
+        locations = locations.filter(a => !removedLocationIds.has(String(a.id))).map(a => touchedLocationIds.has(String(a.id)) ? (localLocations.get(String(a.id)) || a) : a);
+        for (const day of days) {
+          const localDay = (localBefore.days || []).find(d => String(d.id) === String(day.id));
+          if (localDay && queued.some(item => String(item.dayId || '') === String(day.id))) Object.assign(day, localDay);
+        }
       }
       // Preserve local-only itinerary entries when a remote import is incomplete.
       // Do not upload or delete either side automatically: a local-only item may
@@ -4388,7 +4391,7 @@ async function fetchTripData(tripId, { preferLocal = false } = {}) {
         locationsByDay: groupByDay(locations),
         loadedAt: Date.now(),
         version: Date.now(),
-        remoteVerified: !localOnlyActivities.length && !localOnlyLocations.length
+        remoteVerified: !pendingLocalChanges && !localOnlyActivities.length && !localOnlyLocations.length
       };
       state.tripDataCache.set(key, data);
       refreshSyncStatus().catch(console.warn);
@@ -8593,8 +8596,7 @@ document.addEventListener('visibilitychange', () => {
 });
 dom.syncStatus.addEventListener('click', async () => {
   try {
-    const synced = await flushOutbox();
-    if (!synced) return;
+    await flushOutbox(); // Even if upload fails, read remote; reconcile pending edits by ID.
     if (state.activeTripId) {
       const id = String(state.activeTripId);
       state.tripDataCache.delete(id);
