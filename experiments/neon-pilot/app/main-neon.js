@@ -81,12 +81,20 @@ async function hydrateManagedMedia(record, {
   urlField = 'photo_url'
 } = {}, client = null) {
   if (!record?.[pathField] || !record?.[hashField]) return record;
+  // A network failure must not discard an already resolved image from this
+  // session. Do not fall back to an unrelated location illustration.
+  const previous = record[urlField];
+  const reusable = typeof previous === 'string' &&
+    (previous.startsWith('blob:') || previous.startsWith('data:image/')) ? previous : null;
   try {
     const url = await mediaObjectUrl(client, bucket, record[pathField], record[hashField]);
-    record[urlField] = url || null;
+    record[urlField] = url || reusable || null;
   } catch (error) {
-    console.warn('Imagem local/remota indisponível', record[pathField], error);
-    record[urlField] = null;
+    console.warn('[Viaggio mídia] Falha ao recuperar arquivo', {
+      path: record[pathField], code: error?.code || null,
+      message: error?.message || String(error)
+    });
+    record[urlField] = reusable || null;
   }
   return record;
 }
