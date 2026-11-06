@@ -61,7 +61,7 @@ assert.ok(css.includes('bottom:max(11px,calc(env(safe-area-inset-bottom,0px) - 2
 const navPos=html.indexOf('<div class="home-bottom">');
 assert.ok(navPos>html.indexOf('id="trip_edit_footer"') && navPos<html.indexOf('</main>'));
 assert.ok(html.includes('style.css?v=20261024-tickets21'));
-assert.ok(html.includes('main-neon.js?v=20261024-tickets21'));
+assert.match(html, /main-neon\.js\?v=\d{8}-[a-zA-Z0-9-]+/, 'Production app must load a versioned Neon module');
 assert.ok(html.includes('ticket_metadata_dialog'));
 assert.ok(!html.includes('ticket_metadata_agenda'));
 assert.ok(!html.includes('ticket_metadata_venue'));
@@ -98,7 +98,7 @@ assert.ok(main.includes('Foto pronta para salvar.'));
 assert.ok(main.includes("const media=ticketCoverUploadInfo(context.coverBlob);"));
 assert.ok(main.includes("contentType:media.mime,upsert:false"));
 assert.ok(!main.includes("contentType:'image/webp',upsert:false"));
-assert.ok(main.includes("const limit=DAY_ATTACHMENT_MAX_BYTES"));
+assert.ok(main.includes("const limit=TICKET_COVER_MAX_BYTES"), 'Card cover size must be independent of attachment size');
 const categoryEmojis={flight:'✈️',hotel:'🏨',restaurant:'🍽️',sport:'⚽️',attraction:'🎡',transport:'🚆',other:'🗂️'};
 for (const [category,emoji] of Object.entries(categoryEmojis)) {
   const tile=new RegExp('data-ticket-category="'+category+'"[^>]*><span class="ticket-category-symbol">([^<]+)<\\/span>');
