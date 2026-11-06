@@ -704,8 +704,14 @@ async function refreshSyncStatus() {
     return;
   }
 
-  dom.syncStatus.dataset.kind = 'synced';
-  dom.syncStatus.textContent = 'Sincronizado · disponível offline';
+  // An empty outbox proves uploads completed, not that the cached itinerary
+  // matches the remote Neon state. Never advertise a verified sync here.
+  const cachedTrips = [...state.tripDataCache.values()];
+  const remoteVerified = cachedTrips.length > 0 && cachedTrips.every(data => data.remoteVerified === true);
+  dom.syncStatus.dataset.kind = remoteVerified ? 'synced' : 'pending';
+  dom.syncStatus.textContent = remoteVerified
+    ? 'Agenda conferida no Neon · disponível offline'
+    : 'Cópia offline disponível · agenda ainda não conferida';
 }
 
 
@@ -4268,15 +4274,23 @@ function groupByDay(records = []) {
 // the offline copy once every smaller batch has completed successfully.
 async function loadDayRecords(client, dayIds) {
   const activities = [], locations = [];
-  for (let index = 0; index < dayIds.length; index += 1) {
-    const ids = dayIds.slice(index, index + 1);
-    const [activityResult, locationResult] = await Promise.all([
-      client.from('activities').select('*').in('day_id', ids).order('position'),
-      client.from('day_locations').select('*').in('day_id', ids).order('position')
-    ]);
-    if (activityResult.error || locationResult.error) throw activityResult.error || locationResult.error;
-    activities.push(...(activityResult.data || []).map(normalizeActivityRecord));
-    locations.push(...(locationResult.data || []));
+  // Query days individually to limit photo payloads, but run at most
+  // three in parallel so a long trip does not stay on stale IndexedDB.
+  for (let index = 0; index < dayIds.length; index += 3) {
+    const batch = dayIds.slice(index, index + 3);
+    const results = await Promise.all(batch.map(async dayId => {
+      const ids = [dayId];
+      const [activityResult, locationResult] = await Promise.all([
+        client.from('activities').select('*').in('day_id', ids).order('position'),
+        client.from('day_locations').select('*').in('day_id', ids).order('position')
+      ]);
+      if (activityResult.error || locationResult.error) throw activityResult.error || locationResult.error;
+      return { activities: (activityResult.data || []).map(normalizeActivityRecord), locations: locationResult.data || [] };
+    }));
+    for (const result of results) {
+      activities.push(...result.activities);
+      locations.push(...result.locations);
+    }
   }
   return { activities, locations };
 }
@@ -4330,6 +4344,7 @@ async function fetchTripData(tripId, { preferLocal = false } = {}) {
           offline: true
         };
         state.tripDataCache.set(key, data);
+        refreshSyncStatus().catch(console.warn);
         return data;
       }
     }
@@ -4345,6 +4360,19 @@ async function fetchTripData(tripId, { preferLocal = false } = {}) {
       if (days.length) {
         ({ activities, locations } = await loadDayRecords(client, days.map(day => day.id)));
       }
+      // Preserve local-only itinerary entries when a remote import is incomplete.
+      // Do not upload or delete either side automatically: a local-only item may
+      // be an unsynced legacy reservation, while a remote-only item may be new.
+      const dayIds = new Set(days.map(day => String(day.id)));
+      const remoteActivityIds = new Set(activities.map(item => String(item.id)));
+      const remoteLocationIds = new Set(locations.map(item => String(item.id)));
+      const localOnlyActivities = (localBefore.activities || []).filter(item => dayIds.has(String(item.day_id)) && !remoteActivityIds.has(String(item.id)));
+      const localOnlyLocations = (localBefore.locations || []).filter(item => dayIds.has(String(item.day_id)) && !remoteLocationIds.has(String(item.id)));
+      if (localOnlyActivities.length || localOnlyLocations.length) {
+        console.warn('Agenda local e Neon divergentes: preservando registros locais sem enviá-los ao servidor.', {activities: localOnlyActivities.length, locations: localOnlyLocations.length});
+        activities.push(...localOnlyActivities);
+        locations.push(...localOnlyLocations);
+      }
       await adoptLegacyTripMedia(days, activities, locations, localBefore);
       await offlineStore.replaceTripData(key, days, activities, locations);
       await hydrateTripMedia(days, activities, locations, client);
@@ -4353,9 +4381,11 @@ async function fetchTripData(tripId, { preferLocal = false } = {}) {
         activitiesByDay: groupByDay(activities),
         locationsByDay: groupByDay(locations),
         loadedAt: Date.now(),
-        version: Date.now()
+        version: Date.now(),
+        remoteVerified: !localOnlyActivities.length && !localOnlyLocations.length
       };
       state.tripDataCache.set(key, data);
+      refreshSyncStatus().catch(console.warn);
       return data;
     } catch (remoteError) {
       const local = await offlineStore.loadTripData(key);
@@ -4367,9 +4397,11 @@ async function fetchTripData(tripId, { preferLocal = false } = {}) {
         locationsByDay: groupByDay(local.locations),
         loadedAt: Date.now(),
         version: Date.now(),
-        offline: true
+        offline: true,
+        remoteVerified: false
       };
       state.tripDataCache.set(key, data);
+      refreshSyncStatus().catch(console.warn);
       return data;
     }
   })().finally(() => state.tripDataLoads.delete(key));
@@ -6825,6 +6857,13 @@ async function cacheCompleteWorkspace() {
     const activities = allActivities.filter(activity => ids.has(String(activity.day_id)));
     const locations = allLocations.filter(location => ids.has(String(location.day_id)));
     const localBefore = await offlineStore.loadTripData(String(trip.id)).catch(() => ({ days: [], activities: [], locations: [] }));
+    // Background snapshot must not erase local-only entries either.
+    const remoteActivityIds = new Set(activities.map(item => String(item.id)));
+    const remoteLocationIds = new Set(locations.map(item => String(item.id)));
+    const localOnlyActivities = (localBefore.activities || []).filter(item => ids.has(String(item.day_id)) && !remoteActivityIds.has(String(item.id)));
+    const localOnlyLocations = (localBefore.locations || []).filter(item => ids.has(String(item.day_id)) && !remoteLocationIds.has(String(item.id)));
+    activities.push(...localOnlyActivities);
+    locations.push(...localOnlyLocations);
     await adoptLegacyTripMedia(days, activities, locations, localBefore);
     await offlineStore.replaceTripData(String(trip.id), days, activities, locations);
     await cacheTripMedia(days, activities, locations, client);
