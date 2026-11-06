@@ -3484,7 +3484,7 @@ function renderDayPageAgenda(day, activities, locations) {
     place.addEventListener('click', () => openInlinePlaceSearch(day, activity, location));
 
     const heading = document.createElement('div'); heading.className = 'day-agenda-heading';
-    heading.append(title, createCalendarFavoriteButton(day, activity));
+    heading.append(title);
     copy.append(heading, place);
 
     const description = document.createElement('button');
@@ -3501,6 +3501,9 @@ function renderDayPageAgenda(day, activities, locations) {
     item.append(time, pin);
     if (googleMapsLink) item.append(googleMapsLink);
     item.append(saveStatus, copy);
+    const favorite = createCalendarFavoriteButton(day, activity);
+    favorite.classList.add('day-inline-favorite-rail');
+    item.append(favorite);
 
     if (canEditActiveTrip()) {
       const trash = document.createElement('button');
@@ -3560,11 +3563,11 @@ function renderDayPageAgenda(day, activities, locations) {
       photo.className = 'day-view-place-photo';
       photo.style.backgroundImage = 'url("' + String(photoUrl).replaceAll('"', '%22') + '")';
 
-      photoShell.append(photo);
+      photoShell.append(photo, camera);
       item.append(photoShell);
     }
-    // Camera always occupies the bottom-left corner of the agenda card.
-    item.append(camera);
+    // For activities without a photo, retain a visible upload control.
+    if (!photoUrl) item.append(camera);
 
     dom.dayPageAgenda.append(item);
   }
