@@ -3498,12 +3498,14 @@ function renderDayPageAgenda(day, activities, locations) {
 
     const photoUrl = activityPhotoForPreview(activity, location);
     item.dataset.hasPhoto = String(Boolean(photoUrl));
-    item.append(time, pin);
-    if (googleMapsLink) item.append(googleMapsLink);
-    item.append(saveStatus, copy);
+    const iconRail = document.createElement('div');
+    iconRail.className = 'day-inline-icon-rail';
+    iconRail.append(pin);
+    if (googleMapsLink) iconRail.append(googleMapsLink);
     const favorite = createCalendarFavoriteButton(day, activity);
     favorite.classList.add('day-inline-favorite-rail');
-    item.append(favorite);
+    iconRail.append(favorite);
+    item.append(time, iconRail, saveStatus, copy);
 
     if (canEditActiveTrip()) {
       const trash = document.createElement('button');
@@ -3566,8 +3568,12 @@ function renderDayPageAgenda(day, activities, locations) {
       photoShell.append(photo, camera);
       item.append(photoShell);
     }
-    // For activities without a photo, retain a visible upload control.
-    if (!photoUrl) item.append(camera);
+    // Without a photo, the upload control follows the description in the
+    // content column instead of floating at the bottom of the entire card.
+    if (!photoUrl) {
+      camera.classList.add('day-inline-camera-no-photo');
+      copy.append(camera);
+    }
 
     dom.dayPageAgenda.append(item);
   }
