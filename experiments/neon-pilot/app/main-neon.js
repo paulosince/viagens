@@ -2623,6 +2623,10 @@ async function renderDayTicketReservations(day) {
 function openDayPage(dayId, { pushHistory = true } = {}) {
   const day = state.tripDays.find(item => String(item.id) === String(dayId));
   if (!day) return;
+  // The day page is a persistent scroll container. Reset only on navigation,
+  // not on in-place rerenders (editing, syncing, adding photos, etc.).
+  const enteringDay = document.body.dataset.dayPage !== 'open' || state.activeDayId !== String(day.id);
+  if (enteringDay) dom.dayPage.scrollTop = 0;
   dom.tripTabs.inert = true;
   dom.tripTabs.setAttribute('aria-hidden', 'true');
   if (state.activeDayId && state.activeDayId !== String(day.id) && dom.dayMapSection.dataset.expanded === 'true') setDayMapExpanded(false);
