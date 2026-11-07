@@ -2620,6 +2620,20 @@ async function renderDayTicketReservations(day) {
   } catch(error) { console.warn('Reservas do dia indisponíveis',error); }
 }
 
+// iOS may restore the scroll offset after a hidden fixed page becomes visible.
+// Apply the reset after the visible layout, without resetting same-day edits.
+let dayScrollResetToken = 0;
+function resetEnteredDayScroll(dayId) {
+  const token = ++dayScrollResetToken;
+  const reset = () => {
+    if (token !== dayScrollResetToken || state.activeDayId !== String(dayId) || document.body.dataset.dayPage !== 'open') return;
+    dom.dayPage.scrollTop = 0;
+    dom.dayPage.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  };
+  reset();
+  requestAnimationFrame(() => requestAnimationFrame(reset));
+}
+
 function openDayPage(dayId, { pushHistory = true } = {}) {
   const day = state.tripDays.find(item => String(item.id) === String(dayId));
   if (!day) return;
@@ -2643,6 +2657,7 @@ function openDayPage(dayId, { pushHistory = true } = {}) {
     dom.dayPageSaveStatus.dataset.state = state.daySaveStates.get(String(day.id)) || 'idle';
     dom.dayPage.setAttribute('aria-hidden', 'false');
     document.body.dataset.dayPage = 'open';
+    if (enteringDay) resetEnteredDayScroll(day.id);
     updateAgendaAddStickyState();
     renderDayAttachments(day.id);
     renderDayTicketReservations(day).catch(error => console.warn('Reservas do dia indisponíveis',error));
@@ -2667,6 +2682,7 @@ function openDayPage(dayId, { pushHistory = true } = {}) {
   dom.dayPage.dataset.renderKey = renderKey;
   dom.dayPage.setAttribute('aria-hidden', 'false');
   document.body.dataset.dayPage = 'open';
+    if (enteringDay) resetEnteredDayScroll(day.id);
   updateAgendaAddStickyState();
   renderDayAttachments(day.id);
   renderDayTicketReservations(day).catch(error => console.warn('Reservas do dia indisponíveis',error));
