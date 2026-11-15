@@ -1,7 +1,7 @@
 // Neon-only preview backend. No Supabase project or Supabase Auth calls.
 // Transport: official @neondatabase/postgrest-js, JWTs: Managed Neon Auth.
 // IMPORTANT: these are staging APIs. Never substitute project main URLs.
-import {createNeonMediaClient} from './storage-neon.mjs?v=20261115-login1';
+import {createNeonMediaClient} from './storage-neon.mjs?v=20261115-media1';
 import {createRouter} from './router-neon.mjs?v=20261024-home3';
 import {createNeonIdentity} from './neon-identity.mjs';
 export const API_ROOTS=Object.freeze({
@@ -15,6 +15,16 @@ const NEON_AUTH_UPSTREAM='https://ep-small-bread-b7uq0zva.neonauth.c-13.us-east-
 export const NEON_AUTH_URL=(typeof location!=='undefined' && location.hostname==='ioviaggio.com.br')
   ? location.origin+'/api/auth'
   : NEON_AUTH_UPSTREAM;
+// On the custom domain, Neon Function calls go through the same-origin
+// Cloudflare function (functions/api/media), because the Neon Functions only
+// accept the GitHub Pages origin. The user's JWT is still checked by Neon.
+const viaSameOrigin=url=>{
+ if(typeof location==='undefined'||location.hostname!=='ioviaggio.com.br')return url;
+ const host=new URL(url).hostname;
+ const suffix='.compute.c-14.us-east-1.aws.neon.tech';
+ if(!host.endsWith(suffix))throw Error('Destino de mídia inesperado.');
+ return location.origin+'/api/media/'+host.slice(0,-suffix.length)+'/';
+};
 const USAGE=Object.freeze({a:'https://br-silent-band-b80nklzl-appusage.compute.c-14.us-east-1.aws.neon.tech/',b:'https://br-falling-leaf-b8xuv1d0-appusage.compute.c-14.us-east-1.aws.neon.tech/'});
 const MEDIA=Object.freeze({
  a:'https://br-proud-paper-b83l1z7d-appmedia.compute.c-14.us-east-1.aws.neon.tech/',
@@ -53,7 +63,7 @@ export function createNeonPreview({authSdk,NeonPostgrestClient,fetchWithToken,en
       dataApiUrl:url,
       options:{global:{fetch:fetchWithToken(getToken)}}
    });
-   return {id,media:MEDIA[id],attachmentMedia:ATTACHMENT_MEDIA[id],mediaWrite:MEDIA_WRITE[id],client:pg.schema('viaggio_app')};
+   return {id,media:viaSameOrigin(MEDIA[id]),attachmentMedia:viaSameOrigin(ATTACHMENT_MEDIA[id]),mediaWrite:viaSameOrigin(MEDIA_WRITE[id]),client:pg.schema('viaggio_app')};
  });
  const facade=createNeonIdentity({sdkAuth:rawAuth,projects});
  // Keep the existing preview's generic RPC router, but never silently send
@@ -63,7 +73,7 @@ export function createNeonPreview({authSdk,NeonPostgrestClient,fetchWithToken,en
  const readUsage=async project=>{
    const jwt=await getToken();
    if(!jwt)throw Error('Sessão indisponível para medir armazenamento.');
-   const response=await fetch(USAGE[project.id],{headers:{authorization:'Bearer '+jwt},cache:'no-store',redirect:'error',signal:AbortSignal.timeout(30000)});
+   const response=await fetch(viaSameOrigin(USAGE[project.id]),{headers:{authorization:'Bearer '+jwt},cache:'no-store',redirect:'error',signal:AbortSignal.timeout(30000)});
    if(!response.ok)throw Error('Não foi possível medir o armazenamento ('+response.status+').');
    const body=await response.json();
    if(!Array.isArray(body.data)||body.data.length!==1||body.data[0]?.measurement_version!==2)

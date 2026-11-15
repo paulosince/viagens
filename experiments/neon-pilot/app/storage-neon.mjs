@@ -3,6 +3,11 @@
 // permission. Never retry another person's project after a 401/403/404.
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ALLOWED=new Set(['trip-images','profile-photos','day-attachments']);
+// A Neon Function root (https://host/) or, on the custom domain, the
+// same-origin pass-through for one function (/api/media/<host-prefix>/).
+const validEndpoint=u=>typeof u==='string'&&(/^https:\/\/[^/]+\/$/.test(u)
+  ||(typeof location!=='undefined'&&u.startsWith(location.origin+'/api/media/')
+    &&/^\/api\/media\/[a-z0-9-]+\/$/.test(u.slice(location.origin.length))));
 const safeError=message=>Object.assign(new Error(message),{code:'VIAGGIO_NEON_MEDIA'});
 function validate(bucket,path){
   if(!ALLOWED.has(bucket))throw safeError('Categoria de arquivo não reconhecida.');
@@ -82,10 +87,10 @@ export function createNeonMediaClient({projects,accessToken,fetcher=fetch,allowM
     const jwt=await accessToken();
     if(typeof jwt!=='string'||jwt.split('.').length!==3)
       throw safeError('Sessão Neon sem token JWT. Entre na sua conta.');
-    if(!p.media||!/^https:\/\/[^/]+\/$/.test(p.media))
+    if(!p.media||!validEndpoint(p.media))
       throw safeError('Destino de mídia do Neon inválido.');
     const endpoint=(route==='upload'||route==='remove')?p.mediaWrite:(bucket==='day-attachments'?p.attachmentMedia:p.media);
-    if(!endpoint||!/^https:\/\/[^/]+\/$/.test(endpoint))
+    if(!endpoint||!validEndpoint(endpoint))
       throw safeError('Destino de escrita de mídia não configurado.');
     const u=new URL(route,endpoint);
     u.searchParams.set('bucket',bucket);
