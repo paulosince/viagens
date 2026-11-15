@@ -98,7 +98,7 @@
         <p id="auth_intro" class="auth-intro">Suas viagens começam muito antes do embarque.</p>
         <form id="auth_form" class="auth-form" aria-hidden="false">
           <label class="visually-hidden" for="auth_email">E-mail</label>
-          <input id="auth_email" name="email" type="email" autocomplete="username" placeholder="E-mail" required>
+          <input id="auth_email" name="email" type="email" autocomplete="email" placeholder="E-mail" required>
           <label class="visually-hidden" for="auth_password">Senha</label>
           <input id="auth_password" name="password" type="password" autocomplete="current-password" placeholder="Senha" required>
           <button class="auth-submit" type="submit">Entrar</button>
@@ -645,7 +645,7 @@
       if (legacyPending > 0) {
         location.replace('./legacy-supabase.html?recover=1');
       } else {
-        await import('./experiments/neon-pilot/app/main-neon.js?v=20261115-ios-autofill2');
+        await import('./experiments/neon-pilot/app/main-neon.js?v=20261115-autofill-history3');
       }
     } catch (error) {
       console.error('Não foi possível validar o estado local antes da migração Neon', error);
