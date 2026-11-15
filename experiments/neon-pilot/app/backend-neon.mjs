@@ -14,6 +14,13 @@ const MEDIA=Object.freeze({
  a:'https://br-proud-paper-b83l1z7d-appmedia.compute.c-14.us-east-1.aws.neon.tech/',
  b:'https://br-dawn-bread-b83r0ztn-appmedia.compute.c-14.us-east-1.aws.neon.tech/'
 });
+// Attachments were written through the validated branch's appwrite/appmedia
+// services. Keep their read endpoint on that same branch; trip-images use
+// the main-branch endpoint confirmed working for itinerary photographs.
+const ATTACHMENT_MEDIA=Object.freeze({
+ a:'https://br-falling-leaf-b8xuv1d0-appmedia.compute.c-14.us-east-1.aws.neon.tech/',
+ b:'https://br-silent-band-b80nklzl-appmedia.compute.c-14.us-east-1.aws.neon.tech/'
+});
 const MEDIA_WRITE=Object.freeze({
  a:'https://br-silent-band-b80nklzl-appwrite.compute.c-14.us-east-1.aws.neon.tech/',
  b:'https://br-falling-leaf-b8xuv1d0-appmedia.compute.c-14.us-east-1.aws.neon.tech/'
@@ -40,7 +47,7 @@ export function createNeonPreview({authSdk,NeonPostgrestClient,fetchWithToken,en
       dataApiUrl:url,
       options:{global:{fetch:fetchWithToken(getToken)}}
    });
-   return {id,media:MEDIA[id],mediaWrite:MEDIA_WRITE[id],client:pg.schema('viaggio_app')};
+   return {id,media:MEDIA[id],attachmentMedia:ATTACHMENT_MEDIA[id],mediaWrite:MEDIA_WRITE[id],client:pg.schema('viaggio_app')};
  });
  const facade=createNeonIdentity({sdkAuth:rawAuth,projects});
  // Keep the existing preview's generic RPC router, but never silently send
