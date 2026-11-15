@@ -18,9 +18,13 @@ import {
 const VIAGGIO_MCP_URL = '';
 const CHATGPT_PLUGIN_URL = '';
 // The official Viaggio route uses the same validated Neon backend.
+// GitHub Pages serves the app under /viagens/; the custom domain serves it at the root.
+const IS_CUSTOM_DOMAIN_ROOT = location.hostname === 'ioviaggio.com.br'
+  && (location.pathname === '/' || location.pathname === '/index.html');
 const IS_NEON_EDITABLE = location.pathname.endsWith('/neon-editable.html')
   || location.pathname === '/viagens/'
-  || location.pathname === '/viagens/index.html';
+  || location.pathname === '/viagens/index.html'
+  || IS_CUSTOM_DOMAIN_ROOT;
 const TRIP_IMAGE_BUCKET = 'trip-images';
 const PROFILE_IMAGE_BUCKET = 'profile-photos';
 const NEW_AGENDA_TITLE = 'Nova atividade';
