@@ -1,5 +1,8 @@
 # Viaggio: same-origin authentication deployment
 
+> **SUSPENSO — NÃO PUBLICAR.** A auditoria de 15/11 identificou dependências não cobertas pelos testes isolados: CORS das Data APIs/Functions, cache de auth same-origin no service worker e recursos ausentes no pacote. Este diretório é somente um protótipo não implantado. Consulte [a auditoria](../../docs/ARCHITECTURE-AUDIT-2026-11-15.md). Vercel não é requisito; a infraestrutura Cloudflare existente precisa ser inspecionada antes de escolher hospedagem.
+
+
 Status: implementation prepared and tested locally. NOT deployed, NOT validated on the user's iPad. The GitHub Pages app remains unchanged.
 
 ## Evidence and scope
