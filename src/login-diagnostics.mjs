@@ -7,7 +7,7 @@ export function createLoginDiagnostics({authUrl, apiRoots, render, standalone=fa
   const note=(label)=>{if(active && events.length<30)events.push(label)};
   function route(input) {
     try {
-      const url=new URL(typeof input==='string'?input:input.url);
+      const url=new URL(typeof input==='string' || input instanceof URL ? input : input.url);
       if(url.origin===auth.origin && url.pathname.startsWith(auth.pathname+'/')) {
         const path=url.pathname.slice(auth.pathname.length);
         return ({'/sign-in/email':'senha','/get-session':'sessao','/token':'jwt'})[path]||null;
@@ -40,7 +40,7 @@ export function createLoginDiagnostics({authUrl, apiRoots, render, standalone=fa
     }},
     async finish(failed){
       await Promise.allSettled(pending);
-      const report=['VIAGGIO DIAG D1',standalone?'modo: PWA':'modo: navegador',online?'rede: online':'rede: offline',...events].join('\n');
+      const report=['VIAGGIO DIAG D2',standalone?'modo: PWA':'modo: navegador',online?'rede: online':'rede: offline',...events].join('\n');
       active=false;
       if(failed)render(report);
     }

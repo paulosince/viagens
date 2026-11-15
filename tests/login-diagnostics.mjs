@@ -6,7 +6,7 @@ let calls=0;
 const response=new Response(JSON.stringify({session:{token:'SECRET-TOKEN'},user:{email:'PRIVATE-EMAIL'}}),{status:200});
 const wrapped=d.wrapFetch(async(input,init)=>{calls++;assert.equal(init.body,'PRIVATE-PASSWORD');return response});
 d.start();
-const returned=await wrapped('https://auth.test/db/auth/get-session?secret=PRIVATE-QUERY',{body:'PRIVATE-PASSWORD'});
+const returned=await wrapped(new URL('https://auth.test/db/auth/get-session?secret=PRIVATE-QUERY'),{body:'PRIVATE-PASSWORD'});
 assert.equal(returned,response);
 assert.equal((await returned.json()).session.token,'SECRET-TOKEN');
 await d.finish(true);

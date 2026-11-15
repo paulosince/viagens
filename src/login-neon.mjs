@@ -1,4 +1,4 @@
-import {createLoginDiagnostics} from './login-diagnostics.mjs?v=20261115-diag1';
+import {createLoginDiagnostics} from './login-diagnostics.mjs?v=20261115-diag2';
 // Deliberately standalone: no app forms, signup password fields or field swapping.
 export function bindLoginForm({form, button, message, authenticate, navigate}) {
   let pending = false;
