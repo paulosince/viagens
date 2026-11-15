@@ -1,7 +1,7 @@
 // Neon-only preview backend. No Supabase project or Supabase Auth calls.
 // Transport: official @neondatabase/postgrest-js, JWTs: Managed Neon Auth.
 // IMPORTANT: these are staging APIs. Never substitute project main URLs.
-import {createNeonMediaClient} from './storage-neon.mjs?v=20261115-ticket-http';
+import {createNeonMediaClient} from './storage-neon.mjs?v=20261115-ticket-route3';
 import {createRouter} from './router-neon.mjs?v=20261024-home3';
 import {createNeonIdentity} from './neon-identity.mjs';
 export const API_ROOTS=Object.freeze({
@@ -18,8 +18,8 @@ const MEDIA=Object.freeze({
 // services. Keep their read endpoint on that same branch; trip-images use
 // the main-branch endpoint confirmed working for itinerary photographs.
 const ATTACHMENT_MEDIA=Object.freeze({
- a:'https://br-falling-leaf-b8xuv1d0-appmedia.compute.c-14.us-east-1.aws.neon.tech/',
- b:'https://br-silent-band-b80nklzl-appmedia.compute.c-14.us-east-1.aws.neon.tech/'
+ a:'https://br-silent-band-b80nklzl-appmedia.compute.c-14.us-east-1.aws.neon.tech/',
+ b:'https://br-falling-leaf-b8xuv1d0-appmedia.compute.c-14.us-east-1.aws.neon.tech/'
 });
 const MEDIA_WRITE=Object.freeze({
  a:'https://br-silent-band-b80nklzl-appwrite.compute.c-14.us-east-1.aws.neon.tech/',

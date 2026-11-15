@@ -1,4 +1,4 @@
-const CACHE_NAME = 'viaggio-home-v154-ticket-http';
+const CACHE_NAME = 'viaggio-home-v155-ticket-route3';
 const MEDIA_CACHE_NAME = 'viaggio-media-v1';
 const NEON_MEDIA_CACHE_NAME = 'viaggio-neon-auth-preview-media-v1';
 const SUPABASE_CLIENT = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
@@ -12,13 +12,13 @@ const APP_SHELL = [
   './',
   './index.html',
   './style.css?v=20261106-agenda-rail3',
-  './experiments/neon-pilot/app/main-neon.js?v=20261115-ticket-http',
-  './experiments/neon-pilot/app/backend-neon.mjs?v=20261115-ticket-http',
+  './experiments/neon-pilot/app/main-neon.js?v=20261115-ticket-route3',
+  './experiments/neon-pilot/app/backend-neon.mjs?v=20261115-ticket-route3',
   './experiments/neon-pilot/app/usage-rings.mjs?v=20261024-home3',
   './experiments/neon-pilot/app/offline-store-neon.js?v=20261021-1',
   './experiments/neon-pilot/app/media-cache-neon.js?v=20261021-1',
   './experiments/neon-pilot/app/photo-source-neon.mjs?v=20261021-7photofix',
-  './experiments/neon-pilot/app/storage-neon.mjs?v=20261115-ticket-http',
+  './experiments/neon-pilot/app/storage-neon.mjs?v=20261115-ticket-route3',
   './experiments/neon-pilot/app/router-neon.mjs?v=20261024-home3',
   './experiments/neon-pilot/app/neon-identity.mjs',
   './src/offline-store.js?v=20261007-59',
