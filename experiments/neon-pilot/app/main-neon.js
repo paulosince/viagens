@@ -1,5 +1,5 @@
 import {mountTicketImageZoom} from './ticket-image-zoom.mjs?v=20261115-zoom1';
-import {createNeonPreview,NEON_AUTH_URL,API_ROOTS} from './backend-neon.mjs?v=20261115-login1';
+import {createNeonPreview,NEON_AUTH_URL,API_ROOTS} from './backend-neon.mjs?v=20261115-sameorigin1';
 import {activityPhotoForPreview} from './photo-source-neon.mjs?v=20261021-7photofix';
 import {usageRingsModel} from './usage-rings.mjs?v=20261024-home3';
 import { offlineStore } from './offline-store-neon.js?v=20261021-1';

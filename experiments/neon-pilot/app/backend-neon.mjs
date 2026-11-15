@@ -8,7 +8,13 @@ export const API_ROOTS=Object.freeze({
   a:'https://ep-empty-pine-b8r7sa8d.apirest.c-14.us-east-1.aws.neon.tech/viaggio_lab/rest/v1',
   b:'https://ep-spring-moon-b8fi6yxc.apirest.c-14.us-east-1.aws.neon.tech/viaggio_lab/rest/v1'
 });
-export const NEON_AUTH_URL='https://ep-small-bread-b7uq0zva.neonauth.c-13.us-east-1.aws.neon.tech/viaggio_auth/auth';
+const NEON_AUTH_UPSTREAM='https://ep-small-bread-b7uq0zva.neonauth.c-13.us-east-1.aws.neon.tech/viaggio_auth/auth';
+// On the custom domain, auth goes through the same-origin Cloudflare function
+// (functions/api/auth) so the session cookie is first-party. GitHub Pages keeps
+// calling Neon Auth directly.
+export const NEON_AUTH_URL=(typeof location!=='undefined' && location.hostname==='ioviaggio.com.br')
+  ? location.origin+'/api/auth'
+  : NEON_AUTH_UPSTREAM;
 const USAGE=Object.freeze({a:'https://br-silent-band-b80nklzl-appusage.compute.c-14.us-east-1.aws.neon.tech/',b:'https://br-falling-leaf-b8xuv1d0-appusage.compute.c-14.us-east-1.aws.neon.tech/'});
 const MEDIA=Object.freeze({
  a:'https://br-proud-paper-b83l1z7d-appmedia.compute.c-14.us-east-1.aws.neon.tech/',
