@@ -109,10 +109,33 @@ export function createNeonMediaClient({projects,accessToken,fetcher=fetch,allowM
       return await unwrap(await request(project,route,bucket,path,{expires}),route);
     }catch(error){return {data:null,error};}
   }
+  // Day attachments must remain readable without relying on a public signed
+  // URL endpoint. Fetch the private bytes with the current Neon JWT, then
+  // provide a session-local object URL to existing image/PDF viewers.
+  const attachmentUrls=new Map();
+  const attachmentLoads=new Map();
+  async function attachmentUrl(path){
+    try {
+      validate('day-attachments',path);
+      if(attachmentUrls.has(path))return {data:{signedUrl:attachmentUrls.get(path)},error:null};
+      if(!attachmentLoads.has(path)) {
+        attachmentLoads.set(path,(async()=>{
+          const result=await read('day-attachments',path,'download');
+          if(result.error)throw result.error;
+          const url=URL.createObjectURL(result.data);
+          attachmentUrls.set(path,url);
+          return url;
+        })().finally(()=>attachmentLoads.delete(path)));
+      }
+      return {data:{signedUrl:await attachmentLoads.get(path)},error:null};
+    } catch(error){return {data:null,error};}
+  }
   return {from(bucket){
     return {
       download:path=>read(bucket,path,'download'),
-      createSignedUrl:(path,expires)=>read(bucket,path,'sign',expires),
+      createSignedUrl:(path,expires)=>bucket==='day-attachments'
+        ? attachmentUrl(path)
+        : read(bucket,path,'sign',expires),
       async upload(path,file,options={}){
         try{
           if(!allowMutations)throw safeError('Upload aguardando a validação final da etapa 7.');
