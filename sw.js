@@ -1,4 +1,4 @@
-const CACHE_NAME = 'viaggio-home-v164-same-origin-media';
+const CACHE_NAME = 'viaggio-home-v165-redirect-safe';
 const MEDIA_CACHE_NAME = 'viaggio-media-v1';
 const NEON_MEDIA_CACHE_NAME = 'viaggio-neon-auth-preview-media-v1';
 const SUPABASE_CLIENT = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
@@ -110,14 +110,24 @@ self.addEventListener('fetch', event => {
   event.respondWith(
     fetch(event.request)
       .then(async response => {
+        // Hosts such as Cloudflare Pages redirect /login.html -> /login and
+        // /index.html -> /. Let the browser follow that redirect itself.
+        if (response.type === 'opaqueredirect') return response;
         if (!response.ok || !response.headers.get('content-type')?.includes('text/html')) {
-          return (await caches.match(event.request)) || (await caches.match('./index.html')) || response;
+          return withoutRedirect((await caches.match(event.request)) || (await caches.match('./index.html'))) || response;
         }
         await caches.open(CACHE_NAME)
           .then(cache => cache.put(event.request, response.clone()))
           .catch(() => {});
         return response;
       })
-      .catch(() => caches.match(event.request).then(cached => cached || caches.match('./index.html')))
+      .catch(() => caches.match(event.request).then(cached => withoutRedirect(cached) || caches.match('./index.html').then(withoutRedirect)))
   );
 });
+
+// Browsers refuse a redirected response as the answer to a navigation.
+// App-shell entries cached through a redirect are re-wrapped as plain responses.
+function withoutRedirect(response) {
+  if (!response || !response.redirected) return response;
+  return new Response(response.body, {status: response.status, statusText: response.statusText, headers: response.headers});
+}
