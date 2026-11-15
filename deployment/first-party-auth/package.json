@@ -1,0 +1,8 @@
+{
+  "name": "viaggio-first-party-auth",
+  "private": true,
+  "type": "module",
+  "scripts": {"build": "node build.mjs", "test": "node --test proxy.test.mjs && node build.mjs && node verify-build.mjs"},
+  "engines": {"node": "24.x"},
+  "dependencies": {"@neondatabase/auth": "0.7.0-beta"}
+}

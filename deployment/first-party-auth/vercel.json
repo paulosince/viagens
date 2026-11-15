@@ -1,0 +1,10 @@
+{
+  "framework": null,
+  "buildCommand": "npm run build",
+  "outputDirectory": "public",
+  "redirects": [{"source": "/", "destination": "/viagens/", "permanent": false}],
+  "headers": [
+    {"source": "/api/auth/:path*", "headers": [{"key": "Cache-Control", "value": "no-store"}]},
+    {"source": "/viagens/sw.js", "headers": [{"key": "Cache-Control", "value": "no-cache"}]}
+  ]
+}
