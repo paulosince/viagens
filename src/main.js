@@ -7079,6 +7079,14 @@ function setAuthMode(mode) {
   dom.signupForm.setAttribute('aria-hidden', String(!signup));
   dom.authForm.inert = signup;
   dom.signupForm.inert = !signup;
+  // Keep inactive form controls out of Safari/iOS Password AutoFill heuristics.
+  // Only the active form may expose password fields to the password manager.
+  for (const field of dom.authForm.elements) field.disabled = signup;
+  for (const field of dom.signupForm.elements) field.disabled = !signup;
+  dom.authForm.querySelector('[name="password"]').autocomplete = signup ? 'off' : 'current-password';
+  for (const field of dom.signupForm.querySelectorAll('input[type="password"]')) {
+    field.autocomplete = signup ? 'new-password' : 'off';
+  }
   dom.authMessage.textContent = '';
   dom.signupMessage.textContent = '';
 }
