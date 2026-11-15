@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Viaggio — Diagnóstico de preenchimento</title>
+<style>body{font:16px -apple-system,BlinkMacSystemFont,sans-serif;max-width:440px;margin:40px auto;padding:0 20px;color:#17212b}label{display:block;margin:20px 0 6px}input{display:block;width:100%;box-sizing:border-box;font:inherit;padding:13px;border:1px solid #aaa;border-radius:8px}button{margin-top:20px;padding:12px 18px;font:inherit}small{display:block;color:#555;margin-top:20px}</style></head>
+<body><h1>Teste de preenchimento do Viaggio</h1><p>Esta página não envia nem armazena credenciais. Apenas testa o reconhecimento do par e-mail/senha pelo Safari.</p>
+<form id="login" method="post" action="#">
+<label for="username">E-mail</label><input id="username" name="username" type="email" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+<label for="password">Senha</label><input id="password" name="password" type="password" autocomplete="current-password" required>
+<button type="submit">Testar reconhecimento</button>
+</form><small>Versão diagnóstica 2026-11-15. Não informe sua senha manualmente; apenas observe as sugestões do iOS. Não envie o formulário.</small>
+<script>document.getElementById('login').addEventListener('submit',e=>e.preventDefault());</script>
+</body></html>
