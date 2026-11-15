@@ -1,4 +1,5 @@
-import {createNeonPreview,NEON_AUTH_URL,API_ROOTS} from './backend-neon.mjs?v=20261115-ticket-route3';
+import {mountTicketImageZoom} from './ticket-image-zoom.mjs?v=20261115-zoom1';
+import {createNeonPreview,NEON_AUTH_URL,API_ROOTS} from './backend-neon.mjs?v=20261115-ticket-zoom1';
 import {activityPhotoForPreview} from './photo-source-neon.mjs?v=20261021-7photofix';
 import {usageRingsModel} from './usage-rings.mjs?v=20261024-home3';
 import { offlineStore } from './offline-store-neon.js?v=20261021-1';
@@ -5030,6 +5031,7 @@ function tripFileSize(file) {
     : (kilobytes / 1024).toFixed(1) + ' MB';
 }
 
+let clearTicketImageZoom = null;
 let tripFileViewerState = null;
 let tripFileViewerBlobUrl = null;
 let tripFileViewerLoad = 0;
@@ -5037,6 +5039,8 @@ let tripFileViewerCloseTimer = null;
 let tripFileViewerLeavingView = null;
 
 function clearTripFileViewerMedia() {
+  clearTicketImageZoom?.();
+  clearTicketImageZoom = null;
   tripFileViewerLoad += 1;
   dom.tripFileViewerMedia.replaceChildren();
   if (tripFileViewerBlobUrl) URL.revokeObjectURL(tripFileViewerBlobUrl);
@@ -5109,6 +5113,7 @@ function showTripFileViewerIndex(index, { syncHistory = true } = {}) {
     image.onerror = () => { dom.tripFileViewerStatus.textContent = 'Não foi possível carregar a imagem.'; };
     image.src = file.signedUrl;
     dom.tripFileViewerMedia.append(image);
+    clearTicketImageZoom = mountTicketImageZoom({image, viewport:dom.tripFileViewerMedia, footer:dom.tripFileViewerStatus.parentElement});
   } else if (file.mime_type === 'application/pdf') {
     dom.tripFileViewerStatus.textContent = 'Carregando PDF…';
     const loading = document.createElement('div');
