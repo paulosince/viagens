@@ -1,4 +1,4 @@
-const CACHE_NAME = 'viaggio-home-v151-media-endpoints1';
+const CACHE_NAME = 'viaggio-home-v152-ticket-private1';
 const MEDIA_CACHE_NAME = 'viaggio-media-v1';
 const NEON_MEDIA_CACHE_NAME = 'viaggio-neon-auth-preview-media-v1';
 const SUPABASE_CLIENT = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
@@ -12,8 +12,8 @@ const APP_SHELL = [
   './',
   './index.html',
   './style.css?v=20261106-agenda-rail3',
-  './experiments/neon-pilot/app/main-neon.js?v=20261115-media-endpoints1',
-  './experiments/neon-pilot/app/backend-neon.mjs?v=20261115-media-endpoints1',
+  './experiments/neon-pilot/app/main-neon.js?v=20261115-ticket-private1',
+  './experiments/neon-pilot/app/backend-neon.mjs?v=20261115-ticket-private1',
   './experiments/neon-pilot/app/usage-rings.mjs?v=20261024-home3',
   './experiments/neon-pilot/app/offline-store-neon.js?v=20261021-1',
   './experiments/neon-pilot/app/media-cache-neon.js?v=20261021-1',
