@@ -8622,7 +8622,7 @@ dom.authForm.addEventListener('submit', async event => {
   try {
     const client = await tryNeon();
     if (!client) { dom.authMessage.textContent = 'Sem conexão. Abra o app normalmente se este aparelho já tiver uma cópia da viagem.'; return; }
-    const result = await client.auth.signInWithPassword(Object.fromEntries(new FormData(dom.authForm)));
+    const result = await client.auth.signInWithPassword({ email: String(new FormData(dom.authForm).get('username') || '').trim(), password: String(new FormData(dom.authForm).get('password') || '') });
     if (result.error) { dom.authMessage.textContent = result.error.message; return; }
     await enterWithUser(result.data.user);
   } catch (error) {
