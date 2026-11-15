@@ -1,4 +1,4 @@
-const CACHE_NAME = 'viaggio-home-v148-autofill-template5';
+const CACHE_NAME = 'viaggio-home-v149-autofill-username6';
 const MEDIA_CACHE_NAME = 'viaggio-media-v1';
 const NEON_MEDIA_CACHE_NAME = 'viaggio-neon-auth-preview-media-v1';
 const SUPABASE_CLIENT = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
@@ -12,7 +12,7 @@ const APP_SHELL = [
   './',
   './index.html',
   './style.css?v=20261106-agenda-rail3',
-  './experiments/neon-pilot/app/main-neon.js?v=20261115-autofill-template5',
+  './experiments/neon-pilot/app/main-neon.js?v=20261115-autofill-username6',
   './experiments/neon-pilot/app/backend-neon.mjs?v=20261024-home3',
   './experiments/neon-pilot/app/usage-rings.mjs?v=20261024-home3',
   './experiments/neon-pilot/app/offline-store-neon.js?v=20261021-1',
