@@ -11,8 +11,8 @@ test('initial login offers an existing credential and disables hidden signup inp
   for (const input of signup.match(/<input\b[^>]*>/g)) assert.match(input, /\bdisabled\b/);
 });
 test('switching auth mode enables only the active form and preserves entered values', () => {
-  const form = () => ({inputs:[{disabled:false,value:'existing'}],setAttribute(){},querySelectorAll(){return this.inputs;}});
-  const dom = {authCard:{dataset:{}},authIntro:{},authForm:form(),signupForm:form(),authMessage:{},signupMessage:{}};
+  const form = () => ({isConnected:false,inputs:[{disabled:false,value:'existing'}],remove(){this.isConnected=false},setAttribute(){},querySelector(){return this.inputs[0]},querySelectorAll(){return this.inputs;}});
+  const dom = {authCard:{dataset:{},append(form){form.isConnected=true}},authIntro:{},authForm:form(),signupForm:form(),authMessage:{},signupMessage:{}};
   const context = vm.createContext({dom});
   vm.runInContext(source.slice(source.indexOf('function setAuthMode('), source.indexOf('async function enterWithUser(')), context);
   for (const mode of ['signup','login','signup','login']) {

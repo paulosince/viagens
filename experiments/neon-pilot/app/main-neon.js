@@ -1,5 +1,5 @@
 import {mountTicketImageZoom} from './ticket-image-zoom.mjs?v=20261115-zoom1';
-import {createNeonPreview,NEON_AUTH_URL,API_ROOTS} from './backend-neon.mjs?v=20261115-ticket-zoom1';
+import {createNeonPreview,NEON_AUTH_URL,API_ROOTS} from './backend-neon.mjs?v=20261115-login1';
 import {activityPhotoForPreview} from './photo-source-neon.mjs?v=20261021-7photofix';
 import {usageRingsModel} from './usage-rings.mjs?v=20261024-home3';
 import { offlineStore } from './offline-store-neon.js?v=20261021-1';
@@ -659,6 +659,14 @@ function setUsageOpen(open) {
 }
 
 function setSessionView(session) {
+  // The normal sign-in document has only one stable username/password pair.
+  // Preserve explicit signup and lab flows; authenticated/offline boot is unchanged.
+  const authMode = new URLSearchParams(location.search).get('auth');
+  if (session === 'anonymous' && IS_NEON_EDITABLE && !location.pathname.endsWith('/neon-editable.html') && authMode !== 'signup') {
+    location.replace('./login.html' + location.hash);
+    return;
+  }
+  if (session === 'anonymous' && authMode === 'signup') setAuthMode('signup');
   if (window.__viaggioBootGuard) {
     clearTimeout(window.__viaggioBootGuard);
     window.__viaggioBootGuard = null;
@@ -8619,7 +8627,10 @@ async function enterWithUser(user) {
 
 setAuthMode('login');
 dom.showSignup.addEventListener('click', () => setAuthMode('signup'));
-dom.showLogin.addEventListener('click', () => setAuthMode('login'));
+dom.showLogin.addEventListener('click', () => {
+  if (new URLSearchParams(location.search).get('auth') === 'signup') location.replace('./login.html');
+  else setAuthMode('login');
+});
 dom.authForm.addEventListener('submit', async event => {
   event.preventDefault(); dom.authMessage.textContent = ''; dom.authMessage.dataset.kind = 'error';
   const button = dom.authForm.querySelector('.auth-submit');
@@ -8677,7 +8688,7 @@ dom.signupForm.addEventListener('submit', async event => {
       return;
     }
     const photoUnavailable = !!signupAvatar && !avatarSaved;
-    dom.authForm.querySelector('[name="email"]').value = email;
+    dom.authForm.querySelector('[name="username"]').value = email;
     dom.signupForm.reset();
     clearSignupAvatar();
     setAuthMode('login');
