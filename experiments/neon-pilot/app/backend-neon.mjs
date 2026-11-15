@@ -1,7 +1,7 @@
 // Neon-only preview backend. No Supabase project or Supabase Auth calls.
 // Transport: official @neondatabase/postgrest-js, JWTs: Managed Neon Auth.
 // IMPORTANT: these are staging APIs. Never substitute project main URLs.
-import {createNeonMediaClient} from './storage-neon.mjs?v=20261115-ticket-branch2';
+import {createNeonMediaClient} from './storage-neon.mjs?v=20261115-ticket-http';
 import {createRouter} from './router-neon.mjs?v=20261024-home3';
 import {createNeonIdentity} from './neon-identity.mjs';
 export const API_ROOTS=Object.freeze({

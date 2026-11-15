@@ -92,13 +92,22 @@ export function createNeonMediaClient({projects,accessToken,fetcher=fetch,allowM
     if(path)u.searchParams.set('path',path);
     if(expires!==undefined)u.searchParams.set('expires',String(expires));
     // Redirect errors prevent the Bearer token from being replayed to another host.
-    return fetcher(u.toString(),{
+    const response=await fetcher(u.toString(),{
       method:body===undefined?'GET':'POST',body,
       headers:{Authorization:'Bearer '+jwt,...headers},
       mode:'cors',credentials:'omit',redirect:'error',
       cache:'no-store',referrerPolicy:'no-referrer',
       signal:AbortSignal.timeout(45000)
     });
+    if(bucket==='day-attachments' && route==='download') {
+      let code='';
+      if(!response.ok) {
+        const problem=await response.clone().json().catch(()=>null);
+        if(typeof problem?.error==='string' && /^[A-Z_]{1,80}$/.test(problem.error))code=' '+problem.error;
+      }
+      console.info('[Viaggio tickets] GET '+u.origin+'/download HTTP '+response.status+code);
+    }
+    return response;
   }
   async function read(bucket,path,route,expires){
     try{
