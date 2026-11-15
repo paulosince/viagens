@@ -97,6 +97,7 @@ main {
     button { width: 100%; min-height: 53px; margin-top: 4px; border: 0; border-radius: 14px; background: #087df4; color: white; font: inherit; font-weight: 700; cursor: pointer; }
     button:disabled { opacity: .6; }
     #login-message { margin: 12px 0 0; color: #b7312e; font-size: 13px; line-height: 1.4; }
+    [hidden] { display: none !important; }
     #login-message:empty { display: none; }
     .signup-link { margin: 18px 0 0; padding-top: 16px; border-top: 1px solid rgba(18,76,112,.12); color: #456176; font-size: 14px; text-align: center; }
     a { display: inline-block; padding: 5px 2px; color: #006ed6; font-weight: 700; text-decoration: none; }
@@ -124,8 +125,13 @@ main {
       <p id="login-message" role="status" aria-live="polite"></p>
     </form>
     <p class="signup-link">Ainda não tem conta? <a href="./index.html?auth=signup">Criar conta</a></p>
+    <details id="login-diagnostic" hidden style="margin-top:16px;font-size:13px">
+      <summary>Diagnóstico do login · D1</summary>
+      <pre id="login-diagnostic-output" style="white-space:pre-wrap;overflow-wrap:anywhere;user-select:text"></pre>
+      <p>Envie uma foto deste diagnóstico. Ele não contém sua senha nem tokens.</p>
+    </details>
     <noscript>Ative o JavaScript para entrar com segurança.</noscript>
   </main>
-  <script type="module" src="./src/login-neon.mjs?v=20261115-login1"></script>
+  <script type="module" src="./src/login-neon.mjs?v=20261115-diag1"></script>
 </body>
 </html>

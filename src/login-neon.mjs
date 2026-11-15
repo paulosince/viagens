@@ -1,3 +1,4 @@
+import {createLoginDiagnostics} from './login-diagnostics.mjs?v=20261115-diag1';
 // Deliberately standalone: no app forms, signup password fields or field swapping.
 export function bindLoginForm({form, button, message, authenticate, navigate}) {
   let pending = false;
@@ -27,17 +28,39 @@ export function bindLoginForm({form, button, message, authenticate, navigate}) {
 
 if (typeof document !== 'undefined') {
   let clientPromise;
+  const diagnosticOutput=document.getElementById('login-diagnostic-output');
+  const diagnosticPanel=document.getElementById('login-diagnostic');
+  let diagnostic;
+  const initializeDiagnostics=backend=>{
+    if(diagnostic)return;
+    diagnostic=createLoginDiagnostics({
+      authUrl:backend.NEON_AUTH_URL,apiRoots:backend.API_ROOTS,
+      standalone:matchMedia('(display-mode: standalone)').matches || navigator.standalone===true,
+      online:navigator.onLine,
+      render:text=>{diagnosticOutput.textContent=text;diagnosticPanel.hidden=!text;diagnosticPanel.open=!!text}
+    });
+    window.fetch=diagnostic.wrapFetch(window.fetch.bind(window));
+  };
   async function authenticate(credentials) {
     clientPromise ||= Promise.all([
       import('../experiments/neon-pilot/app/backend-neon.mjs?v=20261115-login1'),
       import('https://cdn.jsdelivr.net/npm/@neondatabase/neon-js@0.9.0-beta/+esm'),
       import('https://cdn.jsdelivr.net/npm/@neondatabase/postgrest-js@0.2.0-beta/+esm')
     ]).then(([backend, {createClient, SupabaseAuthAdapter}, {NeonPostgrestClient, fetchWithToken}]) => {
+      initializeDiagnostics(backend);
       const authSdk = createClient({auth:{url:backend.NEON_AUTH_URL,adapter:SupabaseAuthAdapter()},dataApi:{url:backend.API_ROOTS.a}});
       return backend.createNeonPreview({authSdk, NeonPostgrestClient, fetchWithToken});
     }).catch(error => { clientPromise = null; throw error; });
     const client = await clientPromise;
-    return client.auth.signInWithPassword(credentials);
+    diagnostic.start();
+    diagnostic.note('etapa: autenticacao e perfil');
+    let failed=true;
+    try {
+      const result=await client.auth.signInWithPassword(credentials);
+      failed=!!result.error || !result.data?.session || !result.data?.user;
+      diagnostic.note(result.error?'resultado: falha':result.data?.session?'resultado: sessao confirmada':'resultado: sem sessao');
+      return result;
+    }finally{await diagnostic.finish(failed)}
   }
   bindLoginForm({
     form: document.getElementById('login-form'),
