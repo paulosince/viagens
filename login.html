@@ -8,25 +8,113 @@
   <title>Entrar no Viaggio</title>
   <link rel="icon" href="assets/app-icon.svg" type="image/svg+xml">
   <style>
+    :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", sans-serif; font-synthesis: none; }
     * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: 24px; color: #183047; background: linear-gradient(160deg,#daf5fa,#b9def3); font: 16px/1.5 system-ui,sans-serif; }
-    main { width: min(100%,400px); padding: 30px 24px; background: #ffffffed; border-radius: 24px; box-shadow: 0 20px 60px #124c701a; }
-    h1 { margin: 0; font-size: 36px; letter-spacing: -.04em; }
-    .intro { margin: 8px 0 24px; color: #526778; }
-    label { display: block; margin: 16px 0 6px; font-weight: 600; }
-    input { width: 100%; min-height: 52px; border: 1px solid #a9bfce; border-radius: 12px; padding: 12px; font: inherit; background: white; color: #183047; }
-    input:focus { outline: 3px solid #168ce240; border-color: #168ce2; }
-    button { width: 100%; min-height: 52px; margin-top: 24px; border: 0; border-radius: 12px; background: #087df4; color: white; font: inherit; font-weight: 700; }
+    body { margin: 0; color: #0b1628; -webkit-font-smoothing: antialiased; }
+.splash-cloud {
+  position: absolute;
+  z-index: 1;
+  left: 110vw;
+  width: 180px;
+  height: 52px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.76);
+  filter: blur(.2px);
+  box-shadow: 0 10px 28px rgba(40,126,174,.12);
+  animation: splash-cloud-pass 13s linear infinite;
+}
+.splash-cloud::before,
+.splash-cloud::after {
+  position: absolute;
+  bottom: 13px;
+  border-radius: 50%;
+  background: inherit;
+  content: "";
+}
+.splash-cloud::before { left: 28px; width: 76px; height: 76px; }
+.splash-cloud::after { right: 25px; width: 98px; height: 98px; }
+.splash-cloud-one { top: 18%; animation-duration: 12s; }
+.splash-cloud-two { top: 58%; width: 230px; opacity: .68; animation-delay: -7s; animation-duration: 17s; transform: scale(.75); }
+.splash-cloud-three { top: 78%; width: 145px; opacity: .58; animation-delay: -3s; animation-duration: 14s; transform: scale(.58); }
+@keyframes splash-cloud-pass {
+  from { translate: 0 0; }
+  to { translate: -155vw 0; }
+}
+body {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  min-height: 100svh;
+  padding: max(28px, env(safe-area-inset-top)) 20px max(32px, env(safe-area-inset-bottom));
+  place-items: center;
+  overflow-x: clip;
+  background: linear-gradient(180deg, #58baf1 0%, #8cddf3 42%, #c9f2ee 77%, #b6ece9 100%);
+}
+body::before {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  background: radial-gradient(circle 145px at 82% 8%, rgba(255,250,214,.35), transparent 82%);
+  content: "";
+  pointer-events: none;
+}
+body::after {
+  position: absolute;
+  z-index: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: clamp(190px, 28svh, 340px);
+  background: url("assets/auth-shore.svg") center bottom / 100% 100% no-repeat;
+  content: "";
+  pointer-events: none;
+}
+body .splash-cloud { animation-duration: 18s; }
+body .splash-cloud-one { animation-delay: -3s; }
+body .splash-cloud-two { animation-delay: -9s; }
+body .splash-cloud-three { top: 31%; animation-delay: -15s; }
+main {
+  position: relative;
+  z-index: 2;
+  width: min(100%, 420px);
+  padding: 30px 26px 24px;
+  border: 1px solid rgba(255,255,255,.86);
+  border-radius: 32px;
+  background: rgba(255,255,255,.91);
+  box-shadow: 0 22px 68px rgba(11,84,125,.18), 0 2px 12px rgba(11,84,125,.08);
+  -webkit-backdrop-filter: blur(28px);
+  backdrop-filter: blur(28px);
+}
+.auth-brand { display: flex; align-items: center; gap: 8px; }
+.auth-brand h1 { margin: 0; font-size: clamp(34px, 9vw, 44px); line-height: 1.12; letter-spacing: -.055em; }
+.auth-brand img { display: block; width: 84px; height: 53px; object-fit: contain; animation: auth-plane-float 3.8s ease-in-out infinite alternate; }
+@keyframes auth-plane-float { to { transform: translateY(-5px) rotate(-2deg); } }
+.intro { margin: 13px 0 24px; color: #3c5266; font-size: 16px; line-height: 1.4; }
+
+    label { display: block; margin: 12px 0 6px; color: #3c5266; font-size: 14px; font-weight: 600; }
+    input { display: block; width: 100%; height: 52px; margin: 0 0 11px; padding: 0 15px; border: 1px solid rgba(18,76,112,.18); border-radius: 14px; outline: 0; color: #0b1628; background: rgba(255,255,255,.9); font: inherit; font-size: 16px; }
+    input:focus { border-color: #168ce2; box-shadow: 0 0 0 3px rgba(0,122,255,.13); }
+    button { width: 100%; min-height: 53px; margin-top: 4px; border: 0; border-radius: 14px; background: #087df4; color: white; font: inherit; font-weight: 700; cursor: pointer; }
     button:disabled { opacity: .6; }
-    #login-message { color: #a32828; margin: 12px 0 0; }
-    .signup-link { margin: 20px 0 0; font-size: 14px; text-align: center; }
-    a { color: #075db2; }
+    #login-message { margin: 12px 0 0; color: #b7312e; font-size: 13px; line-height: 1.4; }
+    #login-message:empty { display: none; }
+    .signup-link { margin: 18px 0 0; padding-top: 16px; border-top: 1px solid rgba(18,76,112,.12); color: #456176; font-size: 14px; text-align: center; }
+    a { display: inline-block; padding: 5px 2px; color: #006ed6; font-weight: 700; text-decoration: none; }
+    a:focus-visible, button:focus-visible { outline: 3px solid rgba(0,122,255,.4); outline-offset: 3px; }
+    .splash-cloud { pointer-events: none; }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; } }
   </style>
 </head>
 <body>
+  <span class="splash-cloud splash-cloud-one" aria-hidden="true"></span>
+  <span class="splash-cloud splash-cloud-two" aria-hidden="true"></span>
+  <span class="splash-cloud splash-cloud-three" aria-hidden="true"></span>
   <main>
-    <h1>Viaggio</h1>
-    <p class="intro">Entre com sua conta para continuar a viagem.</p>
+    <div class="auth-brand">
+      <img src="assets/splash-plane.png" alt="" aria-hidden="true">
+      <h1>Viaggio</h1>
+    </div>
+    <p class="intro">Suas viagens começam muito antes do embarque.</p>
     <form id="login-form" name="login" method="post" action="./login.html" autocomplete="on">
       <label for="login-username">E-mail</label>
       <input id="login-username" name="username" type="email" autocomplete="username" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="next" required>

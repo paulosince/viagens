@@ -1,4 +1,4 @@
-const CACHE_NAME = 'viaggio-home-v157-login1';
+const CACHE_NAME = 'viaggio-home-v158-login-style1';
 const MEDIA_CACHE_NAME = 'viaggio-media-v1';
 const NEON_MEDIA_CACHE_NAME = 'viaggio-neon-auth-preview-media-v1';
 const SUPABASE_CLIENT = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
