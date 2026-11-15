@@ -13,8 +13,6 @@ const HOST_SUFFIX = '.compute.c-14.us-east-1.aws.neon.tech';
 const ALLOWED_ORIGINS = new Set(['https://ioviaggio.com.br']);
 const MEDIA_ACTIONS = new Map([['sign', 'GET'], ['download', 'GET'], ['upload', 'POST'], ['remove', 'POST']]);
 export const TARGETS = new Map([
-  ['br-proud-paper-b83l1z7d-appmedia', MEDIA_ACTIONS],
-  ['br-dawn-bread-b83r0ztn-appmedia', MEDIA_ACTIONS],
   ['br-silent-band-b80nklzl-appmedia', MEDIA_ACTIONS],
   ['br-falling-leaf-b8xuv1d0-appmedia', MEDIA_ACTIONS],
   ['br-silent-band-b80nklzl-appwrite', MEDIA_ACTIONS],

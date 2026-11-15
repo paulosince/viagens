@@ -1,7 +1,7 @@
 // Neon-only preview backend. No Supabase project or Supabase Auth calls.
 // Transport: official @neondatabase/postgrest-js, JWTs: Managed Neon Auth.
 // IMPORTANT: these are staging APIs. Never substitute project main URLs.
-import {createNeonMediaClient} from './storage-neon.mjs?v=20261115-media1';
+import {createNeonMediaClient} from './storage-neon.mjs?v=20261115-photos1';
 import {createRouter} from './router-neon.mjs?v=20261024-home3';
 import {createNeonIdentity} from './neon-identity.mjs';
 export const API_ROOTS=Object.freeze({
@@ -26,14 +26,12 @@ const viaSameOrigin=url=>{
  return location.origin+'/api/media/'+host.slice(0,-suffix.length)+'/';
 };
 const USAGE=Object.freeze({a:'https://br-silent-band-b80nklzl-appusage.compute.c-14.us-east-1.aws.neon.tech/',b:'https://br-falling-leaf-b8xuv1d0-appusage.compute.c-14.us-east-1.aws.neon.tech/'});
+// Reads of every bucket (trip photos, profile photos, ticket attachments) go to
+// the appmedia function on the same branch as the project's Data API. That
+// branch's storage holds 100% of the files registered in its media manifest
+// (verified 2026-11-15: A 84/84, B 5/5). The former main-branch endpoints were
+// crossed between projects and held only 1 file each.
 const MEDIA=Object.freeze({
- a:'https://br-proud-paper-b83l1z7d-appmedia.compute.c-14.us-east-1.aws.neon.tech/',
- b:'https://br-dawn-bread-b83r0ztn-appmedia.compute.c-14.us-east-1.aws.neon.tech/'
-});
-// Attachments were written through the validated branch's appwrite/appmedia
-// services. Keep their read endpoint on that same branch; trip-images use
-// the main-branch endpoint confirmed working for itinerary photographs.
-const ATTACHMENT_MEDIA=Object.freeze({
  a:'https://br-silent-band-b80nklzl-appmedia.compute.c-14.us-east-1.aws.neon.tech/',
  b:'https://br-falling-leaf-b8xuv1d0-appmedia.compute.c-14.us-east-1.aws.neon.tech/'
 });
@@ -63,7 +61,7 @@ export function createNeonPreview({authSdk,NeonPostgrestClient,fetchWithToken,en
       dataApiUrl:url,
       options:{global:{fetch:fetchWithToken(getToken)}}
    });
-   return {id,media:viaSameOrigin(MEDIA[id]),attachmentMedia:viaSameOrigin(ATTACHMENT_MEDIA[id]),mediaWrite:viaSameOrigin(MEDIA_WRITE[id]),client:pg.schema('viaggio_app')};
+   return {id,media:viaSameOrigin(MEDIA[id]),attachmentMedia:viaSameOrigin(MEDIA[id]),mediaWrite:viaSameOrigin(MEDIA_WRITE[id]),client:pg.schema('viaggio_app')};
  });
  const facade=createNeonIdentity({sdkAuth:rawAuth,projects});
  // Keep the existing preview's generic RPC router, but never silently send

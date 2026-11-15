@@ -43,7 +43,7 @@ if (typeof document !== 'undefined') {
   };
   async function authenticate(credentials) {
     clientPromise ||= Promise.all([
-      import('../experiments/neon-pilot/app/backend-neon.mjs?v=20261115-media1'),
+      import('../experiments/neon-pilot/app/backend-neon.mjs?v=20261115-photos1'),
       import('https://cdn.jsdelivr.net/npm/@neondatabase/neon-js@0.9.0-beta/+esm'),
       import('https://cdn.jsdelivr.net/npm/@neondatabase/postgrest-js@0.2.0-beta/+esm')
     ]).then(([backend, {createClient, SupabaseAuthAdapter}, {NeonPostgrestClient, fetchWithToken}]) => {

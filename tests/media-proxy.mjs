@@ -21,20 +21,21 @@ globalThis.fetch = async (input, init) => {
 try {
   const jwt = {authorization: 'Bearer a.b.c'};
   // Rejections never reach the upstream.
-  assert.equal((await call('br-proud-paper-b83l1z7d-appmedia/sign', {headers: jwt}, 'https://paulosince.github.io')).status, 403);
+  assert.equal((await call('br-silent-band-b80nklzl-appmedia/sign', {headers: jwt}, 'https://paulosince.github.io')).status, 403);
   assert.equal((await call('evil-host/sign', {headers: jwt})).status, 404, 'unknown target');
-  assert.equal((await call('br-proud-paper-b83l1z7d-appmedia/admin', {headers: jwt})).status, 404, 'unknown action');
+  assert.equal((await call('br-proud-paper-b83l1z7d-appmedia/sign', {headers: jwt})).status, 404, 'retired crossed endpoint');
+  assert.equal((await call('br-silent-band-b80nklzl-appmedia/admin', {headers: jwt})).status, 404, 'unknown action');
   assert.equal((await call('br-silent-band-b80nklzl-appusage/sign', {headers: jwt})).status, 404, 'usage has no media actions');
-  assert.equal((await call('br-proud-paper-b83l1z7d-appmedia/upload', {headers: jwt})).status, 405);
-  assert.equal((await call('br-proud-paper-b83l1z7d-appmedia/sign', {headers: {...jwt, origin: 'https://evil.example'}})).status, 403);
+  assert.equal((await call('br-silent-band-b80nklzl-appmedia/upload', {headers: jwt})).status, 405);
+  assert.equal((await call('br-silent-band-b80nklzl-appmedia/sign', {headers: {...jwt, origin: 'https://evil.example'}})).status, 403);
   assert.equal((await call('br-silent-band-b80nklzl-appwrite/upload', {method: 'POST', headers: jwt, body: 'x'})).status, 403, 'POST needs Origin');
   assert.equal(seen.length, 0);
 
   // Allowed read: fixed host, same action and query, JWT kept, no Origin/cookie forwarded.
-  const read = await call('br-proud-paper-b83l1z7d-appmedia/sign?bucket=trip-images&path=p&expires=60',
+  const read = await call('br-silent-band-b80nklzl-appmedia/sign?bucket=trip-images&path=p&expires=60',
     {headers: {...jwt, origin: site, cookie: 'secret=1'}});
   assert.equal(read.status, 200);
-  assert.equal(seen[0].url.href, 'https://br-proud-paper-b83l1z7d-appmedia.compute.c-14.us-east-1.aws.neon.tech/sign?bucket=trip-images&path=p&expires=60');
+  assert.equal(seen[0].url.href, 'https://br-silent-band-b80nklzl-appmedia.compute.c-14.us-east-1.aws.neon.tech/sign?bucket=trip-images&path=p&expires=60');
   assert.equal(seen[0].headers.get('authorization'), 'Bearer a.b.c');
   assert.equal(seen[0].headers.get('origin'), null);
   assert.equal(seen[0].headers.get('cookie'), null);
@@ -67,10 +68,10 @@ const project = (media) => ({id: 'a', media, attachmentMedia: media, mediaWrite:
 const fakeFetch = async (u) => { requested.push(u); return new Response('{"data":{"signedUrl":"https://s.example/x"}}', {headers: {'content-type': 'application/json'}}); };
 const otherProject = {...project('https://x.example/'), client: {from: () => ({select: () => ({eq: () => ({limit: async () => ({data: [], error: null})})})})}};
 const tripPath = '11111111-1111-4111-8111-111111111111/cover.jpg';
-const ok = createNeonMediaClient({projects: [project(site + '/api/media/br-proud-paper-b83l1z7d-appmedia/'), otherProject], accessToken: async () => 'a.b.c', fetcher: fakeFetch});
+const ok = createNeonMediaClient({projects: [project(site + '/api/media/br-silent-band-b80nklzl-appmedia/'), otherProject], accessToken: async () => 'a.b.c', fetcher: fakeFetch});
 const good = await ok.from('trip-images').createSignedUrl(tripPath, 60);
 assert.equal(good.error, null);
-assert.match(requested[0], /^https:\/\/ioviaggio\.com\.br\/api\/media\/br-proud-paper-b83l1z7d-appmedia\/sign\?/);
+assert.match(requested[0], /^https:\/\/ioviaggio\.com\.br\/api\/media\/br-silent-band-b80nklzl-appmedia\/sign\?/);
 for (const bad of [site + '/api/other/x/', 'https://evil.example/api/media/x/', site + '/api/media/../x/']) {
   const client = createNeonMediaClient({projects: [project(bad), otherProject], accessToken: async () => 'a.b.c', fetcher: fakeFetch});
   const result = await client.from('trip-images').createSignedUrl(tripPath, 60);

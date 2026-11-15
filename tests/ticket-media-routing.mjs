@@ -3,7 +3,7 @@ import {readFileSync} from 'node:fs';
 import {createNeonMediaClient} from '../experiments/neon-pilot/app/storage-neon.mjs';
 const source=readFileSync(new URL('../experiments/neon-pilot/app/backend-neon.mjs',import.meta.url),'utf8');
 const config=name=>new Function('return '+source.match(new RegExp('const '+name+'=Object.freeze\\((\\{[\\s\\S]*?\\})\\);'))[1])();
-const media=config('MEDIA'),attachments=config('ATTACHMENT_MEDIA'),writes=config('MEDIA_WRITE');
+const media=config('MEDIA'),attachments=media,writes=config('MEDIA_WRITE');
 // Branch-to-Data-API associations verified against Neon compute metadata.
 const branches={a:'br-silent-band-b80nklzl',b:'br-falling-leaf-b8xuv1d0'};
 for(const id of ['a','b']) {
@@ -29,6 +29,6 @@ for(const id of ['a','b']) {
  assert.equal(calls.length,before+1,'Denied downloads must not retry another project');
  status=200;
  await client.from('trip-images').download(path);
- assert.equal(calls.at(-1).url.origin,new URL(media[id]).origin,'Itinerary photo routing remains unchanged');
+ assert.equal(calls.at(-1).url.hostname,branches[id]+'-appmedia.compute.c-14.us-east-1.aws.neon.tech','Itinerary photos must be read from the same branch as the Data API');
 }
 console.log('Ticket media: both verified branch mappings, JWT, blob preview, denied access and photo routing passed.');
