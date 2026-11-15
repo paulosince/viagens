@@ -105,6 +105,7 @@
           <p id="auth_message" class="auth-message" role="status" aria-live="polite"></p>
           <p class="auth-switch">Ainda não tem conta? <button id="show_signup" type="button">Criar conta</button></p>
         </form>
+        <template id="signup_form_template">
         <form id="signup_form" class="auth-form" aria-hidden="true" inert>
           <label class="signup-photo-picker" for="signup_photo">
             <span class="signup-photo-preview"><img id="signup_photo_preview" alt="" hidden><span id="signup_photo_placeholder" aria-hidden="true">＋</span></span>
@@ -123,6 +124,7 @@
           <p id="signup_message" class="auth-message" role="status" aria-live="polite"></p>
           <p class="auth-switch">Já tem conta? <button id="show_login" type="button">Entrar</button></p>
         </form>
+        </template>
       </div>
     </section>
 
@@ -645,7 +647,7 @@
       if (legacyPending > 0) {
         location.replace('./legacy-supabase.html?recover=1');
       } else {
-        await import('./experiments/neon-pilot/app/main-neon.js?v=20261115-autofill-isolated4');
+        await import('./experiments/neon-pilot/app/main-neon.js?v=20261115-autofill-template5');
       }
     } catch (error) {
       console.error('Não foi possível validar o estado local antes da migração Neon', error);
