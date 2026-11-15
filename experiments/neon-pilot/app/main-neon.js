@@ -8570,8 +8570,14 @@ async function applyPendingSignupAvatar() {
   return pendingSignupAvatarTask;
 }
 
+// Keep only the active credential form in the document. Safari may otherwise
+// associate Password AutoFill with an inactive registration password field.
 function setAuthMode(mode) {
   const signup = mode === 'signup';
+  const activeForm = signup ? dom.signupForm : dom.authForm;
+  const inactiveForm = signup ? dom.authForm : dom.signupForm;
+  if (inactiveForm.isConnected) inactiveForm.remove();
+  if (!activeForm.isConnected) dom.authCard.append(activeForm);
   dom.authCard.dataset.mode = signup ? 'signup' : 'login';
   dom.authIntro.textContent = signup ? 'Comece a planejar suas próximas viagens.' : 'Suas viagens começam muito antes do embarque.';
   dom.authForm.setAttribute('aria-hidden', String(signup));
@@ -8601,6 +8607,7 @@ async function enterWithUser(user) {
   cacheCompleteWorkspace().catch(error => console.warn('Snapshot offline incompleto', error));
 }
 
+setAuthMode('login');
 dom.showSignup.addEventListener('click', () => setAuthMode('signup'));
 dom.showLogin.addEventListener('click', () => setAuthMode('login'));
 dom.authForm.addEventListener('submit', async event => {
