@@ -8581,6 +8581,11 @@ function setAuthMode(mode) {
   // Keep inactive password fields out of Safari's credential detection.
   for (const input of dom.authForm.querySelectorAll('input')) input.disabled = signup;
   for (const input of dom.signupForm.querySelectorAll('input')) input.disabled = !signup;
+  // Only the visible form should advertise password fields to iOS AutoFill.
+  dom.authForm.querySelector('input[type="password"]').autocomplete = signup ? 'off' : 'current-password';
+  for (const input of dom.signupForm.querySelectorAll('input[type="password"]')) {
+    input.autocomplete = signup ? 'new-password' : 'off';
+  }
   dom.authMessage.textContent = '';
   dom.signupMessage.textContent = '';
 }
