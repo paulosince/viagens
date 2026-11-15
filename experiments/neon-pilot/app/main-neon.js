@@ -347,6 +347,11 @@ const state = {
   tripRoles: new Map(), tripOwners: new Map()
 };
 
+// Registration stays in an inert HTML template until the user explicitly opens it.
+// Safari sees only the login credential pair in the live document on initial load.
+const signupTemplate = document.querySelector('#signup_form_template');
+if (!signupTemplate?.content.querySelector('#signup_form')) throw new Error('Cadastro indisponível: formulário não encontrado');
+
 const dom = {
   dayMapSection: document.querySelector('#day_map_section'),
   dayMapToggle: document.querySelector('#day_map_toggle'),
@@ -354,7 +359,7 @@ const dom = {
   tripPageShare: document.querySelector('#trip_page_share'), tripPagePdf: document.querySelector('#trip_page_pdf'), tripPdfDialog: document.querySelector('#trip_pdf_dialog'), tripPdfStatus: document.querySelector('#trip_pdf_status'), tripPdfActions: document.querySelector('#trip_pdf_actions'), tripPdfShare: document.querySelector('#share_trip_pdf'), tripPdfDownload: document.querySelector('#download_trip_pdf'), tripPdfClose: document.querySelector('#close_trip_pdf'), tripShareSheet: document.querySelector('#trip_share_sheet'), tripShareScrim: document.querySelector('#trip_share_scrim'), closeTripShare: document.querySelector('#close_trip_share'), tripShareForm: document.querySelector('#trip_share_form'), tripShareRecipient: document.querySelector('#trip_share_recipient'), sendTripShare: document.querySelector('#send_trip_share'), tripShareStatus: document.querySelector('#trip_share_status'), tripShareList: document.querySelector('#trip_share_list'),
   tripCreateMessage: document.querySelector('#trip_create_message'),
   splashStatus: document.querySelector('#splash_status'),
-  authView: document.querySelector('#auth_view'), authForm: document.querySelector('#auth_form'), authMessage: document.querySelector('#auth_message'), authIntro: document.querySelector('#auth_intro'), authCard: document.querySelector('.auth-card'), signupForm: document.querySelector('#signup_form'), signupMessage: document.querySelector('#signup_message'), signupPhotoInput: document.querySelector('#signup_photo'), signupPhotoPreview: document.querySelector('#signup_photo_preview'), signupPhotoPlaceholder: document.querySelector('#signup_photo_placeholder'), showSignup: document.querySelector('#show_signup'), showLogin: document.querySelector('#show_login'),
+  authView: document.querySelector('#auth_view'), authForm: document.querySelector('#auth_form'), authMessage: document.querySelector('#auth_message'), authIntro: document.querySelector('#auth_intro'), authCard: document.querySelector('.auth-card'), signupForm: signupTemplate.content.querySelector('#signup_form'), signupMessage: signupTemplate.content.querySelector('#signup_message'), signupPhotoInput: signupTemplate.content.querySelector('#signup_photo'), signupPhotoPreview: signupTemplate.content.querySelector('#signup_photo_preview'), signupPhotoPlaceholder: signupTemplate.content.querySelector('#signup_photo_placeholder'), showSignup: document.querySelector('#show_signup'), showLogin: signupTemplate.content.querySelector('#show_login'),
   home: document.querySelector('#user_home'), profileButton: document.querySelector('#profile_button'), headerProfileImage: document.querySelector('#header_profile_image'), headerProfileFallback: document.querySelector('#header_profile_fallback'), homeChatgptButton: document.querySelector('#home_chatgpt_button'),
   usageButton: document.querySelector('#home_usage_button'), usageDetails: document.querySelector('#home_usage_details'),
   databaseUsage: document.querySelector('#home_database_usage'), storageUsage: document.querySelector('#home_storage_usage'),
