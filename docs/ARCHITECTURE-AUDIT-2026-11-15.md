@@ -39,6 +39,11 @@ flowchart TD
 
 ## 2. Cloudflare: o que foi comprovado
 
+**Atualização posterior à auditoria inicial (15/11):** capturas fornecidas pelo usuário mostram o projeto **Pages `viagens`**, endereço **`viagens-cc8.pages.dev`**, com deployment recente incluindo o commit desta auditoria. Portanto, a ausência de acesso ao painel neste ambiente não significa ausência de hospedagem ativa. O usuário também salvou no Registro.br `dahlia.ns.cloudflare.com` e `jaxson.ns.cloudflare.com`; a captura de 13h56 informa aproximadamente duas horas de transição. Ainda não foi comprovada a ativação do domínio personalizado, seu TLS ou sua associação ao Pages. Os parágrafos seguintes registram as observações anteriores, não o estado atual de DNS.
+
+**Preparação posterior:** o service worker passou a excluir `/api`, `/viagens/api` e requisições same-origin com Authorization antes de qualquer acesso ao cache. Testes executam o handler do SW e verificam ausência de interceptação; o shell continua disponível offline. O adaptador `deployment/first-party-auth/cloudflare.mjs` usa Request/Response e bindings de ambiente, falhando com 503 sem configuração. Testes locais Node não equivalem a validação no runtime Cloudflare nem no iPad. Nenhum endpoint de autenticação ativo foi trocado.
+
+
 Existe a branch `cloudflare/workers-autoconfig`, cujo último commit é `0beb8e3ba4a3a5c359f79a4cfa88f498ecd4abec`, de 05/06/2026, criado por `cloudflare-workers-and-pages[bot]`. Seu `wrangler.jsonc` declara:
 
 - Worker chamado `viagens`;

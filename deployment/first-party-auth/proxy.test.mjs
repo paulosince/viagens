@@ -42,3 +42,12 @@ test('official SDK proxy emits first-party Secure HttpOnly cookies and forwards 
   assert.equal(session.status,200);assert.equal((await session.json()).user.id,'test-user');assert.match(seenCookie,/synthetic-test-token/);
  }finally{globalThis.fetch=nativeFetch}
 });
+
+test('Cloudflare adapter fails closed without secrets and rejects foreign origins',async()=>{
+ const {onRequest}=await import('./cloudflare.mjs');
+ const missing=await onRequest({request:req('get-session'),env:{}});
+ assert.equal(missing.status,503);
+ assert.equal(missing.headers.get('cache-control'),'no-store');
+ const result=await onRequest({request:req('sign-out',{method:'POST',headers:{origin:'https://foreign.test','content-type':'application/json'},body:'{}'}),env:{VIAGGIO_PUBLIC_ORIGIN:origin,NEON_AUTH_COOKIE_SECRET:cookieSecret}});
+ assert.equal(result.status,403);
+});

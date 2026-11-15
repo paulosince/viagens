@@ -1,4 +1,4 @@
-const CACHE_NAME = 'viaggio-home-v160-login-diag2';
+const CACHE_NAME = 'viaggio-home-v161-auth-network-only';
 const MEDIA_CACHE_NAME = 'viaggio-media-v1';
 const NEON_MEDIA_CACHE_NAME = 'viaggio-neon-auth-preview-media-v1';
 const SUPABASE_CLIENT = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
@@ -68,6 +68,11 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
+  // Session/API responses must never enter Cache Storage or fall back to HTML.
+  // Includes requests outside the worker scope made by a controlled page.
+  if (url.origin === self.location.origin &&
+      (/^\/(?:viagens\/)?api(?:\/|$)/.test(url.pathname) ||
+       event.request.headers.has('authorization'))) return;
   const isExternalAsset = EXTERNAL_ASSETS.includes(url.href);
   const isImage = event.request.destination === 'image';
 

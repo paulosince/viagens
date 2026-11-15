@@ -13,14 +13,18 @@ This deployment removes that cross-site dependency. It uses the official `handle
 
 Only the generated copy's auth URL and service-worker cache name change. Source app HTML, main JS, photo and ticket logic, and Neon application databases remain untouched. No users, passwords, files, or records are migrated.
 
-## Deploy alongside the existing app
+## Target: existing Cloudflare Pages project
 
-1. Connect the user's Vercel account and import paulosince/viagens as a separate project.
-2. Use root directory `deployment/first-party-auth`, framework Other, Node 24, build `npm run build`, output `public`. Enable inclusion of source files outside the root directory so the build can copy the existing app.
-3. Assign its stable HTTPS hostname. Set server environment `VIAGGIO_PUBLIC_ORIGIN` to that exact origin (no path or trailing slash).
-4. Generate a random `NEON_AUTH_COOKIE_SECRET` of at least 32 characters and set it only as a secret server environment variable. Never commit or print it.
-5. Register the exact HTTPS origin as a trusted origin on Neon project `dark-union-03886858`, branch `br-square-river-b765bpl4`, preserving all existing origins.
-6. Deploy. No redirects or changes to the existing GitHub Pages deployment until authenticated tests pass and the owner chooses to switch.
+The user confirmed Pages project `viagens` at `viagens-cc8.pages.dev` in dashboard screenshots. Vercel instructions are withdrawn. `cloudflare.mjs` is a prepared Pages Functions adapter, not an automatically deployed route. Keep this prototype suspended until these dependencies are resolved:
+
+1. Inspect the existing Pages build/output configuration through an authenticated dashboard. Do not replace it based on the historical Workers branch.
+2. Bundle the official SDK and adapter into the Pages function `/api/auth/[[path]]`; verify execution in Cloudflare's runtime, not only Node tests.
+3. Set exact `VIAGGIO_PUBLIC_ORIGIN` and a random server-only `NEON_AUTH_COOKIE_SECRET` of at least 32 characters in Pages bindings. Never commit a secret.
+4. Preserve existing origins while authorizing the chosen origin in Neon Auth, both Data APIs and the relevant media/usage functions. Existing photograph routing must stay intact.
+5. Review generated assets (including apple-touch-icon), manifest scope, `/viagens/` paths and custom-domain routing. The existing build remains an isolated prototype, not a production output definition.
+6. After real authenticated session/data/media tests, switch the generated auth URL. Keep the GitHub Pages deployment, local outbox and media caches intact.
+
+The service worker source now excludes same-origin API/auth and Authorization requests from cache. This prevents a future proxy response from being cached; it does not fix the current cross-site iPad login by itself.
 
 ## Validation before any switch
 
