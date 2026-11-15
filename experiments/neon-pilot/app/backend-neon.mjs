@@ -11,8 +11,8 @@ export const API_ROOTS=Object.freeze({
 export const NEON_AUTH_URL='https://ep-small-bread-b7uq0zva.neonauth.c-13.us-east-1.aws.neon.tech/viaggio_auth/auth';
 const USAGE=Object.freeze({a:'https://br-silent-band-b80nklzl-appusage.compute.c-14.us-east-1.aws.neon.tech/',b:'https://br-falling-leaf-b8xuv1d0-appusage.compute.c-14.us-east-1.aws.neon.tech/'});
 const MEDIA=Object.freeze({
- a:'https://br-silent-band-b80nklzl-appmedia.compute.c-14.us-east-1.aws.neon.tech/',
- b:'https://br-falling-leaf-b8xuv1d0-appmedia.compute.c-14.us-east-1.aws.neon.tech/'
+ a:'https://br-proud-paper-b83l1z7d-appmedia.compute.c-14.us-east-1.aws.neon.tech/',
+ b:'https://br-dawn-bread-b83r0ztn-appmedia.compute.c-14.us-east-1.aws.neon.tech/'
 });
 const MEDIA_WRITE=Object.freeze({
  a:'https://br-silent-band-b80nklzl-appwrite.compute.c-14.us-east-1.aws.neon.tech/',
