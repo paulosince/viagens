@@ -20,7 +20,7 @@ export const TARGETS = new Map([
   ['br-falling-leaf-b8xuv1d0-appusage', new Map([['', 'GET']])]
 ]);
 const FORWARD_HEADERS = ['authorization', 'content-type', 'x-upsert'];
-const MAX_UPLOAD = 25000000;
+const MAX_UPLOAD = 30 * 1024 * 1024;
 
 const fail = (status, error) => Response.json({error}, {status, headers: {'cache-control': 'no-store'}});
 
