@@ -2524,6 +2524,25 @@ function openDayAttachments() {
   }).catch(error => setDayAttachmentStatus(error.message || 'Não foi possível carregar os arquivos.', 'error'));
 }
 
+// Indeterminate progress: fetch-based Neon uploads do not expose byte-level progress.
+function setAttachmentUploadProgress(statusElement, active) {
+  if (!statusElement) return;
+  let progress = statusElement.parentElement?.querySelector('[data-attachment-upload-progress]');
+  if (active) {
+    if (!progress) {
+      progress = document.createElement('progress');
+      progress.dataset.attachmentUploadProgress = 'true';
+      progress.setAttribute('aria-label', 'Enviando arquivo');
+      progress.style.cssText = 'display:block;width:100%;height:8px;margin:10px 0;border-radius:8px;accent-color:#087cf5';
+      statusElement.insertAdjacentElement('afterend', progress);
+    }
+    progress.removeAttribute('value');
+    progress.hidden = false;
+  } else if (progress) {
+    progress.remove();
+  }
+}
+
 async function uploadDayAttachments(files) {
   const day = state.tripDays.find(item => String(item.id) === state.activeDayId);
   if (!day || !files.length) return;
@@ -2531,6 +2550,7 @@ async function uploadDayAttachments(files) {
   if (!client) { setDayAttachmentStatus('É preciso estar conectado para enviar arquivos.', 'error'); return; }
   const uploadControl = dom.dayAttachmentsInput.closest('.day-attachments-upload');
   uploadControl.dataset.busy = 'true';
+  setAttachmentUploadProgress(dom.dayAttachmentsStatus, true);
   try {
     for (const [index, file] of files.entries()) {
       setDayAttachmentStatus(`Enviando ${index + 1} de ${files.length}: ${file.name}`);
@@ -2544,6 +2564,7 @@ async function uploadDayAttachments(files) {
     setDayAttachmentStatus(error.message || 'Falha no envio. Tente novamente.', 'error');
   } finally {
     uploadControl.dataset.busy = 'false';
+    setAttachmentUploadProgress(dom.dayAttachmentsStatus, false);
     dom.dayAttachmentsInput.value = '';
   }
 }
@@ -5466,6 +5487,7 @@ async function uploadTripFiles(files) {
   const client = await tryNeon(5000);
   if (!client) { setTripPanelStatus(dom.tripFilesStatus, 'Conecte-se para enviar arquivos.', 'error'); return; }
   const button = dom.tripFilesInput.closest('.trip-files-pick'); button.dataset.busy = 'true';
+  setAttachmentUploadProgress(dom.tripFilesStatus, true);
   try {
     for (const [index, file] of files.entries()) {
       setTripPanelStatus(dom.tripFilesStatus, `Enviando ${index + 1} de ${files.length}: ${file.name}`);
@@ -5476,7 +5498,7 @@ async function uploadTripFiles(files) {
   } catch (error) {
     await loadTripFiles(tripId).catch(() => {});
     setTripPanelStatus(dom.tripFilesStatus, error.message || 'Não foi possível enviar.', 'error');
-  } finally { button.dataset.busy = 'false'; dom.tripFilesInput.value = ''; }
+  } finally { button.dataset.busy = 'false'; setAttachmentUploadProgress(dom.tripFilesStatus, false); dom.tripFilesInput.value = ''; }
 }
 
 let tripPdfFile = null;
