@@ -2524,23 +2524,61 @@ function openDayAttachments() {
   }).catch(error => setDayAttachmentStatus(error.message || 'Não foi possível carregar os arquivos.', 'error'));
 }
 
-// Indeterminate progress: fetch-based Neon uploads do not expose byte-level progress.
+// The Neon media adapter uses fetch: byte-level upload progress is unavailable.
+// Show a clearly indeterminate, accessible progress card instead of a fake percentage.
 function setAttachmentUploadProgress(statusElement, active) {
   if (!statusElement) return;
-  let progress = statusElement.parentElement?.querySelector('[data-attachment-upload-progress]');
+  let panel = statusElement.parentElement?.querySelector('[data-attachment-upload-progress]');
   if (active) {
-    if (!progress) {
-      progress = document.createElement('progress');
-      progress.dataset.attachmentUploadProgress = 'true';
-      progress.setAttribute('aria-label', 'Enviando arquivo');
-      progress.style.cssText = 'display:block;width:100%;height:8px;margin:10px 0;border-radius:8px;accent-color:#087cf5';
-      statusElement.insertAdjacentElement('afterend', progress);
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.dataset.attachmentUploadProgress = 'true';
+      panel.setAttribute('role', 'status');
+      panel.setAttribute('aria-label', 'Envio em andamento');
+      panel.style.cssText = 'padding:13px 15px;margin:10px 0 14px;border:1px solid rgba(255,255,255,.7);border-radius:15px;background:rgba(255,255,255,.91);box-shadow:0 4px 18px rgba(9,57,83,.12);color:#19465d';
+      const label = document.createElement('div');
+      label.textContent = 'Aguarde enquanto salvamos seu arquivo…';
+      label.style.cssText = 'font-size:13px;font-weight:600;margin-bottom:10px';
+      const track = document.createElement('div');
+      track.style.cssText = 'height:9px;overflow:hidden;border-radius:99px;background:#dcecf5;position:relative';
+      const bar = document.createElement('div');
+      bar.style.cssText = 'position:absolute;top:0;bottom:0;width:38%;border-radius:99px;background:#168ce2;animation:viaggioUploadSweep 1.65s ease-in-out infinite alternate';
+      track.append(bar);
+      panel.append(label, track);
+      if (!document.getElementById('viaggio-upload-progress-style')) {
+        const style = document.createElement('style');
+        style.id = 'viaggio-upload-progress-style';
+        style.textContent = '@keyframes viaggioUploadSweep{from{left:0}to{left:62%}}@media(prefers-reduced-motion:reduce){[data-attachment-upload-progress] div div{animation:none!important;width:100%!important;opacity:.6}}';
+        document.head.append(style);
+      }
+      statusElement.insertAdjacentElement('afterend', panel);
     }
-    progress.removeAttribute('value');
-    progress.hidden = false;
-  } else if (progress) {
-    progress.remove();
-  }
+    panel.hidden = false;
+  } else panel?.remove();
+}
+
+// Large iPhone PNG screenshots can exceed upstream request-body limits.
+// Preserve the original on the device; only an optimized upload copy is created.
+async function prepareAttachmentForUpload(file, notify) {
+  if (file.size <= 8 * 1024 * 1024 || !/^image\\/(png|jpeg|webp)$/.test(file.type)) return file;
+  notify?.('Preparando uma cópia otimizada da imagem; o original será preservado…');
+  let bitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+    const canvas = document.createElement('canvas');
+    const scale = Math.min(1, Math.sqrt(14_000_000 / (bitmap.width * bitmap.height)));
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Não foi possível preparar a imagem.');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', .94));
+    if (!blob || !blob.size || blob.size >= file.size || blob.size > 8 * 1024 * 1024)
+      throw new Error('Não foi possível reduzir a imagem com qualidade adequada.');
+    return new File([blob], file.name.replace(/\\.[^.]+$/, '') + '-otimizado.jpg', {type:'image/jpeg'});
+  } finally { bitmap?.close(); }
 }
 
 async function uploadDayAttachments(files) {
@@ -2553,8 +2591,9 @@ async function uploadDayAttachments(files) {
   setAttachmentUploadProgress(dom.dayAttachmentsStatus, true);
   try {
     for (const [index, file] of files.entries()) {
-      setDayAttachmentStatus(`Enviando ${index + 1} de ${files.length}: ${file.name}`);
-      await storeTripAttachment(client, day.trip_id, day.id, file);
+      const prepared = await prepareAttachmentForUpload(file, message => setDayAttachmentStatus(message));
+      setDayAttachmentStatus(`Salvando arquivo ${index + 1} de ${files.length} em ${day.title || 'seu roteiro'}…`);
+      await storeTripAttachment(client, day.trip_id, day.id, prepared);
     }
     await loadDayAttachments(day.id);
     if (state.activeTripTab === 'arquivos') loadTripFiles(day.trip_id).catch(console.warn);
@@ -5490,8 +5529,9 @@ async function uploadTripFiles(files) {
   setAttachmentUploadProgress(dom.tripFilesStatus, true);
   try {
     for (const [index, file] of files.entries()) {
-      setTripPanelStatus(dom.tripFilesStatus, `Enviando ${index + 1} de ${files.length}: ${file.name}`);
-      await storeTripAttachment(client, tripId, day?.id || null, file);
+      const prepared = await prepareAttachmentForUpload(file, message => setTripPanelStatus(dom.tripFilesStatus, message));
+      setTripPanelStatus(dom.tripFilesStatus, `Salvando arquivo ${index + 1} de ${files.length}${day ? ' em ' + (day.title || 'seu roteiro') : ' na viagem'}…`);
+      await storeTripAttachment(client, tripId, day?.id || null, prepared);
     }
     await loadTripFiles(tripId);
     setTripPanelStatus(dom.tripFilesStatus, files.length === 1 ? 'Arquivo salvo.' : `${files.length} arquivos salvos.`);
