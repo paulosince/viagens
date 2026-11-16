@@ -2400,7 +2400,7 @@ function updateAgendaAddStickyState() {
 }
 
 const DAY_ATTACHMENT_BUCKET = 'day-attachments';
-const DAY_ATTACHMENT_MAX_BYTES = 20 * 1024 * 1024;
+const DAY_ATTACHMENT_MAX_BYTES = 30 * 1024 * 1024;
 const TICKET_COVER_MAX_BYTES = 6 * 1024 * 1024;
 const DAY_ATTACHMENT_TYPES = {
   jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp',
@@ -2426,7 +2426,7 @@ function dayAttachmentPath(tripId, dayId, extension) {
 async function storeTripAttachment(client, tripId, dayId, file) {
   const accepted = dayAttachmentType(file);
   if (!accepted || !file.size || file.size > DAY_ATTACHMENT_MAX_BYTES) {
-    throw new Error('Use fotos, PDF ou Word de até 20 MB: ' + file.name);
+    throw new Error('Use fotos, PDF ou Word de até 30 MB: ' + file.name);
   }
   const path = dayAttachmentPath(tripId, dayId, accepted.extension);
   const uploaded = await client.storage.from(DAY_ATTACHMENT_BUCKET).upload(path, file, {
