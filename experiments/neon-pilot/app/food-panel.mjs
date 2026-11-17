@@ -136,12 +136,12 @@ export function createFoodPanel(ctx) {
             entry.append(img);
           }
           const match = files.filter(file=>{
-            if(file.item_category!=='restaurant')return false;
             if(file.activity_id && String(file.activity_id)===String(activity.id))return true;
-            if(dateOnly(file.event_date)!==date)return false;
+            if(file.item_category!=='restaurant' || dateOnly(file.event_date)!==date)return false;
             const venue=fold([file.display_title,file.venue].filter(Boolean).join(' '));
             const place=fold(activity.place_name||'');
-            return place.length>=6 && venue.includes(place);
+            const aliases=[place,place.replace(/ by .*/,''),place.replace(/ \(.*\)/,'')].filter(value=>value.length>=6);
+            return aliases.some(value=>venue.includes(value));
           });
           for(const ticket of match){
             const button=html('button','food-meal-ticket','Ver reserva · '+(ticket.display_title||'comprovante'));
@@ -193,6 +193,9 @@ export function createFoodPanel(ctx) {
       cell.append(html('small','',label),html('strong','',value));grid.append(cell);
     }
     footer.append(title,grid,html('small','food-total-note',unpriced?'*Há refeições com preço não informado; totais parciais.':'Valores realizados só aparecem após o lançamento.'));
+    const contingency=budgets.filter(item=>!item.activity_id && item.currency==='EUR' && /reserva de alimentacao/.test(fold(item.label)))
+      .reduce((total,item)=>total+(Number(item.planned_amount)||0),0);
+    if(contingency)footer.append(html('small','food-total-note','Reserva para imprevistos: '+money(contingency)+' (fora das cinco refeições diárias).'));
     if(excludedCurrency)footer.append(html('small','food-total-note','Despesas em outras moedas não foram convertidas automaticamente.'));
     if(notice)notice.textContent=!editable?'Somente leitura.':'Preencha o realizado em cada refeição para acompanhar os gastos.';
   }
