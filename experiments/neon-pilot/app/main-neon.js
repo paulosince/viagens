@@ -410,7 +410,16 @@ const foodPanel = createFoodPanel({
       ? rows.map(row=>String(row.id)===String(item.id)?item:row) : [...rows,item]);
     if (state.activeTripId === tripId) renderTripBudget(tripId);
   },
-  openTicket: (file, files) => openTripFileViewer(file, files)
+  openTicket: (file, files) => openTripFileViewer(file, files),
+  applyTicket: file => {
+    const key=String(file.trip_id);
+    const rows=state.tripFilesByTrip.get(key)||[];
+    state.tripFilesByTrip.set(key,rows.map(item=>String(item.id)===String(file.id)
+      ? {...item,...file,signedUrl:item.signedUrl||file.signedUrl||'',cardSignedUrl:item.cardSignedUrl||file.cardSignedUrl||''} : item));
+    if(state.activeTripId===key) {
+      renderTripFiles(key,state.tripDays.filter(day=>String(day.trip_id)===key));
+    }
+  }
 });
 
 const displayDate = value => value ? new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(`${value}T12:00:00`)).replace('.', '') : '';
