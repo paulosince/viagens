@@ -396,6 +396,8 @@ const foodPanel = createFoodPanel({
       days: trip ? state.tripDays.filter(day => !dayDeletedAt(day) && !dayIsHidden(day) && dayPosition(day) < tripDayCount(trip)).sort((a,b)=>dayPosition(a)-dayPosition(b)) : [],
       budgets: state.budgetByTrip.get(tripId) || [],
       files: state.tripFilesByTrip.get(tripId) || [],
+      budgetReady: state.budgetByTrip.has(tripId),
+      ticketsReady: state.tripFilesByTrip.has(tripId),
       getActivities: day => state.dayActivities.get(String(day.id)) || [],
       getLocations: day => state.dayLocations.get(String(day.id)) || [],
       editable: canEditActiveTrip()
