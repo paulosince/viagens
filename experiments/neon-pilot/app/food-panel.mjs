@@ -299,55 +299,91 @@ export function createFoodPanel(ctx) {
     const files=data.files||[];
     const existing=files.find(file=>String(file.meal_day_id||'')===String(day.id) && file.meal_slot===slot.key);
     const dialog=html('dialog','food-link-dialog');
+    dialog.setAttribute('aria-label','Vincular reserva · '+slot.label);
     const title=html('h3','','Vincular reserva · '+slot.label);
-    const subtitle=html('p','','Escolha um comprovante já salvo em Tickets. Ele continuará no local original e será exibido aqui como reserva.');
-    const form=html('form','food-link-form');
-    form.method='dialog';
-    const label=html('label','','Ticket existente');
-    const select=html('select','food-link-select');
-    const empty=html('option','','Selecione um ticket');
-    empty.value='';
-    select.append(empty);
-    const sorted=[...files].sort((a,b)=>{
-      const rank=file=>(String(file.meal_day_id||'')===String(day.id)?0:dateOnly(file.event_date)===date?1:String(file.day_id||'')===String(day.id)?2:file.item_category==='restaurant'?3:4);
-      return rank(a)-rank(b);
-    });
-    for(const file of sorted){
-      const option=html('option','',(file.display_title||file.file_name||'Arquivo')+
-        (file.item_category==='restaurant'?' · Restaurante':'')+
-        (file.event_date?' · '+dateOnly(file.event_date).slice(8,10)+'/'+dateOnly(file.event_date).slice(5,7):''));
-      option.value=String(file.id);
-      select.append(option);
-    }
-    if(existing)select.value=String(existing.id);
-    label.append(select);
-    const preview=html('div','food-link-preview');
-    const updatePreview=()=>{
-      preview.replaceChildren();
-      const file=files.find(item=>String(item.id)===String(select.value));
-      if(!file)return;
-      if(file.mime_type?.startsWith('image/') && file.signedUrl){
-        const image=html('img','food-link-preview-image');
-        image.alt='Prévia de '+(file.display_title||file.file_name||'ticket');
-        image.src=file.signedUrl;
-        image.addEventListener('error',()=>image.remove(),{once:true});
-        preview.append(image);
-      }
-      preview.append(html('small','food-link-preview-label',(file.display_title||file.file_name||'Arquivo')+
-        (file.mime_type==='application/pdf'?' · PDF':'')+
-        (file.day_id?' · Arquivo do dia':' · Arquivo geral da viagem')));
-    };
-    select.addEventListener('change',updatePreview);
-    updatePreview();
+    const subtitle=html('p','','Toque na imagem do comprovante para selecioná-lo. Ele continuará salvo em Tickets.');
+    const form=html('div','food-link-form');
+    const gallery=html('div','food-ticket-gallery');
+    gallery.setAttribute('role','group');
+    gallery.setAttribute('aria-label','Comprovantes disponíveis');
+    const selected=html('div','food-link-selected');
     const message=html('p','food-link-message','');
     const actions=html('div','food-link-actions');
     const cancel=html('button','','Cancelar');cancel.type='button';
     cancel.addEventListener('click',()=>dialog.close());
-    const submit=html('button','food-link-save','Vincular ticket');submit.type='button';submit.disabled=files.length===0;
+    const view=html('button','food-link-view','Ampliar');
+    view.type='button';view.disabled=true;
+    const submit=html('button','food-link-save','Vincular ticket');
+    submit.type='button';submit.disabled=true;
+    const sorted=[...files].sort((a,b)=>{
+      const rank=file=>(String(file.meal_day_id||'')===String(day.id)?0
+        :dateOnly(file.event_date)===date?1
+        :String(file.day_id||'')===String(day.id)?2
+        :file.item_category==='restaurant'?3:4);
+      return rank(a)-rank(b);
+    });
+    let selectedFile=existing||null;
+    const tiles=[];
+    const name=file=>file.display_title||file.file_name||'Comprovante';
+    const imageFor=file=>file.mime_type?.startsWith('image/')?file.signedUrl||''
+      :file.cardSignedUrl||'';
+    function renderSelection(){
+      selected.replaceChildren();
+      tiles.forEach(({file,button})=>button.setAttribute('aria-pressed',String(String(file.id)===String(selectedFile?.id))));
+      submit.disabled=!selectedFile;
+      view.disabled=!selectedFile;
+      if(!selectedFile)return;
+      const summary=html('div','food-link-selected-header');
+      summary.append(html('strong','','Selecionado'),html('span','',name(selectedFile)));
+      selected.append(summary);
+      const url=imageFor(selectedFile);
+      if(url){
+        const photo=html('img','food-link-preview-image');
+        photo.alt='Prévia ampliada de '+name(selectedFile);
+        photo.loading='eager';photo.src=url;
+        photo.addEventListener('error',()=>{photo.remove();selected.append(html('small','food-link-preview-label','Prévia indisponível. Use Ampliar para abrir o arquivo.'));},{once:true});
+        selected.append(photo);
+      } else selected.append(html('small','food-link-preview-label','Este arquivo não tem miniatura. Use Ampliar para conferir o documento.'));
+    }
+    for(const file of sorted){
+      const tile=html('button','food-ticket-tile');tile.type='button';
+      tile.setAttribute('aria-label','Selecionar '+name(file));
+      const imageBox=html('span','food-ticket-tile-image');
+      const url=imageFor(file);
+      if(url){
+        const thumb=html('img','');
+        thumb.alt='';thumb.loading='lazy';thumb.decoding='async';thumb.src=url;
+        thumb.addEventListener('error',()=>{
+          thumb.remove();
+          imageBox.append(html('span','food-ticket-tile-fallback','Prévia indisponível'));
+        },{once:true});
+        imageBox.append(thumb);
+      }else{
+        imageBox.append(html('span','food-ticket-tile-fallback',file.mime_type==='application/pdf'?'PDF':'Arquivo'));
+      }
+      const copy=html('span','food-ticket-tile-copy');
+      copy.append(html('strong','',name(file)));
+      const details=[
+        file.item_category==='restaurant'?'Restaurante':null,
+        file.event_date?dateOnly(file.event_date).slice(8,10)+'/'+dateOnly(file.event_date).slice(5,7):null,
+        file.day_id?'Arquivo do dia':null
+      ].filter(Boolean).join(' · ');
+      if(details)copy.append(html('small','',details));
+      tile.append(imageBox,copy);
+      tile.addEventListener('click',()=>{selectedFile=file;message.textContent='';renderSelection();});
+      tiles.push({file,button:tile});
+      gallery.append(tile);
+    }
+    view.addEventListener('click',()=>{
+      if(!selectedFile)return;
+      const file=selectedFile;
+      dialog.close();
+      ctx.openTicket(file,files);
+    });
     submit.addEventListener('click',async()=>{
-      const file=files.find(item=>String(item.id)===String(select.value));
-      if(!file){message.textContent='Selecione um ticket da lista.';return;}
-      submit.disabled=true;message.textContent='Salvando vínculo…';
+      const file=selectedFile;
+      if(!file){message.textContent='Escolha um comprovante pela imagem.';return;}
+      submit.disabled=true;view.disabled=true;message.textContent='Salvando vínculo…';
       try{
         const client=await ctx.getClient();
         if(!client)throw new Error('Conecte-se para vincular o ticket.');
@@ -358,22 +394,28 @@ export function createFoodPanel(ctx) {
           event_date:date
         };
         if(!file.event_time && activity?.start_time)patch.event_time=activity.start_time;
-        // Do not change day_id: for general attachments the storage policy
-        // requires it to remain null even when linked to a meal.
+        // Keep day_id unchanged. General attachments must stay in general storage.
         const result=await client.from('day_attachments').update(patch)
           .eq('trip_id',tripId).eq('id',file.id).select('*').single();
         if(result.error)throw result.error;
         ctx.applyTicket({...file,...result.data,signedUrl:file.signedUrl||'',cardSignedUrl:file.cardSignedUrl||''});
         dialog.close();render();
-      }catch(error){message.textContent=error.message||'Não foi possível vincular o ticket.';submit.disabled=false;}
+      }catch(error){
+        message.textContent=error.message||'Não foi possível vincular o ticket.';
+        submit.disabled=!selectedFile;view.disabled=!selectedFile;
+      }
     });
-    actions.append(cancel,submit);
-    if(!files.length)form.append(html('p','food-link-message','Não há tickets carregados. Envie o comprovante na aba Tickets e volte aqui.'));
-    form.append(label,preview,message,actions);
+    actions.append(cancel,view,submit);
+    if(files.length){
+      form.append(html('span','food-ticket-gallery-label',files.length+' comprovantes · selecione pela imagem'),gallery,selected,message,actions);
+    }else{
+      form.append(html('p','food-link-message','Nenhum comprovante disponível. Envie-o pela aba Tickets e volte aqui.'),actions);
+    }
     dialog.append(title,subtitle,form);
     dialog.addEventListener('close',()=>dialog.remove(),{once:true});
     document.body.append(dialog);
     dialog.showModal();
+    renderSelection();
   }
   async function saveMealValue({field,data,activities,budgets,manual,date,slot,amount}){
     const client=await ctx.getClient();
