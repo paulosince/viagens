@@ -21,17 +21,23 @@ export function createFoodPanel(ctx) {
   const imageUrl = value => /^(https?:\/\/|blob:)/i.test(String(value || '')) ? String(value) : '';
   const dateOnly = value => String(value || '').slice(0,10);
   const suffixLabel = (date,key) => extraPrefix + date + ' | ' + key;
-  const mealSlot = (activity,hasBudget) => {
+  const mealSlot = (activity,linkedBudgets = []) => {
     const text = fold(activity.title);
     const meal = fold(activity.meal);
+    const budgetTitle = fold(linkedBudgets.map(row=>row.label).join(' '));
     const time = String(activity.start_time || '').slice(0,5);
     if (/cafe da manha/.test(text) || (/cafe simples/.test(text) && time < '10:00')) return 0;
     if (/lanche da manha/.test(text)) return 1;
     if (/lanche da tarde/.test(text)) return 3;
     if (/almoco/.test(text)) return 2;
     if (/jantar/.test(text)) return 4;
+    if (/cafe da manha/.test(budgetTitle)) return 0;
+    if (/lanche da manha/.test(budgetTitle)) return 1;
+    if (/lanche da tarde/.test(budgetTitle)) return 3;
+    if (/almoco/.test(budgetTitle)) return 2;
+    if (/jantar/.test(budgetTitle)) return 4;
     const food = /cafe|lanche|refeicao|piquenique|picnic|sala vip|lanche rapido/.test(text)
-      || Boolean(meal) || (hasBudget && /champ de mars|picnic|piquenique/.test(text));
+      || Boolean(meal) || (linkedBudgets.length>0 && /champ de mars|picnic|piquenique/.test(text));
     if (!food) return -1;
     if (time < '09:00') return 0;
     if (time < '12:00') return 1;
@@ -73,7 +79,7 @@ export function createFoodPanel(ctx) {
       const foodRows = slots.map(slot => ({slot,activities:[],budgets:[]}));
       for (const activity of activities) {
         const linked = budgetsByActivity.get(String(activity.id)) || [];
-        const slotIndex = mealSlot(activity,linked.length>0);
+        const slotIndex = mealSlot(activity,linked);
         if (slotIndex < 0) continue;
         foodRows[slotIndex].activities.push(activity);
         foodRows[slotIndex].budgets.push(...linked);
