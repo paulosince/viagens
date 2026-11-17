@@ -192,6 +192,7 @@ export function createFoodPanel(ctx) {
           const valid=!plannedInput.value.trim() || amount!==null;
           plannedInput.setAttribute('aria-invalid',String(!valid));
           if(valid){
+            plannedStatus.textContent='Prévia';
             lineState.planned=amount;
             lineState.unpriced=amount==null && lineState.needsPrice;
             refreshSummary();
@@ -224,7 +225,7 @@ export function createFoodPanel(ctx) {
           const amount=previewAmount(input.value);
           const valid=!input.value.trim() || amount!==null;
           input.setAttribute('aria-invalid',String(!valid));
-          if(valid){lineState.actual=amount;refreshSummary();}
+          if(valid){status.textContent='Prévia';lineState.actual=amount;refreshSummary();}
         });
         const status=html('small','food-meal-status','');
         input.addEventListener('change',async()=>{
@@ -318,6 +319,24 @@ export function createFoodPanel(ctx) {
     }
     if(existing)select.value=String(existing.id);
     label.append(select);
+    const preview=html('div','food-link-preview');
+    const updatePreview=()=>{
+      preview.replaceChildren();
+      const file=files.find(item=>String(item.id)===String(select.value));
+      if(!file)return;
+      if(file.mime_type?.startsWith('image/') && file.signedUrl){
+        const image=html('img','food-link-preview-image');
+        image.alt='Prévia de '+(file.display_title||file.file_name||'ticket');
+        image.src=file.signedUrl;
+        image.addEventListener('error',()=>image.remove(),{once:true});
+        preview.append(image);
+      }
+      preview.append(html('small','food-link-preview-label',(file.display_title||file.file_name||'Arquivo')+
+        (file.mime_type==='application/pdf'?' · PDF':'')+
+        (file.day_id?' · Arquivo do dia':' · Arquivo geral da viagem')));
+    };
+    select.addEventListener('change',updatePreview);
+    updatePreview();
     const message=html('p','food-link-message','');
     const actions=html('div','food-link-actions');
     const cancel=html('button','','Cancelar');cancel.type='button';
@@ -348,7 +367,7 @@ export function createFoodPanel(ctx) {
     });
     actions.append(cancel,submit);
     if(!files.length)form.append(html('p','food-link-message','Não há tickets carregados. Envie o comprovante na aba Tickets e volte aqui.'));
-    form.append(label,message,actions);
+    form.append(label,preview,message,actions);
     dialog.append(title,subtitle,form);
     dialog.addEventListener('close',()=>dialog.remove(),{once:true});
     document.body.append(dialog);
