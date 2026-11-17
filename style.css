@@ -840,7 +840,7 @@ body[data-budget-page="open"] .budget-item-page { visibility: visible; pointer-e
 .trip-files-pick[hidden] { display: none; }
 .trip-files-pick[data-busy="true"] { opacity: .5; pointer-events: none; }
 .trip-files-list { display: grid; gap: 15px; }
-.trip-files-group { min-width: 0; padding: 16px; border: 1px solid rgba(255,255,255,.65); border-radius: 24px; background: rgba(255,255,255,.95); }
+.trip-files-group { min-width: 0; padding: 16px; border: 0; border-radius: 24px; background: transparent; }
 .trip-files-general { padding: 0; border: 0; background: transparent; }
 .trip-files-group-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .trip-files-day { min-width: 0; padding: 0; border: 0; color: #16243c; background: none; font: inherit; font-size: 17px; font-weight: 750; text-align: left; cursor: pointer; }
