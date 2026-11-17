@@ -3787,3 +3787,9 @@ body:not([data-budget-page="closed"]) .food-trip-summary { display: none !import
 .food-link-actions .food-link-save {background:#087aff;border-color:#087aff;color:#fff}
 .food-link-actions button:disabled {opacity:.45;cursor:not-allowed}
 @media(max-width:390px) { .food-meal-budget {font-size:12px;} }
+
+
+.food-meal-link:disabled {opacity:.43;cursor:default}
+.food-link-preview {display:grid;justify-items:start;gap:7px;min-height:12px}
+.food-link-preview-image {display:block;max-width:100%;width:min(100%,240px);max-height:180px;object-fit:contain;background:#e9f3fa;border-radius:10px}
+.food-link-preview-label {color:#5a7083;font-size:12px;overflow-wrap:anywhere}
