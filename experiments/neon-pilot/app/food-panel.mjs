@@ -25,6 +25,9 @@ export function createFoodPanel(ctx) {
     const text = fold(activity.title);
     const meal = fold(activity.meal);
     const budgetTitle = fold(linkedBudgets.map(row=>row.label).join(' '));
+    // A nearby restaurant's facade or a grocery stop is not itself a meal.
+    if (/sem refeicao|sem consumacao|foto da fachada/.test(text)) return -1;
+    if (/compras para piquenique|comprar para piquenique|monoprix|compras no mercado/.test(text)) return -1;
     const time = String(activity.start_time || '').slice(0,5);
     if (/cafe da manha/.test(text) || (/cafe simples/.test(text) && time < '10:00')) return 0;
     if (/lanche da manha/.test(text)) return 1;
