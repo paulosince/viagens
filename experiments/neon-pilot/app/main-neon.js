@@ -5558,8 +5558,16 @@ async function loadTripFiles(tripId) {
   const { data, error } = await client.from('day_attachments').select('*').eq('trip_id', key).order('created_at');
   if (error) throw error;
   const signed = await Promise.all((data || []).map(async file => {
-    const result = await client.storage.from(DAY_ATTACHMENT_BUCKET).createSignedUrl(file.storage_path, 3600);
-    return { ...file, signedUrl: result.error ? '' : result.data?.signedUrl || '' };
+    const storage = client.storage.from(DAY_ATTACHMENT_BUCKET);
+    const [original, cover] = await Promise.all([
+      storage.createSignedUrl(file.storage_path, 3600),
+      file.card_image_path ? storage.createSignedUrl(file.card_image_path, 3600) : Promise.resolve(null)
+    ]);
+    return {
+      ...file,
+      signedUrl: original.error ? '' : original.data?.signedUrl || '',
+      cardSignedUrl: cover?.error ? '' : cover?.data?.signedUrl || ''
+    };
   }));
   state.tripFilesByTrip.set(key, signed);
   if (state.activeTripId === key) { renderTripFiles(key, days); if (state.activeTripTab === 'alimentacao') foodPanel.render(); setTripPanelStatus(dom.tripFilesStatus); }
