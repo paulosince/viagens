@@ -1,4 +1,5 @@
 import {mountTicketImageZoom} from './ticket-image-zoom.mjs?v=20261115-zoom1';
+import {createFoodPanel} from './food-panel.mjs?v=20261117-food1';
 import {createNeonPreview,NEON_AUTH_URL,API_ROOTS} from './backend-neon.mjs?v=20261115-photos1';
 import {activityPhotoForPreview} from './photo-source-neon.mjs?v=20261021-7photofix';
 import {usageRingsModel} from './usage-rings.mjs?v=20261024-home3';
@@ -372,7 +373,7 @@ const dom = {
   attachmentsDetail: document.querySelector('#home_attachments_detail'), usageNote: document.querySelector('#home_usage_note'),
   editTripsButton: document.querySelector('#edit_trips_button'), newTripButton: document.querySelector('#new_trip_button'), emptyNewTripButton: document.querySelector('#empty_new_trip_button'), syncStatus: document.querySelector('#sync_status'), tripHeading: document.querySelector('#trip_heading'), yearButton: document.querySelector('#year_selector_button'), currentYear: document.querySelector('#current_year'), yearMenu: document.querySelector('#year_menu'), yearList: document.querySelector('#year_list'),
   tripList: document.querySelector('#trip_list'), homeEmpty: document.querySelector('#home_empty'), scrim: document.querySelector('#sheet_scrim'), tripEditFooter: document.querySelector('#trip_edit_footer'), deleteSelectedTrips: document.querySelector('#delete_selected_trips'), tripPage: document.querySelector('#trip_page'), closeTripPage: document.querySelector('#close_trip_page'), tripPageHero: document.querySelector('#trip_page_hero'), tripPageTitle: document.querySelector('#trip_page_title'), tripPageTitleInput: document.querySelector('#trip_page_title_input'), tripPageDates: document.querySelector('#trip_page_dates'), tripDateEditor: document.querySelector('#trip_page_date_editor'), tripStartDate: document.querySelector('#trip_page_start_date'), tripDayCount: document.querySelector('#trip_page_day_count'), tripDateDone: document.querySelector('#trip_page_date_done'), tripPageColor: document.querySelector('#trip_page_color'), tripPageCoverInput: document.querySelector('#trip_page_cover_input'), tripPageSaveStatus: document.querySelector('#trip_page_save_status'), tripPagePassengers: document.querySelector('#trip_page_passengers'), tripPagePassengerCount: document.querySelector('#trip_page_passenger_count'), tripPassengerSheet: document.querySelector('#trip_passenger_sheet'), tripPassengerSheetBody: document.querySelector('#trip_passenger_sheet_body'), tripPassengerSelf: document.querySelector('#trip_passenger_self'), tripPassengerSelfImage: document.querySelector('#trip_passenger_self_image'), tripPassengerSelfName: document.querySelector('#trip_passenger_self_name'), tripPassengerClose: document.querySelector('#close_trip_passengers'), tripPassengerMessage: document.querySelector('#trip_passenger_message'), tripDayList: document.querySelector('#trip_day_list'), tripDayMessage: document.querySelector('#trip_day_message'),
-  tripTabs: document.querySelector('.trip-tabs'), tripPanels: { roteiro: document.querySelector('#trip_panel_roteiro'), orcamento: document.querySelector('#trip_panel_orcamento'), arquivos: document.querySelector('#trip_panel_arquivos') }, budgetSummary: document.querySelector('#budget_summary'), budgetStatus: document.querySelector('#budget_status'), budgetList: document.querySelector('#budget_list'), budgetPage: document.querySelector('#budget_item_page'), budgetPageTitle: document.querySelector('#budget_item_page_title'), closeBudgetPage: document.querySelector('#close_budget_item_page'), budgetEditor: document.querySelector('#budget_editor'), budgetPageMessage: document.querySelector('#budget_item_message'), budgetAdd: document.querySelector('#budget_add'), tripFilesStatus: document.querySelector('#trip_files_status'), tripFilesList: document.querySelector('#trip_files_list'), tripFilesDay: document.querySelector('#trip_files_day'), tripFilesInput: document.querySelector('#trip_files_input'),
+  tripTabs: document.querySelector('.trip-tabs'), tripPanels: { roteiro: document.querySelector('#trip_panel_roteiro'), orcamento: document.querySelector('#trip_panel_orcamento'), alimentacao: document.querySelector('#trip_panel_alimentacao'), arquivos: document.querySelector('#trip_panel_arquivos') }, budgetSummary: document.querySelector('#budget_summary'), budgetStatus: document.querySelector('#budget_status'), budgetList: document.querySelector('#budget_list'), budgetPage: document.querySelector('#budget_item_page'), budgetPageTitle: document.querySelector('#budget_item_page_title'), closeBudgetPage: document.querySelector('#close_budget_item_page'), budgetEditor: document.querySelector('#budget_editor'), budgetPageMessage: document.querySelector('#budget_item_message'), budgetAdd: document.querySelector('#budget_add'), tripFilesStatus: document.querySelector('#trip_files_status'), tripFilesList: document.querySelector('#trip_files_list'), tripFilesDay: document.querySelector('#trip_files_day'), tripFilesInput: document.querySelector('#trip_files_input'),
   tripFileViewer: document.querySelector('#trip_file_viewer'), tripFileViewerTitle: document.querySelector('#trip_file_viewer_title'), tripFileViewerMedia: document.querySelector('#trip_file_viewer_media'), tripFileViewerStatus: document.querySelector('#trip_file_viewer_status'), tripFileViewerDelete: document.querySelector('#delete_trip_file_viewer'), tripFileViewerPosition: document.querySelector('#trip_file_viewer_position'), tripFileViewerPrevious: document.querySelector('#previous_trip_file_viewer'), tripFileViewerNext: document.querySelector('#next_trip_file_viewer'), closeTripFileViewer: document.querySelector('#close_trip_file_viewer'),
   dayPage: document.querySelector('#day_page'), closeDayPage: document.querySelector('#close_day_page'), addDayPageActivity: document.querySelector('#add_day_page_activity'), dayAgendaStickyMarker: document.querySelector('#day_agenda_sticky_marker'), dayPageHero: document.querySelector('#day_page_hero'), dayPageBadge: document.querySelector('#day_page_badge'), dayPageTitle: document.querySelector('#day_page_title'), dayPageDate: document.querySelector('#day_page_date'), dayPageSaveStatus: document.querySelector('#day_page_save_status'), dayPagePhotoInput: document.querySelector('#day_page_photo_input'), dayPageCamera: document.querySelector('#day_page_camera'), dayPageAgenda: document.querySelector('#day_page_agenda'), dayPageEmpty: document.querySelector('#day_page_empty'), dayPageMap: document.querySelector('#day_page_map'), dayPageDirections: document.querySelector('#day_page_directions'),
   dayAttachmentsButton: document.querySelector('#day_attachments_button'), dayAttachmentsCount: document.querySelector('#day_attachments_count'), dayAttachmentsScrim: document.querySelector('#day_attachments_scrim'), dayAttachmentsSheet: document.querySelector('#day_attachments_sheet'), closeDayAttachments: document.querySelector('#close_day_attachments'), dayAttachmentsInput: document.querySelector('#day_attachments_input'), dayAttachmentsStatus: document.querySelector('#day_attachments_status'), dayAttachmentsList: document.querySelector('#day_attachments_list'),
@@ -385,6 +386,32 @@ const dom = {
 // As folhas são camadas globais. Fora da Home, não ficam presas ao contexto
 // de empilhamento criado por transform/isolation daquele contêiner.
 dom.tripPage.after(dom.scrim, dom.newTripSheet, dom.profileSheet, dom.chatgptSheet, dom.changeLogSheet);
+
+const foodPanel = createFoodPanel({
+  getContext: () => {
+    const tripId = String(state.activeTripId || '');
+    const trip = state.trips.find(item => String(item.id) === tripId);
+    return {
+      trip,
+      days: trip ? state.tripDays.filter(day => !dayDeletedAt(day) && !dayIsHidden(day) && dayPosition(day) < tripDayCount(trip)).sort((a,b)=>dayPosition(a)-dayPosition(b)) : [],
+      budgets: state.budgetByTrip.get(tripId) || [],
+      files: state.tripFilesByTrip.get(tripId) || [],
+      getActivities: day => state.dayActivities.get(String(day.id)) || [],
+      getLocations: day => state.dayLocations.get(String(day.id)) || [],
+      editable: canEditActiveTrip()
+    };
+  },
+  dayDate: (day, trip) => derivedDayDate(day, trip),
+  getClient: () => tryNeon(5000),
+  applyBudget: item => {
+    const tripId = String(item.trip_id);
+    const rows = state.budgetByTrip.get(tripId) || [];
+    state.budgetByTrip.set(tripId, rows.some(row=>String(row.id)===String(item.id))
+      ? rows.map(row=>String(row.id)===String(item.id)?item:row) : [...rows,item]);
+    if (state.activeTripId === tripId) renderTripBudget(tripId);
+  },
+  openTicket: (file, files) => openTripFileViewer(file, files)
+});
 
 const displayDate = value => value ? new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(`${value}T12:00:00`)).replace('.', '') : '';
 
@@ -4543,6 +4570,7 @@ function applyTripData(data) {
   state.dayLocations = locationsByDay;
   state.activeTripDataVersion = data.version;
   renderTripDays(days, activitiesByDay, locationsByDay);
+  if (state.activeTripTab === 'alimentacao') foodPanel.render();
 }
 
 async function fetchTripData(tripId, { preferLocal = false } = {}) {
@@ -4693,11 +4721,13 @@ function selectTripTab(name, { reset = false } = {}) {
   if (!dom.tripPanels[name] || !state.activeTripId) return;
   const key = String(state.activeTripId);
   if (!reset && name === state.activeTripTab) return;
-  const order = ['roteiro', 'orcamento', 'arquivos'];
+  const order = ['roteiro', 'orcamento', 'alimentacao', 'arquivos'];
   const previous = order.indexOf(state.activeTripTab);
   const next = order.indexOf(name);
   if (!reset) state.tripTabScroll.set(`${key}:${state.activeTripTab}`, dom.tripPage.scrollTop);
   state.activeTripTab = name;
+  document.body.dataset.tripTab = name;
+  document.getElementById('trip_food_summary').hidden = name !== 'alimentacao';
   dom.tripTabs.style.setProperty('--active-index', String(next));
   for (const [tab, panel] of Object.entries(dom.tripPanels)) {
     panel.hidden = tab !== name;
@@ -4712,6 +4742,12 @@ function selectTripTab(name, { reset = false } = {}) {
   });
   if (name === 'orcamento') loadTripBudget(key).catch(error => setTripPanelStatus(dom.budgetStatus, error.message, 'error'));
   if (name === 'arquivos') loadTripFiles(key).catch(error => setTripPanelStatus(dom.tripFilesStatus, error.message, 'error'));
+  if (name === 'alimentacao') {
+    foodPanel.render();
+    Promise.allSettled([loadTripBudget(key), loadTripFiles(key)]).then(() => {
+      if (state.activeTripId === key && state.activeTripTab === 'alimentacao') foodPanel.render();
+    });
+  }
 }
 
 function setTripPanelStatus(node, message = '', kind = 'info') {
@@ -4898,6 +4934,7 @@ async function loadTripBudget(tripId) {
   }
   if (state.activeTripId === key) {
     renderTripBudget(key);
+    if (state.activeTripTab === 'alimentacao') foodPanel.render();
     setTripPanelStatus(dom.budgetStatus);
   }
 }
@@ -5514,7 +5551,7 @@ async function loadTripFiles(tripId) {
     return { ...file, signedUrl: result.error ? '' : result.data?.signedUrl || '' };
   }));
   state.tripFilesByTrip.set(key, signed);
-  if (state.activeTripId === key) { renderTripFiles(key, days); setTripPanelStatus(dom.tripFilesStatus); }
+  if (state.activeTripId === key) { renderTripFiles(key, days); if (state.activeTripTab === 'alimentacao') foodPanel.render(); setTripPanelStatus(dom.tripFilesStatus); }
 }
 
 async function uploadTripFiles(files) {
