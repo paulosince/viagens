@@ -196,6 +196,9 @@ export function createFoodPanel(ctx) {
     const contingency=budgets.filter(item=>!item.activity_id && item.currency==='EUR' && /reserva de alimentacao/.test(fold(item.label)))
       .reduce((total,item)=>total+(Number(item.planned_amount)||0),0);
     if(contingency)footer.append(html('small','food-total-note','Reserva para imprevistos: '+money(contingency)+' (fora das cinco refeições diárias).'));
+    const detached=budgets.filter(item=>!item.activity_id && /alimentacao/.test(fold(item.category))
+      && !String(item.label||'').startsWith(extraPrefix) && !/reserva de alimentacao/.test(fold(item.label)));
+    if(detached.length)footer.append(html('small','food-total-note',detached.length+' gasto(s) do orçamento sem atividade vinculada; verificar na aba Orçamento antes de somar.'));
     if(excludedCurrency)footer.append(html('small','food-total-note','Despesas em outras moedas não foram convertidas automaticamente.'));
     if(notice)notice.textContent=!editable?'Somente leitura.':'Preencha o realizado em cada refeição para acompanhar os gastos.';
   }
