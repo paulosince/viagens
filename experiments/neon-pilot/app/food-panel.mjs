@@ -10,6 +10,8 @@ export function createFoodPanel(ctx) {
     { key: 'jantar', label: 'Jantar' }
   ];
   const extraPrefix = 'Alimentação avulsa | ';
+  const formatInput = value => value == null ? '' : Number(value).toFixed(2).replace('.', ',');
+  const previewAmount = value => { try { return parseMoney(value); } catch { return null; } };
   const fold = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
   const money = n => n == null ? '—' : new Intl.NumberFormat('pt-BR', {style:'currency',currency:'EUR'}).format(Number(n));
   const parseMoney = value => {
@@ -73,6 +75,8 @@ export function createFoodPanel(ctx) {
       }
     });
     const displayed = document.createDocumentFragment();
+    const daySummaries = [];
+    let refreshSummary = () => {};
     let tripPlanned = 0, tripActual = 0, unpriced = 0, spentCount = 0, excludedCurrency = false;
     for (const day of days) {
       const date = ctx.dayDate(day,trip);
@@ -96,6 +100,7 @@ export function createFoodPanel(ctx) {
       const headerCols=html('div','food-meal-columns');
       for(const label of ['Refeição / local','Previsto','Realizado']) headerCols.append(html('span','',label));
       card.append(headerCols);
+      const mealStates=[];
       let dayPlanned=0, dayActual=0, dayMissing=false, daySpent=false;
       for (let i=0; i<foodRows.length; i++) {
         const group=foodRows[i],slot=group.slot;
@@ -111,15 +116,21 @@ export function createFoodPanel(ctx) {
           }
           return activity.currency && activity.currency!=='EUR' && activity.planned_amount!=null ? 0 : activity.planned_amount!=null ? Number(activity.planned_amount) : null;
         });
-        const isUnpriced = activitiesForSlot.length>0 && plannedNumbers.some(v=>v===null);
+        const unresolved = activitiesForSlot.length>0 && plannedNumbers.some(v=>v===null);
+        const fallback = plannedNumbers.filter(v=>v!=null).reduce((a,v)=>a+v,0);
+        const manualCanCover = group.budgets.length===0 && (activitiesForSlot.length===0 || plannedNumbers.every(v=>v==null || v===0));
+        const manualPlan = manualCanCover && manual?.planned_amount!=null ? Number(manual.planned_amount) : null;
+        const isUnpriced = unresolved && manualPlan==null;
         if(isUnpriced){dayMissing=true;unpriced++;}
-        const planned=plannedNumbers.some(v=>v!=null)?plannedNumbers.reduce((a,v)=>a+(v||0),0):activitiesForSlot.length?null:null;
+        const planned = manualPlan!=null ? manualPlan : plannedNumbers.some(v=>v!=null) ? fallback : null;
         const spentAmounts=included.filter(item=>item.actual_amount!=null);
         const spend=spentAmounts.reduce((n,item)=>n+Number(item.actual_amount),0)+(manual?.actual_amount!=null?Number(manual.actual_amount):0);
         const hasSpend=spentAmounts.length>0 || manual?.actual_amount!=null;
         if(planned!=null)dayPlanned+=planned;
         if(hasSpend){dayActual+=spend;daySpent=true;spentCount++;}
         const row=html('div','food-meal');
+        const lineState={planned,actual:hasSpend?spend:null,unpriced:isUnpriced,needsPrice:activitiesForSlot.length>0};
+        mealStates.push(lineState);
         const grid=html('div','food-meal-grid');
         const info=html('div','food-meal-info');
         info.append(html('strong','food-meal-name',slot.label));
@@ -151,48 +162,112 @@ export function createFoodPanel(ctx) {
           }
           info.append(entry);
         }
-        const predicted=html('span','food-meal-amount',planned==null?'—':money(planned)+(isUnpriced?' + ?':''));
+        const plannedWrap=html('div','food-meal-input-wrap');
+        const plannedInput=html('input','food-meal-budget');
+        plannedInput.type='text'; plannedInput.inputMode='decimal'; plannedInput.placeholder='—';
+        plannedInput.value=formatInput(planned);
+        plannedInput.setAttribute('aria-label','Previsto: '+slot.label+' '+localized);
+        const mixedCurrency=group.budgets.some(item=>item.currency!=='EUR');
+        const tooManyBudgets=group.budgets.length>1;
+        const complexFallback=group.budgets.length===0 && activitiesForSlot.length>1 && plannedNumbers.some(v=>v!=null && v!==0);
+        const canPlan=editable && !mixedCurrency && !tooManyBudgets && !complexFallback;
+        plannedInput.disabled=!canPlan;
+        if (!canPlan && editable) plannedInput.title='Mais de uma previsão ou moeda diferente. Ajuste individualmente na aba Orçamento.';
+        const plannedStatus=html('small','food-meal-status','');
+        plannedInput.addEventListener('input',()=>{
+          const amount=previewAmount(plannedInput.value);
+          const valid=!plannedInput.value.trim() || amount!==null;
+          plannedInput.setAttribute('aria-invalid',String(!valid));
+          if(valid){
+            lineState.planned=amount;
+            lineState.unpriced=amount==null && lineState.needsPrice;
+            refreshSummary();
+          }
+        });
+        plannedInput.addEventListener('change',async()=>{
+          const old=formatInput(planned);
+          plannedInput.disabled=true; plannedStatus.textContent='Salvando…';
+          try{
+            const amount=parseMoney(plannedInput.value);
+            const saved=await saveMealValue({field:'planned_amount',data,activities:activitiesForSlot,budgets:group.budgets,manual,date,slot,amount});
+            if(saved)ctx.applyBudget(saved);
+            render();
+          }catch(error){
+            plannedStatus.textContent=error.message||'Não foi possível salvar';
+            plannedInput.value=old;lineState.planned=planned;lineState.unpriced=isUnpriced;
+            plannedInput.disabled=!canPlan;refreshSummary();
+          }
+        });
+        plannedWrap.append(plannedInput,plannedStatus);
         const actual=html('div','food-meal-input-wrap');
         const input=html('input','food-meal-actual');
         input.type='text'; input.inputMode='decimal';
         input.placeholder='—';
-        input.value=hasSpend?spend.toFixed(2).replace('.',','):'';
+        input.value=hasSpend?formatInput(spend):'';
         input.setAttribute('aria-label','Realizado: '+slot.label+' '+localized);
-        input.disabled=!editable || group.budgets.length>1 || excludedCurrency && group.budgets.some(item=>item.currency!=='EUR');
-        if(group.budgets.length>1){
-          input.title='Mais de uma despesa nesta refeição: edite individualmente na aba Orçamento.';
-        }
+        input.disabled=!editable || tooManyBudgets || mixedCurrency || (group.budgets.length>0 && manual?.actual_amount!=null);
+        if(input.disabled && editable) input.title='Há múltiplos lançamentos nesta refeição. Edite individualmente na aba Orçamento.';
+        input.addEventListener('input',()=>{
+          const amount=previewAmount(input.value);
+          const valid=!input.value.trim() || amount!==null;
+          input.setAttribute('aria-invalid',String(!valid));
+          if(valid){lineState.actual=amount;refreshSummary();}
+        });
         const status=html('small','food-meal-status','');
         input.addEventListener('change',async()=>{
           input.disabled=true;status.textContent='Salvando…';
           try{
             const amount=parseMoney(input.value);
-            const linked=included.length===1 && group.budgets.length===1?included[0]:null;
-            const saved=await saveAmount({data,activity:activitiesForSlot[0]||null,linked,manual,date,slot,amount});
+            const saved=await saveMealValue({field:'actual_amount',data,activities:activitiesForSlot,budgets:group.budgets,manual,date,slot,amount});
             if(saved)ctx.applyBudget(saved);
             status.textContent='Salvo';
             render();
-          }catch(error){status.textContent=error.message||'Falha ao salvar';input.disabled=false;}
+          }catch(error){status.textContent=error.message||'Falha ao salvar';input.value=hasSpend?formatInput(spend):'';lineState.actual=hasSpend?spend:null;input.disabled=!editable || tooManyBudgets || mixedCurrency;refreshSummary();}
         });
         actual.append(input,status);
-        grid.append(info,predicted,actual);
+        grid.append(info,plannedWrap,actual);
         row.append(grid);card.append(row);
       }
       tripPlanned+=dayPlanned;tripActual+=dayActual;
       badge.textContent=money(dayPlanned)+(dayMissing?' + ?':'');
       const dayFoot=html('div','food-day-footer');
       dayFoot.append(html('span','','Total do dia'),html('strong','',money(dayPlanned)+' previsto / '+(daySpent?money(dayActual):'—')+' realizado'));
+      const dayTotalText=dayFoot.children[1];
       card.append(dayFoot);displayed.append(card);
+      daySummaries.push({badge,dayTotalText,rows:mealStates});
     }
     host.replaceChildren(displayed);
     footer.replaceChildren();
     const title=html('div','food-total-heading','Alimentação · totais da viagem');
     const grid=html('div','food-total-grid');
+    const totalCells=[];
     for(const [label,value] of [['Previsto',money(tripPlanned)+(unpriced?'*':'')],['Realizado',spentCount?money(tripActual):'—'],['Diferença',spentCount?money(tripPlanned-tripActual):'—']]){
       const cell=html('div','food-total-cell');
-      cell.append(html('small','',label),html('strong','',value));grid.append(cell);
+      const valueNode=html('strong','',value);
+      cell.append(html('small','',label),valueNode);grid.append(cell);totalCells.push(valueNode);
     }
-    footer.append(title,grid,html('small','food-total-note',unpriced?'*Há refeições com preço não informado; totais parciais.':'Valores realizados só aparecem após o lançamento.'));
+    const summaryNote=html('small','food-total-note','');
+    footer.append(title,grid,summaryNote);
+    refreshSummary=()=>{
+      let forecast=0,spent=0,actualRows=0,missing=0;
+      for(const day of daySummaries){
+        let dp=0,da=0,hasActual=false,hasUnknown=false;
+        for(const row of day.rows){
+          if(row.planned!=null)dp+=row.planned;
+          if(row.actual!=null){da+=row.actual;hasActual=true;actualRows++;}
+          if(row.unpriced)hasUnknown=true;
+        }
+        forecast+=dp;spent+=da;
+        if(hasUnknown)missing++;
+        day.badge.textContent=money(dp)+(hasUnknown?' + ?':'');
+        day.dayTotalText.textContent=money(dp)+' previsto / '+(hasActual?money(da):'—')+' realizado';
+      }
+      totalCells[0].textContent=money(forecast)+(missing?'*':'');
+      totalCells[1].textContent=actualRows?money(spent):'—';
+      totalCells[2].textContent=actualRows?money(forecast-spent):'—';
+      summaryNote.textContent=missing?'*Há refeições sem preço informado; totais parciais.':'Valores realizados só aparecem após o lançamento.';
+    };
+    refreshSummary();
     const contingency=budgets.filter(item=>!item.activity_id && item.currency==='EUR' && /reserva de alimentacao/.test(fold(item.label)))
       .reduce((total,item)=>total+(Number(item.planned_amount)||0),0);
     if(contingency)footer.append(html('small','food-total-note','Reserva para imprevistos: '+money(contingency)+' (fora das cinco refeições diárias).'));
@@ -202,28 +277,38 @@ export function createFoodPanel(ctx) {
     if(excludedCurrency)footer.append(html('small','food-total-note','Despesas em outras moedas não foram convertidas automaticamente.'));
     if(notice)notice.textContent=!editable?'Somente leitura.':'Preencha o realizado em cada refeição para acompanhar os gastos.';
   }
-  async function saveAmount({data,activity,linked,manual,date,slot,amount}){
+  async function saveMealValue({field,data,activities,budgets,manual,date,slot,amount}){
     const client=await ctx.getClient();
-    if(!client)throw new Error('Conecte-se para registrar a despesa.');
+    if(!client)throw new Error('Conecte-se para registrar o valor.');
     const tripId=String(data.trip.id);
-    if(linked){
-      const patch={actual_amount:amount,purchase_status:amount==null?'pending':'purchased'};
-      const res=await client.from('budget_items').update(patch).eq('id',linked.id).eq('trip_id',tripId).select('*').single();
-      if(res.error)throw res.error;
-      return res.data;
-    }
+    if(budgets.length>1 || budgets.some(item=>item.currency!=='EUR')) throw new Error('Edite os lançamentos separadamente no Orçamento.');
+    if(field==='actual_amount' && budgets.length && manual?.actual_amount!=null) throw new Error('Há mais de um gasto nesta refeição; use a aba Orçamento.');
+    const activity=activities.length===1?activities[0]:null;
+    const linked=budgets.length===1?budgets[0]:null;
     const label=suffixLabel(date,slot.key);
-    let existing=manual;
+    let existing=linked||manual;
     if(!existing){
-      const find=await client.from('budget_items').select('*').eq('trip_id',tripId).eq('label',label).limit(1);
-      if(find.error)throw find.error;
-      existing=find.data?.[0]||null;
+      const found=await client.from('budget_items').select('*').eq('trip_id',tripId).eq('label',label).limit(1);
+      if(found.error)throw found.error;
+      existing=found.data?.[0]||null;
     }
-    if(!existing&&amount==null)return null;
-    const patch={actual_amount:amount,purchase_status:amount==null?'pending':'purchased'};
-    const result=existing
-      ?await client.from('budget_items').update(patch).eq('id',existing.id).eq('trip_id',tripId).select('*').single()
-      :await client.from('budget_items').insert({trip_id:tripId,activity_id:null,label,category:'Alimentação · refeições',currency:'EUR',planned_amount:0,...patch}).select('*').single();
+    if(!existing && amount==null)return null;
+    const patch={[field]:amount};
+    if(field==='actual_amount')patch.purchase_status=amount==null?'pending':'purchased';
+    if(existing){
+      const result=await client.from('budget_items').update(patch).eq('id',existing.id).eq('trip_id',tripId).select('*').single();
+      if(result.error)throw result.error;
+      return result.data;
+    }
+    const newRow={
+      trip_id:tripId,activity_id:activity?.id||null,
+      label:activity?date.slice(8,10)+'/'+date.slice(5,7)+' · '+activity.title+' · alimentação':label,
+      category:'Alimentação · refeições',currency:'EUR',
+      planned_amount:field==='planned_amount'?amount:activity?.planned_amount??null,
+      actual_amount:field==='actual_amount'?amount:null,
+      purchase_status:field==='actual_amount'&&amount!=null?'purchased':'pending'
+    };
+    const result=await client.from('budget_items').insert(newRow).select('*').single();
     if(result.error)throw result.error;
     return result.data;
   }
