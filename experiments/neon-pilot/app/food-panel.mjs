@@ -146,21 +146,32 @@ export function createFoodPanel(ctx) {
             img.addEventListener('error',()=>img.remove(),{once:true});
             entry.append(img);
           }
-          const match = files.filter(file=>{
-            if(file.activity_id && String(file.activity_id)===String(activity.id))return true;
-            if(file.item_category!=='restaurant' || dateOnly(file.event_date)!==date)return false;
-            const venue=fold([file.display_title,file.venue].filter(Boolean).join(' '));
+          info.append(entry);
+        }
+        const tickets=files.filter(file=>{
+          if(file.meal_day_id && file.meal_slot){
+            return String(file.meal_day_id)===String(day.id) && file.meal_slot===slot.key;
+          }
+          if(file.activity_id && activitiesForSlot.some(activity=>String(activity.id)===String(file.activity_id))) return true;
+          if(file.item_category!=='restaurant' || dateOnly(file.event_date)!==date) return false;
+          const venue=fold([file.display_title,file.venue].filter(Boolean).join(' '));
+          return activitiesForSlot.some(activity=>{
             const place=fold(activity.place_name||'');
             const aliases=[place,place.replace(/ by .*/,''),place.replace(/ \(.*\)/,'')].filter(value=>value.length>=6);
             return aliases.some(value=>venue.includes(value));
           });
-          for(const ticket of match){
-            const button=html('button','food-meal-ticket','Ver reserva · '+(ticket.display_title||'comprovante'));
-            button.type='button';
-            button.addEventListener('click',()=>ctx.openTicket(ticket,files));
-            entry.append(button);
-          }
-          info.append(entry);
+        });
+        for(const ticket of tickets){
+          const button=html('button','food-meal-ticket','Ver reserva · '+(ticket.display_title||ticket.file_name||'comprovante'));
+          button.type='button';
+          button.addEventListener('click',()=>ctx.openTicket(ticket,files));
+          info.append(button);
+        }
+        if(editable){
+          const bind=html('button','food-meal-link',tickets.length?'Vincular outro ticket':'Vincular reserva');
+          bind.type='button';
+          bind.addEventListener('click',()=>openLinkDialog({data,day,date,slot,activities:activitiesForSlot}));
+          info.append(bind);
         }
         const plannedWrap=html('div','food-meal-input-wrap');
         const plannedInput=html('input','food-meal-budget');
@@ -276,6 +287,70 @@ export function createFoodPanel(ctx) {
     if(detached.length)footer.append(html('small','food-total-note',detached.length+' gasto(s) do orçamento sem atividade vinculada; verificar na aba Orçamento antes de somar.'));
     if(excludedCurrency)footer.append(html('small','food-total-note','Despesas em outras moedas não foram convertidas automaticamente.'));
     if(notice)notice.textContent=!editable?'Somente leitura.':'Preencha o realizado em cada refeição para acompanhar os gastos.';
+  }
+
+  function openLinkDialog({data,day,date,slot,activities}){
+    const tripId=String(data.trip.id);
+    const files=data.files||[];
+    const existing=files.find(file=>String(file.meal_day_id||'')===String(day.id) && file.meal_slot===slot.key);
+    const dialog=html('dialog','food-link-dialog');
+    const title=html('h3','','Vincular reserva · '+slot.label);
+    const subtitle=html('p','','Escolha um comprovante já salvo em Tickets. Ele continuará no local original e será exibido aqui como reserva.');
+    const form=html('form','food-link-form');
+    form.method='dialog';
+    const label=html('label','','Ticket existente');
+    const select=html('select','food-link-select');
+    const empty=html('option','','Selecione um ticket');
+    empty.value='';
+    select.append(empty);
+    const sorted=[...files].sort((a,b)=>{
+      const rank=file=>(String(file.meal_day_id||'')===String(day.id)?0:dateOnly(file.event_date)===date?1:String(file.day_id||'')===String(day.id)?2:file.item_category==='restaurant'?3:4);
+      return rank(a)-rank(b);
+    });
+    for(const file of sorted){
+      const option=html('option','',(file.display_title||file.file_name||'Arquivo')+
+        (file.item_category==='restaurant'?' · Restaurante':'')+
+        (file.event_date?' · '+dateOnly(file.event_date).slice(8,10)+'/'+dateOnly(file.event_date).slice(5,7):''));
+      option.value=String(file.id);
+      select.append(option);
+    }
+    if(existing)select.value=String(existing.id);
+    label.append(select);
+    const message=html('p','food-link-message','');
+    const actions=html('div','food-link-actions');
+    const cancel=html('button','','Cancelar');cancel.type='button';
+    cancel.addEventListener('click',()=>dialog.close());
+    const submit=html('button','food-link-save','Vincular ticket');submit.type='button';submit.disabled=files.length===0;
+    submit.addEventListener('click',async()=>{
+      const file=files.find(item=>String(item.id)===String(select.value));
+      if(!file){message.textContent='Selecione um ticket da lista.';return;}
+      submit.disabled=true;message.textContent='Salvando vínculo…';
+      try{
+        const client=await ctx.getClient();
+        if(!client)throw new Error('Conecte-se para vincular o ticket.');
+        const activity=activities.length===1?activities[0]:null;
+        const patch={
+          meal_day_id:String(day.id),meal_slot:slot.key,
+          activity_id:activity?.id||null,item_category:'restaurant',
+          event_date:date
+        };
+        if(!file.event_time && activity?.start_time)patch.event_time=activity.start_time;
+        // Do not change day_id: for general attachments the storage policy
+        // requires it to remain null even when linked to a meal.
+        const result=await client.from('day_attachments').update(patch)
+          .eq('trip_id',tripId).eq('id',file.id).select('*').single();
+        if(result.error)throw result.error;
+        ctx.applyTicket({...file,...result.data,signedUrl:file.signedUrl||'',cardSignedUrl:file.cardSignedUrl||''});
+        dialog.close();render();
+      }catch(error){message.textContent=error.message||'Não foi possível vincular o ticket.';submit.disabled=false;}
+    });
+    actions.append(cancel,submit);
+    if(!files.length)form.append(html('p','food-link-message','Não há tickets carregados. Envie o comprovante na aba Tickets e volte aqui.'));
+    form.append(label,message,actions);
+    dialog.append(title,subtitle,form);
+    dialog.addEventListener('close',()=>dialog.remove(),{once:true});
+    document.body.append(dialog);
+    dialog.showModal();
   }
   async function saveMealValue({field,data,activities,budgets,manual,date,slot,amount}){
     const client=await ctx.getClient();
