@@ -3740,3 +3740,50 @@ body:not([data-budget-page="closed"]) .food-trip-summary { display: none !import
   .food-meal, .food-meal-columns { padding-left: 9px; padding-right: 9px; }
   .food-meal-actual { font-size: 13px; }
 }
+
+
+/* Alimentação: previsão editável e seleção manual de reservas. */
+.food-meal-budget {
+  width:100%; min-width:0; min-height:36px; padding:5px 3px;
+  border:1px solid #bed1df; border-radius:10px;
+  background:#fff; color:#17253a;
+  font:inherit; font-size:13px; font-weight:750; text-align:center;
+  font-variant-numeric:tabular-nums;
+}
+.food-meal-budget:focus,.food-meal-actual:focus {
+  outline:2px solid #087aff; outline-offset:1px;
+}
+.food-meal-budget[aria-invalid="true"],.food-meal-actual[aria-invalid="true"] {
+  border-color:#d54545; background:#fff2f2;
+}
+.food-meal-budget:disabled { color:#8393a1; background:#edf4f8; }
+.food-meal-link {
+  display:inline-flex; align-items:center; justify-content:center;
+  max-width:100%; min-height:31px;
+  padding:5px 10px; margin-top:2px;
+  border:1px dashed #96bddc; border-radius:9px;
+  background:#f0f8ff; color:#1464ab;
+  font:inherit; font-size:11px; font-weight:750; text-align:left;
+  cursor:pointer;
+}
+.food-meal-link:before { content:'+'; margin-right:6px; font-weight:900; }
+.food-link-dialog {
+  width:min(calc(100% - 32px),420px);
+  max-width:none; max-height:min(80dvh,580px);
+  margin:auto; padding:22px;
+  border:1px solid #d3e3f1; border-radius:24px;
+  color:#162f47; background:#f8fcff;
+  font:inherit; box-shadow:0 22px 80px #0d203b59;
+}
+.food-link-dialog::backdrop {background:rgba(5,20,42,.55);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
+.food-link-dialog h3 {margin:0 0 7px;font-size:20px;font-weight:800;color:#16344b}
+.food-link-dialog p {font-size:13px;line-height:1.5;color:#5a7389;margin:0 0 14px}
+.food-link-form {display:grid;gap:15px}
+.food-link-form label {display:grid;gap:8px;font-size:13px;font-weight:700;color:#223f5a}
+.food-link-select {width:100%;min-height:47px;padding:9px;border:1px solid #a7c9e4;border-radius:12px;background:#fff;color:#183048;font:inherit;font-size:14px}
+.food-link-dialog .food-link-message {min-height:16px;margin:0;color:#aa4d2a;font-size:12px}
+.food-link-actions {display:flex;gap:10px;justify-content:flex-end}
+.food-link-actions button {min-height:43px;padding:10px 14px;border:1px solid #cbd8e4;border-radius:12px;background:#fff;color:#17314a;font:inherit;font-size:13px;font-weight:750}
+.food-link-actions .food-link-save {background:#087aff;border-color:#087aff;color:#fff}
+.food-link-actions button:disabled {opacity:.45;cursor:not-allowed}
+@media(max-width:390px) { .food-meal-budget {font-size:12px;} }
