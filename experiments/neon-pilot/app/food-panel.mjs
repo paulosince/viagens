@@ -87,7 +87,7 @@ export function createFoodPanel(ctx) {
       const headerCols=html('div','food-meal-columns');
       for(const label of ['Refeição / local','Previsto','Realizado']) headerCols.append(html('span','',label));
       card.append(headerCols);
-      let dayPlanned=0, dayActual=0, dayMissing=false;
+      let dayPlanned=0, dayActual=0, dayMissing=false, daySpent=false;
       for (let i=0; i<foodRows.length; i++) {
         const group=foodRows[i],slot=group.slot;
         const activitiesForSlot=group.activities;
@@ -96,7 +96,10 @@ export function createFoodPanel(ctx) {
         const manual=manualByLabel.get(suffixLabel(date,slot.key));
         const plannedNumbers=activitiesForSlot.map(activity=>{
           const rows=budgetsByActivity.get(String(activity.id)) || [];
-          if (rows.length) return rows.filter(item=>item.currency==='EUR').map(item=>item.planned_amount).filter(v=>v!=null).reduce((n,v)=>n+Number(v),0);
+          if (rows.length) {
+            const estimates=rows.filter(item=>item.currency==='EUR').map(item=>item.planned_amount).filter(v=>v!=null);
+            return estimates.length?estimates.reduce((n,v)=>n+Number(v),0):null;
+          }
           return activity.currency && activity.currency!=='EUR' && activity.planned_amount!=null ? 0 : activity.planned_amount!=null ? Number(activity.planned_amount) : null;
         });
         const isUnpriced = activitiesForSlot.length>0 && plannedNumbers.some(v=>v===null);
@@ -106,7 +109,7 @@ export function createFoodPanel(ctx) {
         const spend=spentAmounts.reduce((n,item)=>n+Number(item.actual_amount),0)+(manual?.actual_amount!=null?Number(manual.actual_amount):0);
         const hasSpend=spentAmounts.length>0 || manual?.actual_amount!=null;
         if(planned!=null)dayPlanned+=planned;
-        if(hasSpend){dayActual+=spend;spentCount++;}
+        if(hasSpend){dayActual+=spend;daySpent=true;spentCount++;}
         const row=html('div','food-meal');
         const grid=html('div','food-meal-grid');
         const info=html('div','food-meal-info');
@@ -169,7 +172,7 @@ export function createFoodPanel(ctx) {
       tripPlanned+=dayPlanned;tripActual+=dayActual;
       badge.textContent=money(dayPlanned)+(dayMissing?' + ?':'');
       const dayFoot=html('div','food-day-footer');
-      dayFoot.append(html('span','','Total do dia'),html('strong','',money(dayPlanned)+' / '+(dayActual||dayMissing||spentCount?money(dayActual):'—')));
+      dayFoot.append(html('span','','Total do dia'),html('strong','',money(dayPlanned)+' previsto / '+(daySpent?money(dayActual):'—')+' realizado'));
       card.append(dayFoot);displayed.append(card);
     }
     host.replaceChildren(displayed);
@@ -205,7 +208,7 @@ export function createFoodPanel(ctx) {
     const patch={actual_amount:amount,purchase_status:amount==null?'pending':'purchased'};
     const result=existing
       ?await client.from('budget_items').update(patch).eq('id',existing.id).eq('trip_id',tripId).select('*').single()
-      :await client.from('budget_items').insert({trip_id:tripId,activity_id:activity?.id||null,label,category:'Alimentação · refeições',currency:'EUR',planned_amount:0,...patch}).select('*').single();
+      :await client.from('budget_items').insert({trip_id:tripId,activity_id:null,label,category:'Alimentação · refeições',currency:'EUR',planned_amount:0,...patch}).select('*').single();
     if(result.error)throw result.error;
     return result.data;
   }
