@@ -2560,7 +2560,7 @@ function setAttachmentUploadProgress(statusElement, active) {
 // Large iPhone PNG screenshots can exceed upstream request-body limits.
 // Preserve the original on the device; only an optimized upload copy is created.
 async function prepareAttachmentForUpload(file, notify) {
-  if (file.size <= 8 * 1024 * 1024 || !/^image\\/(png|jpeg|webp)$/.test(file.type)) return file;
+  if (file.size <= 8 * 1024 * 1024 || !/^image\/(png|jpeg|webp)$/.test(file.type)) return file;
   notify?.('Preparando uma cópia otimizada da imagem; o original será preservado…');
   let bitmap;
   try {
@@ -2577,7 +2577,7 @@ async function prepareAttachmentForUpload(file, notify) {
     const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', .94));
     if (!blob || !blob.size || blob.size >= file.size || blob.size > 8 * 1024 * 1024)
       throw new Error('Não foi possível reduzir a imagem com qualidade adequada.');
-    return new File([blob], file.name.replace(/\\.[^.]+$/, '') + '-otimizado.jpg', {type:'image/jpeg'});
+    return new File([blob], file.name.replace(/\.[^.]+$/, '') + '-otimizado.jpg', {type:'image/jpeg'});
   } finally { bitmap?.close(); }
 }
 
