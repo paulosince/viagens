@@ -1849,7 +1849,7 @@ function renderTripDays(days, activitiesByDay = new Map(), locationsByDay = new 
     const agenda = document.createElement('div');
     agenda.className = 'trip-day-agenda';
     for (const period of ['morning', 'afternoon', 'night']) {
-      const periodActivities = activities.filter(activity => activity.period === period);
+      const periodActivities = orderedDayActivities(activities).filter(activity => activity.period === period);
       if (!periodActivities.length) continue;
       const group = document.createElement('section');
       group.className = 'trip-day-period';
