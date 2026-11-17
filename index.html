@@ -47,9 +47,9 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20261117-white-day-ticket-headings" as="style">
-  <link rel="stylesheet" href="style.css?v=20261117-white-day-ticket-headings" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20261117-white-day-ticket-headings"></noscript>
+  <link rel="preload" href="style.css?v=20261117-food-panel1" as="style">
+  <link rel="stylesheet" href="style.css?v=20261117-food-panel1" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20261117-food-panel1"></noscript>
   <link rel="stylesheet" href="src/update-manager.css?v=20261024-home3">
   <script>
     function showViaggioStartupError(detail) {
@@ -364,6 +364,11 @@
         <div id="budget_summary" class="budget-summary"></div>
         <div id="budget_list" class="budget-list"></div>
       </section>
+      <section id="trip_panel_alimentacao" class="trip-page-content trip-detail-panel food-panel" role="tabpanel" aria-labelledby="trip_tab_alimentacao" hidden>
+        <div class="trip-panel-heading"><h2>Alimentação</h2></div>
+        <p id="trip_food_notice" class="trip-panel-status" role="status" aria-live="polite"></p>
+        <div id="trip_food_days" class="food-day-list"></div>
+      </section>
       <section id="trip_panel_arquivos" class="trip-page-content trip-detail-panel" role="tabpanel" aria-labelledby="trip_tab_arquivos" hidden>
         <div class="trip-panel-heading"><h2>Arquivos</h2></div>
         <p id="trip_files_status" class="trip-panel-status" role="status" aria-live="polite"></p>
@@ -372,10 +377,13 @@
       </section>
     </section>
 
+    <aside id="trip_food_summary" class="food-trip-summary" aria-label="Totais da alimentação da viagem" hidden></aside>
+
     <nav class="trip-tabs" role="tablist" aria-label="Seções da viagem" aria-hidden="true" inert style="--active-index: 0">
       <span class="trip-tab-indicator" aria-hidden="true"></span>
       <button id="trip_tab_roteiro" class="trip-tab" role="tab" type="button" aria-controls="trip_panel_roteiro" aria-selected="true" tabindex="0"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V8l5-3 6 3 5-3v12l-5 3-6-3-5 3Z"/><path d="M9 5v12m6-9v12"/></svg><span>Roteiro</span></button>
       <button id="trip_tab_orcamento" class="trip-tab" role="tab" type="button" aria-controls="trip_panel_orcamento" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 10h18m-5 5h2M6 6V4h12"/></svg><span>Orçamento</span></button>
+      <button id="trip_tab_alimentacao" class="trip-tab" role="tab" type="button" aria-controls="trip_panel_alimentacao" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3v8M7 3v8M10 3v8M7 11v10M17 3v18M17 3c-4 3-4 9 0 10h3V3"/></svg><span>Alimentação</span></button>
       <button id="trip_tab_arquivos" class="trip-tab" role="tab" type="button" aria-controls="trip_panel_arquivos" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/><path d="M3 11h18"/></svg><span>Tickets</span></button>
     </nav>
 
@@ -647,7 +655,7 @@
       if (legacyPending > 0) {
         location.replace('./legacy-supabase.html?recover=1');
       } else {
-        await import('./experiments/neon-pilot/app/main-neon.js?v=20261117-chronological-cards1');
+        await import('./experiments/neon-pilot/app/main-neon.js?v=20261117-food-panel1');
       }
     } catch (error) {
       console.error('Não foi possível validar o estado local antes da migração Neon', error);
