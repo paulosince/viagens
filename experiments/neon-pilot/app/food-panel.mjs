@@ -137,7 +137,9 @@ export function createFoodPanel(ctx) {
         if(activitiesForSlot.length===0)info.append(html('span','food-meal-empty',manual?.planned_amount!=null?'Previsão extra':manual?.actual_amount!=null?'Despesa avulsa':'Sem previsão na agenda'));
         for(const activity of activitiesForSlot){
           const entry=html('div','food-meal-entry');
-          entry.append(html('span','food-meal-description',(activity.start_time?String(activity.start_time).slice(0,5)+' · ':'')+(activity.place_name || activity.title || 'Refeição')));
+          const destination=String(activity.place_name || activity.title || 'Refeição')
+            .replace(/\s*[·—]\s*€\s*\d+(?:[.,]\d+)?(?:\s*\/\s*5)?/g,'').trim();
+          entry.append(html('span','food-meal-description',(activity.start_time?String(activity.start_time).slice(0,5)+' · ':'')+destination));
           const loc=locations.find(x=>String(x.id)===String(activity.place_id));
           const photo=imageUrl(activity.photo_url || loc?.photo_url);
           if(photo){
@@ -393,6 +395,10 @@ export function createFoodPanel(ctx) {
     if(!existing && amount==null)return null;
     const patch={[field]:amount};
     if(field==='actual_amount')patch.purchase_status=amount==null?'pending':'purchased';
+    if(field==='planned_amount' && existing && /€\s*\d+(?:[.,]\d+)?/.test(existing.label||'')){
+      const revised=amount==null?'valor não definido':'€'+Number(amount).toLocaleString('pt-BR',{maximumFractionDigits:2});
+      patch.label=existing.label.replace(/€\s*\d+(?:[.,]\d+)?/,revised);
+    }
     if(existing){
       const result=await client.from('budget_items').update(patch).eq('id',existing.id).eq('trip_id',tripId).select('*').single();
       if(result.error)throw result.error;
