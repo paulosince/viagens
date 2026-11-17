@@ -843,7 +843,7 @@ body[data-budget-page="open"] .budget-item-page { visibility: visible; pointer-e
 .trip-files-group { min-width: 0; padding: 16px; border: 0; border-radius: 24px; background: transparent; }
 .trip-files-general { padding: 0; border: 0; background: transparent; }
 .trip-files-group-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.trip-files-day { min-width: 0; padding: 0; border: 0; color: #16243c; background: none; font: inherit; font-size: 17px; font-weight: 750; text-align: left; cursor: pointer; }
+.trip-files-day { min-width: 0; padding: 0; border: 0; color: #fff; background: none; font: inherit; font-size: 17px; font-weight: 750; text-align: left; cursor: pointer; }
 .trip-files-group-count { flex: 0 0 auto; color: #6c7484; font-size: 12px; white-space: nowrap; }
 .trip-files-general .trip-files-day { margin: 0; color: white; cursor: default; }
 .trip-files-general .trip-files-group-count { color: rgba(255,255,255,.88); }
