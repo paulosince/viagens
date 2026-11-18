@@ -1,3 +1,4 @@
+import {createCashFlow} from './cash-flow.mjs?v=20261118-1';
 import {mountTicketImageZoom} from './ticket-image-zoom.mjs?v=20261115-zoom1';
 import {createFoodPanel} from './food-panel.mjs?v=20261117-food4';
 import {createNeonPreview,NEON_AUTH_URL,API_ROOTS} from './backend-neon.mjs?v=20261115-photos1';
@@ -4751,7 +4752,7 @@ function selectTripTab(name, { reset = false } = {}) {
     if (state.activeTripId !== key || state.activeTripTab !== name) return;
     dom.tripPage.scrollTop = reset ? 0 : state.tripTabScroll.get(`${key}:${name}`) ?? dom.tripPageHero.offsetHeight;
   });
-  if (name === 'orcamento') loadTripBudget(key).catch(error => setTripPanelStatus(dom.budgetStatus, error.message, 'error'));
+  if (name === 'orcamento') cashFlow.load(state.trips.find(t => String(t.id) === key)).catch(error => console.error('Fluxo de caixa:', error));
   if (name === 'arquivos') loadTripFiles(key).catch(error => setTripPanelStatus(dom.tripFilesStatus, error.message, 'error'));
   if (name === 'alimentacao') {
     foodPanel.render();
@@ -8390,6 +8391,12 @@ for (const tab of dom.tripTabs.querySelectorAll('[role="tab"]')) {
     tabs[next].focus(); tabs[next].click();
   });
 }
+const cashFlow = createCashFlow({
+  panel: dom.tripPanels.orcamento,
+  clientForTrip: () => tryNeon(5000),
+  getTrip: () => state.trips.find(t => String(t.id) === String(state.activeTripId)),
+  canEdit: () => canEditActiveTrip()
+});
 dom.budgetAdd.addEventListener('click', () => openBudgetEditor());
 dom.closeBudgetPage.addEventListener('click', navigateBackFromBudget);
 dom.tripFilesInput.addEventListener('change', () => uploadTripFiles([...dom.tripFilesInput.files]).catch(error => setTripPanelStatus(dom.tripFilesStatus, error.message, 'error')));
