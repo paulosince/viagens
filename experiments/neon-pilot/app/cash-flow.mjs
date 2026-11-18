@@ -62,18 +62,33 @@ export function createCashFlow({panel,clientForTrip,getTrip,canEdit}) {
     }top.append(stats);
     const proj=card();proj.append(el('div','cf-title','▥  Projeção diária'),el('div','cf-big',fmt(daily)+' / dia'),el('div','cf-sub',remaining?('Saldo distribuído pelos '+remaining+' dias restantes, incluindo hoje.'): 'Viagem encerrada: sem dias restantes.'),el('div','cf-divider'),el('div','cf-title','Gastos por dia'),el('div','cf-caption','Comparação com o limite diário disponível'));
     const dates=[];for(let d=new Date(start+'T12:00:00'),i=0;i<Math.min(60,Number(currentTrip.day_count)||14);i++,d.setDate(d.getDate()+1))dates.push(d.toLocaleDateString('en-CA'));
+    // Historical benchmark is reconstructed for each date from its own ledger position,
+    // never from today's remaining balance. Same-day credits are available to spend;
+    // same-day debits are measured against the benchmark, not subtracted from it.
     const totals=dates.map(d=>rows.filter(r=>r.entry_date===d&&r.entry_type==='debit').reduce((a,r)=>a+euro(r),0));
-    const max=Math.max(1,...totals,daily);
+    const limits=dates.map((d,i)=>{
+      const before=rows.filter(r=>r.entry_date<d).reduce((a,r)=>a+(r.entry_type==='credit'?1:-1)*euro(r),0);
+      const creditsToday=rows.filter(r=>r.entry_date===d&&r.entry_type==='credit').reduce((a,r)=>a+euro(r),0);
+      return (before+creditsToday)/(dates.length-i);
+    });
+    const max=Math.max(1,...totals,...limits.filter(x=>Number.isFinite(x)&&x>0));
     const width=Math.max(340,dates.length*35+20),height=154;
-    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox',`0 0 ${width} ${height}`);svg.setAttribute('class','cf-chart');svg.setAttribute('role','img');svg.setAttribute('aria-label','Gastos diários comparados ao limite médio disponível');
+    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox',`0 0 ${width} ${height}`);svg.setAttribute('class','cf-chart');svg.setAttribute('role','img');svg.setAttribute('aria-label','Gastos por dia e limites diários reconstruídos a partir dos lançamentos de cada data');
     const shape=(tag,attrs)=>{const n=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const [k,v] of Object.entries(attrs))n.setAttribute(k,String(v));svg.append(n);return n;};
     const y=v=>119-Math.max(0,v)/max*95;
     for(let i=0;i<4;i++)shape('line',{x1:8,x2:width-8,y1:24+i*32,y2:24+i*32,stroke:'currentColor','stroke-opacity':'.1','stroke-dasharray':'3 4'});
-    if(daily>0)shape('line',{x1:8,x2:width-8,y1:y(daily),y2:y(daily),stroke:'#4a90d9','stroke-width':1.5,'stroke-dasharray':'5 4'});
-    dates.forEach((d,i)=>{const v=totals[i],x=16+i*35;shape('rect',{x,y:y(v),width:21,height:Math.max(1,119-y(v)),rx:3,fill:v>daily?'#dc7777':'#43a995',opacity:v?1:.22});const tx=shape('text',{x:x+10.5,y:140,'text-anchor':'middle','font-size':10,fill:'currentColor',opacity:'.75'});tx.textContent=d.slice(8);});
+    dates.forEach((d,i)=>{
+      const v=totals[i],limit=limits[i],x=16+i*35;
+      const future=d>today();
+      const bar=shape('rect',{x,y:y(v),width:21,height:Math.max(1,119-y(v)),rx:3,fill:v>Math.max(0,limit)?'#dc7777':'#43a995',opacity:v?1:.22});
+      const tooltip=document.createElementNS('http://www.w3.org/2000/svg','title');
+      tooltip.textContent=`${dateLocal(d)} · Gastos: ${fmt(v)} · Limite do dia: ${fmt(limit)}${future?' (projeção)':''}`;bar.append(tooltip);
+      if(!future&&limit>0)shape('line',{x1:x-3,x2:x+24,y1:y(limit),y2:y(limit),stroke:'#4a90d9','stroke-width':2.5,'stroke-linecap':'round'});
+      const tx=shape('text',{x:x+10.5,y:140,'text-anchor':'middle','font-size':10,fill:'currentColor',opacity:'.75'});tx.textContent=d.slice(8);
+    });
     const scroll=el('div');scroll.style.overflowX='auto';scroll.append(svg);proj.append(scroll);
-    const legend=el('div','cf-legend');legend.innerHTML='<span><i class="cf-dot" style="background:#43a995"></i>Dentro do limite</span><span><i class="cf-dot" style="background:#dc7777"></i>Acima do limite</span><span><i class="cf-dot" style="background:#4a90d9"></i>Limite projetado</span>';proj.append(legend);
-    proj.append(el('div','cf-sub','Referência visual: limite disponível calculado agora. Histórico de limites por dia será registrado separadamente.'));
+    const legend=el('div','cf-legend');legend.innerHTML='<span><i class="cf-dot" style="background:#43a995"></i>Dentro do limite</span><span><i class="cf-dot" style="background:#dc7777"></i>Acima do limite</span><span><i class="cf-dot" style="background:#4a90d9"></i>Limite de cada dia</span>';proj.append(legend);
+    proj.append(el('div','cf-sub','Cada marca azul usa o saldo disponível naquele dia, distribuído pelos dias restantes. Créditos do próprio dia entram no limite; débitos do dia são comparados a ele. Lançamentos retroativos podem recalcular o histórico.'));
     const list=card();const currencyRow=el('div','cf-row');currencyRow.append(el('strong',null,'Moeda de exibição'));
     const switchLabel=el('label','cf-switch');const sw=el('input');sw.type='checkbox';sw.checked=display==='BRL';sw.disabled=!fx;sw.addEventListener('change',()=>{display=sw.checked?'BRL':'EUR';render()});switchLabel.append(el('span',null,'€ EUR'),sw,el('span',null,'R$ BRL'));currencyRow.append(switchLabel);list.append(currencyRow);
     if(!fx)list.append(el('div','cf-sub','Exibição em reais indisponível até obter a cotação.'));
