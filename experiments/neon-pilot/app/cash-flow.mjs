@@ -26,7 +26,14 @@ export function createCashFlow({panel,clientForTrip,getTrip,canEdit}) {
     .cf-segment button[aria-pressed=true]{background:var(--surface,#fff);box-shadow:0 1px 5px #0002}
     .cf-chart{width:100%;height:auto;display:block}.cf-legend{display:flex;gap:12px;flex-wrap:wrap;font-size:10px;color:#798391}
     .cf-dot{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:4px}
-    .cf-switch{display:flex;align-items:center;gap:8px;font-size:12px}.cf-switch input{accent-color:#344b70;width:18px;height:18px}
+    .cf-switch{display:flex;align-items:center;gap:8px;font-size:12px}.cf-switch input{position:absolute;opacity:0;width:1px;height:1px}
+    .cf-toggle{position:relative;display:inline-flex;width:52px;height:31px;border-radius:999px;background:#aeb6bf;flex-shrink:0;transition:background .2s;box-shadow:inset 0 0 0 1px #00000012}
+    .cf-toggle:after{content:'';position:absolute;left:2px;top:2px;width:27px;height:27px;border-radius:50%;background:white;box-shadow:0 1px 3px #0003;transition:transform .2s}
+    .cf-switch input:checked+.cf-toggle{background:#34c759}
+    .cf-switch input:checked+.cf-toggle:after{transform:translateX(21px)}
+    .cf-switch input:focus-visible+.cf-toggle{outline:3px solid #2689ff;outline-offset:3px}
+    .cf-switch input:disabled+.cf-toggle{opacity:.45;cursor:not-allowed}
+    .cf-switch{cursor:pointer;white-space:nowrap}
     @media(prefers-color-scheme:dark){.cf-root{color:var(--text-primary,#eee)}.cf-card{background:var(--surface,#232833)}.cf-input,.cf-select{background:var(--surface,#232833);border-color:#586070}}
   `;
   if(!document.getElementById('cf-styles')){const st=el('style');st.id='cf-styles';st.textContent=css;document.head.append(st);}
@@ -90,7 +97,7 @@ export function createCashFlow({panel,clientForTrip,getTrip,canEdit}) {
     const legend=el('div','cf-legend');legend.innerHTML='<span><i class="cf-dot" style="background:#43a995"></i>Dentro do limite</span><span><i class="cf-dot" style="background:#dc7777"></i>Acima do limite</span><span><i class="cf-dot" style="background:#4a90d9"></i>Limite de cada dia</span>';proj.append(legend);
     proj.append(el('div','cf-sub','Cada marca azul usa o saldo disponível naquele dia, distribuído pelos dias restantes. Créditos do próprio dia entram no limite; débitos do dia são comparados a ele. Lançamentos retroativos podem recalcular o histórico.'));
     const list=card();const currencyRow=el('div','cf-row');currencyRow.append(el('strong',null,'Moeda de exibição'));
-    const switchLabel=el('label','cf-switch');const sw=el('input');sw.type='checkbox';sw.checked=display==='BRL';sw.disabled=!fx;sw.addEventListener('change',()=>{display=sw.checked?'BRL':'EUR';render()});switchLabel.append(el('span',null,'€ EUR'),sw,el('span',null,'R$ BRL'));currencyRow.append(switchLabel);list.append(currencyRow);
+    const switchLabel=el('label','cf-switch');const sw=el('input');sw.type='checkbox';sw.checked=display==='BRL';sw.disabled=!fx;sw.addEventListener('change',()=>{display=sw.checked?'BRL':'EUR';render()});switchLabel.append(el('span',null,'€ EUR'),sw,el('span','cf-toggle'),el('span',null,'R$ BRL'));currencyRow.append(switchLabel);list.append(currencyRow);
     if(!fx)list.append(el('div','cf-sub','Exibição em reais indisponível até obter a cotação.'));
     const heading=el('div','cf-row');heading.append(el('div','cf-title','Lançamentos'));const add=el('button','cf-button','+ Novo');add.type='button';add.disabled=!canEdit();add.addEventListener('click',()=>showForm(list));heading.append(add);list.append(el('div','cf-divider'),heading,status);
     for(const r of [...rows].sort((a,b)=>b.entry_date.localeCompare(a.entry_date)||b.created_at.localeCompare(a.created_at))){
