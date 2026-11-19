@@ -1,4 +1,4 @@
-const CACHE_NAME = 'viaggio-home-v167-past-days';
+const CACHE_NAME = 'viaggio-home-v168-budget-contrast';
 const MEDIA_CACHE_NAME = 'viaggio-media-v1';
 const NEON_MEDIA_CACHE_NAME = 'viaggio-neon-auth-preview-media-v1';
 const SUPABASE_CLIENT = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
@@ -16,7 +16,8 @@ const APP_SHELL = [
   './',
   './index.html',
   './style.css?v=20261119-past-days1',
-  './experiments/neon-pilot/app/main-neon.js?v=20261119-past-days1',
+  './experiments/neon-pilot/app/main-neon.js?v=20261119-budget-contrast1',
+  './experiments/neon-pilot/app/cash-flow.mjs?v=20261119-budget-contrast1',
   './experiments/neon-pilot/app/backend-neon.mjs?v=20261115-photos1',
   './experiments/neon-pilot/app/usage-rings.mjs?v=20261024-home3',
   './experiments/neon-pilot/app/offline-store-neon.js?v=20261021-1',
