@@ -1814,6 +1814,17 @@ async function softDeleteHiddenDay(day) {
   });
 }
 
+function isPastTripDay(day, trip, referenceDate = new Date()) {
+  const date = derivedDayDate(day, trip);
+  if (!date || dayIsHidden(day)) return false;
+  const today = [
+    referenceDate.getFullYear(),
+    String(referenceDate.getMonth() + 1).padStart(2, '0'),
+    String(referenceDate.getDate()).padStart(2, '0')
+  ].join('-');
+  return date < today;
+}
+
 function renderTripDays(days, activitiesByDay = new Map(), locationsByDay = new Map()) {
   dom.tripDayList.replaceChildren();
   const trip = state.trips.find(item => String(item.id) === String(state.activeTripId));
@@ -1824,7 +1835,49 @@ function renderTripDays(days, activitiesByDay = new Map(), locationsByDay = new 
     .filter(day => !dayDeletedAt(day) && dayPosition(day) < dayCount)
     .sort((a, b) => dayPosition(a) - dayPosition(b));
 
+  // Keep completed days available without pushing today's itinerary down.
+  const pastDays = visibleDays.filter(day => isPastTripDay(day, trip));
+  const pastDayIds = new Set(pastDays.map(day => String(day.id)));
+  if (pastDays.length) {
+    const strip = document.createElement('li');
+    strip.className = 'trip-past-days';
+    strip.setAttribute('aria-label', 'Dias anteriores');
+
+    const label = document.createElement('span');
+    label.className = 'trip-past-days-label';
+    label.textContent = 'Dias anteriores';
+
+    const tiles = document.createElement('div');
+    tiles.className = 'trip-past-days-buttons';
+    for (const day of pastDays) {
+      const key = String(day.id);
+      const activities = activitiesByDay.get(key) || [];
+      const locations = locationsByDay.get(key) || [];
+      const date = derivedDayDate(day, trip);
+      const formattedDate = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit' })
+        .format(new Date(date + 'T12:00:00'));
+      const tile = document.createElement('button');
+      tile.type = 'button';
+      tile.className = 'trip-past-day-button';
+      tile.dataset.dayId = key;
+      tile.textContent = String(dayNumber(day));
+      const description = 'Dia ' + dayNumber(day) + ' · ' + formattedDate + ' · ' + dayTitle(day, activities, locations);
+      tile.setAttribute('aria-label', 'Abrir ' + description);
+      tile.title = description;
+      tile.addEventListener('click', () => {
+        tile.blur();
+        const empty = !day.title && !day.summary && !day.photo_url && activities.length === 0 && locations.length === 0;
+        if (empty && canEditActiveTrip()) openDayEditor(day);
+        else openDayPage(day.id);
+      });
+      tiles.append(tile);
+    }
+    strip.append(label, tiles);
+    dom.tripDayList.append(strip);
+  }
+
   for (const day of visibleDays) {
+    if (pastDayIds.has(String(day.id))) continue;
     const activities = activitiesByDay.get(String(day.id)) || [];
     const locations = locationsByDay.get(String(day.id)) || [];
     const firstLocation = locations[0];

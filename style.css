@@ -899,6 +899,44 @@ body[data-trip-permission="viewer"] #budget_add, body[data-trip-permission="view
   padding: 0;
   list-style: none;
 }
+.trip-past-days {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 10px;
+  padding: 0 2px;
+}
+.trip-past-days-label {
+  color: rgba(255,255,255,.92);
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: .02em;
+}
+.trip-past-days-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.trip-past-day-button {
+  display: grid;
+  min-width: 44px;
+  min-height: 44px;
+  place-items: center;
+  padding: 0 9px;
+  border: 1px solid rgba(255,255,255,.72);
+  border-radius: 12px;
+  color: var(--trip-page-color);
+  background: rgba(255,255,255,.93);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--trip-page-color) 24%, rgba(0,0,0,.14));
+  font: inherit;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform .16s ease, background .16s ease;
+}
+.trip-past-day-button:active { transform: scale(.94); background: white; }
+.trip-past-day-button:focus-visible { outline: 3px solid white; outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .trip-past-day-button { transition: none; } }
 .trip-day-card {
   position: relative;
   overflow: hidden;
