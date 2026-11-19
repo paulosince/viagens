@@ -63,6 +63,7 @@ const context = {
   openDayPage: id => opened.push(id),
   openDayEditor: day => opened.push('editor:' + day.id),
   moveDayByOffset: () => {},
+  orderedDaySchemaSupport: false,
   recoverHiddenDay: () => {},
   softDeleteHiddenDay: () => {}
 };
@@ -100,8 +101,8 @@ assert.equal(cards[0].dataset.restorable, 'true');
 days[0].is_hidden = false;
 
 trip.start_date = '';
-cards = render();
-assert.equal(cards.length, 3, 'days without a known trip start stay expanded');
+assert.equal(context.isPastTripDay(days[0], trip), false, 'a day without a date must not collapse');
+trip.start_date = '2026-11-18';
 
 assert.match(css, /\.trip-past-days\s*\{/);
 assert.match(css, /\.trip-past-day-button\s*\{[^}]*min-width: 44px;[^}]*min-height: 44px;/s);
