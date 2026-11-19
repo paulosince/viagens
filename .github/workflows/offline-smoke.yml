@@ -44,6 +44,8 @@ jobs:
           node --input-type=module --check < src/offline-store.js
           node --check sw.js
           node --input-type=module --check < src/update-manager.js
+      - name: Verify compact past trip days
+        run: node tests/trip-past-days.cjs
       - name: Verify offline sync and independent agenda photos
         run: |
           node tests/tickets-render.cjs
@@ -58,7 +60,6 @@ jobs:
           node tests/saved-passengers.cjs
           node tests/shared-owner-photos.cjs
           node tests/trip-sections.cjs
-          node tests/trip-past-days.cjs
           node tests/neon-outbox.cjs
           node tests/usage-rings.mjs
           node --test tests/neon-usage.mjs
