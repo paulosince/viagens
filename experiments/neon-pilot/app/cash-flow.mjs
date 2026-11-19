@@ -7,23 +7,24 @@ export function createCashFlow({panel,clientForTrip,getTrip,canEdit}) {
   const dateLocal = d => {const x=new Date(d+'T12:00:00');return x.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});};
   const today = () => new Date().toLocaleDateString('en-CA');
   const css = `
-    .cf-root{display:grid;gap:14px;padding:4px 0 28px;color:var(--text-primary,#20242c)}
-    .cf-card{background:var(--surface,#fff);border:1px solid rgba(125,135,150,.13);border-radius:18px;padding:17px;box-shadow:0 3px 14px rgba(0,0,0,.045);display:grid;gap:12px}
+    .cf-root{display:grid;gap:14px;padding:4px 0 28px;color:#243346;color-scheme:light}
+    .cf-card{background:#fff;border:1px solid rgba(125,135,150,.13);border-radius:18px;padding:17px;box-shadow:0 3px 14px rgba(0,0,0,.045);display:grid;gap:12px}
     .cf-caption{font-size:12px;color:#78818e}.cf-title{font-size:15px;font-weight:700}.cf-big{font-size:29px;font-weight:750;letter-spacing:-.7px;overflow-wrap:anywhere}
     .cf-row{display:flex;align-items:center;justify-content:space-between;gap:10px}.cf-sub{font-size:12px;color:#798391;line-height:1.5}
     .cf-divider{border-top:1px solid rgba(120,130,145,.15)}.cf-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
     .cf-stats strong{font-size:13px;overflow-wrap:anywhere}.cf-green{color:#23966d}.cf-red{color:#d46565}
     .cf-button{border:0;background:#242d3c;color:white;border-radius:10px;padding:10px 13px;font-weight:650}
-    .cf-select,.cf-input{border:1px solid #cbd0d8;background:var(--surface,#fff);color:inherit;border-radius:9px;padding:10px;width:100%;min-width:0;font:inherit}
+    .cf-select,.cf-input{border:1px solid #9daab8;background:#fff;color:#18283c;border-radius:9px;padding:10px;width:100%;min-width:0;font:inherit;font-size:16px;min-height:46px}
+    .cf-input::placeholder{color:#7d8898;opacity:1}.cf-input:focus-visible,.cf-select:focus-visible{outline:2px solid #087afa;outline-offset:2px}
     .cf-line{display:grid;grid-template-columns:32px minmax(0,1fr) auto 24px;gap:9px;align-items:center;padding:9px 0;border-bottom:1px solid rgba(125,135,150,.12)}
     .cf-line strong{font-size:13px}.cf-line small{display:block;color:#87909d;font-size:11px}.cf-line .cf-amount{font-size:13px;white-space:nowrap}
     .cf-icon{width:31px;height:31px;border-radius:10px;background:rgba(125,135,150,.1);display:grid;place-items:center}
     .cf-remove{border:0;background:transparent;color:#89909b;font-size:20px;padding:4px}
     .cf-form{display:grid;gap:10px;background:rgba(130,140,155,.07);padding:13px;border-radius:12px}
-    .cf-form label{display:grid;gap:5px;font-size:12px;font-weight:600}
+    .cf-form label{display:grid;gap:5px;color:#344358;font-size:13px;font-weight:650}
     .cf-segment{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;border-radius:10px;background:rgba(120,130,140,.1)}
-    .cf-segment button{border:0;border-radius:8px;background:transparent;padding:10px;font-weight:650;color:inherit}
-    .cf-segment button[aria-pressed=true]{background:var(--surface,#fff);box-shadow:0 1px 5px #0002}
+    .cf-segment button{border:0;border-radius:8px;background:transparent;padding:10px;font-weight:650;color:#344358}
+    .cf-segment button[aria-pressed=true]{background:#fff;color:#18283c;box-shadow:0 1px 5px #0002}
     .cf-chart{width:100%;height:auto;display:block}.cf-legend{display:flex;gap:12px;flex-wrap:wrap;font-size:10px;color:#798391}
     .cf-dot{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:4px}
     .cf-currency-segment{display:grid;grid-template-columns:1fr 1fr;position:relative;min-width:176px;padding:4px;border-radius:13px;background:#dce4e8;isolation:isolate}
@@ -33,9 +34,8 @@ export function createCashFlow({panel,clientForTrip,getTrip,canEdit}) {
     .cf-currency-segment button[aria-pressed="true"]{color:#fff}
     .cf-currency-segment button:focus-visible{outline:2px solid #177f4c;outline-offset:2px}
     .cf-currency-segment button:disabled{opacity:.45;cursor:not-allowed}
-    .cf-switch{display:flex;align-items:center;gap:8px;font-size:12px}
+    .cf-switch{display:flex;align-items:center;gap:8px;color:#344358;font-size:12px}
     .cf-switch input{accent-color:#28b463;width:18px;height:18px}
-    @media(prefers-color-scheme:dark){.cf-root{color:var(--text-primary,#eee)}.cf-card{background:var(--surface,#232833)}.cf-input,.cf-select{background:var(--surface,#232833);border-color:#586070}}
   `;
   if(!document.getElementById('cf-styles')){const st=el('style');st.id='cf-styles';st.textContent=css;document.head.append(st);}
   const root=el('div','cf-root');
@@ -119,8 +119,8 @@ export function createCashFlow({panel,clientForTrip,getTrip,canEdit}) {
     const b1=el('button',null,'− Débito'),b2=el('button',null,'+ Crédito');
     for(const [btn,k] of [[b1,'debit'],[b2,'credit']]){btn.type='button';btn.addEventListener('click',()=>{kind=k;b1.setAttribute('aria-pressed',String(k==='debit'));b2.setAttribute('aria-pressed',String(k==='credit'))})}b1.setAttribute('aria-pressed','true');b2.setAttribute('aria-pressed','false');seg.append(b1,b2);form.append(seg);
     const field=(label,type,value='')=>{const wrap=el('label');wrap.append(el('span',null,label));const input=el('input','cf-input');input.type=type;input.value=value;input.required=true;wrap.append(input);form.append(wrap);return input;};
-    const description=field('Descrição','text');description.maxLength=180;
-    const value=field('Valor','number');value.min='0.01';value.step='0.01';
+    const value=field('Valor (€)','number');value.min='0.01';value.step='0.01';value.inputMode='decimal';value.placeholder='0,00';
+    const description=field('Descrição','text');description.maxLength=180;description.placeholder='Ex.: alimentação, transporte';
     const date=field('Data','date',today());
     const exchange=el('label','cf-switch');const apply=el('input');apply.type='checkbox';exchange.append(apply,el('span',null,'Aplicar câmbio (lançamento em reais)'));form.append(exchange);
     const fxArea=el('div');fxArea.hidden=true;const note=el('div','cf-sub');const manual=field('Cotação EUR → BRL (R$ por € 1)','number');manual.step='0.000001';manual.min='0.000001';manual.required=false;manual.value=fx?String(fx):'';manual.parentElement.remove();fxArea.append(manual.parentElement);fxArea.append(note);form.append(fxArea);
