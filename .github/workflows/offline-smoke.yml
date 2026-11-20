@@ -48,6 +48,8 @@ jobs:
         run: |
           node tests/trip-past-days.cjs
           node tests/itinerary-now-line.cjs
+      - name: Verify offline-first startup and mandatory app modules
+        run: node tests/offline-first.cjs
       - name: Verify offline sync and independent agenda photos
         run: |
           node tests/tickets-render.cjs

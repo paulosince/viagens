@@ -8982,72 +8982,125 @@ dom.signupForm.addEventListener('submit', async event => {
   } finally { button.disabled = false; }
 });
 
+// O IndexedDB é a fonte inicial: abrir imediatamente a cópia da conta
+// previamente autenticada, sem aguardar uma requisição ao Neon.
+async function verifyOnlineSession(cachedUser, localReady = false) {
+  const client = await tryNeon(8500);
+  if (!client) {
+    if (localReady) return false;
+    throw new Error('Serviço Neon temporariamente indisponível.');
+  }
+  let response;
+  try {
+    response = await client.auth.getSession();
+    if (response.error) throw response.error;
+  } catch (error) {
+    // Falha de rede ou renovação de token não é logout.
+    if (localReady) {
+      console.warn('Verificação Neon adiada; mantendo viagens locais', error);
+      return false;
+    }
+    throw error;
+  }
+  const current = response.data?.session?.user || null;
+  if (!current?.id || !current?.neon_subject) {
+    // A ausência de uma sessão online não deve destruir a única cópia
+    // já autenticada e salva no aparelho; o envio aguarda novo login.
+    if (localReady) return false;
+    await offlineStore.clearSession().catch(console.warn);
+    state.user = null;
+    setSessionView('anonymous');
+    setSplashStatus('Entre com sua conta Neon.');
+    return false;
+  }
+
+  const matches = cachedUser?.neon_subject === current.neon_subject && cachedUser?.id === current.id;
+  if (localReady && !matches) {
+    // Uma conta diferente confirmada pelo servidor nunca herda a
+    // viagem visível nem os caches em memória da conta anterior.
+    state.trips = []; state.profile = null; state.passengers.clear();
+    state.tripRoles.clear(); state.tripOwners.clear(); state.sharedByMe.clear();
+    state.savedPassengers = []; state.profileSavedPassengers = [];
+    state.tripDataCache.clear(); state.tripDataLoads.clear();
+    state.budgetByTrip.clear(); state.tripFilesByTrip.clear();
+    state.tripFileDeckIndexes.clear(); state.tripTabScroll.clear();
+    syncTripList();
+  }
+  state.user = current;
+  const local = matches && localReady
+    ? true
+    : await loadLocalWorkspace(current).catch(() => false);
+  await offlineStore.cacheSession(current);
+  if (!local) {
+    setSplashStatus('Carregando perfil Neon…');
+    await loadProfile({ allowLocalFallback: false });
+    setSplashStatus('Carregando viagens Neon…');
+    await loadTrips({ allowLocalFallback: false });
+  }
+  setSessionView('authenticated');
+  await refreshSyncStatus();
+  setSplashStatus('Pronto');
+  refreshWorkspaceInBackground();
+  return true;
+}
+
 async function boot() {
   let settled = false;
+  let localReady = false;
   const watchdog = setTimeout(() => {
-    if(settled)return;
+    if (settled || localReady) return;
     setSessionView('anonymous');
-    setSplashStatus('Não foi possível verificar a sessão Neon. Tente novamente.');
+    setSplashStatus('Não foi possível abrir a cópia local. Tente novamente.');
   }, 11000);
   try {
-    setSplashStatus('Preparando armazenamento Neon isolado…');
+    setSplashStatus('Abrindo armazenamento local…');
     await offlineStore.open();
     await offlineStore.discardHistoryBefore(HISTORY_RESET_AT);
-    navigator.storage?.persist?.().catch(()=>{});
-    const cachedUser=await offlineStore.getCachedSession();
+    navigator.storage?.persist?.().catch(() => {});
+    const cachedUser = await offlineStore.getCachedSession();
 
-    // Offline-only fallback is permitted solely for an identity previously
-    // VERIFIED by Neon in this separate preview, never for Supabase-era cache.
-    if(!navigator.onLine){
-      if(!cachedUser?.neon_subject)
-        throw new Error('Sem rede. Entre uma vez com Neon Auth antes de usar a cópia offline.');
-      state.user=cachedUser;
-      const present=await loadLocalWorkspace(cachedUser);
-      if(!present)throw new Error('Cópia offline não disponível neste aparelho.');
-      setSessionView('authenticated');
-      await refreshSyncStatus();
-      setSplashStatus('Modo offline');
+    // Confiar somente em uma identidade Neon já autenticada e salva.
+    // Não misturar os dados legados ou de outra conta.
+    if (cachedUser?.id && cachedUser?.neon_subject) {
+      state.user = cachedUser;
+      localReady = await loadLocalWorkspace(cachedUser).catch(error => {
+        console.warn('Cópia local temporariamente indisponível', error);
+        return false;
+      });
+      if (localReady) {
+        setSessionView('authenticated');
+        await refreshSyncStatus();
+        setSplashStatus('Roteiro salvo neste aparelho');
+      }
+    }
+
+    if (localReady) {
+      // A UI já está utilizável: rede e autenticação ocorrem sem
+      // bloquear a abertura, inclusive se navigator.onLine mentir.
+      if (navigator.onLine) {
+        verifyOnlineSession(cachedUser, true).catch(error => {
+          console.warn('Atualização Neon adiada; mantendo viagens locais', error);
+          refreshSyncStatus().catch(console.warn);
+        });
+      }
       return;
+    }
+    if (!navigator.onLine) {
+      throw new Error('Não há viagens salvas neste aparelho. Entre com internet uma vez para criar a cópia offline.');
     }
 
     setSplashStatus('Validando sua sessão no Neon…');
-    const client=await tryNeon(8500);
-    if(!client)throw new Error('Serviço Neon temporariamente indisponível.');
-    const {data,error}=await client.auth.getSession();
-    if(error)throw error;
-    const current=data?.session?.user||null;
-    if(!current?.id||!current?.neon_subject){
-      await offlineStore.clearSession().catch(()=>{});
-      state.user=null;
+    await verifyOnlineSession(cachedUser, false);
+  } catch (error) {
+    if (!localReady) {
+      state.user = null;
+      dom.authMessage.textContent = error.message || 'Não foi possível abrir o Viaggio.';
       setSessionView('anonymous');
-      setSplashStatus('Entre com sua conta Neon.');
-      return;
     }
-    // Only reuse offline data whose owner is the exact authenticated
-    // Neon+legacy identity pair; this stops cross-account cache leakage.
-    state.user=current;
-    const matches=cachedUser?.neon_subject===current.neon_subject&&cachedUser?.id===current.id;
-    const local=matches?await loadLocalWorkspace(current).catch(()=>false):false;
-    await offlineStore.cacheSession(current);
-    if(!local){
-      setSplashStatus('Carregando perfil Neon…');
-      await loadProfile({allowLocalFallback:false});
-      setSplashStatus('Carregando viagens Neon…');
-      await loadTrips({allowLocalFallback:false});
-    }
-    setSessionView('authenticated');
-    await refreshSyncStatus();
-    setSplashStatus('Pronto');
-    refreshWorkspaceInBackground();
-  }catch(error){
-    // An ON-LINE failure may never authorize cached data as another user.
-    state.user=null;
-    dom.authMessage.textContent=error.message||'Não foi possível verificar sua sessão Neon.';
-    setSessionView('anonymous');
-  }finally {
-    settled=true;
+  } finally {
+    settled = true;
     clearTimeout(watchdog);
-    document.body.dataset.appReady='true';
+    document.body.dataset.appReady = 'true';
   }
 }
 
@@ -9084,28 +9137,32 @@ dom.syncStatus.addEventListener('click', async () => {
 });
 window.addEventListener('online', () => {
   refreshSyncStatus().catch(console.warn);
-  flushOutbox().then(synced => {
-    if (!synced) return;
-    if (state.activeTripId) {
-      state.tripDataCache.delete(String(state.activeTripId));
-      openTrip(state.activeTripId, { pushHistory: false, forceRefresh: true }).catch(console.warn);
-    }
-    cacheCompleteWorkspace().catch(error => console.warn('Cache offline de imagens aguardando atualização', error));
-  }).catch(console.warn);
+  // Primeiro conferir a identidade; depois atualizar a viagem e a fila.
+  // Evita limpar o cache ou enviar alterações sob uma sessão diferente.
+  if (state.user?.neon_subject) {
+    verifyOnlineSession(state.user, state.trips.length > 0)
+      .catch(error => console.warn('Atualização Neon adiada; mantendo dados locais', error));
+  }
+  subscribeNeonAuth().catch(console.warn);
 });
 
-ensureNeon()
-  .then(client => client.auth.onAuthStateChange((_event, session) => {
-    if (_event === 'SIGNED_OUT') offlineStore.clearSession().catch(console.warn);
-    if (session) {
+let neonAuthSubscribed = false;
+async function subscribeNeonAuth() {
+  if (neonAuthSubscribed || !navigator.onLine) return;
+  const client = await ensureNeon();
+  if (neonAuthSubscribed) return;
+  neonAuthSubscribed = true;
+  client.auth.onAuthStateChange((_event, session) => {
+    // O app já trata logout explícito nos botões e na exclusão de conta.
+    // INITIAL_SESSION vazio, renovação falha ou SIGNED_OUT do SDK
+    // não são motivos para apagar a cópia offline verificada.
+    if (session?.user?.id && session.user.neon_subject &&
+        (!state.user || state.user.id === session.user.id)) {
       offlineStore.cacheSession(session.user).catch(console.warn);
-      return;
     }
-    if (!navigator.onLine && state.user) return;
-    state.user = null; state.profile = null; state.trips = []; state.passengers.clear(); state.tripRoles.clear(); state.tripOwners.clear(); state.sharedByMe.clear(); state.savedPassengers = []; state.profileSavedPassengers = []; state.tripDataCache.clear(); state.tripDataLoads.clear(); state.budgetByTrip.clear(); state.tripFilesByTrip.clear(); state.tripFileDeckIndexes.clear(); state.tripTabScroll.clear();
-    syncTripList(); closeSheets(); setSessionView('anonymous');
-  }))
-  .catch(() => {});
+  });
+}
+subscribeNeonAuth().catch(() => {});
 
 boot();
 
