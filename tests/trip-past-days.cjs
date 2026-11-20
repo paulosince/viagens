@@ -59,6 +59,7 @@ const context = {
   dayTiming: () => ({ label: 'HOJE', today: true }),
   orderedDayActivities: list => list,
   activityTime: () => null,
+  updateCurrentItineraryTime: () => {},
   canEditActiveTrip: () => true,
   openDayPage: id => opened.push(id),
   openDayEditor: day => opened.push('editor:' + day.id),
