@@ -48,7 +48,6 @@ class Item {
       }
     }
     walk(this);
-    if (selector[0] === '.') return all.filter(node => node.className.split(' ').includes(selector.slice(1)));
     if (selector === 'li[data-agenda-time]') return all.filter(node => node.dataset.agendaTime);
     if (selector === '.day-view-agenda-item[data-agenda-time]') {
       return all.filter(node => node.className === 'day-view-agenda-item' && node.dataset.agendaTime);
@@ -56,6 +55,7 @@ class Item {
     if (selector === '.trip-day-card[data-day-id]') {
       return all.filter(node => node.className === 'trip-day-card' && node.dataset.dayId);
     }
+    if (selector[0] === '.') return all.filter(node => node.className.split(' ').includes(selector.slice(1)));
     throw new Error('Unsupported selector ' + selector);
   }
 }
