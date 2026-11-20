@@ -3987,3 +3987,58 @@ body:not([data-budget-page="closed"]) .food-trip-summary { display: none !import
   .food-link-selected .food-link-preview-image {width: 62px;height: 62px;}
   .food-link-dialog {max-height: 90dvh;}
 }
+
+/* Live agenda clock — elapsed entries remain readable and interactive. */
+.trip-day-period li[data-time-past="true"],
+.day-view-agenda-item[data-time-past="true"] {
+  opacity: .34;
+  transition: opacity .3s ease;
+}
+.trip-day-period .trip-now-marker,
+.day-view-agenda .day-now-marker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #db332d;
+  background: transparent;
+  font-weight: 800;
+  opacity: 1;
+}
+.trip-day-period .trip-now-marker {
+  margin: 10px 0;
+  min-height: 22px;
+}
+.trip-day-period .trip-now-marker span,
+.day-view-agenda .day-now-marker span {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.trip-day-period .trip-now-marker::after,
+.day-view-agenda .day-now-marker::after {
+  content: "";
+  height: 2px;
+  flex: 1 1 auto;
+  background: #e53935;
+  border-radius: 999px;
+}
+.day-view-agenda .day-now-marker {
+  min-height: 42px;
+  margin: 0;
+  padding: 6px 14px;
+  list-style: none;
+  background: #fff;
+}
+.day-view-agenda .day-now-marker::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border-radius: 50%;
+  background: #e53935;
+}
+@media (prefers-reduced-motion: reduce) {
+  .trip-day-period li[data-time-past="true"],
+  .day-view-agenda-item[data-time-past="true"] { transition: none; }
+}
