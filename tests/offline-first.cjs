@@ -35,6 +35,7 @@ async function exercise({ online, cached, hasWorkspace, remote }) {
     sharedByMe:new Map(),tripDataCache:new Map(),tripDataLoads:new Map(),budgetByTrip:new Map(),tripFilesByTrip:new Map(),
     tripFileDeckIndexes:new Map(),tripTabScroll:new Map()};
   const ctx = {
+    document:{body:{dataset:{appReady:'false'}}},
     navigator:{onLine:online,storage:{persist:async()=>true}}, state, HISTORY_RESET_AT:'2026-09-27',
     offlineStore:{open:async()=>{},discardHistoryBefore:async()=>{},getCachedSession:async()=>cached,
       cacheSession:async()=>{},clearSession:async()=>calls.push('cleared')},
