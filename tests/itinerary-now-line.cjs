@@ -84,6 +84,14 @@ const context = {
 vm.createContext(context);
 vm.runInContext(source.slice(from, to), context);
 
+// The compact trip overview uses the same live clock without changing card order.
+const summaryCard = new Item('trip-day-card');
+summaryCard.dataset.dayId = 'd1';
+const summary = new Item('trip-day-agenda');
+summary.append(new Item('trip-day-row', '09:00'), new Item('trip-day-row', '15:00'));
+summaryCard.append(summary);
+list.append(summaryCard);
+
 assert.equal(context.itineraryScheduledMinute('15:40'), 940);
 assert.equal(context.itineraryScheduledMinute('25:10'), null);
 assert.equal(context.itineraryScheduledMinute('sem horário'), null);
@@ -99,6 +107,11 @@ assert.ok(marker, 'red current-time marker is inserted');
 assert.equal(marker.children[0].textContent, '12:45');
 assert.equal(agenda.children.indexOf(marker), 2, 'marker precedes next appointment');
 
+let overviewMarker = summary.children.find(x => x.className === 'trip-now-marker');
+assert.ok(overviewMarker, 'overview shows one clock marker');
+assert.equal(summary.children.indexOf(overviewMarker), 1, 'overview marker precedes its next activity');
+assert.equal(summary.children[0].dataset.timePast, 'true');
+
 paint(18, 0);
 marker = agenda.children.find(x => x.className === 'day-now-marker');
 assert.equal(agenda.children.indexOf(marker), 3, 'marker moves as time passes');
@@ -110,6 +123,7 @@ assert.equal(agenda.children.indexOf(marker), 4, 'after last appointment the lin
 
 vm.runInContext('updateCurrentItineraryTime(new Date(2026, 10, 21, 8, 0))', context);
 assert.equal(agenda.children.some(x => x.className === 'day-now-marker'), false, 'no marker outside today');
+assert.equal(summary.children.some(x => x.className === 'trip-now-marker'), false, 'overview clock is also date-scoped');
 assert.ok(agenda.children.every(x => x.dataset.timePast === undefined), 'no opacity outside today');
 
 assert.ok(css.includes('.day-view-agenda-item[data-time-past="true"]'));
