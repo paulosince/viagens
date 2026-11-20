@@ -112,7 +112,7 @@ vm.runInContext('updateCurrentItineraryTime(new Date(2026, 10, 21, 8, 0))', cont
 assert.equal(agenda.children.some(x => x.className === 'day-now-marker'), false, 'no marker outside today');
 assert.ok(agenda.children.every(x => x.dataset.timePast === undefined), 'no opacity outside today');
 
-assert.match(css, /\\.day-view-agenda-item\\[data-time-past="true"\\]/);
-assert.match(css, /\\.day-view-agenda \\.day-now-marker/);
-assert.match(css, /\\.trip-day-period \\.trip-now-marker/);
+assert.ok(css.includes('.day-view-agenda-item[data-time-past="true"]'));
+assert.ok(css.includes('.day-view-agenda .day-now-marker'));
+assert.ok(css.includes('.trip-day-period .trip-now-marker'));
 console.log('PASS: live itinerary time, faded entries, marker placement, and date scoping');
