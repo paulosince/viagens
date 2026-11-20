@@ -1825,6 +1825,101 @@ function isPastTripDay(day, trip, referenceDate = new Date()) {
   return date < today;
 }
 
+
+function localItineraryDateKey(now = new Date()) {
+  return [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, '0'),
+    String(now.getDate()).padStart(2, '0')
+  ].join('-');
+}
+
+function itineraryScheduledMinute(value) {
+  const match = /^([0-9]{2}):([0-9]{2})$/.exec(String(value || ''));
+  if (!match) return null;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  return hour < 24 && minute < 60 ? hour * 60 + minute : null;
+}
+
+// The marker is a visual guide, not a completion flag: past entries stay editable.
+function decorateLiveItineraryAgenda(root, selector, markerClass, nowMinutes, clockLabel) {
+  if (!root) return;
+  root.querySelector('.' + markerClass)?.remove();
+  const items = [...root.querySelectorAll(selector)];
+  let next = null;
+  let last = null;
+  for (const item of items) {
+    const scheduled = itineraryScheduledMinute(item.dataset.agendaTime);
+    if (scheduled === null || nowMinutes === null) {
+      delete item.dataset.timePast;
+      continue;
+    }
+    item.dataset.timePast = String(scheduled < nowMinutes);
+    if (scheduled >= nowMinutes && (!next || scheduled < next.minute)) {
+      next = { item, minute: scheduled };
+    }
+    if (scheduled < nowMinutes && (!last || scheduled >= last.minute)) {
+      last = { item, minute: scheduled };
+    }
+  }
+  if (nowMinutes === null || (!next && !last)) return;
+
+  const marker = document.createElement('li');
+  marker.className = markerClass;
+  marker.setAttribute('aria-label', 'Horário atual: ' + clockLabel);
+  const label = document.createElement('span');
+  label.textContent = clockLabel;
+  marker.append(label);
+  const target = next?.item || last.item;
+  target.parentNode.insertBefore(marker, next ? target : target.nextSibling);
+}
+
+function updateCurrentItineraryTime(now = new Date()) {
+  const trip = state.trips.find(item => String(item.id) === String(state.activeTripId));
+  if (!trip) return;
+  const today = localItineraryDateKey(now);
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  const clockLabel = String(now.getHours()).padStart(2, '0') + ':'
+    + String(now.getMinutes()).padStart(2, '0');
+
+  for (const card of dom.tripDayList.querySelectorAll('.trip-day-card[data-day-id]')) {
+    const day = state.tripDays.find(item => String(item.id) === card.dataset.dayId);
+    const currentMinutes = day && derivedDayDate(day, trip) === today ? minutes : null;
+    decorateLiveItineraryAgenda(
+      card.querySelector('.trip-day-agenda'), 'li[data-agenda-time]',
+      'trip-now-marker', currentMinutes, clockLabel
+    );
+  }
+
+  if (document.body.dataset.dayPage === 'open' && state.activeDayId) {
+    const day = state.tripDays.find(item => String(item.id) === String(state.activeDayId));
+    const currentMinutes = day && derivedDayDate(day, trip) === today ? minutes : null;
+    decorateLiveItineraryAgenda(
+      dom.dayPageAgenda, '.day-view-agenda-item[data-agenda-time]',
+      'day-now-marker', currentMinutes, clockLabel
+    );
+  }
+}
+
+let lastItineraryDateKey = localItineraryDateKey();
+function tickItineraryClock() {
+  const now = new Date();
+  const currentDateKey = localItineraryDateKey(now);
+  if (currentDateKey !== lastItineraryDateKey) {
+    lastItineraryDateKey = currentDateKey;
+    if (state.activeTripId && state.tripDays?.length) {
+      // At midnight the previous day joins the existing compact past-day strip.
+      renderTripDays(state.tripDays, state.dayActivities, state.dayLocations);
+    }
+  }
+  updateCurrentItineraryTime(now);
+}
+window.setInterval(tickItineraryClock, 30000);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') tickItineraryClock();
+});
+
 function renderTripDays(days, activitiesByDay = new Map(), locationsByDay = new Map()) {
   dom.tripDayList.replaceChildren();
   const trip = state.trips.find(item => String(item.id) === String(state.activeTripId));
@@ -1953,6 +2048,7 @@ function renderTripDays(days, activitiesByDay = new Map(), locationsByDay = new 
         const item = document.createElement('li');
         const timeText = activityTime(activity);
         if (timeText) {
+          item.dataset.agendaTime = timeText;
           const time = document.createElement('time');
           time.textContent = timeText;
           item.append(time);
@@ -2084,6 +2180,7 @@ function renderTripDays(days, activitiesByDay = new Map(), locationsByDay = new 
   }
 
   dom.tripDayMessage.textContent = visibleDays.length ? '' : 'Nenhum dia encontrado para esta viagem.';
+  updateCurrentItineraryTime();
 }
 
 function periodFromTime(time) {
@@ -2827,6 +2924,7 @@ function openDayPage(dayId, { pushHistory = true } = {}) {
     dom.dayPageSaveStatus.dataset.state = state.daySaveStates.get(String(day.id)) || 'idle';
     dom.dayPage.setAttribute('aria-hidden', 'false');
     document.body.dataset.dayPage = 'open';
+    updateCurrentItineraryTime();
     if (enteringDay) resetEnteredDayScroll(day.id);
     updateAgendaAddStickyState();
     renderDayAttachments(day.id);
@@ -2852,6 +2950,7 @@ function openDayPage(dayId, { pushHistory = true } = {}) {
   dom.dayPage.dataset.renderKey = renderKey;
   dom.dayPage.setAttribute('aria-hidden', 'false');
   document.body.dataset.dayPage = 'open';
+  updateCurrentItineraryTime();
     if (enteringDay) resetEnteredDayScroll(day.id);
   updateAgendaAddStickyState();
   renderDayAttachments(day.id);
@@ -3644,6 +3743,7 @@ function renderDayPageAgenda(day, activities, locations) {
     const item = document.createElement('li');
     item.className = 'day-view-agenda-item';
     item.dataset.activityId = String(activity.id);
+    item.dataset.agendaTime = activityTime(activity);
 
     const time = document.createElement('button');
     time.type = 'button';
@@ -3795,6 +3895,7 @@ function renderDayPageAgenda(day, activities, locations) {
   }
 
   dom.dayPageEmpty.textContent = ordered.length ? '' : 'Nenhum horário planejado para o dia ' + dayNumber(day) + '.';
+  updateCurrentItineraryTime();
 }
 
 function dayMapPoints(locations, activities = []) {
