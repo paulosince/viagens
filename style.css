@@ -4042,3 +4042,11 @@ body:not([data-budget-page="closed"]) .food-trip-summary { display: none !import
   .trip-day-period li[data-time-past="true"],
   .day-view-agenda-item[data-time-past="true"] { transition: none; }
 }
+
+/* Ticket availability is based on persisted private bytes, not network status. */
+.tickets-offline-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:10px 0 15px;color:var(--text-secondary,#65748b);font-size:12px;line-height:1.35}
+.tickets-offline-count{flex:1;min-width:0}
+.tickets-save-offline{flex-shrink:0;border:1px solid rgba(37,99,235,.18);border-radius:999px;padding:9px 12px;font:inherit;font-weight:700;color:#1454b8;background:rgba(59,130,246,.08)}
+.tickets-save-offline:disabled{opacity:.65}
+.tickets-item-art .tickets-item-offline{position:absolute;right:8px;bottom:8px;z-index:2;border-radius:999px;padding:4px 7px;background:rgba(22,101,52,.92);color:#fff;font-size:10px;font-weight:700;letter-spacing:.01em}
+@media(max-width:380px){.tickets-offline-bar{align-items:flex-start}.tickets-save-offline{padding:8px 9px}}
