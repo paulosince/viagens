@@ -6,6 +6,10 @@ import {activityPhotoForPreview} from './photo-source-neon.mjs?v=20261021-7photo
 import {usageRingsModel} from './usage-rings.mjs?v=20261024-home3';
 import { offlineStore } from './offline-store-neon.js?v=20261021-1';
 import {
+  readTicketManifest, writeTicketManifest, readTicketBlob, hasTicketBlob,
+  writeTicketBlob, deleteTicketBlob, ticketObjectUrl, revokeTicketObjectUrls
+} from './ticket-offline.mjs?v=20261121-offline1';
+import {
   adoptLegacyDataUrl,
   dataUrlToBlob,
   ensureMediaBlob,
@@ -598,6 +602,7 @@ async function refreshWorkspaceInBackground() {
       await flushOutbox().catch(error => console.warn('Fila local aguardando sincronização', error));
       await applyPendingSignupAvatar().catch(error => console.warn('Foto de cadastro aguardando envio', error));
       await loadTrips();
+      warmOfflineTickets().catch(error => console.warn('Ingressos offline aguardando conexão', error));
       await cacheCompleteWorkspace().catch(error => console.warn('Snapshot offline incompleto', error));
       await refreshSyncStatus();
     } catch (error) {
@@ -2630,7 +2635,151 @@ async function storeTripAttachment(client, tripId, dayId, file) {
     await client.storage.from(DAY_ATTACHMENT_BUCKET).remove([path]);
     throw inserted.error;
   }
+  // The uploaded original is already on this device. Preserve it immediately,
+  // rather than forcing a second authenticated download.
+  await writeTicketBlob(state.user?.id, path, file).catch(error =>
+    console.warn('Ingresso enviado, mas a cópia offline não coube no aparelho', error));
   return inserted.data;
+}
+
+const ticketManifestLoads = new Map();
+const ticketDownloads = new Map();
+
+async function decorateTicket(file, userId = state.user?.id) {
+  if (!file) return file;
+  const ready = await hasTicketBlob(userId, file.storage_path).catch(() => false);
+  const imageUrl = ready && /^image\//i.test(String(file.mime_type || ''))
+    ? await ticketObjectUrl(userId, file.storage_path).catch(() => '') : '';
+  const coverUrl = file.card_image_path
+    ? await ticketObjectUrl(userId, file.card_image_path).catch(() => '') : '';
+  return {
+    ...file, offlineReady: ready,
+    signedUrl: imageUrl || file.signedUrl || '',
+    cardSignedUrl: coverUrl || file.cardSignedUrl || ''
+  };
+}
+
+async function restoreCachedTickets(tripId) {
+  const key = String(tripId);
+  if (state.tripFilesByTrip.has(key)) return state.tripFilesByTrip.get(key);
+  const userId = state.user?.id;
+  if (!userId) return null;
+  const files = await readTicketManifest(userId, key).catch(error => {
+    console.warn('Índice de ingressos offline indisponível', error);
+    return null;
+  });
+  if (!files) return null;
+  if (state.user?.id !== userId) return null;
+  const ready = await Promise.all(files.map(file => decorateTicket(file, userId)));
+  if (state.user?.id !== userId) return null;
+  state.tripFilesByTrip.set(key, ready);
+  return ready;
+}
+
+function persistKnownTickets(tripId) {
+  const userId = state.user?.id;
+  const rows = state.tripFilesByTrip.get(String(tripId));
+  if (userId && rows) writeTicketManifest(userId, String(tripId), rows)
+    .catch(error => console.warn('Falha ao salvar índice offline de tickets', error));
+}
+
+function ticketCacheUpdated(tripId) {
+  const key = String(tripId);
+  const rows = state.tripFilesByTrip.get(key) || [];
+  for (const [dayId] of state.dayAttachments) {
+    const dayRows = rows.filter(row => String(row.day_id) === String(dayId));
+    if (dayRows.length || state.dayAttachments.get(dayId)?.some(row => String(row.trip_id) === key)) {
+      state.dayAttachments.set(dayId, dayRows);
+      if (state.activeDayId === dayId) renderDayAttachments(dayId);
+    }
+  }
+  if (state.activeTripId === key && state.activeTripTab === 'arquivos') {
+    renderTripFiles(key, state.tripDays.filter(day => String(day.trip_id) === key));
+  }
+  window.dispatchEvent(new CustomEvent('viaggio:tickets-cached', {detail:{tripId:key}}));
+}
+
+// At most two private downloads at a time. Never put JWT responses in the
+// service-worker cache, and never claim a ticket is offline without its bytes.
+function prefetchTripTickets(tripId, client) {
+  const key = String(tripId), userId = state.user?.id;
+  if (!userId || !client || !navigator.onLine) return Promise.resolve();
+  const queueKey = JSON.stringify([userId, key]);
+  if (ticketDownloads.has(queueKey)) return ticketDownloads.get(queueKey);
+  const task = (async () => {
+    const rows = state.tripFilesByTrip.get(key) || [];
+    const paths = [...new Set(rows.flatMap(row => [row.storage_path, row.card_image_path].filter(Boolean)))];
+    let next = 0;
+    await Promise.all(Array.from({length: Math.min(2, paths.length)}, async () => {
+      while (next < paths.length && navigator.onLine && state.user?.id === userId) {
+        const path = paths[next++];
+        try {
+          if (!await hasTicketBlob(userId, path)) {
+            const result = await client.storage.from(DAY_ATTACHMENT_BUCKET).download(path);
+            if (result.error) throw result.error;
+            await writeTicketBlob(userId, path, result.data);
+          }
+          if (state.user?.id !== userId) return;
+          const current = state.tripFilesByTrip.get(key) || [];
+          const updated = await Promise.all(current.map(async row => {
+            if (row.storage_path === path || row.card_image_path === path) {
+              return decorateTicket(row, userId);
+            }
+            return row;
+          }));
+          if (state.user?.id !== userId) return;
+          state.tripFilesByTrip.set(key, updated);
+          ticketCacheUpdated(key);
+        } catch (error) {
+          console.warn('Ingresso aguardando download offline', {path, message:error?.message || String(error)});
+        }
+      }
+    }));
+  })().finally(() => ticketDownloads.delete(queueKey));
+  ticketDownloads.set(queueKey, task);
+  return task;
+}
+
+async function syncTicketManifest(tripId, client) {
+  const key = String(tripId), userId = state.user?.id;
+  if (!userId || !client) return restoreCachedTickets(key);
+  const loadKey = JSON.stringify([userId, key]);
+  if (ticketManifestLoads.has(loadKey)) return ticketManifestLoads.get(loadKey);
+  const task = (async () => {
+    const result = await client.from('day_attachments').select('*').eq('trip_id', key).order('created_at');
+    if (result.error) throw result.error;
+    if (state.user?.id !== userId) return null;
+    const files = result.data || [];
+    await writeTicketManifest(userId, key, files).catch(error =>
+      console.warn('Não foi possível manter a lista offline de tickets', error));
+    const ready = await Promise.all(files.map(file => decorateTicket(file, userId)));
+    if (state.user?.id !== userId) return null;
+    state.tripFilesByTrip.set(key, ready);
+    ticketCacheUpdated(key);
+    prefetchTripTickets(key, client).catch(console.warn);
+    return ready;
+  })().finally(() => ticketManifestLoads.delete(loadKey));
+  ticketManifestLoads.set(loadKey, task);
+  return task;
+}
+
+async function warmOfflineTickets() {
+  const userId = state.user?.id;
+  if (!userId || !navigator.onLine) return;
+  const client = await tryNeon(5000);
+  if (!client || state.user?.id !== userId) return;
+  // The trip underway is first. Other trips are progressively prepared too.
+  const today = new Date().toISOString().slice(0, 10);
+  const trips = [...state.trips].filter(trip => !trip.deleted_at).sort((a, b) => {
+    const active = trip => trip.start_date <= today && tripEndDate(trip) >= today ? -1 : 0;
+    return active(a) - active(b);
+  });
+  for (const trip of trips) {
+    if (!navigator.onLine || state.user?.id !== userId) break;
+    await restoreCachedTickets(trip.id);
+    await syncTicketManifest(trip.id, client).catch(error =>
+      console.warn('Sincronização de tickets pendente', error));
+  }
 }
 
 function setDayAttachmentStatus(message, kind = 'info') {
