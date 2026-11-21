@@ -44,7 +44,7 @@ assert.equal(context.dayAttachmentPath('trip', null, 'pdf'), 'trip/general/file-
   const neonStart = neonSource.indexOf('const DAY_ATTACHMENT_BUCKET');
   const neonEnd = neonSource.indexOf('\nfunction setDayAttachmentStatus(', neonStart);
   assert.ok(neonStart >= 0 && neonEnd > neonStart, 'Neon attachment functions are available');
-  const neonContext = { crypto: { randomUUID: () => 'file-id' } };
+  const neonContext = { crypto: { randomUUID: () => 'file-id' }, state: {user:{id:'test-user'}}, writeTicketBlob:async()=>true, console };
   vm.createContext(neonContext);
   vm.runInContext(neonSource.slice(neonStart, neonEnd), neonContext);
 
@@ -53,9 +53,9 @@ assert.equal(context.dayAttachmentPath('trip', null, 'pdf'), 'trip/general/file-
   assert.equal(inserted.at(-1).size_bytes, ticket.size, 'JPEG over 6 MB is accepted');
   const uploadCount = paths.length;
   await assert.rejects(
-    neonContext.storeTripAttachment(client, 'trip', 'day', { ...ticket, size: 20 * 1024 * 1024 + 1 }),
-    /até 20 MB/
+    neonContext.storeTripAttachment(client, 'trip', 'day', { ...ticket, size: 30 * 1024 * 1024 + 1 }),
+    /até 30 MB/
   );
   assert.equal(paths.length, uploadCount, 'Oversized attachment is rejected before upload');
-  console.log('PASS: trip attachments accept up to 20 MB in Neon and reject larger files');
+  console.log('PASS: trip attachments accept up to 30 MB in Neon and reject larger files');
 })().catch(error => { console.error(error); process.exitCode = 1; });
