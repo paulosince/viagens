@@ -2971,6 +2971,15 @@ async function removeDayAttachment(attachment) {
   if (removed.error) { setStatus(removed.error.message, 'error'); return false; }
   const file = await client.storage.from(DAY_ATTACHMENT_BUCKET).remove([attachment.storage_path]);
   if (file.error) console.warn('Arquivo removido da lista; limpeza do armazenamento pendente', file.error);
+  const key = String(attachment.trip_id || state.activeTripId || '');
+  const previous = state.tripFilesByTrip.get(key);
+  if (previous) {
+    state.tripFilesByTrip.set(key, previous.filter(row => String(row.id) !== String(attachment.id)));
+    persistKnownTickets(key);
+    ticketCacheUpdated(key);
+  }
+  await deleteTicketBlob(state.user?.id, attachment.storage_path).catch(console.warn);
+  if (attachment.card_image_path) await deleteTicketBlob(state.user?.id, attachment.card_image_path).catch(console.warn);
   if (attachment.day_id) await loadDayAttachments(attachment.day_id).catch(error => setDayAttachmentStatus(error.message, 'error'));
   if (state.activeTripTab === 'arquivos') {
     await loadTripFiles(String(state.activeTripId)).catch(error => setTripPanelStatus(dom.tripFilesStatus, error.message, 'error'));
@@ -5492,10 +5501,31 @@ function clearTripFileViewerMedia() {
 }
 
 async function fetchTripFileBlob(file) {
-  if (!file.signedUrl) throw new Error('Conecte-se para visualizar este arquivo.');
-  const response = await fetch(file.signedUrl);
-  if (!response.ok) throw new Error('Não foi possível carregar o arquivo. Tente novamente.');
-  return response.blob();
+  const userId = state.user?.id;
+  const saved = await readTicketBlob(userId, file.storage_path).catch(() => null);
+  if (saved) { file.offlineReady = true; return saved; }
+  if (!navigator.onLine) throw new Error('Este comprovante ainda não foi salvo offline.');
+  let blob;
+  if (file.signedUrl) {
+    const response = await fetch(file.signedUrl);
+    if (!response.ok) throw new Error('Não foi possível carregar o arquivo. Tente novamente.');
+    blob = await response.blob();
+  } else {
+    const client = await tryNeon(5000);
+    if (!client) throw new Error('Sem conexão para baixar este comprovante.');
+    const download = await client.storage.from(DAY_ATTACHMENT_BUCKET).download(file.storage_path);
+    if (download.error) throw download.error;
+    blob = download.data;
+  }
+  if (state.user?.id === userId && await writeTicketBlob(userId, file.storage_path, blob).catch(error => {
+    console.warn('Arquivo aberto, mas não foi possível persistir offline', error);
+    return false;
+  })) {
+    file.offlineReady = true;
+    const tripId = String(file.trip_id || state.activeTripId || '');
+    if (tripId) ticketCacheUpdated(tripId);
+  }
+  return blob;
 }
 
 function showTripFileViewerFallback(file) {
@@ -5506,7 +5536,7 @@ function showTripFileViewerFallback(file) {
   const message = document.createElement('p');
   message.textContent = 'Documentos Word não têm prévia no navegador. Você pode salvá-los para abrir em outro aplicativo.';
   fallback.append(symbol, message);
-  if (file.signedUrl) {
+  if (file.signedUrl || file.offlineReady || navigator.onLine) {
     const download = document.createElement('button');
     download.type = 'button';
     download.textContent = 'Salvar documento';
@@ -5547,8 +5577,25 @@ function showTripFileViewerIndex(index, { syncHistory = true } = {}) {
   if (syncHistory && window.history.state?.view === 'trip-file') {
     window.history.replaceState({ ...window.history.state, fileId: file.id }, '', `#file-${file.id}`);
   }
-  if (!file.signedUrl) {
-    dom.tripFileViewerStatus.textContent = 'Conecte-se para visualizar este arquivo.';
+  if (!file.signedUrl && !file.offlineReady && !navigator.onLine) {
+    dom.tripFileViewerStatus.textContent = 'Este arquivo ainda não foi baixado para uso offline.';
+    return;
+  }
+  if (file.mime_type?.startsWith('image/') && !file.signedUrl) {
+    dom.tripFileViewerStatus.textContent = 'Abrindo imagem…';
+    const load = tripFileViewerLoad;
+    fetchTripFileBlob(file).then(async blob => {
+      if (load !== tripFileViewerLoad || !dom.tripFileViewer.open) return;
+      const cachedUrl = file.offlineReady
+        ? await ticketObjectUrl(state.user?.id, file.storage_path).catch(() => '') : '';
+      if (load !== tripFileViewerLoad || !dom.tripFileViewer.open) return;
+      const url = cachedUrl || URL.createObjectURL(blob);
+      file.signedUrl = url;
+      showTripFileViewerIndex(index, {syncHistory:false});
+      if (!cachedUrl) tripFileViewerBlobUrl = url;
+    }).catch(error => {
+      if (load === tripFileViewerLoad) dom.tripFileViewerStatus.textContent = error.message;
+    });
     return;
   }
   if (file.mime_type?.startsWith('image/')) {
@@ -6812,8 +6859,11 @@ async function saveTicketMetadata(event) {
       }
       const key = String(context.trip.id);
       const cached = state.tripFilesByTrip.get(key);
-      if (cached) state.tripFilesByTrip.set(key,cached.map(item=>
-        String(item.id) === String(saved.id) ? {...item,...saved,signedUrl:item.signedUrl||saved.signedUrl} : item));
+      if (cached) {
+        state.tripFilesByTrip.set(key,cached.map(item=>
+          String(item.id) === String(saved.id) ? {...item,...saved,signedUrl:item.signedUrl||saved.signedUrl} : item));
+        persistKnownTickets(key);
+      }
       dialogCloseTicketMetadata();
       context.onSaved?.(saved);
     } catch (error) {
@@ -8924,6 +8974,8 @@ dom.logoutButton.addEventListener('click', async () => {
   state.tripDataCache.clear();
   state.tripDataLoads.clear();
   state.budgetByTrip.clear(); state.tripFilesByTrip.clear(); state.tripFileDeckIndexes.clear(); state.tripTabScroll.clear();
+  state.dayAttachments.clear();
+  revokeTicketObjectUrls();
   syncTripList();
   closeSheets();
   setSessionView('anonymous');
@@ -9192,6 +9244,8 @@ async function verifyOnlineSession(cachedUser, localReady = false) {
     state.savedPassengers = []; state.profileSavedPassengers = [];
     state.tripDataCache.clear(); state.tripDataLoads.clear();
     state.budgetByTrip.clear(); state.tripFilesByTrip.clear();
+    state.dayAttachments.clear();
+    revokeTicketObjectUrls();
     state.tripFileDeckIndexes.clear(); state.tripTabScroll.clear();
     syncTripList();
   }
