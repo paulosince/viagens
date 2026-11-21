@@ -6933,7 +6933,8 @@ function renderTicketsFeed(panel, trips) {
         '<button type="button" data-ticket-filter="unclassified" aria-pressed="false">Identificar</button>',
         '<button type="button" data-ticket-filter="other" aria-pressed="false">Outros</button></div>',
       '<div class="tickets-section-heading"><h2>Ingressos e reservas</h2><span class="tickets-counter" aria-live="polite">…</span></div>',
-      '<p class="tickets-message" role="status">Carregando os arquivos da viagem…</p>',
+      '<div class="tickets-offline-bar"><span class="tickets-offline-count" role="status">Verificando cópias offline…</span><button type="button" class="tickets-save-offline">Salvar offline</button></div>',
+      '<p class="tickets-message" role="status">Consultando arquivos salvos…</p>',
       '<div class="tickets-grid"></div>',
     '</div>'
   ].join('');
@@ -7007,6 +7008,8 @@ function renderTicketsFeed(panel, trips) {
   const message = $('.tickets-message');
   const grid = $('.tickets-grid');
   const counter = $('.tickets-counter');
+  const offlineCount = $('.tickets-offline-count');
+  const saveOffline = $('.tickets-save-offline');
   let selectedFilter = 'all';
   let available = [];
   const editTicket = file => openTicketMetadataEditor(trip,file,updated => {
@@ -7015,19 +7018,25 @@ function renderTicketsFeed(panel, trips) {
   });
   const openTicketFile = async file => {
     try {
-      await openTrip(trip.id);
+      // openTrip updates the active page synchronously before its asynchronous
+      // itinerary refresh. Do not wait on Neon just to display a saved ticket.
+      openTrip(trip.id).catch(error => console.warn('Roteiro indisponível', error));
       selectTripTab('arquivos');
-      await loadTripFiles(String(trip.id));
-      const all = state.tripFilesByTrip.get(String(trip.id)) || [];
-      const matching = all.find(item=>String(item.id)===String(file.id));
-      if (matching) openTripFileViewer(matching, all);
-      else setTripPanelStatus(dom.tripFilesStatus,'O arquivo não foi encontrado.');
+      const all = (await restoreCachedTickets(String(trip.id))) || [];
+      let matching = all.find(item => String(item.id) === String(file.id)) || file;
+      if (!matching.storage_path && navigator.onLine) {
+        await loadTripFiles(String(trip.id));
+        matching = (state.tripFilesByTrip.get(String(trip.id)) || []).find(item =>
+          String(item.id) === String(file.id));
+      }
+      if (matching) openTripFileViewer(matching, all.length ? all : [matching]);
+      else setTripPanelStatus(dom.tripFilesStatus, 'O comprovante não foi encontrado.');
     } catch (error) { console.warn('Arquivo indisponível',error); }
   };
   const openTicketAgenda = async file => {
     if (!file.event_date && !file.day_id) { openTicketFile(file); return; }
     try {
-      await openTrip(trip.id,{forceRefresh:true});
+      await openTrip(trip.id);
       const day = tripTicketDay(trip,file.event_date,state.tripDays)
         || state.tripDays.find(item=>String(item.id)===String(file.day_id));
       if (!day) { selectTripTab('arquivos'); return; }
@@ -7038,6 +7047,11 @@ function renderTicketsFeed(panel, trips) {
   const paint = () => {
     const entries = available.filter(file => selectedFilter === 'all' || ticketFileCategory(file).id === selectedFilter);
     counter.textContent = entries.length === 1 ? '1 item' : entries.length + ' itens';
+    const ready = available.filter(file => file.offlineReady).length;
+    offlineCount.textContent = available.length
+      ? ready + ' de ' + available.length + ' documentos disponíveis offline'
+      : 'Nenhum documento armazenado offline';
+    saveOffline.hidden = !navigator.onLine || !available.length || ready === available.length;
     grid.replaceChildren();
     for (const file of entries) {
       const category = ticketFileCategory(file);
@@ -7065,6 +7079,12 @@ function renderTicketsFeed(panel, trips) {
       status.className = 'tickets-item-status';
       status.textContent = ticketStatusLabel(file);
       art.append(status);
+      if (file.offlineReady) {
+        const offline = document.createElement('span');
+        offline.className = 'tickets-item-offline';
+        offline.textContent = 'Offline';
+        art.append(offline);
+      }
       if (!file.cardSignedUrl) art.classList.add('no-cover');
       const details = document.createElement('span'); details.className = 'tickets-item-info';
       const name = document.createElement('strong'); name.textContent = ticketDisplayTitle(file);
@@ -7099,44 +7119,51 @@ function renderTicketsFeed(panel, trips) {
       paint();
     });
   }
-  const cached = state.tripFilesByTrip.get(String(trip.id));
+  const ticketKey = String(trip.id);
+  const cached = state.tripFilesByTrip.get(ticketKey);
   if (cached) { available = cached; paint(); }
-  if (!navigator.onLine) {
-    if (!cached) {
-      counter.textContent = 'Offline';
-      message.textContent = 'Conecte-se para carregar documentos ainda não vistos neste aparelho.';
-    }
-    return;
-  }
-  if (typeof tryNeon !== 'function') {
-    if (!cached) {
-      counter.textContent = '—';
-      message.textContent = 'Documentos indisponíveis nesta prévia.';
-    }
-    return;
-  }
-  tryNeon(5000).then(async client => {
-    if (!client) throw new Error('Conecte-se para consultar os documentos.');
-    const result = await client.from('day_attachments').select('*').eq('trip_id', String(trip.id)).order('created_at');
-    if (result.error) throw result.error;
+  restoreCachedTickets(ticketKey).then(files => {
     if (panel.ticketsRenderToken !== token || state.homeTab !== 'tickets') return;
-    const files = result.data || [];
-    available = await Promise.all(files.map(async file => {
-      if (!file.card_image_path) return file;
-      try {
-        const signed = await client.storage.from(DAY_ATTACHMENT_BUCKET).createSignedUrl(file.card_image_path, 3600);
-        return { ...file, cardSignedUrl:signed.error ? '' : (signed.data?.signedUrl || '') };
-      } catch (error) {
-        console.warn('Capa de ingresso indisponível', error);
-        return file;
+    if (files) { available = files; paint(); }
+    else if (!navigator.onLine) message.textContent = 'Estes arquivos ainda não foram sincronizados neste aparelho.';
+  }).catch(error => console.warn('Tickets offline indisponíveis', error));
+  panel.ticketOfflineController?.abort();
+  panel.ticketOfflineController = new AbortController();
+  window.addEventListener('viaggio:tickets-cached', event => {
+    if (event.detail?.tripId !== ticketKey || panel.ticketsRenderToken !== token || state.homeTab !== 'tickets') return;
+    available = state.tripFilesByTrip.get(ticketKey) || [];
+    paint();
+  }, {signal:panel.ticketOfflineController.signal});
+  saveOffline.addEventListener('click', async () => {
+    saveOffline.disabled = true;
+    saveOffline.textContent = 'Baixando…';
+    try {
+      const client = await tryNeon(5000);
+      if (!client) throw new Error('Conecte-se para salvar os ingressos.');
+      await syncTicketManifest(ticketKey, client);
+      await prefetchTripTickets(ticketKey, client);
+      if (panel.ticketsRenderToken === token) {
+        available = state.tripFilesByTrip.get(ticketKey) || [];
+        paint();
       }
-    }));
+    } catch (error) {
+      if (panel.ticketsRenderToken === token) message.textContent = error.message;
+    } finally {
+      saveOffline.disabled = false;
+      saveOffline.textContent = 'Salvar offline';
+    }
+  });
+  if (!navigator.onLine) return;
+  tryNeon(5000).then(async client => {
+    if (!client) throw new Error('Sem conexão para atualizar os comprovantes.');
+    const files = await syncTicketManifest(ticketKey, client);
     if (panel.ticketsRenderToken !== token || state.homeTab !== 'tickets') return;
+    available = files || available;
     paint();
   }).catch(error => {
     if (panel.ticketsRenderToken !== token || state.homeTab !== 'tickets') return;
-    if (!cached) counter.textContent = '—';
-    message.textContent = (cached ? 'Exibindo arquivos já conhecidos. ' : '') + (error.message || 'Não foi possível consultar os documentos.');
+    message.textContent = (available.length ? 'Exibindo arquivos locais. ' : '') +
+      (error.message || 'Atualização pendente.');
   });
 }
 
