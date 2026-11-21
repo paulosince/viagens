@@ -40,6 +40,7 @@ jobs:
           node --input-type=module --check < experiments/neon-pilot/app/usage-rings.mjs
           node --input-type=module --check < experiments/neon-pilot/app/storage-neon.mjs
           node --input-type=module --check < experiments/neon-pilot/app/offline-store-neon.js
+          node --input-type=module --check < experiments/neon-pilot/app/ticket-offline.mjs
           node --input-type=module --check < src/update-manager-neon.js
           node --input-type=module --check < src/offline-store.js
           node --check sw.js
@@ -53,6 +54,7 @@ jobs:
       - name: Verify offline sync and independent agenda photos
         run: |
           node tests/tickets-render.cjs
+          node tests/tickets-offline.cjs
           node tests/ticket-cover-ios.cjs
           node tests/ticket-cover-selection.cjs
           node tests/ticket-picker-post-confirm.cjs
@@ -75,6 +77,7 @@ jobs:
           test -f experiments/neon-pilot/app/main-neon.js
           test -f experiments/neon-pilot/app/backend-neon.mjs
           test -f experiments/neon-pilot/app/offline-store-neon.js
+          test -f experiments/neon-pilot/app/ticket-offline.mjs
           test -f src/update-manager-neon.js
           test -f legacy-supabase.html
           test -f src/offline-store.js
