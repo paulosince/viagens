@@ -2831,16 +2831,28 @@ async function loadDayAttachments(dayId) {
   const key = String(dayId);
   if (state.dayAttachmentLoads.has(key)) return state.dayAttachmentLoads.get(key);
   const loading = (async () => {
+    const day = state.tripDays.find(item => String(item.id) === key);
+    const tripId = String(day?.trip_id || state.activeTripId || '');
+    if (!tripId) return;
+    const cached = await restoreCachedTickets(tripId);
+    if (cached) {
+      state.dayAttachments.set(key, cached.filter(file => String(file.day_id) === key));
+      renderDayAttachments(key);
+    }
     const client = await tryNeon(5000);
-    if (!client) throw new Error('Conecte-se à internet para acessar os arquivos do dia.');
-    const { data, error } = await client.from('day_attachments').select('*').eq('day_id', key).order('created_at');
-    if (error) throw error;
-    const signed = await Promise.all((data || []).map(async attachment => {
-      const result = await client.storage.from(DAY_ATTACHMENT_BUCKET).createSignedUrl(attachment.storage_path, 3600);
-      return { ...attachment, signedUrl: result.error ? '' : result.data?.signedUrl || '' };
-    }));
-    state.dayAttachments.set(key, signed);
-    renderDayAttachments(key);
+    if (!client) {
+      if (!cached) throw new Error('Arquivos não preparados neste aparelho. Conecte-se para baixá-los.');
+      return;
+    }
+    try {
+      const files = await syncTicketManifest(tripId, client);
+      if (state.activeTripId !== tripId) return;
+      state.dayAttachments.set(key, (files || []).filter(file => String(file.day_id) === key));
+      renderDayAttachments(key);
+    } catch (error) {
+      if (!cached) throw error;
+      console.warn('Mantendo arquivos do dia salvos offline', error);
+    }
   })().finally(() => state.dayAttachmentLoads.delete(key));
   state.dayAttachmentLoads.set(key, loading);
   return loading;
@@ -2856,9 +2868,10 @@ function openDayAttachments() {
   document.body.dataset.dayAttachments = 'open';
   dom.dayAttachmentsSheet.setAttribute('aria-hidden', 'false');
   renderDayAttachments(state.activeDayId);
-  setDayAttachmentStatus('Carregando arquivos…');
+  setDayAttachmentStatus('Consultando arquivos salvos…');
   loadDayAttachments(state.activeDayId).then(() => {
-    if ((state.dayAttachments.get(state.activeDayId) || []).length) setDayAttachmentStatus('');
+    const entries = state.dayAttachments.get(String(state.activeDayId)) || [];
+    setDayAttachmentStatus(entries.length ? '' : 'Nenhum arquivo salvo para este dia.');
   }).catch(error => setDayAttachmentStatus(error.message || 'Não foi possível carregar os arquivos.', 'error'));
 }
 
@@ -3013,10 +3026,15 @@ async function renderDayTicketReservations(day) {
       button.append(icon,copy,arrow);
       button.addEventListener('click',async()=>{
         try {
-          await loadTripFiles(tripId);
-          const all=state.tripFilesByTrip.get(tripId)||[];
-          const found=all.find(x=>String(x.id)===String(file.id));
+          const all = (await restoreCachedTickets(tripId)) || [];
+          const found = all.find(x=>String(x.id)===String(file.id));
           if (found) openTripFileViewer(found,all);
+          else if (navigator.onLine) {
+            await loadTripFiles(tripId);
+            const refreshed = state.tripFilesByTrip.get(tripId) || [];
+            const located = refreshed.find(x=>String(x.id)===String(file.id));
+            if (located) openTripFileViewer(located,refreshed);
+          }
         } catch(error) { console.warn('Comprovante indisponível',error); }
       });
       host.append(button);
@@ -3025,15 +3043,17 @@ async function renderDayTicketReservations(day) {
 
   const cached = state.tripFilesByTrip.get(tripId);
   if (cached) paint(cached);
+  else {
+    const local = await restoreCachedTickets(tripId);
+    if (local) paint(local);
+  }
   if (!navigator.onLine) return;
   try {
-    const client=await tryNeon(5000);
+    const client = await tryNeon(5000);
     if (!client || !stillCurrent()) return;
-    const result=await client.from('day_attachments').select('*')
-      .eq('trip_id',tripId).eq('event_date',date).order('event_time',{ascending:true});
-    if (result.error) throw result.error;
-    paint(result.data||[]);
-  } catch(error) { console.warn('Reservas do dia indisponíveis',error); }
+    const files = await syncTicketManifest(tripId, client);
+    if (files) paint(files);
+  } catch(error) { console.warn('Mantendo reservas já salvas',error); }
 }
 
 // iOS may restore the scroll offset after a hidden fixed page becomes visible.
@@ -5843,7 +5863,7 @@ function renderTripFiles(tripId, days) {
 async function loadTripFiles(tripId) {
   const key = String(tripId);
   if (state.activeTripId !== key) return;
-  setTripPanelStatus(dom.tripFilesStatus, 'Carregando arquivos…');
+  setTripPanelStatus(dom.tripFilesStatus, 'Consultando arquivos salvos…');
   let days = state.tripDays.filter(day => String(day.trip_id) === key);
   if (!days.length) {
     const data = await fetchTripData(key, { preferLocal: true }) || await fetchTripData(key);
@@ -5852,29 +5872,29 @@ async function loadTripFiles(tripId) {
     days = data.days;
   }
   if (state.activeTripId !== key) return;
-  if (state.tripFilesByTrip.has(key)) renderTripFiles(key, days);
+  const cached = await restoreCachedTickets(key);
+  if (state.activeTripId !== key) return;
+  if (cached) {
+    renderTripFiles(key, days);
+    setTripPanelStatus(dom.tripFilesStatus, navigator.onLine ? 'Ingressos locais disponíveis; atualizando…' : 'Mostrando os ingressos salvos neste aparelho.');
+  }
   const client = await tryNeon(5000);
   if (!client) {
     renderTripFiles(key, days);
-    setTripPanelStatus(dom.tripFilesStatus, 'Conecte-se para consultar e enviar arquivos.');
+    if (!cached) setTripPanelStatus(dom.tripFilesStatus, 'Sem arquivos disponíveis offline. Conecte-se para sincronizar.');
     return;
   }
-  const { data, error } = await client.from('day_attachments').select('*').eq('trip_id', key).order('created_at');
-  if (error) throw error;
-  const signed = await Promise.all((data || []).map(async file => {
-    const storage = client.storage.from(DAY_ATTACHMENT_BUCKET);
-    const [original, cover] = await Promise.all([
-      storage.createSignedUrl(file.storage_path, 3600),
-      file.card_image_path ? storage.createSignedUrl(file.card_image_path, 3600) : Promise.resolve(null)
-    ]);
-    return {
-      ...file,
-      signedUrl: original.error ? '' : original.data?.signedUrl || '',
-      cardSignedUrl: cover?.error ? '' : cover?.data?.signedUrl || ''
-    };
-  }));
-  state.tripFilesByTrip.set(key, signed);
-  if (state.activeTripId === key) { renderTripFiles(key, days); if (state.activeTripTab === 'alimentacao') foodPanel.render(); setTripPanelStatus(dom.tripFilesStatus); }
+  try {
+    await syncTicketManifest(key, client);
+    if (state.activeTripId === key) {
+      renderTripFiles(key, days);
+      if (state.activeTripTab === 'alimentacao') foodPanel.render();
+      setTripPanelStatus(dom.tripFilesStatus);
+    }
+  } catch (error) {
+    if (!cached) throw error;
+    setTripPanelStatus(dom.tripFilesStatus, 'Exibindo arquivos salvos. A atualização online falhou.');
+  }
 }
 
 async function uploadTripFiles(files) {
