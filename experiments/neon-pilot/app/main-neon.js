@@ -423,6 +423,7 @@ const foodPanel = createFoodPanel({
     const rows=state.tripFilesByTrip.get(key)||[];
     state.tripFilesByTrip.set(key,rows.map(item=>String(item.id)===String(file.id)
       ? {...item,...file,signedUrl:item.signedUrl||file.signedUrl||'',cardSignedUrl:item.cardSignedUrl||file.cardSignedUrl||''} : item));
+    persistKnownTickets(key);
     if(state.activeTripId===key) {
       renderTripFiles(key,state.tripDays.filter(day=>String(day.trip_id)===key));
     }
@@ -6975,17 +6976,22 @@ function renderTicketsFeed(panel, trips) {
       const client=await tryNeon(7000);
       if (!client) throw new Error('Conecte-se para adicionar o comprovante.');
       const created=await storeTripAttachment(client,trip.id,null,file);
-      let signedUrl='';
-      if (isTicketImageFile(created)) {
-        const result=await client.storage.from(DAY_ATTACHMENT_BUCKET).createSignedUrl(created.storage_path,3600);
-        signedUrl=result.error ? '' : result.data?.signedUrl || '';
-      }
+      // The exact bytes of the freshly uploaded file have already been saved
+      // locally. Register the new ticket in the offline manifest immediately.
+      const entry = await decorateTicket(created);
+      const tripKey = String(trip.id);
+      const existing = state.tripFilesByTrip.get(tripKey) || available;
+      state.tripFilesByTrip.set(tripKey, [entry,...existing.filter(item =>
+        String(item.id) !== String(entry.id))]);
+      persistKnownTickets(tripKey);
+      ticketCacheUpdated(tripKey);
       if (panel.ticketsRenderToken!==token) return;
-      const entry={...created,signedUrl};
-      available.unshift(entry);
+      available = state.tripFilesByTrip.get(tripKey);
       paint();
       openTicketMetadataEditor(trip,entry,updated=>{
         available=available.map(item=>String(item.id)===String(updated.id)?{...item,...updated}:item);
+        state.tripFilesByTrip.set(tripKey, available);
+        persistKnownTickets(tripKey);
         paint();
       });
     } catch(error) {
@@ -7014,6 +7020,8 @@ function renderTicketsFeed(panel, trips) {
   let available = [];
   const editTicket = file => openTicketMetadataEditor(trip,file,updated => {
     available = available.map(item=>String(item.id)===String(updated.id)?{...item,...updated}:item);
+    state.tripFilesByTrip.set(String(trip.id), available);
+    persistKnownTickets(String(trip.id));
     paint();
   });
   const openTicketFile = async file => {
