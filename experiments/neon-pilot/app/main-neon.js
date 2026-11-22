@@ -1055,6 +1055,24 @@ function renderSyncConflicts() {
   if (dom.syncConflictServer) dom.syncConflictServer.disabled = busy;
 }
 
+// Older versions saved the successful manual reconciliation, but not the
+// resolvedAt annotation on preceding warnings. Recover that presentation from
+// the adjacent history without changing the recorded result of each attempt.
+function resolvedSyncLogEntries(records) {
+  let reviewed = false;
+  return (records || []).map(item => {
+    if (item.status === 'synced' && item.manual && item.stage === 'Revisão confirmada') {
+      reviewed = true;
+      return { ...item, displayResolved: false };
+    }
+    if (item.status === 'pending' && (item.resolvedAt || reviewed)) {
+      return { ...item, displayResolved: true };
+    }
+    reviewed = false;
+    return { ...item, displayResolved: false };
+  });
+}
+
 function renderSyncLog() {
   if (!dom.syncLogDialog || !dom.syncLogSummary || !dom.syncLogEntries) return;
   const active = workspaceSyncChecking || syncRetryWaiting;
@@ -1066,10 +1084,10 @@ function renderSyncLog() {
       : 'Ainda não há verificações registradas.';
   dom.syncLogEntries.replaceChildren();
   renderSyncConflicts();
-  for (const item of syncLogRecords || []) {
+  for (const item of resolvedSyncLogEntries(syncLogRecords)) {
     const row = document.createElement('li');
     row.className = 'sync-log-item';
-    const resolved = item.status === 'pending' && Boolean(item.resolvedAt);
+    const resolved = item.displayResolved;
     row.dataset.status = resolved ? 'resolved' : item.status;
     const heading = document.createElement('div');
     heading.className = 'sync-log-item-heading';
