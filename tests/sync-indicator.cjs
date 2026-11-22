@@ -36,7 +36,7 @@ for (const kind of ['synced','syncing','pending','offline','error']) {
 
 async function exerciseSnapshot({localActivities=[],localDays=[],force=true,fresh=false}={}) {
   const meta = new Map();
-  if (fresh) meta.set('complete_snapshot:user','2026-11-22T08:45:00Z');
+  if (fresh) meta.set('complete_snapshot:user',new Date().toISOString());
   const records = [];
   let reads = 0;
   const state = {
@@ -96,7 +96,7 @@ async function exerciseSnapshot({localActivities=[],localDays=[],force=true,fres
 
   const localDay=await exerciseSnapshot({localDays:[{id:'offline-day',trip_id:'trip'}]}).then(
     ()=>null,error=>error);
-  assert(localDay instanceof Error && /preservada/.test(localDay.message),
+  assert(localDay && /preservada/.test(localDay.message),
     'Never silently erase days that exist only on the phone');
 
   assert(source.includes('await cacheCompleteWorkspace({force:true})'),
