@@ -7843,7 +7843,7 @@ function availableSavedPassengers() {
   return [...entries.values()].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 }
 
-async function cacheCompleteWorkspace({force = false} = {}) {
+async function cacheCompleteWorkspace({force = false, resolveFromServer = false} = {}) {
   const userId = state.user?.id;
   if (!userId || !state.trips.length || !navigator.onLine) return false;
   if (await offlineStore.countOutbox()) return false;
@@ -7880,9 +7880,8 @@ async function cacheCompleteWorkspace({force = false} = {}) {
 
     // Never erase an entire local-only day to make a remote check appear green.
     const localOnlyDays = (localBefore.days || []).filter(day => !ids.has(String(day.id)));
-    if (localOnlyDays.length) {
-      // A remote deletion or offline edit needs inspection; keep this entire
-      // local trip untouched instead of turning a difference into an error.
+    if (localOnlyDays.length && !resolveFromServer) {
+      // Preserve an unmatched entire day until the owner explicitly decides.
       localDaysOnly += localOnlyDays.length;
       for (const localDay of localOnlyDays) conflicts.push({
         kind:'day', id:String(localDay.id), tripId:String(trip.id),
@@ -7901,23 +7900,39 @@ async function cacheCompleteWorkspace({force = false} = {}) {
       .filter(item => ids.has(String(item.day_id)) && !remoteActivityIds.has(String(item.id)));
     const localOnlyLocations = (localBefore.locations || [])
       .filter(item => ids.has(String(item.day_id)) && !remoteLocationIds.has(String(item.id)));
-    const verified = !localOnlyActivities.length && !localOnlyLocations.length;
-    localActivitiesOnly += localOnlyActivities.length;
-    localLocationsOnly += localOnlyLocations.length;
-    for (const entry of [...localOnlyActivities.map(record => ({kind:'activity',record})),
-      ...localOnlyLocations.map(record => ({kind:'location',record}))]) {
-      const day = days.find(item => String(item.id) === String(entry.record.day_id));
-      conflicts.push({
-        kind:entry.kind, id:String(entry.record.id), tripId:String(trip.id),
-        tripName:trip.name || 'Viagem', dayId:String(entry.record.day_id),
-        dayLabel:day?.title || 'Dia ' + (Number(day?.position || 0) + 1),
-        title:String(entry.record.title || entry.record.name || entry.record.place_name || 'Item sem título'),
-        record:entry.record
-      });
+    const hasLocalDifferences = Boolean(localOnlyDays.length ||
+      localOnlyActivities.length || localOnlyLocations.length);
+    const verified = resolveFromServer || !hasLocalDifferences;
+    if (hasLocalDifferences && resolveFromServer) {
+      // This code path is entered ONLY after explicit approval in the history
+      // dialog. Persist a full, account-scoped recoverable snapshot BEFORE
+      // replacing any local record. If storage fails, abort without mutation.
+      if (await offlineStore.hasPendingForTrip(trip.id) || await offlineStore.countOutbox()) {
+        throw new Error('Existem edições aguardando envio. A cópia local foi preservada.');
+      }
+      await saveSyncRecovery(userId, trip, localBefore, [
+        ...localOnlyDays.map(record => ({kind:'day',record})),
+        ...localOnlyActivities.map(record => ({kind:'activity',record})),
+        ...localOnlyLocations.map(record => ({kind:'location',record}))
+      ]);
+    } else {
+      localActivitiesOnly += localOnlyActivities.length;
+      localLocationsOnly += localOnlyLocations.length;
+      for (const entry of [...localOnlyActivities.map(record => ({kind:'activity',record})),
+        ...localOnlyLocations.map(record => ({kind:'location',record}))]) {
+        const day = days.find(item => String(item.id) === String(entry.record.day_id));
+        conflicts.push({
+          kind:entry.kind, id:String(entry.record.id), tripId:String(trip.id),
+          tripName:trip.name || 'Viagem', dayId:String(entry.record.day_id),
+          dayLabel:day?.title || 'Dia ' + (Number(day?.position || 0) + 1),
+          title:String(entry.record.title || entry.record.name || entry.record.place_name || 'Item sem título'),
+          record:entry.record
+        });
+      }
+      activities.push(...localOnlyActivities);
+      locations.push(...localOnlyLocations);
     }
     allVerified = allVerified && verified;
-    activities.push(...localOnlyActivities);
-    locations.push(...localOnlyLocations);
     await adoptLegacyTripMedia(days, activities, locations, localBefore).catch(error =>
       console.warn('[Viaggio mídia] Mídia legada indisponível, preservando os registros', error));
     await offlineStore.replaceTripData(String(trip.id), days, activities, locations);
@@ -7939,7 +7954,8 @@ async function cacheCompleteWorkspace({force = false} = {}) {
   if (state.user?.id !== userId) throw new Error('A conta mudou durante a sincronização.');
   workspaceConflictOwner = userId;
   workspaceConflictDetails = conflicts;
-  await offlineStore.setMeta(`sync_conflicts:${userId}`, conflicts);
+  await offlineStore.setMeta(`sync_conflicts:${userId}`, conflicts).catch(error =>
+    console.warn('Detalhes de divergência não puderam ser salvos localmente', error));
   if (dom.syncLogDialog?.open) renderSyncLog();
   const now = new Date().toISOString();
   // The stored snapshot is a durable local itinerary, not proof of comparison.
