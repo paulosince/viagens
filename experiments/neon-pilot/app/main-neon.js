@@ -624,14 +624,15 @@ async function refreshWorkspaceInBackground() {
 
   setTimeout(async () => {
     try {
-      // The avatar and shared-owner badge should not wait for pending trip edits.
+      // Verify the itinerary first, so the visible status transitions immediately.
+      // Profile/avatar checks are independent and must not hold up the sync badge.
+      await verifyWorkspaceSync();
       const client = await tryNeon(5000);
       if (client) {
         await Promise.allSettled([loadProfile(), refreshSharedTripOwners(client)]);
         syncTripList();
       }
       await applyPendingSignupAvatar().catch(error => console.warn('Foto de cadastro aguardando envio', error));
-      await verifyWorkspaceSync();
       warmOfflineTickets().catch(error => console.warn('Ingressos offline aguardando conexão', error));
       await refreshSyncStatus();
     } catch (error) {
