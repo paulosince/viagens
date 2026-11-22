@@ -954,8 +954,19 @@ async function loadSyncLog(userId) {
 async function appendSyncLog(userId, data) {
   const previous = await loadSyncLog(userId);
   if (state.user?.id !== userId) return;
+  const at = new Date().toISOString();
+  // A successful, explicitly approved reconciliation resolves only the latest
+  // contiguous group of previous local-difference warnings. Preserve each
+  // original attempt's pending status and message for auditability.
+  const history = [...previous];
+  if (data.resolvesPending === true && data.manual && data.status === 'synced') {
+    for (const record of history) {
+      if (record.status !== 'pending' || record.resolvedAt) break;
+      record.resolvedAt = at;
+    }
+  }
   syncLogRecords = [{
-    at: new Date().toISOString(),
+    at,
     manual: Boolean(data.manual),
     attempt: data.attempt,
     maxAttempts: SYNC_MAX_ATTEMPTS,
@@ -963,7 +974,7 @@ async function appendSyncLog(userId, data) {
     stage: data.stage || '',
     message: safeSyncLogMessage(data.message),
     durationMs: Math.max(0, Math.round(data.durationMs || 0))
-  }, ...previous].slice(0, SYNC_LOG_LIMIT);
+  }, ...history].slice(0, SYNC_LOG_LIMIT);
   try {
     await offlineStore.setMeta(`sync_log:${userId}`, syncLogRecords);
   } catch (error) {
@@ -1058,11 +1069,13 @@ function renderSyncLog() {
   for (const item of syncLogRecords || []) {
     const row = document.createElement('li');
     row.className = 'sync-log-item';
-    row.dataset.status = item.status;
+    const resolved = item.status === 'pending' && Boolean(item.resolvedAt);
+    row.dataset.status = resolved ? 'resolved' : item.status;
     const heading = document.createElement('div');
     heading.className = 'sync-log-item-heading';
     const title = document.createElement('strong');
-    title.textContent = item.status === 'synced' ? 'Sincronizado'
+    title.textContent = resolved ? 'Diferenças resolvidas'
+      : item.status === 'synced' ? 'Sincronizado'
       : item.status === 'pending' ? 'Diferenças preservadas' : 'Tentativa não concluída';
     const stamp = document.createElement('time');
     stamp.dateTime = item.at;
@@ -1077,9 +1090,10 @@ function renderSyncLog() {
       + (item.stage ? ` · ${item.stage}` : '');
     const detail = document.createElement('p');
     detail.className = 'sync-log-item-detail';
-    detail.textContent = item.message || (item.status === 'synced'
+    detail.textContent = (item.message || (item.status === 'synced'
       ? 'Os dados do roteiro foram conferidos com o servidor.'
-      : 'Nenhum detalhe adicional disponível.');
+      : 'Nenhum detalhe adicional disponível.')) +
+      (resolved ? ' · Resolvido posteriormente na revisão do roteiro.' : '');
     row.append(heading, attempt, detail);
     dom.syncLogEntries.append(row);
   }
@@ -1182,7 +1196,7 @@ async function resolveSyncConflicts(choice) {
       workspaceSyncWarning = null;
       syncRetryLastStartedAt = Date.now();
       dom.syncConflictFeedback.textContent = 'Roteiro conferido com sucesso. Os dados anteriores continuam guardados na recuperação.';
-      await appendSyncLog(userId,{manual:true,attempt:1,status:'synced',
+      await appendSyncLog(userId,{manual:true,attempt:1,status:'synced',resolvesPending:true,
         stage:'Revisão confirmada',durationMs:Date.now()-started,
         message:choice==='server'
           ? 'Versão do servidor aplicada. Cópia local anterior preservada no aparelho.'
