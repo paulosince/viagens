@@ -50,6 +50,17 @@ let workspaceSyncWarning = null;
 let workspaceSyncPhase = 'Sincronizando roteiro…';
 let workspaceSyncFailureStage = '';
 let syncStatusVersion = 0;
+let syncRetryPromise = null;
+let syncRetryWaiting = false;
+let syncRetryNumber = 0;
+let syncRetryLastStartedAt = 0;
+let syncLogOwnerId = null;
+let syncLogRecords = null;
+let syncLogLoading = null;
+const SYNC_MAX_ATTEMPTS = 3;
+const SYNC_RETRY_DELAYS_MS = [0, 1500, 3500];
+const SYNC_RETRY_COOLDOWN_MS = 10 * 60 * 1000;
+const SYNC_LOG_LIMIT = 30;
 const mediaPrefetchTasks = new Map();
 
 const verifiedSyncKey = userId => `verified_sync:${userId}`;
@@ -58,34 +69,34 @@ const verifiedSyncKey = userId => `verified_sync:${userId}`;
 // snapshot exists or that the mutation queue is empty.
 function syncIndicatorViewModel({online, pending, snapshotAt, verifiedAt, checking, phase, error, failureStage, warning, queueError, hasTrips}) {
   if (checking && online) return {kind:'syncing', text:phase || 'Sincronizando roteiro…', title:'Conferindo alterações e atualizando a cópia local.'};
-  if (pending === null) return {kind:'error', text:'Não foi possível conferir os dados locais · tocar para tentar', title:'Falha ao consultar alterações salvas neste aparelho.'};
+  if (pending === null) return {kind:'error', text:'Não foi possível conferir os dados locais', title:'Falha ao consultar alterações salvas neste aparelho.'};
   if (!online) return pending
     ? {kind:'offline', text:`Offline · ${pending} ${pending === 1 ? 'alteração salva' : 'alterações salvas'} no aparelho`, title:'As alterações serão enviadas quando houver conexão.'}
     : {kind:'offline', text:snapshotAt ? 'Offline · roteiro disponível' : 'Offline · cópia do roteiro incompleta', title:'É necessário conectar para conferir os dados mais recentes.'};
   if (pending) {
     const count = `${pending} ${pending === 1 ? 'alteração pendente' : 'alterações pendentes'}`;
     return queueError
-      ? {kind:'error', text:`${count} · falha ao enviar · tocar para tentar`, title:String(queueError)}
-      : {kind:'pending', text:`${count} · tocar para sincronizar`, title:'Há alterações salvas no aparelho que ainda precisam ser confirmadas no servidor.'};
+      ? {kind:'error', text:`${count} · falha ao enviar`, title:String(queueError)}
+      : {kind:'pending', text:`${count} · aguardando sincronização`, title:'Há alterações salvas no aparelho aguardando confirmação. Toque para abrir o histórico.'};
   }
   if (error) {
     const message = String(error);
     const label = /JWT|token|sessão|401|403|unauthori|forbidden/i.test(message)
-      ? 'Sessão não confirmada · tocar para tentar'
+      ? 'Sessão não confirmada'
       : /fetch|network|conexão|timeout|timed out|indisponível|abort/i.test(message)
-        ? 'Conexão falhou · tocar para tentar'
-        : failureStage === 'viagens' ? 'Falha ao consultar viagens · tocar para tentar'
-        : failureStage === 'agenda' ? 'Falha ao consultar agenda · tocar para tentar'
-        : 'Falha ao sincronizar · tocar para tentar';
+        ? 'Conexão falhou'
+        : failureStage === 'viagens' ? 'Falha ao consultar viagens'
+        : failureStage === 'agenda' ? 'Falha ao consultar agenda'
+        : 'Falha ao sincronizar';
     return {kind:'error', text:label, title:message};
   }
-  if (warning) return {kind:'pending', text:'Roteiro com alterações a conferir · tocar para tentar', title:String(warning)};
+  if (warning) return {kind:'pending', text:'Roteiro com alterações a conferir', title:String(warning)};
   if (verifiedAt && Number.isFinite(Date.parse(verifiedAt))) {
     const at = new Intl.DateTimeFormat('pt-BR',{hour:'2-digit',minute:'2-digit'}).format(new Date(verifiedAt));
-    return {kind:'synced', text:`Roteiro sincronizado às ${at}`, title:'Última conferência completa com o servidor. Toque para conferir novamente.'};
+    return {kind:'synced', text:`Roteiro sincronizado às ${at}`, title:'Última conferência completa com o servidor. Toque para abrir o histórico.'};
   }
   if (!hasTrips) return {kind:'pending', text:'Nenhuma viagem para sincronizar', title:''};
-  return {kind:'pending', text:snapshotAt ? 'Roteiro salvo · toque para sincronizar' : 'Sincronização pendente · toque para iniciar',
+  return {kind:'pending', text:snapshotAt ? 'Roteiro salvo · sincronização pendente' : 'Sincronização pendente',
     title:'O roteiro está no aparelho, mas a conferência com o servidor não foi concluída.'};
 }
 
@@ -836,7 +847,7 @@ async function refreshSyncStatus() {
   const view = syncIndicatorViewModel({
     online: navigator.onLine,
     pending, snapshotAt, verifiedAt,
-    checking: workspaceSyncChecking || outboxSyncing,
+    checking: workspaceSyncChecking || outboxSyncing || syncRetryWaiting,
     phase: workspaceSyncPhase,
     error: workspaceSyncError,
     failureStage: workspaceSyncFailureStage,
@@ -848,7 +859,8 @@ async function refreshSyncStatus() {
   dom.syncStatus.textContent = view.text;
   dom.syncStatus.title = view.title;
   dom.syncStatus.setAttribute('aria-busy', String(view.kind === 'syncing'));
-  dom.syncStatus.setAttribute('aria-label', view.text + '. Toque para tentar sincronizar.');
+  dom.syncStatus.setAttribute('aria-label', view.text + '. Abrir histórico de sincronização.');
+  if (dom.syncLogDialog?.open) renderSyncLog();
 }
 
 // One explicit operation covers the outbox, remote trip list, full itinerary
