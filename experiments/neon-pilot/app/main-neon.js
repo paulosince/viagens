@@ -54,6 +54,7 @@ let syncRetryPromise = null;
 let syncRetryWaiting = false;
 let syncRetryNumber = 0;
 let syncRetryLastStartedAt = 0;
+let syncRetryOwnerId = null;
 let syncLogOwnerId = null;
 let syncLogRecords = null;
 let syncLogLoading = null;
@@ -454,7 +455,7 @@ const dom = {
   databaseUsage: document.querySelector('#home_database_usage'), storageUsage: document.querySelector('#home_storage_usage'),
   databaseDetail: document.querySelector('#home_database_detail'), storageDetail: document.querySelector('#home_storage_detail'), imagesDetail: document.querySelector('#home_images_detail'),
   attachmentsDetail: document.querySelector('#home_attachments_detail'), usageNote: document.querySelector('#home_usage_note'),
-  editTripsButton: document.querySelector('#edit_trips_button'), newTripButton: document.querySelector('#new_trip_button'), emptyNewTripButton: document.querySelector('#empty_new_trip_button'), syncStatus: document.querySelector('#sync_status'), tripHeading: document.querySelector('#trip_heading'), yearButton: document.querySelector('#year_selector_button'), currentYear: document.querySelector('#current_year'), yearMenu: document.querySelector('#year_menu'), yearList: document.querySelector('#year_list'),
+  editTripsButton: document.querySelector('#edit_trips_button'), newTripButton: document.querySelector('#new_trip_button'), emptyNewTripButton: document.querySelector('#empty_new_trip_button'), syncStatus: document.querySelector('#sync_status'), syncLogDialog: document.querySelector('#sync_log_dialog'), syncLogClose: document.querySelector('#sync_log_close'), syncLogSummary: document.querySelector('#sync_log_summary'), syncLogEntries: document.querySelector('#sync_log_entries'), tripHeading: document.querySelector('#trip_heading'), yearButton: document.querySelector('#year_selector_button'), currentYear: document.querySelector('#current_year'), yearMenu: document.querySelector('#year_menu'), yearList: document.querySelector('#year_list'),
   tripList: document.querySelector('#trip_list'), homeEmpty: document.querySelector('#home_empty'), scrim: document.querySelector('#sheet_scrim'), tripEditFooter: document.querySelector('#trip_edit_footer'), deleteSelectedTrips: document.querySelector('#delete_selected_trips'), tripPage: document.querySelector('#trip_page'), closeTripPage: document.querySelector('#close_trip_page'), tripPageHero: document.querySelector('#trip_page_hero'), tripPageTitle: document.querySelector('#trip_page_title'), tripPageTitleInput: document.querySelector('#trip_page_title_input'), tripPageDates: document.querySelector('#trip_page_dates'), tripDateEditor: document.querySelector('#trip_page_date_editor'), tripStartDate: document.querySelector('#trip_page_start_date'), tripDayCount: document.querySelector('#trip_page_day_count'), tripDateDone: document.querySelector('#trip_page_date_done'), tripPageColor: document.querySelector('#trip_page_color'), tripPageCoverInput: document.querySelector('#trip_page_cover_input'), tripPageSaveStatus: document.querySelector('#trip_page_save_status'), tripPagePassengers: document.querySelector('#trip_page_passengers'), tripPagePassengerCount: document.querySelector('#trip_page_passenger_count'), tripPassengerSheet: document.querySelector('#trip_passenger_sheet'), tripPassengerSheetBody: document.querySelector('#trip_passenger_sheet_body'), tripPassengerSelf: document.querySelector('#trip_passenger_self'), tripPassengerSelfImage: document.querySelector('#trip_passenger_self_image'), tripPassengerSelfName: document.querySelector('#trip_passenger_self_name'), tripPassengerClose: document.querySelector('#close_trip_passengers'), tripPassengerMessage: document.querySelector('#trip_passenger_message'), tripDayList: document.querySelector('#trip_day_list'), tripDayMessage: document.querySelector('#trip_day_message'),
   tripTabs: document.querySelector('.trip-tabs'), tripPanels: { roteiro: document.querySelector('#trip_panel_roteiro'), orcamento: document.querySelector('#trip_panel_orcamento'), alimentacao: document.querySelector('#trip_panel_alimentacao'), arquivos: document.querySelector('#trip_panel_arquivos') }, budgetSummary: document.querySelector('#budget_summary'), budgetStatus: document.querySelector('#budget_status'), budgetList: document.querySelector('#budget_list'), budgetPage: document.querySelector('#budget_item_page'), budgetPageTitle: document.querySelector('#budget_item_page_title'), closeBudgetPage: document.querySelector('#close_budget_item_page'), budgetEditor: document.querySelector('#budget_editor'), budgetPageMessage: document.querySelector('#budget_item_message'), budgetAdd: document.querySelector('#budget_add'), tripFilesStatus: document.querySelector('#trip_files_status'), tripFilesList: document.querySelector('#trip_files_list'), tripFilesDay: document.querySelector('#trip_files_day'), tripFilesInput: document.querySelector('#trip_files_input'),
   tripFileViewer: document.querySelector('#trip_file_viewer'), tripFileViewerTitle: document.querySelector('#trip_file_viewer_title'), tripFileViewerMedia: document.querySelector('#trip_file_viewer_media'), tripFileViewerStatus: document.querySelector('#trip_file_viewer_status'), tripFileViewerDelete: document.querySelector('#delete_trip_file_viewer'), tripFileViewerPosition: document.querySelector('#trip_file_viewer_position'), tripFileViewerPrevious: document.querySelector('#previous_trip_file_viewer'), tripFileViewerNext: document.querySelector('#next_trip_file_viewer'), closeTripFileViewer: document.querySelector('#close_trip_file_viewer'),
@@ -910,6 +911,168 @@ function verifyWorkspaceSync() {
     refreshSyncStatus().catch(console.warn);
   });
   return workspaceSyncPromise;
+}
+
+
+function safeSyncLogMessage(value) {
+  return String(value || '')
+    .replace(/Bearer\\s+[^\\s]+/gi, '[credencial ocultada]')
+    .replace(/https?:\\/\\/[^\\s]+/gi, '[endereço omitido]')
+    .replace(/\\bNeon\\b|\\bSupabase\\b/gi, 'servidor')
+    .replace(/\\s+/g, ' ').slice(0, 300);
+}
+
+async function loadSyncLog(userId) {
+  if (syncLogOwnerId !== userId) {
+    syncLogOwnerId = userId;
+    syncLogRecords = null;
+    syncLogLoading = null;
+  }
+  if (syncLogRecords) return syncLogRecords;
+  if (!syncLogLoading) {
+    syncLogLoading = offlineStore.getMeta(`sync_log:${userId}`)
+      .then(rows => Array.isArray(rows) ? rows.slice(0, SYNC_LOG_LIMIT) : [])
+      .catch(error => {
+        console.warn('Histórico de sincronização indisponível', error);
+        return [];
+      }).then(rows => {
+        if (syncLogOwnerId === userId) syncLogRecords = rows;
+        return rows;
+      }).finally(() => { if (syncLogOwnerId === userId) syncLogLoading = null; });
+  }
+  return syncLogLoading;
+}
+
+async function appendSyncLog(userId, data) {
+  const previous = await loadSyncLog(userId);
+  if (state.user?.id !== userId) return;
+  syncLogRecords = [{
+    at: new Date().toISOString(),
+    attempt: data.attempt,
+    maxAttempts: SYNC_MAX_ATTEMPTS,
+    status: data.status,
+    stage: data.stage || '',
+    message: safeSyncLogMessage(data.message),
+    durationMs: Math.max(0, Math.round(data.durationMs || 0))
+  }, ...previous].slice(0, SYNC_LOG_LIMIT);
+  try {
+    await offlineStore.setMeta(`sync_log:${userId}`, syncLogRecords);
+  } catch (error) {
+    console.warn('Histórico de sincronização não pôde ser salvo neste aparelho', error);
+  }
+  if (dom.syncLogDialog?.open) renderSyncLog();
+}
+
+function renderSyncLog() {
+  if (!dom.syncLogDialog || !dom.syncLogSummary || !dom.syncLogEntries) return;
+  const active = workspaceSyncChecking || syncRetryWaiting;
+  const finished = syncLogRecords?.[0];
+  dom.syncLogSummary.textContent = active
+    ? `Tentativa ${syncRetryNumber || 1} de ${SYNC_MAX_ATTEMPTS} · ${workspaceSyncPhase}`
+    : finished ? `Última tentativa: ${finished.status === 'synced' ? 'concluída' : finished.status === 'pending' ? 'pendente de conferência' : 'não concluída'}.`
+      : 'Ainda não há verificações registradas.';
+  dom.syncLogEntries.replaceChildren();
+  for (const item of syncLogRecords || []) {
+    const row = document.createElement('li');
+    row.className = 'sync-log-item';
+    row.dataset.status = item.status;
+    const heading = document.createElement('div');
+    heading.className = 'sync-log-item-heading';
+    const title = document.createElement('strong');
+    title.textContent = item.status === 'synced' ? 'Sincronizado'
+      : item.status === 'pending' ? 'Diferenças preservadas' : 'Tentativa não concluída';
+    const stamp = document.createElement('time');
+    stamp.dateTime = item.at;
+    stamp.textContent = new Intl.DateTimeFormat('pt-BR',{
+      day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit'
+    }).format(new Date(item.at));
+    heading.append(title, stamp);
+    const attempt = document.createElement('p');
+    attempt.className = 'sync-log-item-attempt';
+    attempt.textContent = `Tentativa ${item.attempt} de ${item.maxAttempts} · ${(item.durationMs / 1000).toFixed(1).replace('.', ',')} s`
+      + (item.stage ? ` · ${item.stage}` : '');
+    const detail = document.createElement('p');
+    detail.className = 'sync-log-item-detail';
+    detail.textContent = item.message || (item.status === 'synced'
+      ? 'Os dados do roteiro foram conferidos com o servidor.'
+      : 'Nenhum detalhe adicional disponível.');
+    row.append(heading, attempt, detail);
+    dom.syncLogEntries.append(row);
+  }
+}
+
+async function openSyncLog() {
+  if (!dom.syncLogDialog || !state.user?.id) return;
+  const userId = state.user.id;
+  if (!dom.syncLogDialog.open) dom.syncLogDialog.showModal();
+  dom.syncLogSummary.textContent = 'Carregando histórico salvo…';
+  dom.syncLogEntries.replaceChildren();
+  await loadSyncLog(userId);
+  if (state.user?.id !== userId || !dom.syncLogDialog.open) return;
+  renderSyncLog();
+}
+
+function retrySyncDelay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// One bounded automatic cycle, never started by tapping the status badge.
+// A later foreground/resume may begin a new cycle only after the cooldown.
+function runAutomaticSync() {
+  const userId = state.user?.id;
+  if (!userId || !navigator.onLine) return Promise.resolve(false);
+  if (syncRetryPromise) return syncRetryPromise;
+  if (syncRetryOwnerId !== userId) {
+    syncRetryOwnerId = userId;
+    syncRetryLastStartedAt = 0;
+  }
+  if (Date.now() - syncRetryLastStartedAt < SYNC_RETRY_COOLDOWN_MS) return Promise.resolve(false);
+  syncRetryLastStartedAt = Date.now();
+  syncRetryPromise = (async () => {
+    let verified = false;
+    for (let attempt = 1; attempt <= SYNC_MAX_ATTEMPTS; attempt++) {
+      if (state.user?.id !== userId || !navigator.onLine) break;
+      syncRetryNumber = attempt;
+      if (attempt > 1) {
+        syncRetryWaiting = true;
+        workspaceSyncPhase = `Nova tentativa ${attempt} de ${SYNC_MAX_ATTEMPTS}…`;
+        refreshSyncStatus().catch(console.warn);
+        await retrySyncDelay(SYNC_RETRY_DELAYS_MS[attempt - 1]);
+        syncRetryWaiting = false;
+        if (state.user?.id !== userId || !navigator.onLine) break;
+      }
+      const started = Date.now();
+      try {
+        verified = await verifyWorkspaceSync();
+      } catch (error) {
+        workspaceSyncError = String(error?.message || error);
+        verified = false;
+      }
+      if (state.user?.id !== userId) break;
+      const status = verified ? 'synced' : workspaceSyncWarning ? 'pending' : 'error';
+      const detail = verified ? 'Os dados do roteiro foram conferidos com o servidor.'
+        : workspaceSyncWarning || workspaceSyncError || 'Não foi possível concluir a conferência.';
+      await appendSyncLog(userId, {
+        attempt,
+        status,
+        stage: workspaceSyncFailureStage === 'envio' ? 'Envio de alterações'
+          : workspaceSyncFailureStage === 'viagens' ? 'Consulta das viagens'
+          : workspaceSyncFailureStage === 'agenda' ? 'Consulta da agenda'
+          : 'Conferência do roteiro',
+        message: detail,
+        durationMs: Date.now() - started
+      });
+      if (verified) break;
+    }
+    return verified;
+  })().finally(() => {
+    syncRetryWaiting = false;
+    syncRetryNumber = 0;
+    syncRetryPromise = null;
+    refreshSyncStatus().catch(console.warn);
+    if (dom.syncLogDialog?.open) renderSyncLog();
+  });
+  return syncRetryPromise;
 }
 
 function tripNameForLog(tripId) {
