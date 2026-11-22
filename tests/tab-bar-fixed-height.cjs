@@ -20,7 +20,7 @@ for (const [name, r] of [['trip',trip],['home',home]]) {
     name + ' navigation must have a fixed height');
   assert(r.includes('min-height:') && r.includes('max-height:'),
     name + ' navigation must not stretch when search opens');
-  assert(r.includes('grid-template-rows:') && r.includes('minmax(0,1fr)'),
+  assert(r.includes('grid-template-rows:') && r.replace(/\s+/g,'').includes('minmax(0,1fr)'),
     name + ' navigation must keep one fixed grid row');
 }
 
