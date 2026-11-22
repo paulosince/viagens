@@ -675,7 +675,7 @@ async function refreshWorkspaceInBackground() {
     try {
       // Verify the itinerary first, so the visible status transitions immediately.
       // Profile/avatar checks are independent and must not hold up the sync badge.
-      await verifyWorkspaceSync();
+      await runAutomaticSync();
       const client = await tryNeon(5000);
       if (client) {
         await Promise.allSettled([loadProfile(), refreshSharedTripOwners(client)]);
@@ -916,10 +916,10 @@ function verifyWorkspaceSync() {
 
 function safeSyncLogMessage(value) {
   return String(value || '')
-    .replace(/Bearer\\s+[^\\s]+/gi, '[credencial ocultada]')
-    .replace(/https?:\\/\\/[^\\s]+/gi, '[endereço omitido]')
-    .replace(/\\bNeon\\b|\\bSupabase\\b/gi, 'servidor')
-    .replace(/\\s+/g, ' ').slice(0, 300);
+    .replace(/Bearer\s+[^\s]+/gi, '[credencial ocultada]')
+    .replace(/https?:\/\/[^\s]+/gi, '[endereço omitido]')
+    .replace(/\bNeon\b|\bSupabase\b/gi, 'servidor')
+    .replace(/\s+/g, ' ').slice(0, 300);
 }
 
 async function loadSyncLog(userId) {
@@ -9688,22 +9688,25 @@ window.addEventListener('offline', () => { refreshSyncStatus().catch(console.war
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden' && tripColorSaveTimer) savePendingTripColor();
   if (document.visibilityState === 'visible' && state.user) {
-    if (navigator.onLine) verifyWorkspaceSync().catch(error => console.warn('Sincronização do roteiro adiada', error));
+    if (navigator.onLine) runAutomaticSync().catch(error => console.warn('Sincronização do roteiro adiada', error));
     if (navigator.onLine && document.body.dataset.activeSheet !== 'profile') loadProfile().catch(error => console.warn('Foto do perfil aguardando atualização', error));
     refreshChatgptConnection().catch(console.warn);
   }
 });
 dom.syncStatus.addEventListener('click', () => {
-  verifyWorkspaceSync().catch(console.warn);
+  openSyncLog().catch(error => console.warn('Histórico indisponível', error));
 });
+dom.syncLogClose?.addEventListener('click', () => dom.syncLogDialog?.close());
 
 window.addEventListener('online', () => {
+  syncRetryLastStartedAt = 0; // A restored connection permits a fresh bounded cycle.
   refreshSyncStatus().catch(console.warn);
   // Primeiro conferir a identidade; depois atualizar a viagem e a fila.
   // Evita limpar o cache ou enviar alterações sob uma sessão diferente.
   if (state.user?.neon_subject) {
     verifyOnlineSession(state.user, state.trips.length > 0)
-      .catch(error => console.warn('Atualização Neon adiada; mantendo dados locais', error));
+      .then(verified => { if (verified) runAutomaticSync().catch(console.warn); })
+      .catch(error => console.warn('Atualização adiada; mantendo dados locais', error));
   }
   subscribeNeonAuth().catch(console.warn);
 });
