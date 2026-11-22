@@ -12,7 +12,7 @@ vm.createContext(modelContext);
 vm.runInContext(source.slice(modelStart, modelEnd), modelContext);
 const model = input => modelContext.syncIndicatorViewModel({
   online: true, pending: 0, snapshotAt: null, verifiedAt: null,
-  checking: false, error: null, queueError: null, hasTrips: true, ...input
+  checking: false, error: null, warning: null, queueError: null, hasTrips: true, ...input
 });
 assert.equal(model({verifiedAt:'2026-11-22T08:30:00Z'}).kind, 'synced');
 assert.match(model({verifiedAt:'2026-11-22T08:30:00Z'}).text, /Roteiro sincronizado às/);
@@ -25,6 +25,7 @@ assert.equal(model({pending:3,verifiedAt:'2026-11-22T08:30:00Z'}).kind, 'pending
   'Queued edits override prior success');
 assert.equal(model({pending:1,queueError:'timeout'}).kind, 'error');
 assert.equal(model({error:'network down',verifiedAt:'2026-11-22T08:30:00Z'}).kind, 'error');
+assert.equal(model({warning:'Local-only records',verifiedAt:'2026-11-22T08:30:00Z'}).kind, 'pending');
 assert.equal(model({pending:null}).kind, 'error', 'Unreadable local outbox cannot be treated as empty');
 for(const state of [{},{checking:true},{verifiedAt:'2026-11-22T08:30:00Z'},{online:false},{error:'failure'}]){
   assert(!/Neon|Supabase/i.test(model(state).text),'UI must not expose the backend product');
@@ -34,11 +35,11 @@ for (const kind of ['synced','syncing','pending','offline','error']) {
     'Bottom status must have a meaningful color for '+kind);
 }
 
-async function exerciseSnapshot({localActivities=[],localDays=[],force=true,fresh=false}={}) {
+async function exerciseSnapshot({localActivities=[],localDays=[],force=true,fresh=false, mediaFails=false}={}) {
   const meta = new Map();
   if (fresh) meta.set('complete_snapshot:user',new Date().toISOString());
   const records = [];
-  let reads = 0;
+  let reads = 0, mediaCalls = 0;
   const state = {
     user:{id:'user'}, trips:[{id:'trip'}], tripDataCache:new Map()
   };
@@ -64,6 +65,7 @@ async function exerciseSnapshot({localActivities=[],localDays=[],force=true,fres
     loadDayRecords:async()=>({activities:[],locations:[]}),
     adoptLegacyTripMedia:async()=>{},cacheTripMedia:async()=>{},
     groupByDay:()=>new Map(),verifiedSyncKey:id=>'verified_sync:'+id,
+    scheduleTripMediaCache:()=>{mediaCalls++; if(mediaFails) throw Error('Simulated photo failure');},
     refreshSyncStatus:async()=>{},console,Date
   };
   vm.createContext(ctx);
@@ -72,7 +74,7 @@ async function exerciseSnapshot({localActivities=[],localDays=[],force=true,fres
   assert(start>0 && end>start);
   vm.runInContext(source.slice(start,end),ctx);
   const result = await ctx.cacheCompleteWorkspace({force});
-  return {result,meta,records,reads,state};
+  return {result,meta,records,reads,state,mediaCalls};
 }
 (async()=>{
   const good=await exerciseSnapshot();
@@ -94,10 +96,13 @@ async function exerciseSnapshot({localActivities=[],localDays=[],force=true,fres
   assert.equal(forced.result,true);
   assert.equal(forced.reads,1,'User-initiated sync must bypass 30 minute cache guard');
 
-  const localDay=await exerciseSnapshot({localDays:[{id:'offline-day',trip_id:'trip'}]}).then(
-    ()=>null,error=>error);
-  assert(localDay && /preservada/.test(localDay.message),
-    'Never silently erase days that exist only on the phone');
+  const localDay=await exerciseSnapshot({localDays:[{id:'offline-day',trip_id:'trip'}]});
+  assert.equal(localDay.result,false,'Unreconciled local days must block green success');
+  assert.equal(localDay.records.length,0,'Local-only days must not be overwritten');
+  assert(!localDay.meta.has('verified_sync:user'));
+  const media=await exerciseSnapshot();
+  assert.equal(media.result,true,'Optional media must not block a completed itinerary snapshot');
+  assert.equal(media.mediaCalls,1,'Photos are scheduled after the itinerary check');
 
   assert(source.includes('await cacheCompleteWorkspace({force:true})'),
     'Full sync must force a fresh read');
