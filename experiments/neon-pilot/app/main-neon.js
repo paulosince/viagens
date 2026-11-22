@@ -73,7 +73,7 @@ const verifiedSyncKey = userId => `verified_sync:${userId}`;
 
 // The badge states what was actually verified, never just that a local
 // snapshot exists or that the mutation queue is empty.
-function syncIndicatorViewModel({online, pending, snapshotAt, verifiedAt, checking, phase, error, failureStage, warning, queueError, hasTrips}) {
+function syncIndicatorViewModel({online, pending, snapshotAt, verifiedAt, checking, phase, error, failureStage, warning, conflictCount = 0, queueError, hasTrips}) {
   if (checking && online) return {kind:'syncing', text:phase || 'Sincronizando roteiro…', title:'Conferindo alterações e atualizando a cópia local.'};
   if (pending === null) return {kind:'error', text:'Não foi possível conferir os dados locais', title:'Falha ao consultar alterações salvas neste aparelho.'};
   if (!online) return pending
@@ -96,7 +96,9 @@ function syncIndicatorViewModel({online, pending, snapshotAt, verifiedAt, checki
         : 'Falha ao sincronizar';
     return {kind:'error', text:label, title:message};
   }
-  if (warning) return {kind:'pending', text:'Roteiro com alterações a conferir', title:String(warning)};
+  if (warning) return {kind:'pending', text:conflictCount
+    ? `${conflictCount} ${conflictCount === 1 ? 'item local para revisar' : 'itens locais para revisar'}`
+    : 'Roteiro com diferenças locais', title:String(warning)};
   if (verifiedAt && Number.isFinite(Date.parse(verifiedAt))) {
     const at = new Intl.DateTimeFormat('pt-BR',{hour:'2-digit',minute:'2-digit'}).format(new Date(verifiedAt));
     return {kind:'synced', text:`Roteiro sincronizado às ${at}`, title:'Última conferência completa com o servidor. Toque para abrir o histórico.'};
@@ -858,6 +860,7 @@ async function refreshSyncStatus() {
     error: workspaceSyncError,
     failureStage: workspaceSyncFailureStage,
     warning: workspaceSyncWarning,
+    conflictCount: workspaceConflictOwner === userId ? workspaceConflictDetails.length : 0,
     queueError: lastOutboxError,
     hasTrips: state.trips.length > 0
   });
@@ -1045,6 +1048,7 @@ function renderSyncLog() {
   if (!dom.syncLogDialog || !dom.syncLogSummary || !dom.syncLogEntries) return;
   const active = workspaceSyncChecking || syncRetryWaiting;
   const finished = syncLogRecords?.[0];
+  dom.syncLogSummary.dataset.status = active ? 'syncing' : finished?.status || 'unknown';
   dom.syncLogSummary.textContent = active
     ? `Tentativa ${syncRetryNumber || 1} de ${SYNC_MAX_ATTEMPTS} · ${workspaceSyncPhase}`
     : finished ? `Última tentativa: ${finished.status === 'synced' ? 'concluída' : finished.status === 'pending' ? 'pendente de conferência' : 'não concluída'}.`
