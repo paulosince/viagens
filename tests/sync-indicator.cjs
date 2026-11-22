@@ -29,6 +29,7 @@ assert.equal(model({pending:3,verifiedAt:'2026-11-22T08:30:00Z'}).kind, 'pending
 assert.equal(model({pending:1,queueError:'timeout'}).kind, 'error');
 assert.equal(model({error:'network down',verifiedAt:'2026-11-22T08:30:00Z'}).kind, 'error');
 assert.equal(model({warning:'Local-only records',verifiedAt:'2026-11-22T08:30:00Z'}).kind, 'pending');
+assert.equal(model({warning:'Local-only records',conflictCount:3}).text, '3 itens locais para revisar');
 assert.equal(model({pending:null}).kind, 'error', 'Unreadable local outbox cannot be treated as empty');
 for(const state of [{},{checking:true},{verifiedAt:'2026-11-22T08:30:00Z'},{online:false},{error:'failure'}]){
   assert(!/Neon|Supabase/i.test(model(state).text),'UI must not expose the backend product');
