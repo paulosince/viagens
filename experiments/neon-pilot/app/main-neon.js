@@ -4641,6 +4641,12 @@ async function flushOutbox() {
       return false;
     }
 
+    // Uploading queued edits invalidates an older successful check until
+    // the updated remote data has been read back.
+    if (await offlineStore.countOutbox()) {
+      await offlineStore.deleteMeta(verifiedSyncKey(state.user.id)).catch(error =>
+        console.warn('Não foi possível invalidar a conferência antiga', error));
+    }
     const droppedColorLogs = await offlineStore.compactPendingColorHistory();
     if (droppedColorLogs.length) {
       const droppedIds = new Set(droppedColorLogs);
@@ -7544,13 +7550,15 @@ function availableSavedPassengers() {
   return [...entries.values()].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 }
 
-async function cacheCompleteWorkspace() {
-  if (!state.user?.id || !state.trips.length || !navigator.onLine) return;
-  if (await offlineStore.countOutbox()) return;
+async function cacheCompleteWorkspace({force = false} = {}) {
+  const userId = state.user?.id;
+  if (!userId || !state.trips.length || !navigator.onLine) return false;
+  if (await offlineStore.countOutbox()) return false;
   const client = await tryNeon();
-  if (!client) return;
-  const lastSnapshot = await offlineStore.getMeta(`complete_snapshot:${state.user.id}`);
-  if (lastSnapshot && Date.now() - new Date(lastSnapshot).getTime() < 30 * 60 * 1000) return;
+  if (!client) throw new Error('Sem conexão para conferir o roteiro.');
+
+  const lastSnapshot = await offlineStore.getMeta(`complete_snapshot:${userId}`);
+  if (!force && lastSnapshot && Date.now() - new Date(lastSnapshot).getTime() < 30 * 60 * 1000) return false;
 
   const tripIds = state.trips.map(trip => trip.id);
   const orderedSchema = await supportsOrderedDaySchema(client);
@@ -7564,19 +7572,32 @@ async function cacheCompleteWorkspace() {
     ({ activities: allActivities, locations: allLocations } = await loadDayRecords(client, allDays.map(day => day.id)));
   }
 
-  const dayById = new Map(allDays.map(day => [String(day.id), day]));
+  let allVerified = true;
   for (const trip of state.trips) {
-    if (await offlineStore.hasPendingForTrip(trip.id)) continue;
+    if (state.user?.id !== userId) throw new Error('A conta mudou durante a sincronização.');
+    if (await offlineStore.hasPendingForTrip(trip.id)) { allVerified = false; continue; }
     const days = allDays.filter(day => String(day.trip_id) === String(trip.id));
     const ids = new Set(days.map(day => String(day.id)));
     const activities = allActivities.filter(activity => ids.has(String(activity.day_id)));
     const locations = allLocations.filter(location => ids.has(String(location.day_id)));
-    const localBefore = await offlineStore.loadTripData(String(trip.id)).catch(() => ({ days: [], activities: [], locations: [] }));
-    // Background snapshot must not erase local-only entries either.
+    const localBefore = await offlineStore.loadTripData(String(trip.id))
+      .catch(() => ({ days: [], activities: [], locations: [] }));
+
+    // Never erase an entire local-only day to make a remote check appear green.
+    const localOnlyDays = (localBefore.days || []).filter(day => !ids.has(String(day.id)));
+    if (localOnlyDays.length) {
+      throw new Error('Existem dias salvos apenas neste aparelho. A cópia local foi preservada.');
+    }
+
+    // Background snapshots must not erase local-only entries either.
     const remoteActivityIds = new Set(activities.map(item => String(item.id)));
     const remoteLocationIds = new Set(locations.map(item => String(item.id)));
-    const localOnlyActivities = (localBefore.activities || []).filter(item => ids.has(String(item.day_id)) && !remoteActivityIds.has(String(item.id)));
-    const localOnlyLocations = (localBefore.locations || []).filter(item => ids.has(String(item.day_id)) && !remoteLocationIds.has(String(item.id)));
+    const localOnlyActivities = (localBefore.activities || [])
+      .filter(item => ids.has(String(item.day_id)) && !remoteActivityIds.has(String(item.id)));
+    const localOnlyLocations = (localBefore.locations || [])
+      .filter(item => ids.has(String(item.day_id)) && !remoteLocationIds.has(String(item.id)));
+    const verified = !localOnlyActivities.length && !localOnlyLocations.length;
+    allVerified = allVerified && verified;
     activities.push(...localOnlyActivities);
     locations.push(...localOnlyLocations);
     await adoptLegacyTripMedia(days, activities, locations, localBefore);
@@ -7588,11 +7609,22 @@ async function cacheCompleteWorkspace() {
       activitiesByDay: groupByDay(activities),
       locationsByDay: groupByDay(locations),
       loadedAt: Date.now(),
-      version: Date.now()
+      version: Date.now(),
+      remoteVerified: verified
     });
   }
 
-  await offlineStore.setMeta(`complete_snapshot:${state.user.id}`, new Date().toISOString());
+  if (await offlineStore.countOutbox()) allVerified = false;
+  if (state.user?.id !== userId) throw new Error('A conta mudou durante a sincronização.');
+  const now = new Date().toISOString();
+  await offlineStore.setMeta(`complete_snapshot:${userId}`, now);
+  if (allVerified) {
+    await offlineStore.setMeta(verifiedSyncKey(userId), now);
+  } else {
+    await offlineStore.deleteMeta(verifiedSyncKey(userId));
+  }
+  refreshSyncStatus().catch(console.warn);
+  return allVerified;
 }
 
 async function refreshSharedTripOwners(client) {
