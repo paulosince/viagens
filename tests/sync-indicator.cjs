@@ -108,7 +108,7 @@ async function exerciseSnapshot({localActivities=[],localDays=[],force=true,fres
   // Use the actual media-precache loop: one missing photo must not interrupt
   // other media, and cannot change the confirmed itinerary result.
   const photoStart=source.indexOf('async function cacheTripMedia(');
-  const photoEnd=source.indexOf('\\nfunction scheduleTripMediaCache(',photoStart);
+  const photoEnd=source.indexOf('\nfunction scheduleTripMediaCache(',photoStart);
   assert(photoStart>0 && photoEnd>photoStart);
   const attempted=[];
   const photoContext={
