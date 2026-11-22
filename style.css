@@ -4112,3 +4112,9 @@ body[data-home-tab="calendar"] .home-bottom .sync-status[data-kind="error"] {col
 .sync-conflict-feedback{font-size:12px;color:#39465b;white-space:pre-wrap}
 .home-bottom .sync-status[data-kind="pending"]::before{background-color:#f1b500}
 @media(max-width:400px){.sync-conflict-actions{grid-template-columns:1fr}.sync-conflict-section{max-height:29vh}}
+
+/* Resumo e cartões usam a MESMA semântica cromática. */
+.sync-log-summary[data-status="pending"]{background:#fff0bd;color:#26374c;border-left:4px solid #f2b400}
+.sync-log-summary[data-status="synced"]{background:#e7f8eb;color:#196a37;border-left:4px solid #28a651}
+.sync-log-summary[data-status="error"]{background:#ffebed;color:#a42734;border-left:4px solid #dc5058}
+.sync-log-summary[data-status="syncing"]{background:#e4f0ff;color:#1c5eae;border-left:4px solid #2e8bdf}
