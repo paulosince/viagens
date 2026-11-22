@@ -19,6 +19,7 @@ assert.match(model({verifiedAt:'2026-11-22T08:30:00Z'}).text, /Roteiro sincroniz
 assert.equal(model({snapshotAt:'2026-11-22T08:30:00Z'}).kind, 'pending',
   'Local snapshot alone must never advertise a green sync');
 assert.equal(model({checking:true}).kind, 'syncing');
+assert.equal(model({checking:true,phase:'Verificando agenda…'}).text, 'Verificando agenda…');
 assert.equal(model({checking:true,online:false}).kind, 'offline',
   'Losing the network must dismiss a stale progress indication');
 assert.equal(model({pending:3,verifiedAt:'2026-11-22T08:30:00Z'}).kind, 'pending',
@@ -35,7 +36,7 @@ for (const kind of ['synced','syncing','pending','offline','error']) {
     'Bottom status must have a meaningful color for '+kind);
 }
 
-async function exerciseSnapshot({localActivities=[],localDays=[],force=true,fresh=false, mediaFails=false}={}) {
+async function exerciseSnapshot({localActivities=[],localDays=[],force=true,fresh=false}={}) {
   const meta = new Map();
   if (fresh) meta.set('complete_snapshot:user',new Date().toISOString());
   const records = [];
@@ -65,7 +66,7 @@ async function exerciseSnapshot({localActivities=[],localDays=[],force=true,fres
     loadDayRecords:async()=>({activities:[],locations:[]}),
     adoptLegacyTripMedia:async()=>{},cacheTripMedia:async()=>{},
     groupByDay:()=>new Map(),verifiedSyncKey:id=>'verified_sync:'+id,
-    scheduleTripMediaCache:()=>{mediaCalls++; if(mediaFails) throw Error('Simulated photo failure');},
+    scheduleTripMediaCache:()=>{mediaCalls++;},
     refreshSyncStatus:async()=>{},console,Date
   };
   vm.createContext(ctx);
@@ -103,6 +104,25 @@ async function exerciseSnapshot({localActivities=[],localDays=[],force=true,fres
   const media=await exerciseSnapshot();
   assert.equal(media.result,true,'Optional media must not block a completed itinerary snapshot');
   assert.equal(media.mediaCalls,1,'Photos are scheduled after the itinerary check');
+
+  // Use the actual media-precache loop: one missing photo must not interrupt
+  // other media, and cannot change the confirmed itinerary result.
+  const photoStart=source.indexOf('async function cacheTripMedia(');
+  const photoEnd=source.indexOf('\\nfunction scheduleTripMediaCache(',photoStart);
+  assert(photoStart>0 && photoEnd>photoStart);
+  const attempted=[];
+  const photoContext={
+    navigator:{onLine:true},console:{warn(){}},
+    cacheManagedMedia:async record=>{
+      attempted.push(record.id);
+      if(record.id==='missing')throw new Error('HTTP 404');
+    }
+  };
+  vm.createContext(photoContext);
+  vm.runInContext(source.slice(photoStart,photoEnd),photoContext);
+  await photoContext.cacheTripMedia([{id:'missing'}],[{id:'ok'}],[{id:'also-ok'}],{});
+  assert.deepEqual(attempted,['missing','ok','also-ok'],
+    'One missing image must not stop the remaining downloads');
 
   assert(source.includes('await cacheCompleteWorkspace({force:true})'),
     'Full sync must force a fresh read');
