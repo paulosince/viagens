@@ -20,6 +20,8 @@ assert.equal(model({snapshotAt:'2026-11-22T08:30:00Z'}).kind, 'pending',
   'Local snapshot alone must never advertise a green sync');
 assert.equal(model({checking:true}).kind, 'syncing');
 assert.equal(model({checking:true,phase:'Verificando agenda…'}).text, 'Verificando agenda…');
+assert(!model({warning:'Divergência'}).text.includes('toque'), 'Badge must not ask the user to retry');
+assert(!model({error:'conexão'}).text.includes('toque'), 'Failed badge must not ask for retry');
 assert.equal(model({checking:true,online:false}).kind, 'offline',
   'Losing the network must dismiss a stale progress indication');
 assert.equal(model({pending:3,verifiedAt:'2026-11-22T08:30:00Z'}).kind, 'pending',
@@ -126,7 +128,13 @@ async function exerciseSnapshot({localActivities=[],localDays=[],force=true,fres
 
   assert(source.includes('await cacheCompleteWorkspace({force:true})'),
     'Full sync must force a fresh read');
-  assert(source.includes("dom.syncStatus.addEventListener('click', () => {\n  verifyWorkspaceSync()"),
-    'Status touch must invoke the real verifier');
+  assert(source.includes("dom.syncStatus.addEventListener('click', () => {\n  openSyncLog()"),
+    'Touching the status opens the history without starting synchronization');
+  assert(!source.includes("dom.syncStatus.addEventListener('click', () => {\n  verifyWorkspaceSync()"),
+    'Status touch must not manually restart syncing');
+  assert(source.includes("await runAutomaticSync()"),
+    'Background startup must schedule automatic retries');
+  assert(source.includes("if (navigator.onLine) runAutomaticSync()"),
+    'Returning to the app must schedule automatic retries');
   console.log('PASS: verified sync model, actual remote checks, pending/error states and divergence preservation');
 })().catch(error=>{console.error(error);process.exitCode=1;});
