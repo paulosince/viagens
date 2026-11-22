@@ -60,7 +60,7 @@ assert.ok(css.includes('.tickets-item-thumbnail'));
 assert.ok(css.includes('bottom:max(11px,calc(env(safe-area-inset-bottom,0px) - 21px))'));
 const navPos=html.indexOf('<div class="home-bottom">');
 assert.ok(navPos>html.indexOf('id="trip_edit_footer"') && navPos<html.indexOf('</main>'));
-assert.ok(html.includes('style.css?v=20261121-tickets-offline1'));
+assert.ok(html.includes('style.css?v=20261122-sync-status1'));
 assert.match(html, /main-neon\.js\?v=\d{8}-[a-zA-Z0-9-]+/, 'Production app must load a versioned Neon module');
 assert.ok(html.includes('ticket_metadata_dialog'));
 assert.ok(!html.includes('ticket_metadata_agenda'));
