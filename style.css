@@ -4118,3 +4118,16 @@ body[data-home-tab="calendar"] .home-bottom .sync-status[data-kind="error"] {col
 .sync-log-summary[data-status="synced"]{background:#e7f8eb;color:#196a37;border-left:4px solid #28a651}
 .sync-log-summary[data-status="error"]{background:#ffebed;color:#a42734;border-left:4px solid #dc5058}
 .sync-log-summary[data-status="syncing"]{background:#e4f0ff;color:#1c5eae;border-left:4px solid #2e8bdf}
+
+/* Sync history: consistent inset for the recovery block on small iPhones. */
+.sync-recovery-section{margin:0 20px 14px;padding:14px 15px;border:1px solid #c7e7d3;border-radius:16px;background:#f2faf5;min-width:0;box-sizing:border-box;flex-shrink:0}
+.sync-recovery-section[hidden]{display:none}
+.sync-recovery-section h3{margin:0 0 8px;font-size:15px;font-weight:750;line-height:1.35;color:#246b41}
+.sync-recovery-section p{margin:0 0 12px;font-size:12px;line-height:1.5;color:#4e5e57;overflow-wrap:anywhere}
+.sync-recovery-section button{display:block;max-width:100%;width:100%;padding:11px 12px;border:1px solid #b1d8c0;border-radius:12px;background:#fff;color:#246b41;font:inherit;font-size:12px;font-weight:700;line-height:1.4;text-align:center;white-space:normal}
+.sync-recovery-section button:disabled{opacity:.55}
+.sync-recovery-section #sync_recovery_feedback{margin:9px 0 0}
+.sync-log-item[data-status="resolved"]{background:#f3fcf5;border:1px solid #b7e7c0;border-left:4px solid #28a651}
+.sync-log-item[data-status="resolved"] .sync-log-item-heading strong{color:#24783f}
+.sync-log-item[data-status="resolved"] .sync-log-item-heading strong::before{content:"";display:inline-block;width:8px;height:8px;margin-right:8px;border-radius:50%;background:#28a651;vertical-align:1px}
+@media(max-width:520px){.sync-recovery-section{margin:0 20px 14px;padding:15px}.sync-log-entries{padding-inline:20px}}
