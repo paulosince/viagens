@@ -69,6 +69,7 @@ async function exerciseSnapshot({localActivities=[],localDays=[],force=true,fres
     adoptLegacyTripMedia:async()=>{},cacheTripMedia:async()=>{},
     groupByDay:()=>new Map(),verifiedSyncKey:id=>'verified_sync:'+id,
     scheduleTripMediaCache:()=>{mediaCalls++;},
+    dom:{syncLogDialog:{open:false}},
     refreshSyncStatus:async()=>{},console,Date
   };
   vm.createContext(ctx);
