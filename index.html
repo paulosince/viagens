@@ -655,7 +655,7 @@
       if (legacyPending > 0) {
         location.replace('./legacy-supabase.html?recover=1');
       } else {
-        await import('./experiments/neon-pilot/app/main-neon.js?v=20261122-sync-status2');
+        await import('./experiments/neon-pilot/app/main-neon.js?v=20261122-sync-status3');
       }
     } catch (error) {
       console.error('Não foi possível validar o estado local antes da migração Neon', error);
@@ -670,6 +670,6 @@
       (retry?.parentElement || document.body).append(link);
     }
   </script>
-  <script type="module" src="src/update-manager-neon.js?v=20261122-sync-status2"></script>
+  <script type="module" src="src/update-manager-neon.js?v=20261122-sync-status3"></script>
 </body>
 </html>
