@@ -1,4 +1,4 @@
-const CACHE_NAME = 'viaggio-home-v173-sync-status';
+const CACHE_NAME = 'viaggio-home-v174-sync-status';
 const MEDIA_CACHE_NAME = 'viaggio-media-v1';
 const NEON_MEDIA_CACHE_NAME = 'viaggio-neon-auth-preview-media-v1';
 const SUPABASE_CLIENT = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
@@ -16,7 +16,7 @@ const APP_SHELL = [
   './',
   './index.html',
   './style.css?v=20261122-sync-status1',
-  './experiments/neon-pilot/app/main-neon.js?v=20261122-sync-status1',
+  './experiments/neon-pilot/app/main-neon.js?v=20261122-sync-status2',
   './experiments/neon-pilot/app/cash-flow.mjs?v=20261119-budget-contrast1',
   './experiments/neon-pilot/app/food-panel.mjs?v=20261117-food4',
   './experiments/neon-pilot/app/ticket-image-zoom.mjs?v=20261115-zoom1',
@@ -34,9 +34,9 @@ const APP_SHELL = [
   './legacy-supabase.html',
   './src/main.js?v=20261018-64',
   './src/media-cache.js?v=20261007-62',
-  './src/update-manager-neon.js?v=20261122-sync-status1',
+  './src/update-manager-neon.js?v=20261122-sync-status2',
   './src/update-manager.js?v=20261018-63',
-  './src/update-manager.css?v=20261122-sync-status1',
+  './src/update-manager.css?v=20261122-sync-status2',
   './manifest.webmanifest',
   './assets/app-icon.svg',
   './assets/avatar-placeholder.svg',
