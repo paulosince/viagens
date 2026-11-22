@@ -23,7 +23,7 @@ inShell('./experiments/neon-pilot/app/ticket-image-zoom.mjs?v=20261115-zoom1');
 const storeVersion = manager.match(/offline-store-neon\.js\?v=([^'"]+)/)?.[1];
 assert.ok(storeVersion);
 inShell('./experiments/neon-pilot/app/offline-store-neon.js?v=' + storeVersion);
-assert.match(manager, /SW_URL = '\.\/sw\.js\?v=20261122-sync-padding2'/);
+assert.match(manager, /SW_URL = '\.\/sw\.js\?v=20261122-fixed-tabs1'/);
 
 // Execute the actual boot + session verification functions with fake IndexedDB,
 // networking and DOM; do not depend on live Neon or user credentials.
