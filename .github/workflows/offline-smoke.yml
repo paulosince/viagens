@@ -57,6 +57,7 @@ jobs:
           node tests/tickets-offline.cjs
           node tests/sync-indicator.cjs
           node tests/sync-retries.cjs
+          node tests/sync-conflicts.cjs
           node tests/ticket-cover-ios.cjs
           node tests/ticket-cover-selection.cjs
           node tests/ticket-picker-post-confirm.cjs
