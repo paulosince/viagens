@@ -47,6 +47,8 @@ let workspaceSyncPromise = null;
 let workspaceSyncChecking = false;
 let workspaceSyncError = null;
 let workspaceSyncWarning = null;
+let workspaceSyncPhase = 'Sincronizando roteiro…';
+let workspaceSyncFailureStage = '';
 let syncStatusVersion = 0;
 const mediaPrefetchTasks = new Map();
 
@@ -54,8 +56,8 @@ const verifiedSyncKey = userId => `verified_sync:${userId}`;
 
 // The badge states what was actually verified, never just that a local
 // snapshot exists or that the mutation queue is empty.
-function syncIndicatorViewModel({online, pending, snapshotAt, verifiedAt, checking, error, warning, queueError, hasTrips}) {
-  if (checking && online) return {kind:'syncing', text:'Sincronizando roteiro…', title:'Conferindo alterações e atualizando a cópia local.'};
+function syncIndicatorViewModel({online, pending, snapshotAt, verifiedAt, checking, phase, error, failureStage, warning, queueError, hasTrips}) {
+  if (checking && online) return {kind:'syncing', text:phase || 'Sincronizando roteiro…', title:'Conferindo alterações e atualizando a cópia local.'};
   if (pending === null) return {kind:'error', text:'Não foi possível conferir os dados locais · tocar para tentar', title:'Falha ao consultar alterações salvas neste aparelho.'};
   if (!online) return pending
     ? {kind:'offline', text:`Offline · ${pending} ${pending === 1 ? 'alteração salva' : 'alterações salvas'} no aparelho`, title:'As alterações serão enviadas quando houver conexão.'}
@@ -72,7 +74,9 @@ function syncIndicatorViewModel({online, pending, snapshotAt, verifiedAt, checki
       ? 'Sessão não confirmada · tocar para tentar'
       : /fetch|network|conexão|timeout|timed out|indisponível|abort/i.test(message)
         ? 'Conexão falhou · tocar para tentar'
-        : 'Falha ao conferir roteiro · tocar para tentar';
+        : failureStage === 'viagens' ? 'Falha ao consultar viagens · tocar para tentar'
+        : failureStage === 'agenda' ? 'Falha ao consultar agenda · tocar para tentar'
+        : 'Falha ao sincronizar · tocar para tentar';
     return {kind:'error', text:label, title:message};
   }
   if (warning) return {kind:'pending', text:'Roteiro com alterações a conferir · tocar para tentar', title:String(warning)};
@@ -833,7 +837,9 @@ async function refreshSyncStatus() {
     online: navigator.onLine,
     pending, snapshotAt, verifiedAt,
     checking: workspaceSyncChecking || outboxSyncing,
+    phase: workspaceSyncPhase,
     error: workspaceSyncError,
+    failureStage: workspaceSyncFailureStage,
     warning: workspaceSyncWarning,
     queueError: lastOutboxError,
     hasTrips: state.trips.length > 0
@@ -857,18 +863,28 @@ function verifyWorkspaceSync() {
   workspaceSyncChecking = true;
   workspaceSyncError = null;
   workspaceSyncWarning = null;
+  workspaceSyncFailureStage = '';
+  workspaceSyncPhase = 'Enviando alterações…';
   refreshSyncStatus().catch(console.warn);
   workspaceSyncPromise = (async () => {
+    workspaceSyncFailureStage = 'envio';
     const uploaded = await flushOutbox();
     if (!uploaded) throw lastOutboxError || new Error('Ainda há alterações aguardando envio.');
     if (state.user?.id !== userId) return false;
+    workspaceSyncPhase = 'Conferindo viagens…';
+    workspaceSyncFailureStage = 'viagens';
+    refreshSyncStatus().catch(console.warn);
     await loadTrips({allowLocalFallback:false});
     if (state.user?.id !== userId) return false;
+    workspaceSyncPhase = 'Verificando agenda…';
+    workspaceSyncFailureStage = 'agenda';
+    refreshSyncStatus().catch(console.warn);
     const verified = await cacheCompleteWorkspace({force:true});
     if (!verified) {
       workspaceSyncWarning ||= 'Alguns registros estão disponíveis somente neste aparelho ou aguardam conferência.';
       return false;
     }
+    workspaceSyncFailureStage = '';
     return true;
   })().catch(error => {
     if (state.user?.id === userId) {
