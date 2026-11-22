@@ -43,7 +43,7 @@ const ctx={
   setTimeout:(fn,delay)=>{delays.push(delay);queueMicrotask(fn);return 1;}
 };
 vm.createContext(ctx);
-vm.runInContext(main.slice(start,end)+'\nthis.testSync={runAutomaticSync,loadSyncLog,openSyncLog,safeSyncLogMessage};',ctx);
+vm.runInContext(main.slice(start,end)+'\nthis.testSync={runAutomaticSync,loadSyncLog,openSyncLog,safeSyncLogMessage,resolvedSyncLogEntries,appendSyncLog};',ctx);
 const sync=ctx.testSync;
 (async()=>{
   assert.equal(await sync.runAutomaticSync(),false);
@@ -70,6 +70,38 @@ const sync=ctx.testSync;
   assert.equal(await sync.runAutomaticSync(),true);
   assert.equal(calls.length,4,'A successful first attempt stops the retry cycle');
   assert.equal(meta.get('sync_log:account-A')[0].status,'synced');
+
+  // Existing iPhone log: one manually confirmed consolidation and three
+  // preceding pending attempts must render green as resolved, but must retain
+  // their historical status (they did fail at the time).
+  const historical=[
+    {status:'synced',manual:true,stage:'Revisão confirmada',at:'2026-11-22T10:19:53Z'},
+    {status:'pending',message:'2 atividades e 1 local',at:'2026-11-22T10:18:56Z'},
+    {status:'pending',message:'2 atividades e 1 local',at:'2026-11-22T10:18:49Z'},
+    {status:'pending',message:'2 atividades e 1 local',at:'2026-11-22T10:18:43Z'},
+    {status:'error',message:'Unrelated connection failure'},
+    {status:'pending',message:'Older unrelated discrepancy'}
+  ];
+  const presentation=sync.resolvedSyncLogEntries(historical);
+  assert.deepEqual(Array.from(presentation,x=>x.displayResolved),
+    [false,true,true,true,false,false]);
+  assert(historical.every(x=>!Object.hasOwn(x,'displayResolved')),
+    'Retroactive green display must not rewrite audit records');
+  assert.equal(historical[1].status,'pending','Past attempts remain historically pending');
+  assert(css.includes('.sync-log-item[data-status="resolved"]') &&
+    css.includes('.sync-recovery-section{margin:0 20px 14px;padding:14px'),
+    'History must use green resolved cards and inset recovery padding');
+
+  // Future successful manual resolutions persist a resolution annotation, but
+  // only for the latest contiguous group; unrelated older attempts stay intact.
+  ctx.syncLogRecords=historical.slice(1);
+  await sync.appendSyncLog('account-A',{
+    manual:true,resolvesPending:true,status:'synced',attempt:1,
+    stage:'Revisão confirmada',message:'Confirmado',durationMs:10
+  });
+  assert.equal(meta.get('sync_log:account-A')[1].resolvedAt !== undefined,true);
+  assert.equal(meta.get('sync_log:account-A')[3].resolvedAt !== undefined,true);
+  assert.equal(meta.get('sync_log:account-A')[5].resolvedAt,undefined);
 
   ctx.state.user={id:'account-B'};
   ctx.syncRetryLastStartedAt=0;
