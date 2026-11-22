@@ -50,6 +50,8 @@ let workspaceSyncWarning = null;
 let workspaceConflictDetails = [];
 let workspaceConflictOwner = null;
 let syncConflictResolving = false;
+let syncRecoveryItems = [];
+let syncRecoveryOwner = null;
 let workspaceSyncPhase = 'Sincronizando roteiro…';
 let workspaceSyncFailureStage = '';
 let syncStatusVersion = 0;
@@ -458,7 +460,7 @@ const dom = {
   databaseUsage: document.querySelector('#home_database_usage'), storageUsage: document.querySelector('#home_storage_usage'),
   databaseDetail: document.querySelector('#home_database_detail'), storageDetail: document.querySelector('#home_storage_detail'), imagesDetail: document.querySelector('#home_images_detail'),
   attachmentsDetail: document.querySelector('#home_attachments_detail'), usageNote: document.querySelector('#home_usage_note'),
-  editTripsButton: document.querySelector('#edit_trips_button'), newTripButton: document.querySelector('#new_trip_button'), emptyNewTripButton: document.querySelector('#empty_new_trip_button'), syncStatus: document.querySelector('#sync_status'), syncLogDialog: document.querySelector('#sync_log_dialog'), syncLogClose: document.querySelector('#sync_log_close'), syncLogSummary: document.querySelector('#sync_log_summary'), syncLogEntries: document.querySelector('#sync_log_entries'), syncConflictSection: document.querySelector('#sync_conflict_section'), syncConflictItems: document.querySelector('#sync_conflict_items'), syncConflictKeep: document.querySelector('#sync_conflict_keep'), syncConflictServer: document.querySelector('#sync_conflict_server'), syncConflictFeedback: document.querySelector('#sync_conflict_feedback'), tripHeading: document.querySelector('#trip_heading'), yearButton: document.querySelector('#year_selector_button'), currentYear: document.querySelector('#current_year'), yearMenu: document.querySelector('#year_menu'), yearList: document.querySelector('#year_list'),
+  editTripsButton: document.querySelector('#edit_trips_button'), newTripButton: document.querySelector('#new_trip_button'), emptyNewTripButton: document.querySelector('#empty_new_trip_button'), syncStatus: document.querySelector('#sync_status'), syncLogDialog: document.querySelector('#sync_log_dialog'), syncLogClose: document.querySelector('#sync_log_close'), syncLogSummary: document.querySelector('#sync_log_summary'), syncLogEntries: document.querySelector('#sync_log_entries'), syncConflictSection: document.querySelector('#sync_conflict_section'), syncConflictItems: document.querySelector('#sync_conflict_items'), syncConflictKeep: document.querySelector('#sync_conflict_keep'), syncConflictServer: document.querySelector('#sync_conflict_server'), syncConflictFeedback: document.querySelector('#sync_conflict_feedback'), syncRecoverySection: document.querySelector('#sync_recovery_section'), syncRecoverySummary: document.querySelector('#sync_recovery_summary'), syncRecoveryRestore: document.querySelector('#sync_recovery_restore'), syncRecoveryFeedback: document.querySelector('#sync_recovery_feedback'), tripHeading: document.querySelector('#trip_heading'), yearButton: document.querySelector('#year_selector_button'), currentYear: document.querySelector('#current_year'), yearMenu: document.querySelector('#year_menu'), yearList: document.querySelector('#year_list'),
   tripList: document.querySelector('#trip_list'), homeEmpty: document.querySelector('#home_empty'), scrim: document.querySelector('#sheet_scrim'), tripEditFooter: document.querySelector('#trip_edit_footer'), deleteSelectedTrips: document.querySelector('#delete_selected_trips'), tripPage: document.querySelector('#trip_page'), closeTripPage: document.querySelector('#close_trip_page'), tripPageHero: document.querySelector('#trip_page_hero'), tripPageTitle: document.querySelector('#trip_page_title'), tripPageTitleInput: document.querySelector('#trip_page_title_input'), tripPageDates: document.querySelector('#trip_page_dates'), tripDateEditor: document.querySelector('#trip_page_date_editor'), tripStartDate: document.querySelector('#trip_page_start_date'), tripDayCount: document.querySelector('#trip_page_day_count'), tripDateDone: document.querySelector('#trip_page_date_done'), tripPageColor: document.querySelector('#trip_page_color'), tripPageCoverInput: document.querySelector('#trip_page_cover_input'), tripPageSaveStatus: document.querySelector('#trip_page_save_status'), tripPagePassengers: document.querySelector('#trip_page_passengers'), tripPagePassengerCount: document.querySelector('#trip_page_passenger_count'), tripPassengerSheet: document.querySelector('#trip_passenger_sheet'), tripPassengerSheetBody: document.querySelector('#trip_passenger_sheet_body'), tripPassengerSelf: document.querySelector('#trip_passenger_self'), tripPassengerSelfImage: document.querySelector('#trip_passenger_self_image'), tripPassengerSelfName: document.querySelector('#trip_passenger_self_name'), tripPassengerClose: document.querySelector('#close_trip_passengers'), tripPassengerMessage: document.querySelector('#trip_passenger_message'), tripDayList: document.querySelector('#trip_day_list'), tripDayMessage: document.querySelector('#trip_day_message'),
   tripTabs: document.querySelector('.trip-tabs'), tripPanels: { roteiro: document.querySelector('#trip_panel_roteiro'), orcamento: document.querySelector('#trip_panel_orcamento'), alimentacao: document.querySelector('#trip_panel_alimentacao'), arquivos: document.querySelector('#trip_panel_arquivos') }, budgetSummary: document.querySelector('#budget_summary'), budgetStatus: document.querySelector('#budget_status'), budgetList: document.querySelector('#budget_list'), budgetPage: document.querySelector('#budget_item_page'), budgetPageTitle: document.querySelector('#budget_item_page_title'), closeBudgetPage: document.querySelector('#close_budget_item_page'), budgetEditor: document.querySelector('#budget_editor'), budgetPageMessage: document.querySelector('#budget_item_message'), budgetAdd: document.querySelector('#budget_add'), tripFilesStatus: document.querySelector('#trip_files_status'), tripFilesList: document.querySelector('#trip_files_list'), tripFilesDay: document.querySelector('#trip_files_day'), tripFilesInput: document.querySelector('#trip_files_input'),
   tripFileViewer: document.querySelector('#trip_file_viewer'), tripFileViewerTitle: document.querySelector('#trip_file_viewer_title'), tripFileViewerMedia: document.querySelector('#trip_file_viewer_media'), tripFileViewerStatus: document.querySelector('#trip_file_viewer_status'), tripFileViewerDelete: document.querySelector('#delete_trip_file_viewer'), tripFileViewerPosition: document.querySelector('#trip_file_viewer_position'), tripFileViewerPrevious: document.querySelector('#previous_trip_file_viewer'), tripFileViewerNext: document.querySelector('#next_trip_file_viewer'), closeTripFileViewer: document.querySelector('#close_trip_file_viewer'),
@@ -966,11 +968,64 @@ async function appendSyncLog(userId, data) {
   if (dom.syncLogDialog?.open) renderSyncLog();
 }
 
+async function loadSyncRecovery(userId) {
+  if (syncRecoveryOwner !== userId) {
+    syncRecoveryOwner = userId;
+    syncRecoveryItems = [];
+  }
+  const stored = await offlineStore.getMeta(`sync_recovery:${userId}`);
+  if (state.user?.id !== userId) return [];
+  syncRecoveryItems = Array.isArray(stored) ? stored : [];
+  return syncRecoveryItems;
+}
+
+async function saveSyncRecovery(userId, trip, localBefore, differences) {
+  if (state.user?.id !== userId) throw new Error('A conta mudou durante a recuperação.');
+  const previous = await loadSyncRecovery(userId);
+  const record = {
+    savedAt:new Date().toISOString(),
+    tripId:String(trip.id),
+    tripName:trip.name || 'Viagem',
+    data:{
+      days: localBefore.days || [],
+      activities: localBefore.activities || [],
+      locations: localBefore.locations || []
+    },
+    differences
+  };
+  // A successful IndexedDB write is mandatory before the current local copy
+  // can be replaced. The complete previous trip remains recoverable.
+  const next = [record, ...previous].slice(0, 5);
+  await offlineStore.setMeta(`sync_recovery:${userId}`, next);
+  syncRecoveryItems = next;
+  if (dom.syncLogDialog?.open) renderSyncLog();
+  return record;
+}
+
+function renderSyncRecovery() {
+  if (!dom.syncRecoverySection) return;
+  const available = syncRecoveryOwner === state.user?.id ? syncRecoveryItems : [];
+  dom.syncRecoverySection.hidden = !available.length;
+  if (!available.length) return;
+  const latest = available[0];
+  const count = latest.differences?.length || 0;
+  dom.syncRecoverySummary.textContent =
+    `Cópia de ${latest.tripName} guardada em ` +
+    new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})
+      .format(new Date(latest.savedAt)) +
+    `. ${count} ${count === 1 ? 'item' : 'itens'} podem ser restaurados.`;
+  if (dom.syncRecoveryRestore) {
+    dom.syncRecoveryRestore.disabled = syncConflictResolving || workspaceSyncChecking ||
+      !navigator.onLine || (latest.differences || []).some(x=>x.kind==='day');
+  }
+}
+
 function renderSyncConflicts() {
   if (!dom.syncConflictSection || !dom.syncConflictItems) return;
   const entries = workspaceConflictOwner === state.user?.id ? workspaceConflictDetails : [];
   dom.syncConflictSection.hidden = !entries.length;
   dom.syncConflictItems.replaceChildren();
+  renderSyncRecovery();
   for (const item of entries) {
     const row = document.createElement('li');
     const heading = document.createElement('strong');
@@ -1030,9 +1085,13 @@ async function openSyncLog() {
   if (!dom.syncLogDialog.open) dom.syncLogDialog.showModal();
   dom.syncLogSummary.textContent = 'Carregando histórico salvo…';
   dom.syncLogEntries.replaceChildren();
-  const [logged, conflicts] = await Promise.all([
+  const [logged, conflicts, recovery] = await Promise.all([
     loadSyncLog(userId),
-    offlineStore.getMeta(`sync_conflicts:${userId}`).catch(() => null)
+    offlineStore.getMeta(`sync_conflicts:${userId}`).catch(() => null),
+    loadSyncRecovery(userId).catch(error => {
+      console.warn('Cópia local guardada indisponível', error);
+      return [];
+    })
   ]);
   if (state.user?.id !== userId || !dom.syncLogDialog.open) return;
   if (workspaceConflictOwner !== userId && Array.isArray(conflicts)) {
