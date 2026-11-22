@@ -575,6 +575,18 @@
 </nav>
       </div>
   </main>
+
+  <dialog id="sync_log_dialog" class="sync-log-dialog" aria-labelledby="sync_log_heading" aria-describedby="sync_log_intro">
+    <header class="sync-log-header">
+      <h2 id="sync_log_heading">Histórico de sincronização</h2>
+      <button id="sync_log_close" type="button" aria-label="Fechar histórico">Concluído</button>
+    </header>
+    <p id="sync_log_intro" class="sync-log-intro">O roteiro é conferido automaticamente em até 3 tentativas, sem precisar tocar no indicador.</p>
+    <p id="sync_log_summary" class="sync-log-summary" role="status" aria-live="polite">Carregando histórico…</p>
+    <ol id="sync_log_entries" class="sync-log-entries" aria-label="Últimas tentativas de sincronização"></ol>
+    <p class="sync-log-note">Esta conferência verifica o roteiro. Ingressos e imagens possuem armazenamento offline independente.</p>
+  </dialog>
+
   <dialog id="ticket_metadata_dialog" class="ticket-metadata-dialog ticket-metadata-simple" aria-labelledby="ticket_metadata_heading">
     <form id="ticket_metadata_form" class="ticket-metadata-form">
       <div class="ticket-metadata-handle" aria-hidden="true"></div>
