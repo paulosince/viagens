@@ -47,10 +47,10 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20261122-sync-status1" as="style">
-  <link rel="stylesheet" href="style.css?v=20261122-sync-status1" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20261122-sync-status1"></noscript>
-  <link rel="stylesheet" href="src/update-manager.css?v=20261122-sync-status3">
+  <link rel="preload" href="style.css?v=20261122-sync-log1" as="style">
+  <link rel="stylesheet" href="style.css?v=20261122-sync-log1" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20261122-sync-log1"></noscript>
+  <link rel="stylesheet" href="src/update-manager.css?v=20261122-sync-log1">
   <script>
     function showViaggioStartupError(detail) {
       if (!document.body || document.body.dataset.session !== 'loading') return;
@@ -667,7 +667,7 @@
       if (legacyPending > 0) {
         location.replace('./legacy-supabase.html?recover=1');
       } else {
-        await import('./experiments/neon-pilot/app/main-neon.js?v=20261122-sync-status3');
+        await import('./experiments/neon-pilot/app/main-neon.js?v=20261122-sync-log1');
       }
     } catch (error) {
       console.error('Não foi possível validar o estado local antes da migração Neon', error);
@@ -682,6 +682,6 @@
       (retry?.parentElement || document.body).append(link);
     }
   </script>
-  <script type="module" src="src/update-manager-neon.js?v=20261122-sync-status3"></script>
+  <script type="module" src="src/update-manager-neon.js?v=20261122-sync-log1"></script>
 </body>
 </html>
