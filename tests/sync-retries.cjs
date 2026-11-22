@@ -103,12 +103,13 @@ const sync=ctx.testSync;
   assert.equal(meta.get('sync_log:account-A')[3].resolvedAt !== undefined,true);
   assert.equal(meta.get('sync_log:account-A')[5].resolvedAt,undefined);
 
+  const previousAccountALogCount=meta.get('sync_log:account-A').length;
   ctx.state.user={id:'account-B'};
   ctx.syncRetryLastStartedAt=0;
   ctx.verifyWorkspaceSync=async()=>{calls.push('account-B');return true;};
   assert.equal(await sync.runAutomaticSync(),true);
   assert.equal(meta.get('sync_log:account-B').length,1);
-  assert.equal(meta.get('sync_log:account-A').length,4,
+  assert.equal(meta.get('sync_log:account-A').length,previousAccountALogCount,
     'Different accounts cannot inherit the same synchronization log');
 
   assert(!sync.safeSyncLogMessage('Bearer secret-token Neon https://private.test/path').includes('secret-token'));
