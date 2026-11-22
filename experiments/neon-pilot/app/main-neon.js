@@ -49,6 +49,7 @@ let workspaceSyncError = null;
 let workspaceSyncWarning = null;
 let workspaceConflictDetails = [];
 let workspaceConflictOwner = null;
+let syncConflictResolving = false;
 let workspaceSyncPhase = 'Sincronizando roteiro…';
 let workspaceSyncFailureStage = '';
 let syncStatusVersion = 0;
@@ -965,6 +966,25 @@ async function appendSyncLog(userId, data) {
   if (dom.syncLogDialog?.open) renderSyncLog();
 }
 
+function renderSyncConflicts() {
+  if (!dom.syncConflictSection || !dom.syncConflictItems) return;
+  const entries = workspaceConflictOwner === state.user?.id ? workspaceConflictDetails : [];
+  dom.syncConflictSection.hidden = !entries.length;
+  dom.syncConflictItems.replaceChildren();
+  for (const item of entries) {
+    const row = document.createElement('li');
+    const heading = document.createElement('strong');
+    heading.textContent = (item.kind === 'activity' ? 'Atividade: ' : item.kind === 'location' ? 'Local: ' : 'Dia: ') + item.title;
+    const sub = document.createElement('small');
+    sub.textContent = item.tripName + ' · ' + item.dayLabel;
+    row.append(heading, sub);
+    dom.syncConflictItems.append(row);
+  }
+  const busy = syncConflictResolving || workspaceSyncChecking || !navigator.onLine;
+  if (dom.syncConflictKeep) dom.syncConflictKeep.disabled = busy || entries.some(x=>x.kind==='day');
+  if (dom.syncConflictServer) dom.syncConflictServer.disabled = busy;
+}
+
 function renderSyncLog() {
   if (!dom.syncLogDialog || !dom.syncLogSummary || !dom.syncLogEntries) return;
   const active = workspaceSyncChecking || syncRetryWaiting;
@@ -974,6 +994,7 @@ function renderSyncLog() {
     : finished ? `Última tentativa: ${finished.status === 'synced' ? 'concluída' : finished.status === 'pending' ? 'pendente de conferência' : 'não concluída'}.`
       : 'Ainda não há verificações registradas.';
   dom.syncLogEntries.replaceChildren();
+  renderSyncConflicts();
   for (const item of syncLogRecords || []) {
     const row = document.createElement('li');
     row.className = 'sync-log-item';
@@ -1009,8 +1030,15 @@ async function openSyncLog() {
   if (!dom.syncLogDialog.open) dom.syncLogDialog.showModal();
   dom.syncLogSummary.textContent = 'Carregando histórico salvo…';
   dom.syncLogEntries.replaceChildren();
-  await loadSyncLog(userId);
+  const [logged, conflicts] = await Promise.all([
+    loadSyncLog(userId),
+    offlineStore.getMeta(`sync_conflicts:${userId}`).catch(() => null)
+  ]);
   if (state.user?.id !== userId || !dom.syncLogDialog.open) return;
+  if (workspaceConflictOwner !== userId && Array.isArray(conflicts)) {
+    workspaceConflictOwner = userId;
+    workspaceConflictDetails = conflicts;
+  }
   renderSyncLog();
 }
 
