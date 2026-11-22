@@ -51,7 +51,7 @@ const sync=ctx.testSync;
   assert.deepEqual(delays,[1500,3500],'Retries have bounded progressive intervals');
   const entries=meta.get('sync_log:account-A');
   assert.equal(entries.length,3,'Every attempt is persisted');
-  assert.deepEqual(entries.map(e=>e.attempt),[3,2,1]);
+  assert.deepEqual(Array.from(entries,e=>e.attempt),[3,2,1]);
   assert(entries.every(e=>e.status==='pending'),'Local divergence is pending, not a network failure');
   assert(entries.every(e=>e.message.includes('Divergência')));
   assert.equal(ctx.syncRetryNumber,0,'Attempt counter clears after a cycle');
