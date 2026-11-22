@@ -55,6 +55,7 @@ jobs:
         run: |
           node tests/tickets-render.cjs
           node tests/tickets-offline.cjs
+          node tests/sync-indicator.cjs
           node tests/ticket-cover-ios.cjs
           node tests/ticket-cover-selection.cjs
           node tests/ticket-picker-post-confirm.cjs
