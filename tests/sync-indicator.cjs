@@ -5,7 +5,7 @@ const vm = require('node:vm');
 const source = fs.readFileSync('experiments/neon-pilot/app/main-neon.js', 'utf8');
 const css = fs.readFileSync('style.css', 'utf8');
 const modelStart = source.indexOf('function syncIndicatorViewModel(');
-const modelEnd = source.indexOf('\n// Authentication and data requests', modelStart);
+const modelEnd = source.indexOf('\nasync function ensureNeon(', modelStart);
 assert(modelStart > 0 && modelEnd > modelStart, 'Pure status model must be defined');
 const modelContext = {Intl, Date};
 vm.createContext(modelContext);
