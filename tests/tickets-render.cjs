@@ -57,7 +57,7 @@ assert.ok(main.includes("cover.onerror = () => { cover.hidden = true; }"));
 assert.ok(css.includes('.home-trip-shortcut.tickets-feature .tickets-feature-copy > strong'));
 assert.ok(css.includes('.home-trip-shortcut.tickets-feature .tickets-feature-date { color:#f2f7ff'));
 assert.ok(css.includes('.tickets-item-thumbnail'));
-assert.ok(css.includes('bottom:max(11px,calc(env(safe-area-inset-bottom,0px) - 21px))'));
+assert.ok(css.includes('--viaggio-tab-bar-bottom: max(11px, calc(env(safe-area-inset-bottom, 0px) - 21px))') && css.includes('.home-bottom { bottom:var(--viaggio-tab-bar-bottom)'),'Home navigation keeps its safe-area clearance through a shared fixed variable');
 const navPos=html.indexOf('<div class="home-bottom">');
 assert.ok(navPos>html.indexOf('id="trip_edit_footer"') && navPos<html.indexOf('</main>'));
 assert.match(html, /style\.css\?v=\d{8}-[a-zA-Z0-9-]+/, 'Production stylesheet must have a version');
