@@ -110,6 +110,32 @@ async function exercise({allowBackup=true,pending=0,reconcile=false}={}){
   assert(css.includes('.sync-log-item[data-status="synced"]') &&
     css.includes('border-left:4px solid #28a651'),
     'Success log must use the same green semantics as badge');
+  // Reinstating unmatched entries must enqueue the existing safe mutation type
+  // without direct SQL, and never enqueue a whole unknown day.
+  const queued=[];
+  const queueContext={
+    state:{user:{id:'account'}},console,
+    offlineStore:{
+      loadTripData:async()=>({days:[{id:'day',trip_id:'trip',status:'planned'}]}),
+      enqueueMutation:async value=>queued.push(value)
+    }
+  };
+  vm.createContext(queueContext);
+  const from=source.indexOf('async function enqueueLocalConflicts(');
+  const to=source.indexOf('function retrySyncDelay(',from);
+  assert(from>0&&to>from);
+  vm.runInContext(source.slice(from,to),queueContext);
+  await queueContext.enqueueLocalConflicts('account',
+    [{kind:'activity',tripId:'trip',dayId:'day',record:{id:'a1',day_id:'day',title:'Atividade recuperada'}},
+     {kind:'location',tripId:'trip',dayId:'day',record:{id:'l1',day_id:'day',name:'Local recuperado'}}]);
+  assert.equal(queued.length,2);
+  assert(queued.every(q=>q.type==='save-inline-activity'&&q.tripId==='trip'));
+  assert.equal(queued[0].activity.id,'a1');
+  assert.equal(queued[1].location.id,'l1');
+  await assert.rejects(queueContext.enqueueLocalConflicts('account',
+    [{kind:'day',tripId:'trip',record:{id:'day'}}]));
+  assert.equal(queued.length,2,'Whole day changes must never be enqueued without a valid resolver');
+
   assert(source.includes('window.confirm('),'Remote replacement must be approved by user');
   console.log('PASS: 2 activities + 1 place diagnosed, backup before reconcile, rollback on storage failure, consistent semantic colors');
 })().catch(error=>{console.error(error);process.exitCode=1;});
