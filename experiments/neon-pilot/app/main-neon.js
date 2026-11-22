@@ -47,6 +47,8 @@ let workspaceSyncPromise = null;
 let workspaceSyncChecking = false;
 let workspaceSyncError = null;
 let workspaceSyncWarning = null;
+let workspaceConflictDetails = [];
+let workspaceConflictOwner = null;
 let workspaceSyncPhase = 'Sincronizando roteiro…';
 let workspaceSyncFailureStage = '';
 let syncStatusVersion = 0;
@@ -455,7 +457,7 @@ const dom = {
   databaseUsage: document.querySelector('#home_database_usage'), storageUsage: document.querySelector('#home_storage_usage'),
   databaseDetail: document.querySelector('#home_database_detail'), storageDetail: document.querySelector('#home_storage_detail'), imagesDetail: document.querySelector('#home_images_detail'),
   attachmentsDetail: document.querySelector('#home_attachments_detail'), usageNote: document.querySelector('#home_usage_note'),
-  editTripsButton: document.querySelector('#edit_trips_button'), newTripButton: document.querySelector('#new_trip_button'), emptyNewTripButton: document.querySelector('#empty_new_trip_button'), syncStatus: document.querySelector('#sync_status'), syncLogDialog: document.querySelector('#sync_log_dialog'), syncLogClose: document.querySelector('#sync_log_close'), syncLogSummary: document.querySelector('#sync_log_summary'), syncLogEntries: document.querySelector('#sync_log_entries'), tripHeading: document.querySelector('#trip_heading'), yearButton: document.querySelector('#year_selector_button'), currentYear: document.querySelector('#current_year'), yearMenu: document.querySelector('#year_menu'), yearList: document.querySelector('#year_list'),
+  editTripsButton: document.querySelector('#edit_trips_button'), newTripButton: document.querySelector('#new_trip_button'), emptyNewTripButton: document.querySelector('#empty_new_trip_button'), syncStatus: document.querySelector('#sync_status'), syncLogDialog: document.querySelector('#sync_log_dialog'), syncLogClose: document.querySelector('#sync_log_close'), syncLogSummary: document.querySelector('#sync_log_summary'), syncLogEntries: document.querySelector('#sync_log_entries'), syncConflictSection: document.querySelector('#sync_conflict_section'), syncConflictItems: document.querySelector('#sync_conflict_items'), syncConflictKeep: document.querySelector('#sync_conflict_keep'), syncConflictServer: document.querySelector('#sync_conflict_server'), syncConflictFeedback: document.querySelector('#sync_conflict_feedback'), tripHeading: document.querySelector('#trip_heading'), yearButton: document.querySelector('#year_selector_button'), currentYear: document.querySelector('#current_year'), yearMenu: document.querySelector('#year_menu'), yearList: document.querySelector('#year_list'),
   tripList: document.querySelector('#trip_list'), homeEmpty: document.querySelector('#home_empty'), scrim: document.querySelector('#sheet_scrim'), tripEditFooter: document.querySelector('#trip_edit_footer'), deleteSelectedTrips: document.querySelector('#delete_selected_trips'), tripPage: document.querySelector('#trip_page'), closeTripPage: document.querySelector('#close_trip_page'), tripPageHero: document.querySelector('#trip_page_hero'), tripPageTitle: document.querySelector('#trip_page_title'), tripPageTitleInput: document.querySelector('#trip_page_title_input'), tripPageDates: document.querySelector('#trip_page_dates'), tripDateEditor: document.querySelector('#trip_page_date_editor'), tripStartDate: document.querySelector('#trip_page_start_date'), tripDayCount: document.querySelector('#trip_page_day_count'), tripDateDone: document.querySelector('#trip_page_date_done'), tripPageColor: document.querySelector('#trip_page_color'), tripPageCoverInput: document.querySelector('#trip_page_cover_input'), tripPageSaveStatus: document.querySelector('#trip_page_save_status'), tripPagePassengers: document.querySelector('#trip_page_passengers'), tripPagePassengerCount: document.querySelector('#trip_page_passenger_count'), tripPassengerSheet: document.querySelector('#trip_passenger_sheet'), tripPassengerSheetBody: document.querySelector('#trip_passenger_sheet_body'), tripPassengerSelf: document.querySelector('#trip_passenger_self'), tripPassengerSelfImage: document.querySelector('#trip_passenger_self_image'), tripPassengerSelfName: document.querySelector('#trip_passenger_self_name'), tripPassengerClose: document.querySelector('#close_trip_passengers'), tripPassengerMessage: document.querySelector('#trip_passenger_message'), tripDayList: document.querySelector('#trip_day_list'), tripDayMessage: document.querySelector('#trip_day_message'),
   tripTabs: document.querySelector('.trip-tabs'), tripPanels: { roteiro: document.querySelector('#trip_panel_roteiro'), orcamento: document.querySelector('#trip_panel_orcamento'), alimentacao: document.querySelector('#trip_panel_alimentacao'), arquivos: document.querySelector('#trip_panel_arquivos') }, budgetSummary: document.querySelector('#budget_summary'), budgetStatus: document.querySelector('#budget_status'), budgetList: document.querySelector('#budget_list'), budgetPage: document.querySelector('#budget_item_page'), budgetPageTitle: document.querySelector('#budget_item_page_title'), closeBudgetPage: document.querySelector('#close_budget_item_page'), budgetEditor: document.querySelector('#budget_editor'), budgetPageMessage: document.querySelector('#budget_item_message'), budgetAdd: document.querySelector('#budget_add'), tripFilesStatus: document.querySelector('#trip_files_status'), tripFilesList: document.querySelector('#trip_files_list'), tripFilesDay: document.querySelector('#trip_files_day'), tripFilesInput: document.querySelector('#trip_files_input'),
   tripFileViewer: document.querySelector('#trip_file_viewer'), tripFileViewerTitle: document.querySelector('#trip_file_viewer_title'), tripFileViewerMedia: document.querySelector('#trip_file_viewer_media'), tripFileViewerStatus: document.querySelector('#trip_file_viewer_status'), tripFileViewerDelete: document.querySelector('#delete_trip_file_viewer'), tripFileViewerPosition: document.querySelector('#trip_file_viewer_position'), tripFileViewerPrevious: document.querySelector('#previous_trip_file_viewer'), tripFileViewerNext: document.querySelector('#next_trip_file_viewer'), closeTripFileViewer: document.querySelector('#close_trip_file_viewer'),
@@ -7837,6 +7839,7 @@ async function cacheCompleteWorkspace({force = false} = {}) {
 
   let allVerified = true;
   let localDaysOnly = 0, localActivitiesOnly = 0, localLocationsOnly = 0;
+  const conflicts = [];
   const mediaJobs = [];
   for (const trip of state.trips) {
     if (state.user?.id !== userId) throw new Error('A conta mudou durante a sincronização.');
@@ -7853,6 +7856,12 @@ async function cacheCompleteWorkspace({force = false} = {}) {
       // A remote deletion or offline edit needs inspection; keep this entire
       // local trip untouched instead of turning a difference into an error.
       localDaysOnly += localOnlyDays.length;
+      for (const localDay of localOnlyDays) conflicts.push({
+        kind:'day', id:String(localDay.id), tripId:String(trip.id),
+        tripName:trip.name || 'Viagem',
+        dayId:String(localDay.id), dayLabel:localDay.title || 'Dia ' + (Number(localDay.position || 0) + 1),
+        title:localDay.title || 'Dia local', record:localDay
+      });
       allVerified = false;
       continue;
     }
@@ -7867,6 +7876,17 @@ async function cacheCompleteWorkspace({force = false} = {}) {
     const verified = !localOnlyActivities.length && !localOnlyLocations.length;
     localActivitiesOnly += localOnlyActivities.length;
     localLocationsOnly += localOnlyLocations.length;
+    for (const entry of [...localOnlyActivities.map(record => ({kind:'activity',record})),
+      ...localOnlyLocations.map(record => ({kind:'location',record}))]) {
+      const day = days.find(item => String(item.id) === String(entry.record.day_id));
+      conflicts.push({
+        kind:entry.kind, id:String(entry.record.id), tripId:String(trip.id),
+        tripName:trip.name || 'Viagem', dayId:String(entry.record.day_id),
+        dayLabel:day?.title || 'Dia ' + (Number(day?.position || 0) + 1),
+        title:String(entry.record.title || entry.record.name || entry.record.place_name || 'Item sem título'),
+        record:entry.record
+      });
+    }
     allVerified = allVerified && verified;
     activities.push(...localOnlyActivities);
     locations.push(...localOnlyLocations);
@@ -7889,6 +7909,10 @@ async function cacheCompleteWorkspace({force = false} = {}) {
 
   if (await offlineStore.countOutbox()) allVerified = false;
   if (state.user?.id !== userId) throw new Error('A conta mudou durante a sincronização.');
+  workspaceConflictOwner = userId;
+  workspaceConflictDetails = conflicts;
+  await offlineStore.setMeta(`sync_conflicts:${userId}`, conflicts);
+  if (dom.syncLogDialog?.open) renderSyncLog();
   const now = new Date().toISOString();
   // The stored snapshot is a durable local itinerary, not proof of comparison.
   await offlineStore.setMeta(`complete_snapshot:${userId}`, now);
