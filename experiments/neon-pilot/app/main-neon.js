@@ -46,13 +46,15 @@ let lastOutboxError = null;
 let workspaceSyncPromise = null;
 let workspaceSyncChecking = false;
 let workspaceSyncError = null;
+let workspaceSyncWarning = null;
 let syncStatusVersion = 0;
+const mediaPrefetchTasks = new Map();
 
 const verifiedSyncKey = userId => `verified_sync:${userId}`;
 
 // The badge states what was actually verified, never just that a local
 // snapshot exists or that the mutation queue is empty.
-function syncIndicatorViewModel({online, pending, snapshotAt, verifiedAt, checking, error, queueError, hasTrips}) {
+function syncIndicatorViewModel({online, pending, snapshotAt, verifiedAt, checking, error, warning, queueError, hasTrips}) {
   if (checking && online) return {kind:'syncing', text:'Sincronizando roteiro…', title:'Conferindo alterações e atualizando a cópia local.'};
   if (pending === null) return {kind:'error', text:'Não foi possível conferir os dados locais · tocar para tentar', title:'Falha ao consultar alterações salvas neste aparelho.'};
   if (!online) return pending
@@ -64,7 +66,16 @@ function syncIndicatorViewModel({online, pending, snapshotAt, verifiedAt, checki
       ? {kind:'error', text:`${count} · falha ao enviar · tocar para tentar`, title:String(queueError)}
       : {kind:'pending', text:`${count} · tocar para sincronizar`, title:'Há alterações salvas no aparelho que ainda precisam ser confirmadas no servidor.'};
   }
-  if (error) return {kind:'error', text:'Falha na sincronização · tocar para tentar', title:String(error)};
+  if (error) {
+    const message = String(error);
+    const label = /JWT|token|sessão|401|403|unauthori|forbidden/i.test(message)
+      ? 'Sessão não confirmada · tocar para tentar'
+      : /fetch|network|conexão|timeout|timed out|indisponível|abort/i.test(message)
+        ? 'Conexão falhou · tocar para tentar'
+        : 'Falha ao conferir roteiro · tocar para tentar';
+    return {kind:'error', text:label, title:message};
+  }
+  if (warning) return {kind:'pending', text:'Roteiro com alterações a conferir · tocar para tentar', title:String(warning)};
   if (verifiedAt && Number.isFinite(Date.parse(verifiedAt))) {
     const at = new Intl.DateTimeFormat('pt-BR',{hour:'2-digit',minute:'2-digit'}).format(new Date(verifiedAt));
     return {kind:'synced', text:`Roteiro sincronizado às ${at}`, title:'Última conferência completa com o servidor. Toque para conferir novamente.'};
@@ -225,9 +236,31 @@ async function cacheManagedMedia(record, {
 }
 
 async function cacheTripMedia(days, activities, locations, client) {
-  for (const day of days || []) await cacheManagedMedia(day, {}, client);
-  for (const activity of activities || []) await cacheManagedMedia(activity, {}, client);
-  for (const location of locations || []) await cacheManagedMedia(location, {}, client);
+  const records = [...(days || []), ...(activities || []), ...(locations || [])];
+  let failures = 0;
+  for (const record of records) {
+    if (!navigator.onLine) break;
+    try {
+      await cacheManagedMedia(record, {}, client);
+    } catch (error) {
+      failures++;
+      console.warn('[Viaggio mídia] Uma foto aguardará outra tentativa', error);
+    }
+  }
+  if (failures) console.warn('[Viaggio mídia] Fotos pendentes, sem invalidar a agenda:', failures);
+}
+
+function scheduleTripMediaCache(userId, tripId, records, client) {
+  const key = JSON.stringify([userId, String(tripId)]);
+  if (mediaPrefetchTasks.has(key)) return;
+  const task = (async () => {
+    // Let itinerary and ticket requests finish before downloading optional photos.
+    await new Promise(resolve => setTimeout(resolve, 250));
+    if (!navigator.onLine || state.user?.id !== userId) return;
+    await cacheTripMedia(records.days, records.activities, records.locations, client);
+  })().catch(error => console.warn('[Viaggio mídia] Download adiado', error))
+    .finally(() => mediaPrefetchTasks.delete(key));
+  mediaPrefetchTasks.set(key, task);
 }
 
 async function prepareTripMedia(blob, tripId, kind, entityId) {
@@ -801,6 +834,7 @@ async function refreshSyncStatus() {
     pending, snapshotAt, verifiedAt,
     checking: workspaceSyncChecking || outboxSyncing,
     error: workspaceSyncError,
+    warning: workspaceSyncWarning,
     queueError: lastOutboxError,
     hasTrips: state.trips.length > 0
   });
@@ -822,6 +856,7 @@ function verifyWorkspaceSync() {
   const userId = state.user.id;
   workspaceSyncChecking = true;
   workspaceSyncError = null;
+  workspaceSyncWarning = null;
   refreshSyncStatus().catch(console.warn);
   workspaceSyncPromise = (async () => {
     const uploaded = await flushOutbox();
@@ -830,7 +865,10 @@ function verifyWorkspaceSync() {
     await loadTrips({allowLocalFallback:false});
     if (state.user?.id !== userId) return false;
     const verified = await cacheCompleteWorkspace({force:true});
-    if (!verified) throw new Error('Ainda há alterações locais ou diferenças no roteiro que precisam ser conferidas.');
+    if (!verified) {
+      workspaceSyncWarning ||= 'Alguns registros estão disponíveis somente neste aparelho ou aguardam conferência.';
+      return false;
+    }
     return true;
   })().catch(error => {
     if (state.user?.id === userId) {
