@@ -53,7 +53,7 @@ const verifiedSyncKey = userId => `verified_sync:${userId}`;
 // The badge states what was actually verified, never just that a local
 // snapshot exists or that the mutation queue is empty.
 function syncIndicatorViewModel({online, pending, snapshotAt, verifiedAt, checking, error, queueError, hasTrips}) {
-  if (checking) return {kind:'syncing', text:'Sincronizando roteiro…', title:'Conferindo alterações e atualizando a cópia local.'};
+  if (checking && online) return {kind:'syncing', text:'Sincronizando roteiro…', title:'Conferindo alterações e atualizando a cópia local.'};
   if (pending === null) return {kind:'error', text:'Não foi possível conferir os dados locais · tocar para tentar', title:'Falha ao consultar alterações salvas neste aparelho.'};
   if (!online) return pending
     ? {kind:'offline', text:`Offline · ${pending} ${pending === 1 ? 'alteração salva' : 'alterações salvas'} no aparelho`, title:'As alterações serão enviadas quando houver conexão.'}
@@ -630,11 +630,9 @@ async function refreshWorkspaceInBackground() {
         await Promise.allSettled([loadProfile(), refreshSharedTripOwners(client)]);
         syncTripList();
       }
-      await flushOutbox().catch(error => console.warn('Fila local aguardando sincronização', error));
       await applyPendingSignupAvatar().catch(error => console.warn('Foto de cadastro aguardando envio', error));
-      await loadTrips();
+      await verifyWorkspaceSync();
       warmOfflineTickets().catch(error => console.warn('Ingressos offline aguardando conexão', error));
-      await cacheCompleteWorkspace().catch(error => console.warn('Snapshot offline incompleto', error));
       await refreshSyncStatus();
     } catch (error) {
       console.warn('Atualização em segundo plano indisponível', error);
@@ -810,6 +808,41 @@ async function refreshSyncStatus() {
   dom.syncStatus.title = view.title;
   dom.syncStatus.setAttribute('aria-busy', String(view.kind === 'syncing'));
   dom.syncStatus.setAttribute('aria-label', view.text + '. Toque para tentar sincronizar.');
+}
+
+// One explicit operation covers the outbox, remote trip list, full itinerary
+// and offline snapshot. A successful connection alone is not proof of sync.
+function verifyWorkspaceSync() {
+  if (workspaceSyncPromise) return workspaceSyncPromise;
+  if (!state.user?.id || !navigator.onLine) {
+    refreshSyncStatus().catch(console.warn);
+    return Promise.resolve(false);
+  }
+  const userId = state.user.id;
+  workspaceSyncChecking = true;
+  workspaceSyncError = null;
+  refreshSyncStatus().catch(console.warn);
+  workspaceSyncPromise = (async () => {
+    const uploaded = await flushOutbox();
+    if (!uploaded) throw lastOutboxError || new Error('Ainda há alterações aguardando envio.');
+    if (state.user?.id !== userId) return false;
+    await loadTrips({allowLocalFallback:false});
+    if (state.user?.id !== userId) return false;
+    const verified = await cacheCompleteWorkspace({force:true});
+    if (!verified) throw new Error('Ainda há alterações locais ou diferenças no roteiro que precisam ser conferidas.');
+    return true;
+  })().catch(error => {
+    if (state.user?.id === userId) {
+      workspaceSyncError = String(error?.message || error);
+      console.warn('Conferência do roteiro não concluída', error);
+    }
+    return false;
+  }).finally(() => {
+    workspaceSyncChecking = false;
+    workspaceSyncPromise = null;
+    refreshSyncStatus().catch(console.warn);
+  });
+  return workspaceSyncPromise;
 }
 
 function tripNameForLog(tripId) {
@@ -9400,33 +9433,15 @@ window.addEventListener('offline', () => { refreshSyncStatus().catch(console.war
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden' && tripColorSaveTimer) savePendingTripColor();
   if (document.visibilityState === 'visible' && state.user) {
-    if (navigator.onLine) loadTrips().catch(error => console.warn('Viagens compartilhadas aguardando atualização', error));
+    if (navigator.onLine) verifyWorkspaceSync().catch(error => console.warn('Sincronização do roteiro adiada', error));
     if (navigator.onLine && document.body.dataset.activeSheet !== 'profile') loadProfile().catch(error => console.warn('Foto do perfil aguardando atualização', error));
-    flushOutbox().catch(error => console.warn('Fila local aguardando sincronização', error));
     refreshChatgptConnection().catch(console.warn);
   }
 });
-dom.syncStatus.addEventListener('click', async () => {
-  try {
-    await flushOutbox(); // Even if upload fails, read remote; reconcile pending edits by ID.
-    if (state.activeTripId) {
-      const id = String(state.activeTripId);
-      state.tripDataCache.delete(id);
-      await openTrip(id, { pushHistory: false, forceRefresh: true });
-    } else {
-      await loadTrips({ allowLocalFallback: false });
-      await cacheCompleteWorkspace();
-    }
-    await refreshSyncStatus();
-  } catch (error) {
-    console.warn('Falha ao conferir agenda no Neon', error);
-    if (dom.syncStatus) {
-      dom.syncStatus.dataset.kind = 'pending';
-      dom.syncStatus.textContent = 'Falha ao conferir agenda · toque para tentar novamente';
-      dom.syncStatus.title = String(error?.message || error);
-    }
-  }
+dom.syncStatus.addEventListener('click', () => {
+  verifyWorkspaceSync().catch(console.warn);
 });
+
 window.addEventListener('online', () => {
   refreshSyncStatus().catch(console.warn);
   // Primeiro conferir a identidade; depois atualizar a viagem e a fila.
