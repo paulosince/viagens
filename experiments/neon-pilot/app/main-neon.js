@@ -43,6 +43,36 @@ let orderedDaySchemaSupport = null;
 let outboxFlushPromise = null;
 let outboxSyncing = false;
 let lastOutboxError = null;
+let workspaceSyncPromise = null;
+let workspaceSyncChecking = false;
+let workspaceSyncError = null;
+let syncStatusVersion = 0;
+
+const verifiedSyncKey = userId => `verified_sync:${userId}`;
+
+// The badge states what was actually verified, never just that a local
+// snapshot exists or that the mutation queue is empty.
+function syncIndicatorViewModel({online, pending, snapshotAt, verifiedAt, checking, error, queueError, hasTrips}) {
+  if (checking) return {kind:'syncing', text:'Sincronizando roteiro…', title:'Conferindo alterações e atualizando a cópia local.'};
+  if (pending === null) return {kind:'error', text:'Não foi possível conferir os dados locais · tocar para tentar', title:'Falha ao consultar alterações salvas neste aparelho.'};
+  if (!online) return pending
+    ? {kind:'offline', text:`Offline · ${pending} ${pending === 1 ? 'alteração salva' : 'alterações salvas'} no aparelho`, title:'As alterações serão enviadas quando houver conexão.'}
+    : {kind:'offline', text:snapshotAt ? 'Offline · roteiro disponível' : 'Offline · cópia do roteiro incompleta', title:'É necessário conectar para conferir os dados mais recentes.'};
+  if (pending) {
+    const count = `${pending} ${pending === 1 ? 'alteração pendente' : 'alterações pendentes'}`;
+    return queueError
+      ? {kind:'error', text:`${count} · falha ao enviar · tocar para tentar`, title:String(queueError)}
+      : {kind:'pending', text:`${count} · tocar para sincronizar`, title:'Há alterações salvas no aparelho que ainda precisam ser confirmadas no servidor.'};
+  }
+  if (error) return {kind:'error', text:'Falha na sincronização · tocar para tentar', title:String(error)};
+  if (verifiedAt && Number.isFinite(Date.parse(verifiedAt))) {
+    const at = new Intl.DateTimeFormat('pt-BR',{hour:'2-digit',minute:'2-digit'}).format(new Date(verifiedAt));
+    return {kind:'synced', text:`Roteiro sincronizado às ${at}`, title:'Última conferência completa com o servidor. Toque para conferir novamente.'};
+  }
+  if (!hasTrips) return {kind:'pending', text:'Nenhuma viagem para sincronizar', title:''};
+  return {kind:'pending', text:snapshotAt ? 'Roteiro salvo · toque para sincronizar' : 'Sincronização pendente · toque para iniciar',
+    title:'O roteiro está no aparelho, mas a conferência com o servidor não foi concluída.'};
+}
 
 async function ensureNeon() {
   if (neonClient) return neonClient;
@@ -757,58 +787,30 @@ function setActiveSheet(name = 'none') {
 }
 
 async function refreshSyncStatus() {
-  if (!dom.syncStatus || !state.user) return;
-  const [pending, snapshotAt] = await Promise.all([
-    offlineStore.countOutbox().catch(() => 0),
-    offlineStore.getMeta(`complete_snapshot:${state.user.id}`).catch(() => null)
+  if (!dom.syncStatus || !state.user?.id) return;
+  const userId = state.user.id;
+  const version = ++syncStatusVersion;
+  const [pending, snapshotAt, verifiedAt] = await Promise.all([
+    offlineStore.countOutbox().catch(() => null),
+    offlineStore.getMeta(`complete_snapshot:${userId}`).catch(() => null),
+    offlineStore.getMeta(verifiedSyncKey(userId)).catch(() => null)
   ]);
-
-  if (!navigator.onLine) {
-    dom.syncStatus.dataset.kind = 'offline';
-    if (pending) {
-      dom.syncStatus.textContent = `Salvo neste iPhone · ${pending} ${pending === 1 ? 'alteração pendente' : 'alterações pendentes'}`;
-    } else {
-      dom.syncStatus.textContent = snapshotAt ? 'Modo offline · roteiro disponível' : 'Modo offline · cópia incompleta';
-    }
-    return;
-  }
-
-  if (pending) {
-    dom.syncStatus.dataset.kind = 'pending';
-    const count = `${pending} ${pending === 1 ? 'alteração pendente' : 'alterações pendentes'}`;
-    const errorMessage = String(lastOutboxError?.message || lastOutboxError || '')
-      .replace(/\s+/g, ' ')
-      .slice(0, 120);
-    dom.syncStatus.textContent = outboxSyncing
-      ? `Sincronizando · ${count}`
-      : `Salvo neste iPhone · ${count}${lastOutboxError ? ` · ${lastOutboxError.code === '57014' ? 'servidor demorou a responder' : (errorMessage || 'falha na sincronização')} · tocar para tentar novamente` : ''}`;
-    dom.syncStatus.title = lastOutboxError ? `Última falha: ${errorMessage || lastOutboxError}` : '';
-    return;
-  }
-
-  dom.syncStatus.title = '';
-  if (!snapshotAt) {
-    dom.syncStatus.dataset.kind = 'pending';
-    dom.syncStatus.textContent = 'Cópia offline ainda não concluída';
-    return;
-  }
-
-  // An empty outbox proves uploads completed, not that the cached itinerary
-  // matches the remote Neon state. Never advertise a verified sync here.
-  const activeData = state.activeTripId ? state.tripDataCache.get(String(state.activeTripId)) : null;
-  const cachedTrips = [...state.tripDataCache.values()];
-  const remoteVerified = activeData
-    ? activeData.remoteVerified === true
-    : cachedTrips.length > 0 && cachedTrips.every(data => data.remoteVerified === true);
-  dom.syncStatus.dataset.kind = remoteVerified ? 'synced' : 'pending';
-  dom.syncStatus.textContent = remoteVerified
-    ? 'Agenda conferida no Neon · disponível offline'
-    : activeData?.remoteError
-      ? 'Falha ao consultar agenda · toque para tentar novamente'
-      : 'Cópia offline disponível · toque para conferir no Neon';
-  dom.syncStatus.title = activeData?.remoteError || '';
+  // A previous asynchronous read must never repaint a newer sync state.
+  if (version !== syncStatusVersion || state.user?.id !== userId) return;
+  const view = syncIndicatorViewModel({
+    online: navigator.onLine,
+    pending, snapshotAt, verifiedAt,
+    checking: workspaceSyncChecking || outboxSyncing,
+    error: workspaceSyncError,
+    queueError: lastOutboxError,
+    hasTrips: state.trips.length > 0
+  });
+  dom.syncStatus.dataset.kind = view.kind;
+  dom.syncStatus.textContent = view.text;
+  dom.syncStatus.title = view.title;
+  dom.syncStatus.setAttribute('aria-busy', String(view.kind === 'syncing'));
+  dom.syncStatus.setAttribute('aria-label', view.text + '. Toque para tentar sincronizar.');
 }
-
 
 function tripNameForLog(tripId) {
   return state.trips.find(trip => String(trip.id) === String(tripId))?.name || 'Viagem';
