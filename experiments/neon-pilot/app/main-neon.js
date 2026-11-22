@@ -953,6 +953,7 @@ async function appendSyncLog(userId, data) {
   if (state.user?.id !== userId) return;
   syncLogRecords = [{
     at: new Date().toISOString(),
+    manual: Boolean(data.manual),
     attempt: data.attempt,
     maxAttempts: SYNC_MAX_ATTEMPTS,
     status: data.status,
@@ -1067,7 +1068,8 @@ function renderSyncLog() {
     heading.append(title, stamp);
     const attempt = document.createElement('p');
     attempt.className = 'sync-log-item-attempt';
-    attempt.textContent = `Tentativa ${item.attempt} de ${item.maxAttempts} · ${(item.durationMs / 1000).toFixed(1).replace('.', ',')} s`
+    attempt.textContent = (item.manual ? 'Conferência após revisão' : `Tentativa ${item.attempt} de ${item.maxAttempts}`)
+      + ` · ${(item.durationMs / 1000).toFixed(1).replace('.', ',')} s`
       + (item.stage ? ` · ${item.stage}` : '');
     const detail = document.createElement('p');
     detail.className = 'sync-log-item-detail';
@@ -1099,6 +1101,139 @@ async function openSyncLog() {
     workspaceConflictDetails = conflicts;
   }
   renderSyncLog();
+}
+
+
+async function enqueueLocalConflicts(userId, entries) {
+  if (entries.some(item => item.kind === 'day'))
+    throw new Error('Há dias inteiros divergentes. Essa situação exige revisão individual.');
+  for (const item of entries) {
+    if (state.user?.id !== userId) throw new Error('A conta mudou; os dados foram preservados.');
+    const tripId = String(item.tripId);
+    const dayId = String(item.record?.day_id || item.dayId || '');
+    if (!tripId || !dayId || !item.record?.id)
+      throw new Error('Identificador de atividade/local incompleto. Nenhum dado foi descartado.');
+    const localData = await offlineStore.loadTripData(tripId);
+    const day = (localData.days || []).find(row => String(row.id) === dayId);
+    if (!day) throw new Error('O dia original não está disponível neste aparelho.');
+    await offlineStore.enqueueMutation({
+      type:'save-inline-activity', tripId, dayId,
+      dayPatch:{status:day.status || 'planned'},
+      ...(item.kind === 'activity' ? {activity:item.record} : {location:item.record})
+    });
+  }
+}
+
+async function resolveSyncConflicts(choice) {
+  const userId = state.user?.id;
+  if (!userId || syncConflictResolving || workspaceSyncChecking || syncRetryPromise) return;
+  if (!navigator.onLine) {
+    dom.syncConflictFeedback.textContent = 'Conecte-se para conferir estes itens.';
+    return;
+  }
+  const entries = workspaceConflictOwner === userId ? [...workspaceConflictDetails] : [];
+  if (!entries.length) return;
+  if (choice === 'server') {
+    const approved = window.confirm(
+      'Usar o roteiro do servidor? Os itens que existem só neste iPhone serão guardados numa cópia de recuperação antes de atualizar a agenda. Nenhum ingresso será excluído.'
+    );
+    if (!approved) return;
+  } else if (!window.confirm(
+    `Enviar ${entries.length} ${entries.length===1 ? 'item local' : 'itens locais'} ao roteiro do servidor? Eles poderão voltar a aparecer na agenda.`
+  )) return;
+  syncConflictResolving = true;
+  renderSyncLog();
+  dom.syncConflictFeedback.textContent = 'Conferindo e preservando os registros…';
+  const started = Date.now();
+  try {
+    if (await offlineStore.countOutbox()) {
+      throw new Error('Há alterações pendentes no aparelho. Aguarde o envio antes de resolver.');
+    }
+    let done = false;
+    if (choice === 'server') {
+      // Read the newest authoritative trip list before updating anything locally.
+      await loadTrips({allowLocalFallback:false});
+      if (state.user?.id !== userId) return;
+      done = await cacheCompleteWorkspace({force:true,resolveFromServer:true});
+    } else {
+      const groups = new Map();
+      for (const item of entries) {
+        if (!groups.has(String(item.tripId))) groups.set(String(item.tripId), []);
+        groups.get(String(item.tripId)).push(item);
+      }
+      // Keep a full local snapshot before queuing any write.
+      for (const [tripId, items] of groups) {
+        const trip = state.trips.find(row => String(row.id) === tripId);
+        if (!trip) throw new Error('Viagem não identificada. Nenhum registro foi enviado.');
+        const data = await offlineStore.loadTripData(tripId);
+        await saveSyncRecovery(userId, trip, data,
+          items.map(item => ({kind:item.kind, record:item.record})));
+      }
+      await enqueueLocalConflicts(userId, entries);
+      done = await verifyWorkspaceSync();
+    }
+    if (state.user?.id !== userId) return;
+    if (done) {
+      workspaceSyncError = null;
+      workspaceSyncWarning = null;
+      syncRetryLastStartedAt = Date.now();
+      dom.syncConflictFeedback.textContent = 'Roteiro conferido com sucesso. Os dados anteriores continuam guardados na recuperação.';
+      await appendSyncLog(userId,{manual:true,attempt:1,status:'synced',
+        stage:'Revisão confirmada',durationMs:Date.now()-started,
+        message:choice==='server'
+          ? 'Versão do servidor aplicada. Cópia local anterior preservada no aparelho.'
+          : 'Itens locais enviados e conferidos no roteiro.'});
+    } else {
+      dom.syncConflictFeedback.textContent = 'Ainda existem diferenças. Os registros permanecem preservados.';
+    }
+  } catch (error) {
+    const msg = safeSyncLogMessage(error?.message || error);
+    dom.syncConflictFeedback.textContent = msg;
+    console.warn('Reconciliação não concluída; dados locais preservados', error);
+    if (state.user?.id === userId) await appendSyncLog(userId,{manual:true,attempt:1,status:'error',
+      stage:'Revisão de divergências',durationMs:Date.now()-started,message:msg});
+  } finally {
+    syncConflictResolving = false;
+    if (state.user?.id === userId) {
+      await loadSyncRecovery(userId).catch(console.warn);
+      refreshSyncStatus().catch(console.warn);
+      renderSyncLog();
+    }
+  }
+}
+
+async function restoreSyncRecovery() {
+  const userId = state.user?.id;
+  if (!userId || syncConflictResolving || workspaceSyncChecking || syncRetryPromise) return;
+  const latest = syncRecoveryOwner === userId ? syncRecoveryItems[0] : null;
+  if (!latest) return;
+  const items = (latest.differences || []).map(item => ({
+    kind:item.kind, record:item.record, tripId:latest.tripId,
+    dayId:item.record?.day_id
+  }));
+  if (!items.length || items.some(x => x.kind === 'day')) return;
+  if (!window.confirm('Restaurar os itens guardados no roteiro do servidor? Essa ação não apaga a cópia de recuperação.')) return;
+  syncConflictResolving = true;
+  renderSyncLog();
+  dom.syncRecoveryFeedback.textContent = 'Restaurando os itens selecionados…';
+  const started=Date.now();
+  try {
+    if (!navigator.onLine) throw new Error('Conecte-se para restaurar os itens.');
+    await enqueueLocalConflicts(userId, items);
+    const done=await verifyWorkspaceSync();
+    dom.syncRecoveryFeedback.textContent=done ? 'Itens restaurados e conferidos.' : 'Restauração aguardando sincronização.';
+    if (done) await appendSyncLog(userId,{manual:true,attempt:1,status:'synced',
+      stage:'Recuperação',durationMs:Date.now()-started,
+      message:'Itens locais restaurados no roteiro. A cópia de segurança foi mantida.'});
+  } catch(error){
+    dom.syncRecoveryFeedback.textContent=safeSyncLogMessage(error?.message || error);
+  } finally{
+    syncConflictResolving=false;
+    if (state.user?.id===userId) {
+      renderSyncLog();
+      refreshSyncStatus().catch(console.warn);
+    }
+  }
 }
 
 function retrySyncDelay(ms) {
@@ -9824,6 +9959,9 @@ dom.syncStatus.addEventListener('click', () => {
   openSyncLog().catch(error => console.warn('Histórico indisponível', error));
 });
 dom.syncLogClose?.addEventListener('click', () => dom.syncLogDialog?.close());
+dom.syncConflictKeep?.addEventListener('click', () => resolveSyncConflicts('keep').catch(console.warn));
+dom.syncConflictServer?.addEventListener('click', () => resolveSyncConflicts('server').catch(console.warn));
+dom.syncRecoveryRestore?.addEventListener('click', () => restoreSyncRecovery().catch(console.warn));
 
 window.addEventListener('online', () => {
   syncRetryLastStartedAt = 0; // A restored connection permits a fresh bounded cycle.
