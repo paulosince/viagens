@@ -4050,3 +4050,20 @@ body:not([data-budget-page="closed"]) .food-trip-summary { display: none !import
 .tickets-save-offline:disabled{opacity:.65}
 .tickets-item-art .tickets-item-offline{position:absolute;right:8px;bottom:8px;z-index:2;border-radius:999px;padding:4px 7px;background:rgba(22,101,52,.92);color:#fff;font-size:10px;font-weight:700;letter-spacing:.01em}
 @media(max-width:380px){.tickets-offline-bar{align-items:flex-start}.tickets-save-offline{padding:8px 9px}}
+
+/* Sync indicator: make the state legible without exposing backend terminology. */
+.home-bottom .sync-status {transition:color .18s ease,background-color .18s ease;opacity:1;font-weight:650;}
+.home-bottom .sync-status[data-kind="synced"] {color:#176a38;background:rgba(219,245,226,.97);}
+.home-bottom .sync-status[data-kind="syncing"] {color:#1469bd;background:rgba(223,238,255,.97);}
+.home-bottom .sync-status[data-kind="pending"] {color:#8a5900;background:rgba(255,245,217,.97);}
+.home-bottom .sync-status[data-kind="offline"] {color:#525866;background:rgba(241,242,246,.97);}
+.home-bottom .sync-status[data-kind="error"] {color:#ab3034;background:rgba(255,230,231,.97);}
+.home-bottom .sync-status[data-kind="syncing"]::before {animation:viaggioSyncPulse 1s ease-in-out infinite;}
+@keyframes viaggioSyncPulse {0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
+@media(prefers-reduced-motion:reduce){.home-bottom .sync-status{transition:none}.home-bottom .sync-status[data-kind="syncing"]::before{animation:none}}
+/* Override the calendar's generic green; only verified success may be green. */
+body[data-home-tab="calendar"] .home-bottom .sync-status[data-kind="synced"] {color:#a3efbd;background:rgba(17,68,44,.92);}
+body[data-home-tab="calendar"] .home-bottom .sync-status[data-kind="syncing"] {color:#b6daff;background:rgba(19,67,111,.92);}
+body[data-home-tab="calendar"] .home-bottom .sync-status[data-kind="pending"] {color:#ffe0a3;background:rgba(85,61,18,.92);}
+body[data-home-tab="calendar"] .home-bottom .sync-status[data-kind="offline"] {color:#e2e5ed;background:rgba(60,66,78,.92);}
+body[data-home-tab="calendar"] .home-bottom .sync-status[data-kind="error"] {color:#ffd0d0;background:rgba(98,31,35,.92);}
