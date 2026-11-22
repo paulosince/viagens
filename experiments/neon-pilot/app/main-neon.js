@@ -7645,6 +7645,8 @@ async function cacheCompleteWorkspace({force = false} = {}) {
   }
 
   let allVerified = true;
+  let localDaysOnly = 0, localActivitiesOnly = 0, localLocationsOnly = 0;
+  const mediaJobs = [];
   for (const trip of state.trips) {
     if (state.user?.id !== userId) throw new Error('A conta mudou durante a sincronização.');
     if (await offlineStore.hasPendingForTrip(trip.id)) { allVerified = false; continue; }
@@ -7652,13 +7654,16 @@ async function cacheCompleteWorkspace({force = false} = {}) {
     const ids = new Set(days.map(day => String(day.id)));
     const activities = allActivities.filter(activity => ids.has(String(activity.day_id)));
     const locations = allLocations.filter(location => ids.has(String(location.day_id)));
-    const localBefore = await offlineStore.loadTripData(String(trip.id))
-      .catch(() => ({ days: [], activities: [], locations: [] }));
+    const localBefore = await offlineStore.loadTripData(String(trip.id));
 
     // Never erase an entire local-only day to make a remote check appear green.
     const localOnlyDays = (localBefore.days || []).filter(day => !ids.has(String(day.id)));
     if (localOnlyDays.length) {
-      throw new Error('Existem dias salvos apenas neste aparelho. A cópia local foi preservada.');
+      // A remote deletion or offline edit needs inspection; keep this entire
+      // local trip untouched instead of turning a difference into an error.
+      localDaysOnly += localOnlyDays.length;
+      allVerified = false;
+      continue;
     }
 
     // Background snapshots must not erase local-only entries either.
@@ -7669,12 +7674,17 @@ async function cacheCompleteWorkspace({force = false} = {}) {
     const localOnlyLocations = (localBefore.locations || [])
       .filter(item => ids.has(String(item.day_id)) && !remoteLocationIds.has(String(item.id)));
     const verified = !localOnlyActivities.length && !localOnlyLocations.length;
+    localActivitiesOnly += localOnlyActivities.length;
+    localLocationsOnly += localOnlyLocations.length;
     allVerified = allVerified && verified;
     activities.push(...localOnlyActivities);
     locations.push(...localOnlyLocations);
-    await adoptLegacyTripMedia(days, activities, locations, localBefore);
+    await adoptLegacyTripMedia(days, activities, locations, localBefore).catch(error =>
+      console.warn('[Viaggio mídia] Mídia legada indisponível, preservando os registros', error));
     await offlineStore.replaceTripData(String(trip.id), days, activities, locations);
-    await cacheTripMedia(days, activities, locations, client);
+    // Verification covers the agenda. Media is optional and downloaded later,
+    // without blocking the badge or erasing tickets/photographs when unavailable.
+    mediaJobs.push({tripId:trip.id, days, activities, locations});
 
     state.tripDataCache.set(String(trip.id), {
       days,
@@ -7689,11 +7699,26 @@ async function cacheCompleteWorkspace({force = false} = {}) {
   if (await offlineStore.countOutbox()) allVerified = false;
   if (state.user?.id !== userId) throw new Error('A conta mudou durante a sincronização.');
   const now = new Date().toISOString();
+  // The stored snapshot is a durable local itinerary, not proof of comparison.
   await offlineStore.setMeta(`complete_snapshot:${userId}`, now);
   if (allVerified) {
     await offlineStore.setMeta(verifiedSyncKey(userId), now);
+    workspaceSyncWarning = null;
   } else {
     await offlineStore.deleteMeta(verifiedSyncKey(userId));
+    const differences = [
+      localDaysOnly ? `${localDaysOnly} dia(s)` : '',
+      localActivitiesOnly ? `${localActivitiesOnly} atividade(s)` : '',
+      localLocationsOnly ? `${localLocationsOnly} local(is)` : ''
+    ].filter(Boolean);
+    workspaceSyncWarning = differences.length
+      ? 'Preservados somente neste aparelho: ' + differences.join(', ') + '.'
+      : 'Há alterações locais ainda aguardando confirmação.';
+  }
+  // Important for trips and tickets to be responsive even on poor mobile data.
+  // These optional photo downloads happen after all itinerary checks settle.
+  for (const job of mediaJobs) {
+    scheduleTripMediaCache(userId, job.tripId, job, client);
   }
   refreshSyncStatus().catch(console.warn);
   return allVerified;
