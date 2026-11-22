@@ -4067,3 +4067,24 @@ body[data-home-tab="calendar"] .home-bottom .sync-status[data-kind="syncing"] {c
 body[data-home-tab="calendar"] .home-bottom .sync-status[data-kind="pending"] {color:#ffe0a3;background:rgba(85,61,18,.92);}
 body[data-home-tab="calendar"] .home-bottom .sync-status[data-kind="offline"] {color:#e2e5ed;background:rgba(60,66,78,.92);}
 body[data-home-tab="calendar"] .home-bottom .sync-status[data-kind="error"] {color:#ffd0d0;background:rgba(98,31,35,.92);}
+
+/* Native iOS-like history sheet; opening it must never trigger another sync. */
+.sync-log-dialog{box-sizing:border-box;width:min(560px,calc(100vw - 28px));max-width:560px;max-height:min(76dvh,700px);max-height:min(76vh,700px);margin:auto;border:1px solid rgba(100,110,130,.15);border-radius:25px;padding:0;overflow:hidden;background:#f8f9fc;color:#202632;font:inherit;box-shadow:0 24px 90px rgba(15,26,49,.20);}
+.sync-log-dialog::backdrop{background:rgba(10,16,34,.42);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+.sync-log-dialog[open]{display:flex;flex-direction:column}
+.sync-log-header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:23px 20px 12px}
+.sync-log-header h2{margin:0;font-size:19px;font-weight:750;letter-spacing:-.025em}
+.sync-log-header button{flex:none;background:none;border:0;padding:8px 0;color:#007aff;font:inherit;font-weight:650;font-size:14px}
+.sync-log-intro{padding:0 20px;margin:0 0 11px;color:#646d7a;font-size:13px;line-height:1.5}
+.sync-log-summary{margin:0 20px 12px;padding:10px 13px;border-radius:12px;background:#e9eef7;color:#334861;font-size:13px;font-weight:650}
+.sync-log-entries{list-style:none;margin:0;padding:0 20px 12px;overflow-y:auto;overscroll-behavior:contain;min-height:0;display:grid;align-content:start;gap:10px}
+.sync-log-item{min-width:0;padding:12px 13px;border:1px solid #e2e6ef;border-radius:14px;background:#fff}
+.sync-log-item-heading{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px;font-size:13px}
+.sync-log-item-heading strong{color:#a43f41}
+.sync-log-item[data-status="synced"] .sync-log-item-heading strong{color:#24783f}
+.sync-log-item[data-status="pending"] .sync-log-item-heading strong{color:#946000}
+.sync-log-item-heading time{color:#77818c;font-size:11px;font-weight:450;font-variant-numeric:tabular-nums}
+.sync-log-item-attempt{margin:5px 0 0;color:#666f7a;font-size:11px}
+.sync-log-item-detail{margin:7px 0 0;overflow-wrap:anywhere;white-space:pre-wrap;color:#333f50;font-size:12px;line-height:1.45}
+.sync-log-note{flex-shrink:0;padding:12px 20px max(16px,env(safe-area-inset-bottom));margin:0;border-top:1px solid #e4e7ef;color:#737d89;font-size:11px;line-height:1.5;background:#f8f9fc}
+@media(max-width:520px){.sync-log-dialog{width:100%;max-width:100%;max-height:min(80dvh,760px);max-height:min(80vh,760px);margin:auto 0 0;border-radius:24px 24px 0 0}.sync-log-dialog[open]{margin:auto 0 0}}
