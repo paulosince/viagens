@@ -37,6 +37,7 @@ jobs:
           node --input-type=module --check < src/main.js
           node --input-type=module --check < experiments/neon-pilot/app/main-neon.js
           node --input-type=module --check < experiments/neon-pilot/app/backend-neon.mjs
+          node --test tests/admin-panel.mjs
           node --input-type=module --check < experiments/neon-pilot/app/usage-rings.mjs
           node --input-type=module --check < experiments/neon-pilot/app/storage-neon.mjs
           node --input-type=module --check < experiments/neon-pilot/app/offline-store-neon.js
