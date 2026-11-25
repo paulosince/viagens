@@ -1041,6 +1041,9 @@ function renderSyncConflicts() {
   dom.syncConflictSection.hidden = !entries.length;
   dom.syncConflictItems.replaceChildren();
   renderSyncRecovery();
+  const busy = syncConflictResolving || workspaceSyncChecking || Boolean(syncRetryPromise) || !navigator.onLine;
+  const hint = document.querySelector('#sync_conflict_hint');
+  if (hint) hint.textContent = !navigator.onLine ? 'Conecte-se à internet para resolver.' : busy ? 'Conferência em andamento. Os botões serão liberados ao terminar.' : 'Escolha uma ação para todos os itens ou resolva cada atividade separadamente.';
   for (const item of entries) {
     const row = document.createElement('li');
     const heading = document.createElement('strong');
@@ -1048,9 +1051,17 @@ function renderSyncConflicts() {
     const sub = document.createElement('small');
     sub.textContent = item.tripName + ' · ' + item.dayLabel;
     row.append(heading, sub);
+    if (item.kind !== 'day') {
+      const actions = document.createElement('div'); actions.className = 'sync-item-actions';
+      for (const [choice,label] of [['keep','Enviar este item'],['server','Usar versão do servidor']]) {
+        const button = document.createElement('button'); button.type='button'; button.textContent=label; button.disabled=busy;
+        button.addEventListener('click',()=>resolveSyncConflicts(choice,item).catch(console.warn));
+        actions.append(button);
+      }
+      row.append(actions);
+    }
     dom.syncConflictItems.append(row);
   }
-  const busy = syncConflictResolving || workspaceSyncChecking || !navigator.onLine;
   if (dom.syncConflictKeep) dom.syncConflictKeep.disabled = busy || entries.some(x=>x.kind==='day');
   if (dom.syncConflictServer) dom.syncConflictServer.disabled = busy;
 }
@@ -1113,6 +1124,15 @@ function renderSyncLog() {
       : 'Nenhum detalhe adicional disponível.')) +
       (resolved ? ' · Resolvido posteriormente na revisão do roteiro.' : '');
     row.append(heading, attempt, detail);
+    if (item.status === 'pending' && !resolved && !dom.syncConflictSection?.hidden) {
+      const review = document.createElement('button'); review.type='button'; review.className='sync-log-review';
+      review.textContent='Revisar itens pendentes';
+      review.addEventListener('click',()=>{
+        document.querySelector('#sync_conflict_heading')?.focus({preventScroll:true});
+        dom.syncConflictSection?.scrollIntoView({block:'start',behavior:'auto'});
+      });
+      row.append(review);
+    }
     dom.syncLogEntries.append(row);
   }
 }
@@ -1160,18 +1180,18 @@ async function enqueueLocalConflicts(userId, entries) {
   }
 }
 
-async function resolveSyncConflicts(choice) {
+async function resolveSyncConflicts(choice, selected = null) {
   const userId = state.user?.id;
   if (!userId || syncConflictResolving || workspaceSyncChecking || syncRetryPromise) return;
   if (!navigator.onLine) {
     dom.syncConflictFeedback.textContent = 'Conecte-se para conferir estes itens.';
     return;
   }
-  const entries = workspaceConflictOwner === userId ? [...workspaceConflictDetails] : [];
-  if (!entries.length) return;
+  const entries = workspaceConflictOwner === userId ? workspaceConflictDetails.filter(item => !selected || (item.kind === selected.kind && String(item.id) === String(selected.id) && String(item.tripId) === String(selected.tripId))) : [];
+  if (!entries.length || (selected && entries.some(item=>item.kind==='day'))) return;
   if (choice === 'server') {
     const approved = window.confirm(
-      'Usar o roteiro do servidor? Os itens que existem só neste iPhone serão guardados numa cópia de recuperação antes de atualizar a agenda. Nenhum ingresso será excluído.'
+      selected ? 'Usar a versão do servidor para este item? A cópia local será guardada antes de removê-lo da agenda deste aparelho.' : 'Usar o roteiro do servidor? Os itens que existem só neste iPhone serão guardados numa cópia de recuperação antes de atualizar a agenda. Nenhum ingresso será excluído.'
     );
     if (!approved) return;
   } else if (!window.confirm(
@@ -1190,7 +1210,7 @@ async function resolveSyncConflicts(choice) {
       // Read the newest authoritative trip list before updating anything locally.
       await loadTrips({allowLocalFallback:false});
       if (state.user?.id !== userId) return;
-      done = await cacheCompleteWorkspace({force:true,resolveFromServer:true});
+      done = await cacheCompleteWorkspace({force:true,resolveFromServer:!selected,resolveSelected:selected ? entries : []});
     } else {
       const groups = new Map();
       for (const item of entries) {
@@ -1220,7 +1240,8 @@ async function resolveSyncConflicts(choice) {
           ? 'Versão do servidor aplicada. Cópia local anterior preservada no aparelho.'
           : 'Itens locais enviados e conferidos no roteiro.'});
     } else {
-      dom.syncConflictFeedback.textContent = 'Ainda existem diferenças. Os registros permanecem preservados.';
+      const remains = selected && workspaceConflictDetails.some(item => item.kind===selected.kind && String(item.id)===String(selected.id) && String(item.tripId)===String(selected.tripId));
+      dom.syncConflictFeedback.textContent = selected && !remains ? 'Item conferido. Revise os demais itens pendentes.' : 'Ainda existem diferenças. Os registros permanecem preservados.';
     }
   } catch (error) {
     const msg = safeSyncLogMessage(error?.message || error);
@@ -8073,7 +8094,7 @@ function availableSavedPassengers() {
   return [...entries.values()].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 }
 
-async function cacheCompleteWorkspace({force = false, resolveFromServer = false} = {}) {
+async function cacheCompleteWorkspace({force = false, resolveFromServer = false, resolveSelected = []} = {}) {
   const userId = state.user?.id;
   if (!userId || !state.trips.length || !navigator.onLine) return false;
   if (await offlineStore.countOutbox()) return false;
@@ -8126,10 +8147,24 @@ async function cacheCompleteWorkspace({force = false, resolveFromServer = false}
     // Background snapshots must not erase local-only entries either.
     const remoteActivityIds = new Set(activities.map(item => String(item.id)));
     const remoteLocationIds = new Set(locations.map(item => String(item.id)));
-    const localOnlyActivities = (localBefore.activities || [])
+    let localOnlyActivities = (localBefore.activities || [])
       .filter(item => ids.has(String(item.day_id)) && !remoteActivityIds.has(String(item.id)));
-    const localOnlyLocations = (localBefore.locations || [])
+    let localOnlyLocations = (localBefore.locations || [])
       .filter(item => ids.has(String(item.day_id)) && !remoteLocationIds.has(String(item.id)));
+    // Only remove explicitly selected records after persisting a recovery copy.
+    if (!resolveFromServer && resolveSelected.length) {
+      const chosen = (kind,record) => resolveSelected.some(item => item.kind===kind && String(item.tripId)===String(trip.id) && String(item.id)===String(record.id));
+      const removed = [
+        ...localOnlyActivities.filter(record=>chosen('activity',record)).map(record=>({kind:'activity',record})),
+        ...localOnlyLocations.filter(record=>chosen('location',record)).map(record=>({kind:'location',record}))
+      ];
+      if (removed.length) {
+        if (await offlineStore.hasPendingForTrip(trip.id) || await offlineStore.countOutbox()) throw new Error('Existem edições aguardando envio. A cópia local foi preservada.');
+        await saveSyncRecovery(userId,trip,localBefore,removed);
+        localOnlyActivities=localOnlyActivities.filter(record=>!chosen('activity',record));
+        localOnlyLocations=localOnlyLocations.filter(record=>!chosen('location',record));
+      }
+    }
     const hasLocalDifferences = Boolean(localOnlyDays.length ||
       localOnlyActivities.length || localOnlyLocations.length);
     const verified = resolveFromServer || !hasLocalDifferences;

@@ -4137,3 +4137,18 @@ body[data-home-tab="calendar"] .home-bottom .sync-status[data-kind="error"] {col
 /* Fixed native-style navigation geometry across home/itinerary/search states. */
 .home-tabs .home-nav-item svg, .trip-tab svg{flex:0 0 auto}
 .home-tabs .home-nav-label, .trip-tab > span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.15}
+
+/* Single scroll region keeps all conflict actions reachable on mobile. */
+.sync-log-dialog .sync-log-header{flex:0 0 auto}
+.sync-log-body{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding-bottom:8px}
+.sync-log-body .sync-conflict-section{max-height:none;overflow:visible;flex-shrink:0}
+.sync-log-body .sync-log-entries{overflow:visible;min-height:auto}
+.sync-log-body .sync-conflict-actions{grid-template-columns:1fr;gap:8px;margin-bottom:10px}
+.sync-log-body .sync-conflict-actions button,.sync-item-actions button{min-height:44px;font-size:13px;cursor:pointer;white-space:normal}
+.sync-log-body .sync-conflict-items{margin-top:10px}
+.sync-item-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:5px}
+.sync-item-actions button,.sync-log-review{border:1px solid #bdc7d2;border-radius:9px;background:#fff;color:#254466;padding:8px;font:inherit;font-size:12px;font-weight:650;white-space:normal}
+.sync-item-actions button:first-child{background:#2172cb;color:#fff;border-color:#2172cb}
+.sync-item-actions button:disabled{opacity:.55;cursor:not-allowed}
+.sync-log-review{display:block;margin-top:10px;min-height:44px;width:100%;cursor:pointer}
+.sync-conflict-section #sync_conflict_feedback:not(:empty){margin-top:10px;padding:9px;background:#fff;border-radius:8px}

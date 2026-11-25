@@ -15,7 +15,7 @@ function sourceBetween(a,b){
 const recoveryCode=sourceBetween('async function loadSyncRecovery(', '\nfunction renderSyncConflicts(');
 const cacheCode=sourceBetween('async function cacheCompleteWorkspace(', '\nasync function refreshSharedTripOwners(');
 
-async function exercise({allowBackup=true,pending=0,reconcile=false}={}){
+async function exercise({allowBackup=true,pending=0,reconcile=false,selected=[]}={}){
   const data={
     days:[{id:'day',trip_id:'trip',position:0,title:'Torre Eiffel'}],
     activities:[
@@ -61,7 +61,7 @@ async function exercise({allowBackup=true,pending=0,reconcile=false}={}){
   vm.createContext(context);
   vm.runInContext(recoveryCode+'\n'+cacheCode,context);
   let ok=null,error=null;
-  try{ok=await context.cacheCompleteWorkspace({force:true,resolveFromServer:reconcile});}
+  try{ok=await context.cacheCompleteWorkspace({force:true,resolveFromServer:reconcile,resolveSelected:selected});}
   catch(e){error=e;}
   return {ok,error,metadata,saved,context,data};
 }
@@ -93,6 +93,15 @@ async function exercise({allowBackup=true,pending=0,reconcile=false}={}){
   assert.equal(reconciled.metadata.get('sync_conflicts:account').length,0);
   assert(reconciled.metadata.has('verified_sync:account'),'Green only after successful protected reconciliation');
 
+  const individual=await exercise({selected:[{kind:'activity',tripId:'trip',id:'local-1'}]});
+  assert.equal(individual.ok,false);
+  assert.deepEqual(Array.from(individual.saved[0][2],x=>x.id),['local-2']);
+  assert.equal(individual.saved[0][3].length,1);
+  assert.equal(individual.metadata.get('sync_recovery:account')[0].differences.length,1);
+  assert.equal(individual.metadata.get('sync_conflicts:account').length,2);
+  assert(!individual.metadata.has('verified_sync:account'));
+  assert(html.includes('class="sync-log-body"'));
+  assert(css.includes('.sync-log-body .sync-conflict-section{max-height:none;overflow:visible;flex-shrink:0}'));
   const rejected=await exercise({reconcile:true,allowBackup:false});
   assert(rejected.error && /No space/.test(rejected.error.message));
   assert.equal(rejected.saved.length,0,
