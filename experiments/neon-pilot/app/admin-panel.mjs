@@ -1,3 +1,4 @@
+import {mountAdminGraph} from './admin-graph.mjs?v=20261125-admin2';
 // Administrative data is memory-only and every RPC is independently JWT-authorized.
 const AUTH_ADMIN_API='https://ep-small-bread-b7uq0zva.apirest.c-13.us-east-1.aws.neon.tech/viaggio_auth/rest/v1';
 const dayMs=86400000;
@@ -12,10 +13,11 @@ export function streakModel(days,today){
 }
 export function adminModel(accounts,projects){
  if(!Array.isArray(accounts?.users)||!Array.isArray(projects)||projects.length!==2||new Set(projects.map(p=>p.project)).size!==2)throw Error('Resposta incompleta');
- const ids=new Map(),trips=new Map(),memberships=new Map(),warnings=[];
+ const ids=new Map(),trips=new Map(),memberships=new Map(),avatars=new Map(),warnings=[];
  for(const p of projects){
   if(!Array.isArray(p.identities)||!Array.isArray(p.trips)||!Array.isArray(p.memberships))throw Error('Projeto incompleto');
   for(const i of p.identities)if(i.id){if(ids.has(i.legacy_id)&&ids.get(i.legacy_id)!==i.id)throw Error('Identidades divergentes');ids.set(i.legacy_id,i.id);}
+  for(const a of p.avatars||[])if(a.legacy_id&&a.path)avatars.set(a.legacy_id,a.path);
   for(const t of p.trips){if(trips.has(t.id))throw Error('Viagem duplicada entre projetos');trips.set(t.id,t);}
   for(const m of p.memberships){const key=m.trip_id+':'+m.user_id;if(memberships.has(key)&&memberships.get(key).role!==m.role)throw Error('Permissões divergentes');memberships.set(key,m);}
  }
@@ -28,10 +30,11 @@ export function adminModel(accounts,projects){
   const owned=[...trips.values()].filter(t=>ids.get(t.owner_id)===u.id);
   const shared=[...memberships.values()].filter(m=>ids.get(m.user_id)===u.id&&trips.has(m.trip_id)&&!trips.get(m.trip_id).deleted&&ids.get(trips.get(m.trip_id).owner_id)!==u.id).map(m=>({name:trips.get(m.trip_id).name,id:m.trip_id,role:m.role}));
   const quotas=projects.filter(p=>ids.get(p.project_owner)===u.id).map(p=>({project:p.project,usage:p.usage}));
-  return {...u,linked:mapped.has(u.id),owned,shared,quotas,streak:streakModel(u.days,accounts.today),
+  const avatarPath=[...ids].find(([legacy,central])=>central===u.id&&avatars.has(legacy))?.[0];
+  return {...u,avatarPath:avatars.get(avatarPath)||null,linked:mapped.has(u.id),owned,shared,quotas,streak:streakModel(u.days,accounts.today),
    kind:owned.length?'creator':shared.length?'shared':'none'};
  });
- return {users,creators:users.filter(u=>u.kind==='creator').length,sharedOnly:users.filter(u=>u.kind==='shared').length,withoutTrips:users.filter(u=>u.kind==='none').length,verified:users.filter(u=>u.verified).length,linked:users.filter(u=>u.linked).length,activeTrips:[...trips.values()].filter(t=>!t.deleted).length,warnings:[...new Set(warnings)]};
+ return {users,graphTrips:[...trips.values()].filter(t=>!t.deleted).map(t=>({id:t.id,name:t.name})),creators:users.filter(u=>u.kind==='creator').length,sharedOnly:users.filter(u=>u.kind==='shared').length,withoutTrips:users.filter(u=>u.kind==='none').length,verified:users.filter(u=>u.verified).length,linked:users.filter(u=>u.linked).length,activeTrips:[...trips.values()].filter(t=>!t.deleted).length,warnings:[...new Set(warnings)]};
 }
 async function rpc(client,name){
  const jwt=await client?.accessToken?.();if(!jwt)throw Error('Sessão indisponível');
@@ -72,7 +75,7 @@ function ensureUI(){
  content=node('div',undefined,'viaggio-admin-body');content.setAttribute('aria-live','polite');dialog.append(header,content);document.body.append(dialog);
  trigger.addEventListener('click',()=>{if(!adminAllowed||!current)return;dialog.showModal();void loadPanel();});
  refreshButton.addEventListener('click',()=>void loadPanel());close.addEventListener('click',()=>dialog.close());
- dialog.addEventListener('close',()=>{content.replaceChildren();});
+ dialog.addEventListener('close',()=>{clearGraph();content.replaceChildren();});
  for(const e of ['visibilitychange','pointerdown'])document.addEventListener(e,()=>void trackAndCheck(),{passive:true});
  window.addEventListener('online',()=>{lastAttempt=0;void trackAndCheck();});
  window.addEventListener('focus',()=>void trackAndCheck());
@@ -85,12 +88,20 @@ function quota(container,title,value,limit){
  if(valid){const bar=node('progress');bar.max=100;bar.value=Math.min(100,Math.max(0,pct));bar.setAttribute('aria-label',title);d.append(bar);}
  container.append(d);
 }
-function render(model){
+let disposeGraph=()=>{};
+function clearGraph(){disposeGraph();disposeGraph=()=>{};}
+function render(model,client){
+ clearGraph();
  const grid=node('div',undefined,'viaggio-admin-kpis');
  for(const [label,value] of [['Contas criadas',model.users.length],['Verificadas',model.verified],['Perfis vinculados',model.linked],['Criadores de viagens',model.creators],['Só compartilhadas',model.sharedOnly],['Sem viagens',model.withoutTrips],['Viagens ativas',model.activeTrips]]){
   const k=node('div',undefined,'viaggio-admin-kpi');k.append(node('strong',String(value)),node('small',label));grid.append(k);
  }
  content.replaceChildren(grid,node('p','Criadores incluem viagens ainda registradas, mesmo excluídas. Compartilhamentos indicam permissão atual, não prova de abertura da viagem.','viaggio-admin-muted'));
+ const graph=mountAdminGraph(model,async path=>{
+  const r=await client.storage.from('profile-photos').download(path);
+  if(r.error)throw r.error;return r.data;
+ });
+ disposeGraph=graph.dispose;content.append(graph.element);
  if(model.warnings.length)content.append(node('p',model.warnings.join(' '),'viaggio-admin-warning'));
  for(const u of model.users){
   const c=node('article',undefined,'viaggio-admin-user');c.append(node('h3',u.name||u.email||'Sem nome'),node('p',u.email||'—','viaggio-admin-muted'),node('p',(u.verified?'E-mail verificado':'E-mail não verificado')+' · '+(u.linked?'Perfil vinculado':'Sem perfil vinculado')+' · Cadastro '+dateText(u.created_at),'viaggio-admin-muted'));
@@ -108,12 +119,12 @@ function render(model){
 }
 async function loadPanel(){
  if(!adminAllowed||!current||request)return;
- const gen=generation;refreshButton.disabled=true;content.replaceChildren(node('p','Consultando dados atualizados…'));
+ const gen=generation;refreshButton.disabled=true;clearGraph();content.replaceChildren(node('p','Consultando dados atualizados…'));
  const job=(async()=>{try{
   const c=await clientFactory(5000);if(!c)throw Error('Conexão indisponível.');
   await rpc(c,'record_access').catch(()=>{});
   const [accounts,projects]=await Promise.all([rpc(c,'admin_accounts'),c.adminProjectData()]);
-  if(gen===generation&&dialog.open)render(adminModel(accounts,projects));
+  if(gen===generation&&dialog.open)render(adminModel(accounts,projects),c);
  }catch(e){if(gen===generation&&dialog.open){content.replaceChildren(node('p','Não foi possível atualizar os dados administrativos. Verifique a conexão e tente novamente.','viaggio-admin-warning'));if(e.status===403||e.status===401){adminAllowed=false;trigger.hidden=true;dialog.close();}}}
  finally{if(request===job){request=null;refreshButton.disabled=false;}}})();
  request=job;
@@ -134,6 +145,6 @@ async function trackAndCheck(){
 export function syncAdminSession(user,getClient){
  if(!ensureUI())return;
  clientFactory=getClient;
- if(current!==user?.id){generation++;current=user?.id||null;accessDay='';lastAttempt=0;checking=false;adminAllowed=null;trigger.hidden=true;request=null;refreshButton.disabled=false;if(dialog.open)dialog.close();content.replaceChildren();}
+ if(current!==user?.id){generation++;current=user?.id||null;accessDay='';lastAttempt=0;checking=false;adminAllowed=null;trigger.hidden=true;request=null;refreshButton.disabled=false;if(dialog.open)dialog.close();clearGraph();content.replaceChildren();}
  if(current)void trackAndCheck();
 }

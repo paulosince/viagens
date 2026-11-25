@@ -16,3 +16,18 @@ test('classification, cross-project deduplication and owner-only quotas',()=>{
  assert.equal(m.users[1].shared[0].role,'viewer');assert.equal(m.users[1].quotas[0].usage,null);assert.equal(m.users[2].quotas.length,0);
  assert.throws(()=>adminModel(accounts,[projects[0],{...projects[1],trips:projects[0].trips}]),/duplicada/);
 });
+
+import {buildGraph,graphLayout,streakRatio} from '../experiments/neon-pilot/app/admin-graph.mjs';
+test('graph preserves ownership, editing, viewing and isolated users',()=>{
+ const graph=buildGraph({graphTrips:[{id:'t',name:'Paris'},{id:'orphan',name:'Sem vínculo'}],users:[
+ {id:'a',owned:[{id:'t',name:'Paris'},{id:'deleted',deleted:true}],shared:[]},
+ {id:'b',owned:[],shared:[{id:'t',role:'editor'}]},
+ {id:'c',owned:[],shared:[{id:'t',role:'viewer'}]},
+ {id:'d',owned:[],shared:[]}]});
+ assert.equal(graph.users.length,4);assert.equal(graph.trips.length,2);
+ assert.deepEqual(graph.edges.map(e=>e.role),['owner','editor','viewer']);
+ assert.equal(graph.edges.some(e=>e.from==='u:d'),false);
+ const l=graphLayout(graph);assert.equal(l.users.length,4);assert.equal(l.trips.length,2);
+ assert.ok(l.users.every(n=>n.y>0&&n.y<l.height));
+ assert.equal(streakRatio({current:3,longest:6}),.5);assert.equal(streakRatio({current:0,longest:0}),0);
+});

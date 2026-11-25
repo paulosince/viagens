@@ -84,7 +84,20 @@ export function createNeonPreview({authSdk,NeonPostgrestClient,fetchWithToken,en
    const result=await project.client.rpc('viaggio_admin_snapshot');
    if(result.error||!result.data?.project_owner)throw Error('Dados administrativos indisponíveis.');
    const usage=await readUsage(project).then(r=>r.data[0]).catch(()=>null);
-   return {project:project.id,...result.data,usage};
+   // Only request photos already visible through ordinary authenticated RLS.
+   // Never widen the media gateway's permissions for an administrative diagram.
+   const avatars=[];
+   const [self,shared]=await Promise.allSettled([
+     project.client.from('passenger_profiles').select('user_id,avatar_path').eq('user_id',result.data.project_owner).limit(1),
+     project.client.rpc('shared_trip_owners')
+   ]);
+   if(self.status==='fulfilled'&&!self.value.error)for(const p of self.value.data||[])
+     if(p.avatar_path)avatars.push({legacy_id:p.user_id,path:p.avatar_path});
+   if(shared.status==='fulfilled'&&!shared.value.error)for(const p of shared.value.data||[]){
+     const t=result.data.trips.find(t=>t.id===p.trip_id);
+     if(t&&p.avatar_path)avatars.push({legacy_id:t.owner_id,path:p.avatar_path});
+   }
+   return {project:project.id,...result.data,usage,avatars};
  }));
  return {...router,adminProjectData,accessToken:facade.accessToken,provider:'neon-auth-central'};
 }
