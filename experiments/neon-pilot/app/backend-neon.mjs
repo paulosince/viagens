@@ -79,6 +79,18 @@ export function createNeonPreview({authSdk,NeonPostgrestClient,fetchWithToken,en
    return {data:body.data,error:null};
  };
  const router=createRouter({projects,auth:facade.auth,functions,storage,readUsage});
+ const centralAdmin=new NeonPostgrestClient({dataApiUrl:'https://ep-small-bread-b7uq0zva.apirest.c-13.us-east-1.aws.neon.tech/viaggio_auth/rest/v1',options:{global:{fetch:fetchWithToken(getToken)}}}).schema('viaggio_admin');
+ const checked=async request=>{const r=await request;if(r.error)throw r.error;return r.data;};
+ const admin={
+   async allowed(){return (await checked(centralAdmin.rpc('admin_access_allowed')))===true;},
+   async recordAccess(){await checked(centralAdmin.rpc('record_access'));},
+   async overview(){
+     // Fail closed: all three server-authorized sources must return successfully.
+     const [accounts,...snapshots]=await Promise.all([checked(centralAdmin.rpc('admin_accounts')),...projects.map(p=>checked(p.client.rpc('viaggio_admin_snapshot')))]);
+     if(!accounts||!Array.isArray(accounts.users)||snapshots.some(s=>!s||!Array.isArray(s.identities)||!Array.isArray(s.trips)||!Array.isArray(s.memberships)))throw Error('Resposta administrativa incompleta.');
+     return {accounts,snapshots};
+   }
+ };
  // No user data operation succeeds unless Neon JWT is presented.
- return {...router,accessToken:facade.accessToken,provider:'neon-auth-central'};
+ return {...router,admin,accessToken:facade.accessToken,provider:'neon-auth-central'};
 }

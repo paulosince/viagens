@@ -47,10 +47,10 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20261125-sync-scroll2" as="style">
-  <link rel="stylesheet" href="style.css?v=20261125-sync-scroll2" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20261125-sync-scroll2"></noscript>
-  <link rel="stylesheet" href="src/update-manager.css?v=20261125-sync-scroll2">
+  <link rel="preload" href="style.css?v=20261125-admin1" as="style">
+  <link rel="stylesheet" href="style.css?v=20261125-admin1" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20261125-admin1"></noscript>
+  <link rel="stylesheet" href="src/update-manager.css?v=20261125-admin1">
   <script>
     function showViaggioStartupError(detail) {
       if (!document.body || document.body.dataset.session !== 'loading') return;
@@ -142,6 +142,7 @@
           </div>
         </div>
         <div id="trip_heading" class="trip-heading"><h1 class="home-title">Minhas Viagens</h1></div>
+        <button id="admin_home_button" type="button" class="admin-entry" hidden>Administração <span aria-hidden="true">›</span></button>
       </header>
       <header class="calendar-toolbar"><img src="assets/splash-plane.png" alt="Viaggio"><h1>Calendário</h1><button id="calendar_menu_button" type="button" aria-label="Busca e filtros" aria-controls="home_discovery" aria-expanded="false">•••</button></header>
       <button id="calendar_menu_scrim" class="calendar-menu-scrim" type="button" aria-label="Fechar busca e filtros" hidden></button>
@@ -281,6 +282,7 @@
           <section class="form-section"><h3>Conta</h3>
             <div class="form-group"><div class="form-row static-row"><span>Perfil criado em</span><output id="profile_created_at"></output></div></div>
             <div class="form-group account-actions">
+              <button id="admin_profile_button" class="account-row account-row-detail" type="button" hidden><span>Administração</span><span aria-hidden="true">›</span></button>
               <button id="change_log_button" class="account-row account-row-detail" type="button"><span>Histórico de alterações</span><span aria-hidden="true">›</span></button>
               <button id="logout_button" class="account-row" type="button">Sair</button>
             </div>
@@ -576,6 +578,10 @@
       </div>
   </main>
 
+  <dialog id="admin_dialog" class="admin-dialog" aria-labelledby="admin_title">
+    <header class="admin-header"><div><small>VIAGGIO</small><h2 id="admin_title">Administração</h2></div><button id="admin_close" type="button">Concluído</button></header>
+    <div class="admin-body"><div class="admin-tools"><p id="admin_status" role="status" aria-live="polite"></p><button id="admin_refresh" type="button">Atualizar</button></div><div id="admin_content"></div></div>
+  </dialog>
   <dialog id="sync_log_dialog" class="sync-log-dialog" aria-labelledby="sync_log_heading" aria-describedby="sync_log_intro">
     <header class="sync-log-header">
       <h2 id="sync_log_heading">Histórico de sincronização</h2>
@@ -687,7 +693,7 @@
       if (legacyPending > 0) {
         location.replace('./legacy-supabase.html?recover=1');
       } else {
-        await import('./experiments/neon-pilot/app/main-neon.js?v=20261125-sync-scroll2');
+        await import('./experiments/neon-pilot/app/main-neon.js?v=20261125-admin1');
       }
     } catch (error) {
       console.error('Não foi possível validar o estado local antes da migração Neon', error);
@@ -702,6 +708,6 @@
       (retry?.parentElement || document.body).append(link);
     }
   </script>
-  <script type="module" src="src/update-manager-neon.js?v=20261125-sync-scroll2"></script>
+  <script type="module" src="src/update-manager-neon.js?v=20261125-admin1"></script>
 </body>
 </html>

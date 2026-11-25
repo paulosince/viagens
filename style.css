@@ -4160,3 +4160,42 @@ html.sync-log-scroll-locked body{position:fixed!important;top:var(--sync-log-scr
 @media(max-width:520px){#sync_log_dialog[open]{height:min(88vh,840px);height:min(88dvh,840px);max-height:min(88vh,840px);max-height:min(88dvh,840px)}}
 #sync_log_dialog .sync-conflict-section,#sync_log_dialog .sync-log-entries,#sync_log_dialog .sync-recovery-section{overflow:visible;max-height:none;min-height:0}
 #sync_log_dialog .sync-log-note,#sync_log_dialog .sync-log-header{flex:0 0 auto}
+
+/* Administrative dashboard: only server-authorized account receives data. */
+.admin-entry[hidden],#admin_profile_button[hidden]{display:none!important}
+.admin-entry{display:inline-flex;align-items:center;gap:10px;margin:4px 0 12px;padding:10px 16px;border:1px solid #c5d9ef;border-radius:16px;background:#edf5ff;color:#1762a7;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.admin-dialog{width:min(760px,calc(100% - 24px));max-width:none;height:min(92vh,850px);height:min(92dvh,850px);max-height:none;margin:auto;padding:0;border:1px solid #dce3eb;border-radius:24px;background:#f5f7fb;color:#203044;overflow:hidden;overscroll-behavior:none}
+.admin-dialog[open]{display:flex;flex-direction:column}
+.admin-dialog::backdrop{background:#17223366;backdrop-filter:blur(4px)}
+.admin-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:20px 18px 12px;flex:0 0 auto}
+.admin-header small{font-size:10px;font-weight:800;color:#617994;letter-spacing:.1em}
+.admin-header h2{font-size:24px;margin:2px 0;font-weight:800}
+.admin-header button,.admin-tools button{border:0;background:transparent;color:#1768bd;font:inherit;font-size:13px;font-weight:700;padding:10px;cursor:pointer}
+.admin-body{flex:1 1 0;min-height:0;overflow:auto;overscroll-behavior:none;padding:0 16px max(24px,env(safe-area-inset-bottom))}
+.admin-tools{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px;color:#5d6d80}
+.admin-tools p{margin:0;overflow-wrap:anywhere}
+.admin-tools button:disabled{opacity:.5}
+#admin_content{display:grid;gap:14px}
+.admin-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.admin-metric,.admin-card{background:white;border:1px solid #e2e9f1;border-radius:17px;padding:14px;min-width:0}
+.admin-metric strong{display:block;font-size:29px;letter-spacing:-.04em;color:#172e49}
+.admin-metric span,.admin-caption{display:block;font-size:12px;color:#69788c;line-height:1.45}
+.admin-card h3{font-size:16px;margin:0 0 10px}
+.admin-person{display:flex;gap:12px;align-items:center}
+.admin-avatar{width:54px;height:54px;flex:0 0 54px;border:3px solid #e0e8f1;border-radius:50%;display:grid;place-items:center;overflow:hidden;background:#eaf3ff;color:#2866a8;font-size:18px;font-weight:750}
+.admin-avatar[data-active="true"]{border-color:#2baf78}
+.admin-avatar img{width:100%;height:100%;object-fit:cover}
+.admin-person-name{min-width:0;flex:1}.admin-person-name strong{display:block;overflow-wrap:anywhere;font-size:15px}
+.admin-person-name small{display:block;font-size:11px;color:#748196;overflow-wrap:anywhere}
+.admin-streak{font-size:13px;color:#26835e;font-weight:800;text-align:right;flex:none}
+.admin-tags{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0}
+.admin-tag{padding:5px 8px;border-radius:9px;background:#eef3f8;font-size:11px;color:#41566d}
+.admin-line{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:12px;margin-top:9px;overflow-wrap:anywhere}
+.admin-meter{height:7px;border-radius:6px;background:#edf1f6;overflow:hidden;margin:4px 0 9px}
+.admin-meter i{height:100%;background:#3899c9;display:block;border-radius:6px}
+.admin-trips{list-style:none;padding:0;margin:7px 0 0;display:grid;gap:6px;font-size:13px}
+.admin-graph{width:100%;display:block;min-height:100px;overflow:visible}
+.admin-legend{display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:#66768a;margin-top:8px}
+.admin-day{font-size:11px;background:#edf5f0;color:#216943;border-radius:5px;padding:4px 6px}
+.admin-days{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+@media(max-width:520px){.admin-dialog{width:100%;height:94vh;height:94dvh;margin:auto 0 0;border-radius:24px 24px 0 0}}

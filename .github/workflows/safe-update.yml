@@ -32,3 +32,5 @@ jobs:
         run: node tests/cash-flow-simulator.mjs
       - name: Verify modal scroll isolation
         run: node tests/sync-log-scroll.cjs
+      - name: Verify administrative dashboard model
+        run: node tests/admin-panel.mjs

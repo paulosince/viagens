@@ -1,7 +1,8 @@
+import {createAdminPanel} from './admin-panel.mjs?v=20261125-admin1';
 import {createCashFlow} from './cash-flow.mjs?v=20261125-simulator1';
 import {mountTicketImageZoom} from './ticket-image-zoom.mjs?v=20261115-zoom1';
 import {createFoodPanel} from './food-panel.mjs?v=20261117-food4';
-import {createNeonPreview,NEON_AUTH_URL,API_ROOTS} from './backend-neon.mjs?v=20261115-photos1';
+import {createNeonPreview,NEON_AUTH_URL,API_ROOTS} from './backend-neon.mjs?v=20261125-admin1';
 import {activityPhotoForPreview} from './photo-source-neon.mjs?v=20261021-7photofix';
 import {usageRingsModel} from './usage-rings.mjs?v=20261024-home3';
 import { offlineStore } from './offline-store-neon.js?v=20261021-1';
@@ -792,6 +793,8 @@ function setUsageOpen(open) {
   dom.usageButton.setAttribute('aria-expanded', String(open));
 }
 
+let adminPanelInstance;
+function adminPanel(){return adminPanelInstance||=createAdminPanel({getClient:()=>tryNeon(5000),getUser:()=>state.user,onError:e=>console.warn('Administração/acesso diário indisponível',e)});}
 function setSessionView(session) {
   // The normal sign-in document has only one stable username/password pair.
   // Preserve explicit signup and lab flows; authenticated/offline boot is unchanged.
@@ -818,7 +821,9 @@ function setSessionView(session) {
       dom.usageNote.textContent='Consultando o armazenamento…';
     }
     restoreCachedUsage().then(() => refreshUsage({ force: true })).catch(console.warn);
+    adminPanel().sessionChanged();
   } else {
+    adminPanelInstance?.reset();
     setUsageOpen(false);
     dom.databaseUsage.textContent = '—';
     dom.storageUsage.textContent = '—';
@@ -10093,6 +10098,7 @@ document.addEventListener('visibilitychange', () => {
     if (navigator.onLine) runAutomaticSync().catch(error => console.warn('Sincronização do roteiro adiada', error));
     if (navigator.onLine && document.body.dataset.activeSheet !== 'profile') loadProfile().catch(error => console.warn('Foto do perfil aguardando atualização', error));
     refreshChatgptConnection().catch(console.warn);
+    adminPanel().sessionChanged();
   }
 });
 dom.syncStatus.addEventListener('click', () => {
