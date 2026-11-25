@@ -4163,7 +4163,15 @@ html.sync-log-scroll-locked body{position:fixed!important;top:var(--sync-log-scr
 
 /* Administrative dashboard: only server-authorized account receives data. */
 .admin-entry[hidden],#admin_profile_button[hidden]{display:none!important}
-.admin-entry{display:inline-flex;align-items:center;gap:10px;margin:4px 0 12px;padding:10px 16px;border:1px solid #c5d9ef;border-radius:16px;background:#edf5ff;color:#1762a7;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.home-header .admin-entry{display:grid;place-items:center;flex:0 0 48px;width:48px;height:48px;margin:0;padding:0;border:1px solid rgba(110,116,128,.2);border-radius:50%;background:rgba(255,255,255,.78);color:#007aff;box-shadow:0 4px 12px rgba(40,48,64,.07);cursor:pointer;transition:transform .2s ease}
+.home-header .admin-entry svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linejoin:round}
+.home-header .admin-entry:active{transform:scale(.92)}
+.home-header .admin-entry:focus-visible{outline:3px solid #1863b6;outline-offset:3px}
+.home-header .header-actions:has(.admin-entry:not([hidden])){gap:8px}
+.home-header .header-actions:has(.admin-entry:not([hidden])) .home-brand-plane{min-width:0;flex:0 1 76px}
+.home-header .header-buttons:has(.admin-entry:not([hidden])){flex:0 0 auto}
+@media(max-width:370px){.home-header .header-buttons:has(.admin-entry:not([hidden])){gap:6px}.home-header .header-buttons:has(.admin-entry:not([hidden])) #year_selector_button{padding-inline:12px}}
+@media(prefers-reduced-motion:reduce){.home-header .admin-entry{transition:none}}
 .admin-dialog{width:min(760px,calc(100% - 24px));max-width:none;height:min(92vh,850px);height:min(92dvh,850px);max-height:none;margin:auto;padding:0;border:1px solid #dce3eb;border-radius:24px;background:#f5f7fb;color:#203044;overflow:hidden;overscroll-behavior:none}
 .admin-dialog[open]{display:flex;flex-direction:column}
 .admin-dialog::backdrop{background:#17223366;backdrop-filter:blur(4px)}
