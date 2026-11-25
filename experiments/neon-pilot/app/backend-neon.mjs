@@ -80,5 +80,11 @@ export function createNeonPreview({authSdk,NeonPostgrestClient,fetchWithToken,en
  };
  const router=createRouter({projects,auth:facade.auth,functions,storage,readUsage});
  // No user data operation succeeds unless Neon JWT is presented.
- return {...router,accessToken:facade.accessToken,provider:'neon-auth-central'};
+ const adminProjectData=async()=>Promise.all(projects.map(async project=>{
+   const result=await project.client.rpc('viaggio_admin_snapshot');
+   if(result.error||!result.data?.project_owner)throw Error('Dados administrativos indisponíveis.');
+   const usage=await readUsage(project).then(r=>r.data[0]).catch(()=>null);
+   return {project:project.id,...result.data,usage};
+ }));
+ return {...router,adminProjectData,accessToken:facade.accessToken,provider:'neon-auth-central'};
 }
