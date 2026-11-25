@@ -1,4 +1,4 @@
-import {createCashFlow} from './cash-flow.mjs?v=20261119-budget-contrast1';
+import {createCashFlow} from './cash-flow.mjs?v=20261125-simulator1';
 import {mountTicketImageZoom} from './ticket-image-zoom.mjs?v=20261115-zoom1';
 import {createFoodPanel} from './food-panel.mjs?v=20261117-food4';
 import {createNeonPreview,NEON_AUTH_URL,API_ROOTS} from './backend-neon.mjs?v=20261115-photos1';
@@ -9423,6 +9423,7 @@ const cashFlow = createCashFlow({
   panel: dom.tripPanels.orcamento,
   clientForTrip: () => tryNeon(5000),
   getTrip: () => state.trips.find(t => String(t.id) === String(state.activeTripId)),
+  getPassengerCount: trip => (state.passengers.get(trip.id) || []).length,
   canEdit: () => canEditActiveTrip()
 });
 dom.budgetAdd.addEventListener('click', () => openBudgetEditor());

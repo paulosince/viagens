@@ -1,4 +1,4 @@
-const CACHE_NAME = 'viaggio-home-v179-fixed-tabs';
+const CACHE_NAME = 'viaggio-home-v180-budget-simulator';
 const MEDIA_CACHE_NAME = 'viaggio-media-v1';
 const NEON_MEDIA_CACHE_NAME = 'viaggio-neon-auth-preview-media-v1';
 const SUPABASE_CLIENT = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
@@ -16,8 +16,8 @@ const APP_SHELL = [
   './',
   './index.html',
   './style.css?v=20261122-fixed-tabs1',
-  './experiments/neon-pilot/app/main-neon.js?v=20261122-fixed-tabs1',
-  './experiments/neon-pilot/app/cash-flow.mjs?v=20261119-budget-contrast1',
+  './experiments/neon-pilot/app/main-neon.js?v=20261125-simulator1',
+  './experiments/neon-pilot/app/cash-flow.mjs?v=20261125-simulator1',
   './experiments/neon-pilot/app/food-panel.mjs?v=20261117-food4',
   './experiments/neon-pilot/app/ticket-image-zoom.mjs?v=20261115-zoom1',
   './experiments/neon-pilot/app/backend-neon.mjs?v=20261115-photos1',

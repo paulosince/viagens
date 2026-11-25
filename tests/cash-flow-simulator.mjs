@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {forecast} from '../experiments/neon-pilot/app/cash-flow.mjs';
+assert.deepEqual(Object.fromEntries(['total','shortfall','firstOver','foodDaily','transportDaily','end'].map(k=>[k,forecast({balance:344.41,days:6,people:5,food:12,rides:4,fare:2.55})[k]])),{total:666,shortfall:321.59,firstOver:4,foodDaily:60,transportDaily:51,end:-321.59});
+assert.equal(forecast({balance:344.41,days:6,people:5,food:6,rides:2,fare:2.05,reserve:30}).available,11.41);
+assert.equal(forecast({balance:100,days:2,people:1,food:20,rides:2,fare:5,extra:10,reserve:30}).firstOver,null);
+assert.equal(forecast({balance:10,days:0,people:5,food:12,rides:4,fare:2.55,extra:20}).firstOver,0);
+assert.equal(forecast({balance:0,days:3,people:2,food:0,rides:0,fare:0}).shortfall,0);
+assert.equal(forecast({balance:30,days:3,people:1,food:10,rides:0,fare:0}).end,0);
+assert.deepEqual(forecast({balance:100,days:3,people:2,food:10,rides:1,fare:2.5,extra:10}).trajectory,[65,40,15]);
+console.log('PASS deterministic cash flow forecast');

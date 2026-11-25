@@ -28,3 +28,5 @@ jobs:
           node-version: '22'
       - name: Verify safe update behavior
         run: node tests/safe-update.cjs
+      - name: Verify deterministic budget simulator
+        run: node tests/cash-flow-simulator.mjs

@@ -1,11 +1,29 @@
 // Viaggio cash flow: isolated from the legacy planning budget.
-export function createCashFlow({panel,clientForTrip,getTrip,canEdit}) {
-  let currentTrip = null, rows = [], display = 'EUR', fx = null, fxDate = null, loading = false;
+export function forecast({balance,days,people,food,rides,fare,extra=0,reserve=0}) {
+  const cents=n=>Math.round((Number(n)||0)*100);
+  const nn=n=>Math.max(0,cents(n));
+  const count=n=>Math.max(0,Math.floor(Number(n)||0));
+  const d=Math.min(365,count(days)),p=Math.max(1,count(people)),r=count(rides);
+  const b=cents(balance),f=nn(food)*p,t=nn(fare)*r*p,x=nn(extra),s=nn(reserve);
+  const daily=f+t,total=d*daily+x,usable=b-x-s;
+  const end=b-total,available=end-s;
+  const firstOver=usable<0?0:daily>0&&Math.floor(usable/daily)<d?Math.floor(usable/daily)+1:null;
+  const maxFood=d?Math.max(0,Math.floor((usable-d*t)/(d*p))):0;
+  const maxRides=d&&nn(fare)>0?Math.max(0,Math.floor((usable-d*f)/(d*p*nn(fare)))):null;
+  const maxDaily=d?Math.max(0,Math.floor(usable/d)):0;
+  const toMoney=n=>n/100;
+  return {days:d,people:p,foodDaily:toMoney(f),transportDaily:toMoney(t),daily:toMoney(daily),foodTotal:toMoney(f*d),transportTotal:toMoney(t*d),extra:toMoney(x),reserve:toMoney(s),total:toMoney(total),end:toMoney(end),available:toMoney(available),shortfall:toMoney(Math.max(0,-available)),firstOver,maxFood:toMoney(maxFood),maxRides,maxDaily:toMoney(maxDaily),trajectory:Array.from({length:d},(_,i)=>toMoney(b-x-daily*(i+1)))};
+}
+
+export function createCashFlow({panel,clientForTrip,getTrip,canEdit,getPassengerCount=()=>0}) {
+  let currentTrip = null, rows = [], display = 'EUR', fx = null, fxDate = null, loading = false, loaded = false, request = 0;
+  const scenarios = new Map();
   const money = (v,c='EUR') => new Intl.NumberFormat('pt-BR',{style:'currency',currency:c}).format(Number(v)||0);
   const euro = r => Number(r.amount)*Number(r.exchange_rate_to_eur);
   const el = (tag,cls,text) => { const n=document.createElement(tag);if(cls)n.className=cls;if(text!=null)n.textContent=text;return n; };
   const dateLocal = d => {const x=new Date(d+'T12:00:00');return x.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});};
-  const today = () => new Date().toLocaleDateString('en-CA');
+  const isoDay = d => [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');
+  const today = () => isoDay(new Date());
   const css = `
     .cf-root{display:grid;gap:14px;padding:4px 0 28px;color:#243346;color-scheme:light}
     .cf-card{background:#fff;border:1px solid rgba(125,135,150,.13);border-radius:18px;padding:17px;box-shadow:0 3px 14px rgba(0,0,0,.045);display:grid;gap:12px}
@@ -36,6 +54,21 @@ export function createCashFlow({panel,clientForTrip,getTrip,canEdit}) {
     .cf-currency-segment button:disabled{opacity:.45;cursor:not-allowed}
     .cf-switch{display:flex;align-items:center;gap:8px;color:#344358;font-size:12px}
     .cf-switch input{accent-color:#28b463;width:18px;height:18px}
+
+    .cf-sim-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+    .cf-sim-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .cf-sim-grid label,.cf-sim-field{display:grid;gap:5px;font-size:12px;font-weight:650;min-width:0}
+    .cf-sim-grid input,.cf-sim-field input{box-sizing:border-box;width:100%}
+    .cf-sim-wide{grid-column:1/-1}
+    .cf-sim-slider{width:100%;accent-color:#23966d;margin:4px 0;min-height:26px}
+    .cf-sim-result{display:grid;gap:10px}
+    .cf-sim-bar{display:flex;height:12px;background:#e7edf0;border-radius:7px;overflow:hidden}
+    .cf-sim-bar span{height:100%;transition:width .15s ease}
+    .cf-sim-days{max-height:240px;overflow-y:auto;display:grid;gap:6px}
+    .cf-sim-day{display:flex;justify-content:space-between;gap:10px;font-size:12px;padding:4px 0;border-bottom:1px solid #e7edf0}
+    .cf-sim-tip{background:#f3f6f8;border-radius:10px;padding:10px;line-height:1.5;font-size:12px;color:#344358}
+    .cf-sim-reset{border:0;background:transparent;color:#53677b;font:inherit;font-size:12px;text-decoration:underline;padding:8px;cursor:pointer}
+
   `;
   if(!document.getElementById('cf-styles')){const st=el('style');st.id='cf-styles';st.textContent=css;document.head.append(st);}
   const root=el('div','cf-root');
@@ -57,19 +90,19 @@ export function createCashFlow({panel,clientForTrip,getTrip,canEdit}) {
     root.replaceChildren();
     const start=currentTrip.start_date||today();
     const finish=new Date(start+'T12:00:00');finish.setDate(finish.getDate()+Math.max(1,Number(currentTrip.day_count)||14)-1);
-    const end=finish.toLocaleDateString('en-CA');
-    const remaining=Math.max(0,Math.round((new Date(end+'T12:00:00')-new Date(today()+'T12:00:00'))/86400000)+1);
+    const end=isoDay(finish);
+    const remaining=Math.max(0,Math.round((new Date(end+'T12:00:00')-new Date((today()<start?start:today())+'T12:00:00'))/86400000)+1);
     const credits=rows.filter(x=>x.entry_type==='credit').reduce((a,x)=>a+euro(x),0);
     const debits=rows.filter(x=>x.entry_type==='debit').reduce((a,x)=>a+euro(x),0);
     const balance=credits-debits, daily=remaining?balance/remaining:0;
     const card=()=>{const x=el('section','cf-card');root.append(x);return x;};
-    const top=card();top.append(el('div','cf-caption','SALDO DISPONÍVEL'),el('div','cf-big',fmt(balance)),el('div','cf-divider'));
+    const top=card();top.append(el('div','cf-caption','SALDO DISPONÍVEL'),el('div','cf-big',(loaded?fmt(balance):'—')),el('div','cf-divider'));
     const stats=el('div','cf-stats');
     for(const [label,val,cl] of [['Créditos',credits,'cf-green'],['Débitos',debits,'cf-red'],['Saldo',balance,'']]){
       const b=el('div');b.append(el('div','cf-caption',label),el('strong',cl,(label==='Débitos'?'−':label==='Créditos'?'+':'')+fmt(val)));stats.append(b);
     }top.append(stats);
-    const proj=card();proj.append(el('div','cf-title','▥  Projeção diária'),el('div','cf-big',fmt(daily)+' / dia'),el('div','cf-sub',remaining?('Saldo distribuído pelos '+remaining+' dias restantes, incluindo hoje.'): 'Viagem encerrada: sem dias restantes.'),el('div','cf-divider'),el('div','cf-title','Gastos por dia'),el('div','cf-caption','Comparação com o limite diário disponível'));
-    const dates=[];for(let d=new Date(start+'T12:00:00'),i=0;i<Math.min(60,Number(currentTrip.day_count)||14);i++,d.setDate(d.getDate()+1))dates.push(d.toLocaleDateString('en-CA'));
+    const proj=card();proj.append(el('div','cf-title','▥  Projeção diária'),el('div','cf-big',loaded?fmt(daily)+' / dia':'—'),el('div','cf-sub',remaining?('Saldo distribuído pelos '+remaining+' dias restantes, incluindo hoje.'): 'Viagem encerrada: sem dias restantes.'),el('div','cf-divider'),el('div','cf-title','Gastos por dia'),el('div','cf-caption','Comparação com o limite diário disponível'));
+    const dates=[];for(let d=new Date(start+'T12:00:00'),i=0;i<Math.min(60,Number(currentTrip.day_count)||14);i++,d.setDate(d.getDate()+1))dates.push(isoDay(d));
     // Historical benchmark is reconstructed for each date from its own ledger position,
     // never from today's remaining balance. Same-day credits are available to spend;
     // same-day debits are measured against the benchmark, not subtracted from it.
@@ -97,6 +130,7 @@ export function createCashFlow({panel,clientForTrip,getTrip,canEdit}) {
     const scroll=el('div');scroll.style.overflowX='auto';scroll.append(svg);proj.append(scroll);
     const legend=el('div','cf-legend');legend.innerHTML='<span><i class="cf-dot" style="background:#43a995"></i>Dentro do limite</span><span><i class="cf-dot" style="background:#dc7777"></i>Acima do limite</span><span><i class="cf-dot" style="background:#4a90d9"></i>Limite de cada dia</span>';proj.append(legend);
     proj.append(el('div','cf-sub','Cada marca azul usa o saldo disponível naquele dia, distribuído pelos dias restantes. Créditos do próprio dia entram no limite; débitos do dia são comparados a ele. Lançamentos retroativos podem recalcular o histórico.'));
+    renderSimulator(card(),balance,remaining,start);
     const list=card();const currencyRow=el('div','cf-row');currencyRow.append(el('strong',null,'Moeda de exibição'));
     const segment=el('div','cf-currency-segment');segment.dataset.currency=display;segment.setAttribute('role','group');segment.setAttribute('aria-label','Moeda de exibição');
     for(const [code,label] of [['EUR','€ EUR'],['BRL','R$ BRL']]){
@@ -113,6 +147,77 @@ export function createCashFlow({panel,clientForTrip,getTrip,canEdit}) {
     }
     if(!rows.length)list.append(el('p','cf-sub','Nenhum lançamento. Comece registrando um crédito com o saldo inicial.'));
   }
+
+  function renderSimulator(container,balance,remaining,start){
+    const id=String(currentTrip.id);
+    const group=Number(getPassengerCount(currentTrip))||0;
+    const defaults=()=>({days:remaining,people:group||1,food:12,rides:4,fare:/paris/i.test([currentTrip.name,currentTrip.destination].join(' '))?2.55:0,extra:0,reserve:0,manual:''});
+    let s=scenarios.get(id);
+    if(!s){s=defaults();scenarios.set(id,s);}
+    const head=el('div','cf-sim-head');head.append(el('div','cf-title','Simulador de orçamento'));
+    const reset=el('button','cf-sim-reset','Restaurar cenário');reset.type='button';reset.addEventListener('click',()=>{scenarios.delete(id);render();});head.append(reset);
+    container.append(head,el('div','cf-sub','Projete alimentação e transporte para todo o grupo. Os valores são cenários editáveis em euros, não lançamentos nem tarifas verificadas. Os resultados acompanham a moeda de exibição.'));
+    const grid=el('div','cf-sim-grid');
+    const out=el('div','cf-sim-result');
+    const inputs={};
+    function field(key,label,{min=0,max,step=.01,wide=false,placeholder='',range=false}={}){
+      const wrap=el('label',wide?'cf-sim-wide':null);wrap.append(el('span',null,label));
+      const n=el('input','cf-input');n.type='number';n.inputMode=step===1?'numeric':'decimal';n.min=String(min);if(max!=null)n.max=String(max);n.step=String(step);n.value=String(s[key]);n.placeholder=placeholder;wrap.append(n);inputs[key]=n;
+      let slider=null;
+      if(range){slider=el('input','cf-sim-slider');slider.type='range';slider.min=String(min);slider.max=String(max);slider.step=String(step);slider.value=n.value;slider.setAttribute('aria-label',label+' — controle deslizante');wrap.append(slider);slider.addEventListener('input',()=>{n.value=slider.value;s[key]=Number(slider.value);update();});}
+      n.addEventListener('input',()=>{if(key==='manual'&&n.value===''){s[key]='';update();return;}if(n.value===''||!n.validity.valid)return;s[key]=Number(n.value);if(slider)slider.value=n.value;update();});
+      n.addEventListener('change',()=>{if(key==='manual'&&n.value==='')return;if(n.value===''||!n.validity.valid)n.value=String(s[key]);});
+      grid.append(wrap);
+    }
+    field('manual','Saldo real da conta (€), opcional',{min:-100000000,wide:true,placeholder:loaded?String(Math.round(balance*100)/100):'Informe o saldo disponível'});
+    field('days','Dias a projetar',{max:365,step:1});
+    field('people','Pessoas',{min:1,max:1000,step:1});
+    field('food','Alimentação por pessoa/dia (€)',{max:500,step:.5,wide:true,range:true});
+    field('rides','Passagens por pessoa/dia',{max:30,step:1,wide:true,range:true});
+    field('fare','Preço médio de uma passagem (€)',{max:10000});
+    field('extra','Outros gastos pendentes (€)',{max:100000000});
+    field('reserve','Reserva para imprevistos (€)',{max:100000000,wide:true});
+    container.append(grid,el('div','cf-divider'),out);
+    const addRow=(label,value,cls='')=>{const line=el('div','cf-row');line.append(el('span','cf-sub',label),el('strong',cls,value));out.append(line);};
+    const dateAt=i=>{const d=new Date((today()<start?start:today())+'T12:00:00');d.setDate(d.getDate()+i);return dateLocal(isoDay(d));};
+    function update(){
+      out.replaceChildren();
+      const hasManual=s.manual!=='';
+      if(!hasManual&&(!loaded||loading)){out.append(el('div','cf-sim-tip',loading?'Aguardando os lançamentos. Você pode informar o saldo real acima para simular agora.':'Saldo não confirmado. Informe o saldo real acima para simular.'));return;}
+      const base=hasManual?Number(s.manual):balance;
+      const v=forecast({...s,balance:base});
+      out.append(el('div','cf-caption',hasManual?'Usando saldo informado manualmente':'Usando saldo dos lançamentos carregados'));
+      if(s.days!==remaining)out.append(el('div','cf-sub','Horizonte personalizado: '+s.days+' dias (roteiro: '+remaining+' dias restantes).'));
+      if(!group)out.append(el('div','cf-sub','Quantidade de viajantes não encontrada; ajuste o campo Pessoas.'));
+      if(s.rides>0&&s.fare===0)out.append(el('div','cf-sim-tip','A tarifa está em zero. Se houver transporte pago, informe o valor médio antes de confiar na projeção.'));
+      addRow('Alimentação por dia · grupo',fmt(v.foodDaily));
+      addRow('Transporte por dia · grupo',fmt(v.transportDaily));
+      addRow('Gasto diário combinado',fmt(v.daily));
+      addRow('Limite diário após extras e reserva',fmt(v.maxDaily));
+      addRow('Alimentação no período',fmt(v.foodTotal));
+      addRow('Transporte no período',fmt(v.transportTotal));
+      addRow('Despesas previstas',fmt(v.total));
+      addRow('Saldo final previsto',fmt(v.end),v.end<0?'cf-red':'cf-green');
+      if(v.reserve) addRow('Reserva separada',fmt(v.reserve));
+      const totalWithReserve=v.total+v.reserve, scale=Math.max(1,Math.max(0,base),totalWithReserve);
+      const bar=el('div','cf-sim-bar');bar.setAttribute('role','img');bar.setAttribute('aria-label','Proporção do saldo disponível e do valor que falta');
+      for(const [val,color] of [[Math.min(Math.max(0,base),totalWithReserve),'#23966d'],[Math.max(0,totalWithReserve-Math.max(0,base)),'#d46565']]){const part=el('span');part.style.width=String(val/scale*100)+'%';part.style.background=color;bar.append(part);}
+      out.append(bar,el('div','cf-caption',v.shortfall>0?'DINHEIRO ADICIONAL NECESSÁRIO':'SALDO LIVRE APÓS A RESERVA'),el('div','cf-big '+(v.shortfall>0?'cf-red':'cf-green'),fmt(v.shortfall>0?v.shortfall:v.available)));
+      const tip=text=>out.append(el('div','cf-sim-tip',text));
+      if(v.firstOver===0)tip('Os gastos pendentes e a reserva já superam o saldo disponível, antes das despesas diárias.');
+      else if(v.firstOver!==null)tip('O orçamento ultrapassa o saldo utilizável em '+dateAt(v.firstOver-1)+' (dia '+v.firstOver+' da projeção). A data pressupõe gastos uniformes e extras reservados agora.');
+      else if(v.days)tip(v.available===0?'O cenário consome todo o saldo livre. Qualquer gasto adicional gera déficit.':'O cenário cabe no orçamento. Mantenha a reserva e atualize os valores conforme os gastos reais.');
+      if(v.shortfall>0&&v.days){
+        if(v.maxFood<s.food)tip('Mantendo o transporte, o limite de alimentação por pessoa/dia é '+money(v.maxFood)+'. Se for insuficiente para se alimentar adequadamente, reforce o saldo ou reduza outros gastos.');
+        if(v.maxRides!==null&&v.maxRides<s.rides)tip('Mantendo a alimentação, o limite é de '+v.maxRides+' passagem(ns) paga(s) por pessoa/dia, se a tarifa permanecer igual.');
+        if(v.maxFood===0)tip('Apenas os demais gastos podem consumir o orçamento: não conte com alimentação gratuita para compensar.');
+        tip('Priorize alimentação, deslocamentos essenciais e retorno. Compare tarifas, agrupe passeios próximos e confira os gastos pendentes.');
+      }
+      if(v.days){out.append(el('div','cf-title','Saldo projetado por dia'));const list=el('div','cf-sim-days');for(const [i,value] of v.trajectory.entries()){const row=el('div','cf-sim-day');row.append(el('span',null,dateAt(i)),el('strong',value<v.reserve?'cf-red':'cf-green',fmt(value)));list.append(row);}out.append(list,el('div','cf-sub','Saldo ao fim de cada dia, descontando os extras antecipadamente. Vermelho indica saldo abaixo da reserva. Não inclui despesas não informadas.'));}
+    }
+    update();
+  }
+
   function showForm(container){
     const old=container.querySelector('.cf-form');if(old){old.remove();return;}
     const form=el('form','cf-form');const seg=el('div','cf-segment');let kind='debit';
@@ -134,9 +239,12 @@ export function createCashFlow({panel,clientForTrip,getTrip,canEdit}) {
     container.insertBefore(form,status);
   }
   async function load(trip){
-    currentTrip=trip;if(!trip)return;status.textContent='Atualizando lançamentos…';render();
-    try{const client=await clientForTrip();if(!client)throw Error('Sem conexão Neon');const res=await client.from('cash_flow_entries').select('*').eq('trip_id',trip.id).order('entry_date',{ascending:false});if(res.error)throw res.error;if(currentTrip.id!==trip.id)return;rows=res.data||[];status.textContent='';render();}
-    catch(e){status.textContent='Não foi possível consultar os lançamentos: '+e.message;render();}
+    if(!trip)return;
+    if(currentTrip?.id!==trip.id){rows=[];loaded=false;}
+    currentTrip=trip;const token=++request;loading=true;status.textContent='Atualizando lançamentos…';render();
+    try{const client=await clientForTrip();if(!client)throw Error('Sem conexão Neon');const res=await client.from('cash_flow_entries').select('*').eq('trip_id',trip.id).order('entry_date',{ascending:false});if(res.error)throw res.error;if(token!==request)return;rows=res.data||[];loaded=true;status.textContent='';}
+    catch(e){if(token!==request)return;loaded=false;status.textContent='Não foi possível consultar os lançamentos: '+e.message;}
+    finally{if(token===request){loading=false;render();}}
   }
   rate();
   return {load};
