@@ -1,4 +1,4 @@
-import {createAdminPanel} from './admin-panel.mjs?v=20261125-adminphotos1';
+import {createAdminPanel} from './admin-panel.mjs?v=20261125-admingraph1';
 import {createCashFlow} from './cash-flow.mjs?v=20261125-simulator1';
 import {mountTicketImageZoom} from './ticket-image-zoom.mjs?v=20261115-zoom1';
 import {createFoodPanel} from './food-panel.mjs?v=20261117-food4';

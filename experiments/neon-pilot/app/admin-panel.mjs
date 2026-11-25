@@ -37,6 +37,13 @@ const initial=name=>String(name||'?').trim().split(/\s+/).slice(0,2).map(x=>x[0]
 const roleLabel=r=>r==='owner'?'Criador':r==='editor'?'Edição':r==='viewer'?'Visualização':String(r||'Não informado');
 const safeImage=x=>{try{const u=new URL(x);return u.protocol==='https:'?u.href:null;}catch{return null;}};
 const displayImage=u=>u.profilePhotoUrl||safeImage(u.image);
+const dayCount=n=>n+' '+(n===1?'dia':'dias');
+// Share the native HTML renderer to avoid WebKit SVG image/blob inconsistencies.
+export function createAdminAvatarImage(user,onError=()=>{},doc=document){
+ const src=displayImage(user);if(!src)return null;
+ const img=doc.createElement('img');img.alt='';img.draggable=false;
+ img.addEventListener('error',onError,{once:true});img.src=src;return img;
+}
 const bytes=n=>{if(n==null||!Number.isFinite(Number(n)))return 'N/D';const v=Number(n);return v>=1e9?(v/1e9).toLocaleString('pt-BR',{maximumFractionDigits:2})+' GB':v>=1e6?(v/1e6).toLocaleString('pt-BR',{maximumFractionDigits:1})+' MB':v.toLocaleString('pt-BR')+' B';};
 const svgNode=(tag,attrs={})=>{const e=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,String(v));return e;};
 function renderGraph(model,host){
@@ -44,20 +51,24 @@ function renderGraph(model,host){
  if(!model.edges.length){card.append(node('p','Nenhum vínculo ativo registrado.','admin-caption'));host.append(card);return;}
  // Fixed columns with independent vertical positions; all edges share the same role legend.
  const users=model.users,trips=model.trips,height=Math.max(120,users.length*72,trips.length*66)+20,width=330;
- const svg=svgNode('svg',{viewBox:'0 0 '+width+' '+height,class:'admin-graph',role:'img','aria-label':'Grafo de usuários e viagens, com conexões por tipo de permissão'});
+ const graph=node('div',null,'admin-graph-wrap');
+ const svg=svgNode('svg',{viewBox:'0 0 '+width+' '+height,width,height,class:'admin-graph',role:'img','aria-label':'Grafo de usuários e viagens, com conexões por tipo de permissão'});
+ graph.append(svg);
  const uy=new Map(users.map((u,i)=>[u.id,36+i*72])),ty=new Map(trips.map((t,i)=>[t.id,36+i*66]));
  for(const edge of model.edges){const a=uy.get(edge.userId),b=ty.get(edge.tripId);if(a==null||b==null)continue;const color=edge.role==='owner'?'#23895d':edge.role==='editor'?'#2579c4':edge.role==='viewer'?'#a77c34':'#8795a5';svg.append(svgNode('path',{d:'M 48 '+a+' C 120 '+a+', 155 '+b+', 205 '+b,fill:'none',stroke:color,'stroke-width':edge.role==='owner'?2.8:1.7,'stroke-dasharray':edge.role==='viewer'?'4 4':'none',opacity:.75}));}
- for(const [i,u] of users.entries()){const y=uy.get(u.id),r=19,cx=26,ratio=Math.min(1,u.streak.current/7),circ=2*Math.PI*22;
- const clip=svgNode('clipPath',{id:'admin-avatar-'+i});clip.append(svgNode('circle',{cx,cy:y,r}));svg.append(clip);
+ for(const u of users){const y=uy.get(u.id),r=19,cx=26,ratio=Math.min(1,u.streak.current/7),circ=2*Math.PI*22;
  svg.append(svgNode('circle',{cx,cy:y,r:22,fill:'white',stroke:'#dbe6ef','stroke-width':3}));
  if(ratio>0)svg.append(svgNode('circle',{cx,cy:y,r:22,fill:'none',stroke:'#29aa76','stroke-width':3,'stroke-dasharray':(circ*ratio)+' '+circ,transform:'rotate(-90 '+cx+' '+y+')'}));
  svg.append(svgNode('circle',{cx,cy:y,r,fill:'#eaf3ff'}));
  const label=svgNode('text',{x:cx,y:y+4,'text-anchor':'middle','font-size':11,fill:'#2465a5','font-weight':700});label.textContent=initial(u.name);svg.append(label);
- const image=displayImage(u);if(image)svg.append(svgNode('image',{href:image,x:cx-r,y:y-r,width:2*r,height:2*r,'clip-path':'url(#admin-avatar-'+i+')',preserveAspectRatio:'xMidYMid slice'}));
+ const overlay=node('div',null,'admin-graph-photo');overlay.setAttribute('aria-hidden','true');
+ overlay.style.left=(cx-r)/width*100+'%';overlay.style.top=(y-r)/height*100+'%';overlay.style.width=2*r/width*100+'%';
+ const photo=createAdminAvatarImage(u,()=>overlay.remove());
+ if(photo){overlay.append(photo);graph.append(overlay);}
  const name=svgNode('text',{x:52,y:y-6,'font-size':10,fill:'#223951','font-weight':700});name.textContent=String(u.name||u.email||'Usuário').slice(0,19);svg.append(name);
- const streak=svgNode('text',{x:52,y:y+8,'font-size':9,fill:'#287d5b'});streak.textContent=u.streak.current+' dias';svg.append(streak);}
+ const streak=svgNode('text',{x:52,y:y+8,'font-size':9,fill:'#287d5b'});streak.textContent=dayCount(u.streak.current);svg.append(streak);}
  for(const t of trips){const y=ty.get(t.id);svg.append(svgNode('rect',{x:205,y:y-17,width:122,height:34,rx:8,fill:'#f1f5fa',stroke:'#dce5ee'}));const n=svgNode('text',{x:214,y:y+4,'font-size':10,fill:'#213a55','font-weight':650});n.textContent=String(t.name).slice(0,21);const full=svgNode('title');full.textContent=t.name;n.append(full);svg.append(n);}
- card.append(svg);const legend=node('div',null,'admin-legend');for(const [label,color] of [['Criação','#23895d'],['Edição','#2579c4'],['Visualização','#a77c34']]){const x=node('span',label);x.style.borderLeft='3px solid '+color;x.style.paddingLeft='5px';legend.append(x);}card.append(legend,node('p','O anel corresponde aos dias consecutivos, completando a volta aos 7 dias; o número mostra o streak real.','admin-caption'));host.append(card);
+ card.append(graph);const legend=node('div',null,'admin-legend');for(const [label,color] of [['Criação','#23895d'],['Edição','#2579c4'],['Visualização','#a77c34']]){const x=node('span',label);x.style.borderLeft='3px solid '+color;x.style.paddingLeft='5px';legend.append(x);}card.append(legend,node('p','O anel corresponde aos dias consecutivos, completando a volta aos 7 dias; o número mostra o streak real.','admin-caption'));host.append(card);
 }
 function render(model,host){
  host.replaceChildren();const grid=node('div',null,'admin-grid');
@@ -66,8 +77,8 @@ function render(model,host){
  if(model.unmapped)host.append(node('p',model.unmapped+' vínculos não puderam ser associados a uma conta central. Não foram atribuídos por suposição.','admin-caption'));
  const heading=node('h3','Usuários');heading.style.margin='4px 0 0';host.append(heading);
  for(const u of model.users){const card=node('section',null,'admin-card'),person=node('div',null,'admin-person'),avatar=node('div',initial(u.name),'admin-avatar');avatar.dataset.active=String(u.streak.active);
- const img=displayImage(u);if(img){const photo=node('img');photo.alt='';photo.src=img;photo.addEventListener('error',()=>{avatar.textContent=initial(u.name)});avatar.replaceChildren(photo);}
- const name=node('div',null,'admin-person-name');name.append(node('strong',u.name||'Usuário'),node('small',u.email||''));person.append(avatar,name,node('div',u.streak.current+' dias','admin-streak'));card.append(person);
+ const photo=createAdminAvatarImage(u,()=>{avatar.textContent=initial(u.name)});if(photo)avatar.replaceChildren(photo);
+ const name=node('div',null,'admin-person-name');name.append(node('strong',u.name||'Usuário'),node('small',u.email||''));person.append(avatar,name,node('div',dayCount(u.streak.current),'admin-streak'));card.append(person);
  const tags=node('div',null,'admin-tags');for(const t of [u.owned.length+' próprias',u.shared.length+' compartilhadas',u.verified?'E-mail confirmado':'E-mail não confirmado','Recorde: '+u.streak.best+' dias'])tags.append(node('span',t,'admin-tag'));card.append(tags);
  const list=node('ul',null,'admin-trips');for(const t of [...u.owned,...u.shared])list.append(node('li',t.name+' · '+roleLabel(t.role)));if(list.children.length)card.append(list);else card.append(node('p','Nenhuma viagem ativa associada.','admin-caption'));
  for(const q of u.quotas){for(const [label,used,limit] of [['Banco de dados do projeto',q.database_bytes,q.database_quota_bytes],['Arquivos registrados',q.registered_storage_bytes,q.storage_quota_bytes]]){const line=node('div',null,'admin-line'),meter=node('div',null,'admin-meter'),bar=node('i');const pct=Number(limit)>0&&used!=null?100*Number(used)/Number(limit):null;line.append(node('span',label),node('strong',bytes(used)+' / '+bytes(limit)));bar.style.width=Math.max(0,Math.min(100,pct||0))+'%';meter.append(bar);card.append(line,meter);}}

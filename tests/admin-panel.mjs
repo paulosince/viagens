@@ -1,7 +1,7 @@
 
 import assert from 'node:assert/strict';
 import {adminPhotoSources} from '../experiments/neon-pilot/app/backend-neon.mjs';
-import {streakModel,buildAdminModel} from '../experiments/neon-pilot/app/admin-panel.mjs';
+import {streakModel,buildAdminModel,createAdminAvatarImage} from '../experiments/neon-pilot/app/admin-panel.mjs';
 assert.equal(streakModel(['2026-11-22','2026-11-23','2026-11-24','2026-11-24'],'2026-11-25').current,3);
 assert.equal(streakModel(['2026-11-20','2026-11-22'],'2026-11-25').current,0);
 assert.equal(streakModel(['2026-11-24','2026-11-25'],'2026-11-25').best,2);
@@ -12,3 +12,6 @@ console.log('PASS: admin model, permissions, deduplication, streak and quota att
 
 const photos=adminPhotoSources(p.accounts,[{profile_photos:[{id:'a',path:'legacy/a.jpg',is_home:false},{id:'b',path:'legacy/b.jpg',is_home:true},{id:'c',path:'../secret.jpg',is_home:true},{id:'outsider',path:'legacy/private.jpg'}]},{profile_photos:[{id:'a',path:'legacy/a-home.jpg',is_home:true}]}]);
 assert.equal(photos.size,2);assert.equal(photos.get('a')[0].index,1);assert.equal(photos.get('a')[0].path,'legacy/a-home.jpg');assert.equal(photos.has('c'),false);assert.equal(photos.has('outsider'),false);console.log('PASS: administrative avatar source selection');
+
+const events=new Map();const imageElement={addEventListener:(name,fn)=>events.set(name,fn)};const fakeDoc={createElement(tag){assert.equal(tag,'img');return imageElement;}};let fallback=0;
+assert.equal(createAdminAvatarImage({profilePhotoUrl:'blob:private-avatar'},()=>fallback++,fakeDoc),imageElement);assert.equal(imageElement.src,'blob:private-avatar');events.get('error')();assert.equal(fallback,1);assert.equal(createAdminAvatarImage({image:'https://example.test/avatar.jpg'},undefined,fakeDoc).src,'https://example.test/avatar.jpg');assert.equal(createAdminAvatarImage({},undefined,fakeDoc),null);assert.equal(createAdminAvatarImage({image:'javascript:invalid'},undefined,fakeDoc),null);console.log('PASS: native avatar image and fallback');

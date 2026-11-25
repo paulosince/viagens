@@ -4202,7 +4202,10 @@ html.sync-log-scroll-locked body{position:fixed!important;top:var(--sync-log-scr
 .admin-meter{height:7px;border-radius:6px;background:#edf1f6;overflow:hidden;margin:4px 0 9px}
 .admin-meter i{height:100%;background:#3899c9;display:block;border-radius:6px}
 .admin-trips{list-style:none;padding:0;margin:7px 0 0;display:grid;gap:6px;font-size:13px}
-.admin-graph{width:100%;display:block;min-height:100px;overflow:visible}
+.admin-graph-wrap{position:relative;width:100%}
+.admin-graph{width:100%;height:auto;display:block;overflow:visible}
+.admin-graph-photo{position:absolute;aspect-ratio:1;border-radius:50%;overflow:hidden;pointer-events:none}
+.admin-graph-photo img{display:block;width:100%;height:100%;object-fit:cover;border-radius:50%}
 .admin-legend{display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:#66768a;margin-top:8px}
 .admin-day{font-size:11px;background:#edf5f0;color:#216943;border-radius:5px;padding:4px 6px}
 .admin-days{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
