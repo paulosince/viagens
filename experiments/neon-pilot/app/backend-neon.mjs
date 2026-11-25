@@ -42,6 +42,20 @@ const MEDIA_WRITE=Object.freeze({
 // The Neon Functions have rejected missing and forged JWTs (401/403).
 // Enable READ ONLY pending a positive real-user JWT authorization test.
 // Never enable mutations until their separate positive and negative tests pass.
+
+export function adminPhotoSources(accounts,snapshots){
+ const ids=new Set(accounts.users.map(u=>String(u.id))),sources=new Map();
+ for(const [index,snapshot] of snapshots.entries()){
+  for(const photo of snapshot.profile_photos||[]){
+   const id=String(photo.id),path=photo.path;
+   if(!ids.has(id)||typeof path!=='string'||!path||path.length>900||path.split('/').some(x=>!x||x==='.'||x==='..')||/[\\?#\x00-\x1f\x7f]/.test(path))continue;
+   const list=sources.get(id)||[];list.push({index,path,isHome:photo.is_home===true});sources.set(id,list);
+  }
+ }
+ for(const list of sources.values())list.sort((a,b)=>Number(b.isHome)-Number(a.isHome));
+ return sources;
+}
+
 export function createNeonPreview({authSdk,NeonPostgrestClient,fetchWithToken,enableMediaWrites=false}){
  if(!authSdk?.auth||!NeonPostgrestClient||!fetchWithToken)throw Error('Neon SDK não inicializado.');
  // Token-provider calls the official Neon Auth adapter, which manages
@@ -88,7 +102,28 @@ export function createNeonPreview({authSdk,NeonPostgrestClient,fetchWithToken,en
      // Fail closed: all three server-authorized sources must return successfully.
      const [accounts,...snapshots]=await Promise.all([checked(centralAdmin.rpc('admin_accounts')),...projects.map(p=>checked(p.client.rpc('viaggio_admin_snapshot')))]);
      if(!accounts||!Array.isArray(accounts.users)||snapshots.some(s=>!s||!Array.isArray(s.identities)||!Array.isArray(s.trips)||!Array.isArray(s.memberships)))throw Error('Resposta administrativa incompleta.');
-     return {accounts,snapshots};
+     // Fetch the private bytes through the existing JWT-verified media gateway.
+     // Never create public URLs, cache the pictures, or grant access to other buckets.
+     const photoBlobs=new Map(), sources=adminPhotoSources(accounts,snapshots);
+     const queue=[...sources.entries()];
+     const jwt=queue.length?await getToken():null;
+     if(jwt)await Promise.all(Array.from({length:Math.min(4,queue.length)},async()=>{
+       while(queue.length){
+         const [id,candidates]=queue.shift();
+         for(const candidate of candidates){
+           try{
+             const endpoint=projects[candidate.index]?.media;if(!endpoint)continue;
+             const url=new URL('download',endpoint);
+             url.searchParams.set('bucket','profile-photos');url.searchParams.set('path',candidate.path);
+             const r=await fetch(url.href,{headers:{authorization:'Bearer '+jwt},cache:'no-store',credentials:'omit',redirect:'error',referrerPolicy:'no-referrer',signal:AbortSignal.timeout(12000)});
+             if(!r.ok)continue;
+             const blob=await r.blob();
+             if(blob.size>0&&blob.size<=25000000&&/^image\/(jpeg|png|webp|gif|avif)$/i.test(blob.type)){photoBlobs.set(id,blob);break;}
+           }catch{/* An unavailable avatar must not hide the dashboard. */}
+         }
+       }
+     }));
+     return {accounts,snapshots,photoBlobs};
    }
  };
  // No user data operation succeeds unless Neon JWT is presented.

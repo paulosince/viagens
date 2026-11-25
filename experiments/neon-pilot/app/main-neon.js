@@ -1,8 +1,8 @@
-import {createAdminPanel} from './admin-panel.mjs?v=20261125-admin1';
+import {createAdminPanel} from './admin-panel.mjs?v=20261125-adminphotos1';
 import {createCashFlow} from './cash-flow.mjs?v=20261125-simulator1';
 import {mountTicketImageZoom} from './ticket-image-zoom.mjs?v=20261115-zoom1';
 import {createFoodPanel} from './food-panel.mjs?v=20261117-food4';
-import {createNeonPreview,NEON_AUTH_URL,API_ROOTS} from './backend-neon.mjs?v=20261125-admin1';
+import {createNeonPreview,NEON_AUTH_URL,API_ROOTS} from './backend-neon.mjs?v=20261125-adminphotos1';
 import {activityPhotoForPreview} from './photo-source-neon.mjs?v=20261021-7photofix';
 import {usageRingsModel} from './usage-rings.mjs?v=20261024-home3';
 import { offlineStore } from './offline-store-neon.js?v=20261021-1';

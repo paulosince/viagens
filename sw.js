@@ -1,4 +1,4 @@
-const CACHE_NAME = 'viaggio-home-v184-admin-icon';
+const CACHE_NAME = 'viaggio-home-v185-admin-photos';
 const MEDIA_CACHE_NAME = 'viaggio-media-v1';
 const NEON_MEDIA_CACHE_NAME = 'viaggio-neon-auth-preview-media-v1';
 const SUPABASE_CLIENT = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
@@ -16,12 +16,12 @@ const APP_SHELL = [
   './',
   './index.html',
   './style.css?v=20261125-admin2',
-  './experiments/neon-pilot/app/main-neon.js?v=20261125-admin1',
+  './experiments/neon-pilot/app/main-neon.js?v=20261125-adminphotos1',
   './experiments/neon-pilot/app/cash-flow.mjs?v=20261125-simulator1',
   './experiments/neon-pilot/app/food-panel.mjs?v=20261117-food4',
   './experiments/neon-pilot/app/ticket-image-zoom.mjs?v=20261115-zoom1',
-  './experiments/neon-pilot/app/backend-neon.mjs?v=20261125-admin1',
-  './experiments/neon-pilot/app/admin-panel.mjs?v=20261125-admin1',
+  './experiments/neon-pilot/app/backend-neon.mjs?v=20261125-adminphotos1',
+  './experiments/neon-pilot/app/admin-panel.mjs?v=20261125-adminphotos1',
   './experiments/neon-pilot/app/usage-rings.mjs?v=20261024-home3',
   './experiments/neon-pilot/app/offline-store-neon.js?v=20261021-1',
   './experiments/neon-pilot/app/ticket-offline.mjs?v=20261121-offline1',
@@ -35,9 +35,9 @@ const APP_SHELL = [
   './legacy-supabase.html',
   './src/main.js?v=20261018-64',
   './src/media-cache.js?v=20261007-62',
-  './src/update-manager-neon.js?v=20261125-admin2',
+  './src/update-manager-neon.js?v=20261125-adminphotos1',
   './src/update-manager.js?v=20261018-63',
-  './src/update-manager.css?v=20261125-admin2',
+  './src/update-manager.css?v=20261125-adminphotos1',
   './manifest.webmanifest',
   './assets/app-icon.svg',
   './assets/avatar-placeholder.svg',

@@ -36,6 +36,7 @@ const node=(tag,text,cls)=>{const e=document.createElement(tag);if(text!=null)e.
 const initial=name=>String(name||'?').trim().split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toUpperCase()||'?';
 const roleLabel=r=>r==='owner'?'Criador':r==='editor'?'Edição':r==='viewer'?'Visualização':String(r||'Não informado');
 const safeImage=x=>{try{const u=new URL(x);return u.protocol==='https:'?u.href:null;}catch{return null;}};
+const displayImage=u=>u.profilePhotoUrl||safeImage(u.image);
 const bytes=n=>{if(n==null||!Number.isFinite(Number(n)))return 'N/D';const v=Number(n);return v>=1e9?(v/1e9).toLocaleString('pt-BR',{maximumFractionDigits:2})+' GB':v>=1e6?(v/1e6).toLocaleString('pt-BR',{maximumFractionDigits:1})+' MB':v.toLocaleString('pt-BR')+' B';};
 const svgNode=(tag,attrs={})=>{const e=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,String(v));return e;};
 function renderGraph(model,host){
@@ -52,7 +53,7 @@ function renderGraph(model,host){
  if(ratio>0)svg.append(svgNode('circle',{cx,cy:y,r:22,fill:'none',stroke:'#29aa76','stroke-width':3,'stroke-dasharray':(circ*ratio)+' '+circ,transform:'rotate(-90 '+cx+' '+y+')'}));
  svg.append(svgNode('circle',{cx,cy:y,r,fill:'#eaf3ff'}));
  const label=svgNode('text',{x:cx,y:y+4,'text-anchor':'middle','font-size':11,fill:'#2465a5','font-weight':700});label.textContent=initial(u.name);svg.append(label);
- const image=safeImage(u.image);if(image)svg.append(svgNode('image',{href:image,x:cx-r,y:y-r,width:2*r,height:2*r,'clip-path':'url(#admin-avatar-'+i+')',preserveAspectRatio:'xMidYMid slice'}));
+ const image=displayImage(u);if(image)svg.append(svgNode('image',{href:image,x:cx-r,y:y-r,width:2*r,height:2*r,'clip-path':'url(#admin-avatar-'+i+')',preserveAspectRatio:'xMidYMid slice'}));
  const name=svgNode('text',{x:52,y:y-6,'font-size':10,fill:'#223951','font-weight':700});name.textContent=String(u.name||u.email||'Usuário').slice(0,19);svg.append(name);
  const streak=svgNode('text',{x:52,y:y+8,'font-size':9,fill:'#287d5b'});streak.textContent=u.streak.current+' dias';svg.append(streak);}
  for(const t of trips){const y=ty.get(t.id);svg.append(svgNode('rect',{x:205,y:y-17,width:122,height:34,rx:8,fill:'#f1f5fa',stroke:'#dce5ee'}));const n=svgNode('text',{x:214,y:y+4,'font-size':10,fill:'#213a55','font-weight':650});n.textContent=String(t.name).slice(0,21);const full=svgNode('title');full.textContent=t.name;n.append(full);svg.append(n);}
@@ -65,7 +66,7 @@ function render(model,host){
  if(model.unmapped)host.append(node('p',model.unmapped+' vínculos não puderam ser associados a uma conta central. Não foram atribuídos por suposição.','admin-caption'));
  const heading=node('h3','Usuários');heading.style.margin='4px 0 0';host.append(heading);
  for(const u of model.users){const card=node('section',null,'admin-card'),person=node('div',null,'admin-person'),avatar=node('div',initial(u.name),'admin-avatar');avatar.dataset.active=String(u.streak.active);
- const img=safeImage(u.image);if(img){const photo=node('img');photo.alt='';photo.src=img;photo.addEventListener('error',()=>{avatar.textContent=initial(u.name)});avatar.replaceChildren(photo);}
+ const img=displayImage(u);if(img){const photo=node('img');photo.alt='';photo.src=img;photo.addEventListener('error',()=>{avatar.textContent=initial(u.name)});avatar.replaceChildren(photo);}
  const name=node('div',null,'admin-person-name');name.append(node('strong',u.name||'Usuário'),node('small',u.email||''));person.append(avatar,name,node('div',u.streak.current+' dias','admin-streak'));card.append(person);
  const tags=node('div',null,'admin-tags');for(const t of [u.owned.length+' próprias',u.shared.length+' compartilhadas',u.verified?'E-mail confirmado':'E-mail não confirmado','Recorde: '+u.streak.best+' dias'])tags.append(node('span',t,'admin-tag'));card.append(tags);
  const list=node('ul',null,'admin-trips');for(const t of [...u.owned,...u.shared])list.append(node('li',t.name+' · '+roleLabel(t.role)));if(list.children.length)card.append(list);else card.append(node('p','Nenhuma viagem ativa associada.','admin-caption'));
@@ -78,11 +79,14 @@ function render(model,host){
 }
 export function createAdminPanel({getClient,getUser,onError=()=>{}}){
  const entry=document.getElementById('admin_home_button'),profile=document.getElementById('admin_profile_button'),dialog=document.getElementById('admin_dialog'),status=document.getElementById('admin_status'),content=document.getElementById('admin_content'),refresh=document.getElementById('admin_refresh');
- let generation=0,actor=null,allowed=false,checking=null,lastAccess='',lastAttempt=0;
+ let generation=0,actor=null,allowed=false,checking=null,lastAccess='',lastAttempt=0,loadId=0;
+ const photoUrls=new Set();
+ function releasePhotos(){for(const url of photoUrls)URL.revokeObjectURL(url);photoUrls.clear();}
+ function clearContent(){content?.replaceChildren();releasePhotos();}
  const show=value=>{for(const e of [entry,profile])if(e)e.hidden=!value;};
  const key=()=>String(getUser()?.neon_subject||'');
  const accessDay=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
- function reset(){generation++;actor=null;allowed=false;checking=null;lastAccess='';lastAttempt=0;show(false);content?.replaceChildren();if(dialog?.open)dialog.close();}
+ function reset(){generation++;loadId++;actor=null;allowed=false;checking=null;lastAccess='';lastAttempt=0;show(false);clearContent();if(dialog?.open)dialog.close();}
  async function sessionChanged(){
   const id=key();if(!id){reset();return;}
   if(actor!==id){reset();actor=id;}
@@ -98,20 +102,28 @@ export function createAdminPanel({getClient,getUser,onError=()=>{}}){
    const ok=await client.admin.allowed();
    if(g!==generation||key()!==id)return;
    allowed=ok;show(ok);
-   if(!ok){content?.replaceChildren();if(dialog?.open)dialog.close();}
+   if(!ok){loadId++;clearContent();if(dialog?.open)dialog.close();}
   })().catch(e=>{if(g===generation){allowed=false;show(false);if(dialog?.open)dialog.close();}onError(e);}).finally(()=>{if(checking===task)checking=null;});
   checking=task;return task;
  }
  async function load(){
   const g=generation,id=key();if(!allowed||!id||!dialog?.open)return;
-  content.replaceChildren();status.textContent='Consultando dados dos três bancos…';refresh.disabled=true;
-  try{const client=await getClient();if(!client?.admin)throw Error('Sem conexão.');const data=await client.admin.overview();if(g!==generation||key()!==id||!dialog.open)return;render(buildAdminModel(data),content);status.textContent='Dados consultados agora';}
-  catch(e){if(g===generation&&key()===id){status.textContent='Não foi possível consultar todos os dados. Nenhum total parcial será exibido.';content.replaceChildren();}onError(e);}
-  finally{if(g===generation)refresh.disabled=false;}
+  const request=++loadId;
+  clearContent();status.textContent='Consultando dados e fotos de perfil…';refresh.disabled=true;
+  try{
+   const client=await getClient();if(!client?.admin)throw Error('Sem conexão.');
+   const data=await client.admin.overview();
+   if(g!==generation||key()!==id||request!==loadId||!dialog.open||!allowed)return;
+   const model=buildAdminModel(data);
+   for(const u of model.users){const blob=data.photoBlobs?.get(u.id);if(blob){const url=URL.createObjectURL(blob);photoUrls.add(url);u.profilePhotoUrl=url;}}
+   render(model,content);status.textContent='Dados consultados agora';
+  }
+  catch(e){if(g===generation&&key()===id&&request===loadId){status.textContent='Não foi possível consultar todos os dados. Nenhum total parcial será exibido.';clearContent();}onError(e);}
+  finally{if(g===generation&&request===loadId)refresh.disabled=false;}
  }
  function open(){if(!allowed||!dialog||!key())return;dialog.showModal();load();}
  entry?.addEventListener('click',open);profile?.addEventListener('click',open);refresh?.addEventListener('click',load);
  document.getElementById('admin_close')?.addEventListener('click',()=>dialog?.close());
- dialog?.addEventListener('close',()=>{content?.replaceChildren();});
+ dialog?.addEventListener('close',()=>{loadId++;clearContent();refresh.disabled=false;});
  show(false);return {sessionChanged,reset};
 }
