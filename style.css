@@ -4071,7 +4071,7 @@ body[data-home-tab="calendar"] .home-bottom .sync-status[data-kind="offline"] {c
 body[data-home-tab="calendar"] .home-bottom .sync-status[data-kind="error"] {color:#ffd0d0;background:rgba(98,31,35,.92);}
 
 /* Native iOS-like history sheet; opening it must never trigger another sync. */
-.sync-log-dialog{box-sizing:border-box;width:min(560px,calc(100vw - 28px));max-width:560px;max-height:min(76dvh,700px);max-height:min(76vh,700px);margin:auto;border:1px solid rgba(100,110,130,.15);border-radius:25px;padding:0;overflow:hidden;background:#f8f9fc;color:#202632;font:inherit;box-shadow:0 24px 90px rgba(15,26,49,.20);}
+.sync-log-dialog{box-sizing:border-box;width:min(560px,calc(100vw - 28px));max-width:560px;max-height:min(76vh,700px);max-height:min(76dvh,700px);margin:auto;border:1px solid rgba(100,110,130,.15);border-radius:25px;padding:0;overflow:hidden;background:#f8f9fc;color:#202632;font:inherit;box-shadow:0 24px 90px rgba(15,26,49,.20);}
 .sync-log-dialog::backdrop{background:rgba(10,16,34,.42);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
 .sync-log-dialog[open]{display:flex;flex-direction:column}
 .sync-log-header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:23px 20px 12px}
@@ -4079,7 +4079,7 @@ body[data-home-tab="calendar"] .home-bottom .sync-status[data-kind="error"] {col
 .sync-log-header button{flex:none;background:none;border:0;padding:8px 0;color:#007aff;font:inherit;font-weight:650;font-size:14px}
 .sync-log-intro{padding:0 20px;margin:0 0 11px;color:#646d7a;font-size:13px;line-height:1.5}
 .sync-log-summary{margin:0 20px 12px;padding:10px 13px;border-radius:12px;background:#e9eef7;color:#334861;font-size:13px;font-weight:650}
-.sync-log-entries{list-style:none;margin:0;padding:0 20px 12px;overflow-y:auto;overscroll-behavior:contain;min-height:0;display:grid;align-content:start;gap:10px}
+.sync-log-entries{list-style:none;margin:0;padding:0 20px 12px;overflow:visible;min-height:auto;display:grid;align-content:start;gap:10px}
 .sync-log-item{min-width:0;padding:12px 13px;border:1px solid #e2e6ef;border-radius:14px;background:#fff}
 .sync-log-item-heading{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px;font-size:13px}
 .sync-log-item-heading strong{color:#a43f41}
@@ -4095,10 +4095,10 @@ body[data-home-tab="calendar"] .home-bottom .sync-status[data-kind="error"] {col
 .sync-log-item-attempt{margin:5px 0 0;color:#666f7a;font-size:11px}
 .sync-log-item-detail{margin:7px 0 0;overflow-wrap:anywhere;white-space:pre-wrap;color:#333f50;font-size:12px;line-height:1.45}
 .sync-log-note{flex-shrink:0;padding:12px 20px max(16px,env(safe-area-inset-bottom));margin:0;border-top:1px solid #e4e7ef;color:#737d89;font-size:11px;line-height:1.5;background:#f8f9fc}
-@media(max-width:520px){.sync-log-dialog{width:100%;max-width:100%;max-height:min(80dvh,760px);max-height:min(80vh,760px);margin:auto 0 0;border-radius:24px 24px 0 0}.sync-log-dialog[open]{margin:auto 0 0}}
+@media(max-width:520px){.sync-log-dialog{width:100%;max-width:100%;max-height:min(80vh,760px);max-height:min(80dvh,760px);margin:auto 0 0;border-radius:24px 24px 0 0}.sync-log-dialog[open]{margin:auto 0 0}}
 
 /* Conflitos reais entre cópia local e roteiro online: revisão explícita, nunca descarte silencioso. */
-.sync-conflict-section{margin:0 20px 14px;padding:14px;border-radius:16px;border:1px solid #f1d27e;background:#fffbea;overflow:auto;max-height:34vh;flex-shrink:1}
+.sync-conflict-section{margin:0 20px 14px;padding:14px;border-radius:16px;border:1px solid #f1d27e;background:#fffbea;overflow:visible;max-height:none;flex-shrink:0}
 .sync-conflict-section[hidden]{display:none}
 .sync-conflict-section h3{font-size:14px;color:#26374c;font-weight:750;margin:0 0 6px}
 .sync-conflict-section > p{color:#586273;font-size:12px;line-height:1.48;margin:0 0 9px}
@@ -4113,7 +4113,7 @@ body[data-home-tab="calendar"] .home-bottom .sync-status[data-kind="error"] {col
 .sync-conflict-section .sync-conflict-explanation{font-size:11px;margin:10px 0 0;color:#71798b}
 .sync-conflict-feedback{font-size:12px;color:#39465b;white-space:pre-wrap}
 .home-bottom .sync-status[data-kind="pending"]::before{background-color:#f1b500}
-@media(max-width:400px){.sync-conflict-actions{grid-template-columns:1fr}.sync-conflict-section{max-height:29vh}}
+@media(max-width:400px){.sync-conflict-actions{grid-template-columns:1fr}}
 
 /* Resumo e cartões usam a MESMA semântica cromática. */
 .sync-log-summary[data-status="pending"]{background:#fff0bd;color:#26374c;border-left:4px solid #f2b400}
@@ -4140,7 +4140,7 @@ body[data-home-tab="calendar"] .home-bottom .sync-status[data-kind="error"] {col
 
 /* Single scroll region keeps all conflict actions reachable on mobile. */
 .sync-log-dialog .sync-log-header{flex:0 0 auto}
-.sync-log-body{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding-bottom:8px}
+.sync-log-body{flex:1 1 0;min-height:0;overflow-x:hidden;overflow-y:auto;overscroll-behavior:none;-webkit-overflow-scrolling:touch;touch-action:pan-y;padding-bottom:8px}
 .sync-log-body .sync-conflict-section{max-height:none;overflow:visible;flex-shrink:0}
 .sync-log-body .sync-log-entries{overflow:visible;min-height:auto}
 .sync-log-body .sync-conflict-actions{grid-template-columns:1fr;gap:8px;margin-bottom:10px}
@@ -4152,3 +4152,11 @@ body[data-home-tab="calendar"] .home-bottom .sync-status[data-kind="error"] {col
 .sync-item-actions button:disabled{opacity:.55;cursor:not-allowed}
 .sync-log-review{display:block;margin-top:10px;min-height:44px;width:100%;cursor:pointer}
 .sync-conflict-section #sync_conflict_feedback:not(:empty){margin-top:10px;padding:9px;background:#fff;border-radius:8px}
+
+/* Modal scroll isolation: preserve the document position on iOS/WebKit. */
+html.sync-log-scroll-locked{overflow:hidden!important;overscroll-behavior:none}
+html.sync-log-scroll-locked body{position:fixed!important;top:var(--sync-log-scroll-top,0px)!important;left:var(--sync-log-scroll-left,0px)!important;right:0;width:100%;overflow:hidden!important;overscroll-behavior:none}
+#sync_log_dialog[open]{height:min(76vh,700px);height:min(76dvh,700px);overflow:hidden;overscroll-behavior:none}
+@media(max-width:520px){#sync_log_dialog[open]{height:min(88vh,840px);height:min(88dvh,840px);max-height:min(88vh,840px);max-height:min(88dvh,840px)}}
+#sync_log_dialog .sync-conflict-section,#sync_log_dialog .sync-log-entries,#sync_log_dialog .sync-recovery-section{overflow:visible;max-height:none;min-height:0}
+#sync_log_dialog .sync-log-note,#sync_log_dialog .sync-log-header{flex:0 0 auto}

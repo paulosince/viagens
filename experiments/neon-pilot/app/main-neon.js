@@ -1137,10 +1137,78 @@ function renderSyncLog() {
   }
 }
 
+
+function createSyncLogScrollLock(dialog, doc = document, win = window) {
+  let saved = null, previousY = null;
+  const root = doc.documentElement;
+  const scroller = () => dialog.querySelector('.sync-log-body');
+  // Defensive compatibility if a cached HTML shell predates the wrapper.
+  function ensureBody() {
+    if (scroller()) return;
+    const body = doc.createElement('div'); body.className = 'sync-log-body';
+    const header = dialog.querySelector('.sync-log-header'), footer = dialog.querySelector('.sync-log-note');
+    if (!header || !footer) return;
+    for (let node = header.nextElementSibling; node && node !== footer;) {
+      const next = node.nextElementSibling; body.append(node); node = next;
+    }
+    dialog.insertBefore(body,footer);
+  }
+  function start(event) {
+    previousY = event.touches?.length === 1 ? event.touches[0].clientY : null;
+  }
+  function move(event) {
+    if (!saved || !dialog.open || event.touches?.length !== 1) return;
+    const body = scroller(), y = event.touches[0].clientY;
+    const dy = previousY === null ? 0 : y - previousY; previousY = y;
+    const outside = !body || !body.contains(event.target);
+    const atTop = body && body.scrollTop <= 0 && dy > 0;
+    const atBottom = body && body.scrollTop + body.clientHeight >= body.scrollHeight - 1 && dy < 0;
+    const noScroll = body && body.scrollHeight <= body.clientHeight + 1;
+    if ((outside || atTop || atBottom || noScroll) && event.cancelable) event.preventDefault();
+  }
+  function wheel(event) {
+    if (!saved || !dialog.open) return;
+    const body = scroller();
+    if ((!body || !body.contains(event.target) || body.scrollHeight <= body.clientHeight + 1 ||
+      (event.deltaY < 0 && body.scrollTop <= 0) ||
+      (event.deltaY > 0 && body.scrollTop + body.clientHeight >= body.scrollHeight - 1)) && event.cancelable) event.preventDefault();
+  }
+  function lock() {
+    if (saved) return;
+    ensureBody();
+    saved = {x:win.scrollX || 0,y:win.scrollY || 0};
+    root.style.setProperty('--sync-log-scroll-top', -saved.y + 'px');
+    root.style.setProperty('--sync-log-scroll-left', -saved.x + 'px');
+    root.classList.add('sync-log-scroll-locked');
+    doc.addEventListener('touchstart',start,{capture:true,passive:true});
+    doc.addEventListener('touchmove',move,{capture:true,passive:false});
+    doc.addEventListener('wheel',wheel,{capture:true,passive:false});
+  }
+  function unlock() {
+    if (!saved) return;
+    const {x,y}=saved; saved=null; previousY=null;
+    doc.removeEventListener('touchstart',start,true);
+    doc.removeEventListener('touchmove',move,true);
+    doc.removeEventListener('wheel',wheel,true);
+    root.classList.remove('sync-log-scroll-locked');
+    root.style.removeProperty('--sync-log-scroll-top');
+    root.style.removeProperty('--sync-log-scroll-left');
+    win.scrollTo(x,y);
+  }
+  dialog.addEventListener('close',unlock);
+  return {lock,unlock};
+}
+
+let syncLogScrollLock = null;
 async function openSyncLog() {
   if (!dom.syncLogDialog || !state.user?.id) return;
   const userId = state.user.id;
-  if (!dom.syncLogDialog.open) dom.syncLogDialog.showModal();
+  if (!dom.syncLogDialog.open) {
+    syncLogScrollLock ||= createSyncLogScrollLock(dom.syncLogDialog);
+    syncLogScrollLock.lock();
+    try { dom.syncLogDialog.showModal(); }
+    catch (error) { syncLogScrollLock.unlock(); throw error; }
+  }
   dom.syncLogSummary.textContent = 'Carregando histórico salvo…';
   dom.syncLogEntries.replaceChildren();
   const [logged, conflicts, recovery] = await Promise.all([
