@@ -31,11 +31,27 @@ const fs=require('fs'), assert=require('assert/strict');
       Object.defineProperty(event,'touches',{value:type==='touchend'?[]:[{clientX:x,clientY:y}]});home.dispatchEvent(event);
     }
   },{dx,dy});
+  const initialBar=await page.locator('.home-tabs').boundingBox();
   await pull(40,45); assert.equal(await page.locator('#home_search_reveal').getAttribute('aria-hidden'),'true');
   await pull(0,15); assert.equal(await page.locator('#home_search_reveal').getAttribute('aria-hidden'),'true');
   await pull(0,40); assert.equal(await page.locator('#home_search_reveal').getAttribute('aria-hidden'),'false');
   assert.equal(await page.locator('#user_home .home-bottom').count(),0,'Fixed tab bar must not be in animated #user_home');
-  const bar=await page.locator('.home-tabs').boundingBox();assert.ok(bar.height<=61);assert.ok(844-bar.y-bar.height>=10 && 844-bar.y-bar.height<=35);
+  await page.waitForTimeout(300);
+  const bar=await page.locator('.home-tabs').boundingBox();
+  assert.ok(Math.abs(bar.height-76)<1);assert.ok(844-bar.y-bar.height>=32 && 844-bar.y-bar.height<=35);
+  assert.ok(Math.abs(bar.y-initialBar.y)<1,'Revealing search must not move navigation');
+  await page.evaluate(()=>{
+    const spacer=document.createElement('div');spacer.id='scroll_test_spacer';spacer.style.height='1200px';
+    document.getElementById('user_home').append(spacer);
+    document.getElementById('user_home').scrollTop=220;
+  });
+  await page.waitForTimeout(300);
+  assert.ok(await page.evaluate(()=>document.getElementById('user_home').scrollTop>100));
+  assert.equal(await page.evaluate(()=>window.scrollY),0,'Document must not scroll with Home');
+  const scrolledBar=await page.locator('.home-tabs').boundingBox();
+  assert.ok(Math.abs(scrolledBar.y-initialBar.y)<1,'Scrolling Home must not move navigation');
+  await page.evaluate(()=>{document.getElementById('scroll_test_spacer').remove();document.getElementById('user_home').scrollTop=0;});
+  await pull(0,40);
   await page.locator('#home_search').fill('sao');assert.equal(await page.locator('#trip_list>li').count(),1);
   await page.locator('#home_search').fill('');await page.locator('[data-home-filter="received"]').click();assert.equal(await page.locator('#trip_list>li').count(),1);
   await page.locator('[data-home-filter="all"]').click();

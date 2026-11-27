@@ -47,9 +47,9 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20261127-profileios1" as="style">
-  <link rel="stylesheet" href="style.css?v=20261127-profileios1" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20261127-profileios1"></noscript>
+  <link rel="preload" href="style.css?v=20261127-fixedshell1" as="style">
+  <link rel="stylesheet" href="style.css?v=20261127-fixedshell1" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20261127-fixedshell1"></noscript>
   <link rel="stylesheet" href="src/update-manager.css?v=20261125-admingraph1">
   <script>
     function showViaggioStartupError(detail) {
@@ -71,7 +71,7 @@
     }, 8000);
   </script>
 </head>
-<body data-session="loading" data-active-sheet="none" data-editing="false" data-year-menu="closed" data-trip-page="closed" data-budget-page="closed" data-day-page="closed" data-day-attachments="closed" data-app-ready="false">
+<body data-layout="fixed-shell" data-session="loading" data-active-sheet="none" data-editing="false" data-year-menu="closed" data-trip-page="closed" data-budget-page="closed" data-day-page="closed" data-day-attachments="closed" data-app-ready="false">
   <div id="app_splash" class="app-splash" aria-label="Carregando Viaggio">
     <span class="splash-cloud splash-cloud-one" aria-hidden="true"></span>
     <span class="splash-cloud splash-cloud-two" aria-hidden="true"></span>
@@ -693,7 +693,7 @@
       if (legacyPending > 0) {
         location.replace('./legacy-supabase.html?recover=1');
       } else {
-        await import('./experiments/neon-pilot/app/main-neon.js?v=20261125-admingraph1');
+        await import('./experiments/neon-pilot/app/main-neon.js?v=20261127-fixedshell1');
       }
     } catch (error) {
       console.error('Não foi possível validar o estado local antes da migração Neon', error);

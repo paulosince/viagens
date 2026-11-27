@@ -12,7 +12,7 @@ const rule = selector => {
 
 const root = rule(':root');
 assert(root.includes('--viaggio-tab-bar-height: 76px;'));
-assert(root.includes('--viaggio-tab-bar-bottom: max(11px, calc(env(safe-area-inset-bottom, 0px) - 21px));'));
+assert(root.includes('--viaggio-tab-bar-bottom: max(32px, env(safe-area-max-inset-bottom, 0px), env(safe-area-inset-bottom, 0px));'));
 const trip = rule('.trip-tabs');
 const home = rule('.home-tabs');
 for (const [name, r] of [['trip',trip],['home',home]]) {
@@ -45,4 +45,17 @@ assert(html.includes('id="home_search_reveal"') && css.includes('.home-search-re
 assert(html.includes('class="trip-tabs"') && html.includes('class="home-tabs"'),
   'Both bars exist in app markup');
 
-console.log('PASS: both tab bars fixed at 76px, unified bottom inset, independent of search reveal');
+const main = fs.readFileSync('experiments/neon-pilot/app/main-neon.js', 'utf8');
+assert(html.includes('data-layout="fixed-shell"'));
+const scope = 'body[data-layout="fixed-shell"][data-session="authenticated"]';
+const shell = rule(scope + ' #app');
+assert(shell.includes('position: fixed') && shell.includes('height: 100dvh'));
+const scrollport = rule(scope + ' #user_home');
+assert(scrollport.includes('overflow-y: auto') && scrollport.includes('overscroll-behavior-y: none'));
+const anchor = rule(scope + ' .home-bottom');
+assert(anchor.includes('position: absolute') && anchor.includes('transform: none'));
+assert(main.includes('home.scrollTop <= 1') && main.includes('home.scrollTop > 64'));
+assert(main.includes("home.addEventListener('scroll',"));
+assert(main.includes("document.getElementById('user_home').scrollTo("));
+assert(main.includes("document.getElementById('user_home').addEventListener('scroll', scheduleHomeHeader"));
+console.log('PASS: fixed 76px navigation, independent Home scrollport and stable shell anchor');

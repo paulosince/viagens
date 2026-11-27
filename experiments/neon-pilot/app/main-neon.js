@@ -6928,7 +6928,7 @@ function installHomeSearchGesture() {
   let start = null;
   const available = () => state.homeTab !== 'calendar' && document.body.dataset.session === 'authenticated' && document.body.dataset.tripPage === 'closed' && document.body.dataset.activeSheet === 'none' && !state.editing;
   home.addEventListener('touchstart', event => {
-    start = available() && window.scrollY <= 1 && event.touches.length === 1 && !event.target.closest('button:not(.trip-card-button):not(.home-trip-shortcut),input,nav,.home-filters')
+    start = available() && home.scrollTop <= 1 && event.touches.length === 1 && !event.target.closest('button:not(.trip-card-button):not(.home-trip-shortcut),input,nav,.home-filters')
       ? { x: event.touches[0].clientX, y: event.touches[0].clientY } : null;
   }, { passive: true });
   home.addEventListener('touchmove', event => {
@@ -6943,10 +6943,10 @@ function installHomeSearchGesture() {
   }, { passive: false });
   for (const name of ['touchend', 'touchcancel']) home.addEventListener(name, () => { start = null; }, { passive: true });
   home.addEventListener('wheel', event => {
-    if (available() && window.scrollY <= 1 && event.deltaY < -12) setHomeSearchOpen(true);
+    if (available() && home.scrollTop <= 1 && event.deltaY < -12) setHomeSearchOpen(true);
   }, { passive: true });
-  window.addEventListener('scroll', () => {
-    if (window.scrollY > 64 && !input.value && document.activeElement !== input) setHomeSearchOpen(false);
+  home.addEventListener('scroll', () => {
+    if (home.scrollTop > 64 && !input.value && document.activeElement !== input) setHomeSearchOpen(false);
   }, { passive: true });
   document.getElementById('home_search_access').addEventListener('click', () => { setHomeSearchOpen(true); input.focus(); });
   input.addEventListener('keydown', event => {
@@ -8062,7 +8062,7 @@ function selectHomeTab(tab) {
   document.querySelector('.home-tabs').style.setProperty('--active-index', String(tabs.findIndex(button => button.dataset.homeTab === tab)));
   for (const button of tabs) button.setAttribute('aria-current', String(button.dataset.homeTab === tab));
   syncTripList();
-  window.scrollTo({ top: 0, behavior: 'instant' });
+  document.getElementById('user_home').scrollTo({ top: 0, behavior: 'instant' });
 }
 
 for (const button of document.querySelectorAll('.home-tabs button[data-home-tab]')) {
@@ -10164,7 +10164,7 @@ if (homeHeader) {
     }
   };
   const scheduleHomeHeader = () => { if (!frame) frame = requestAnimationFrame(updateHomeHeader); };
-  window.addEventListener('scroll', scheduleHomeHeader, {passive:true});
+  document.getElementById('user_home').addEventListener('scroll', scheduleHomeHeader, {passive:true});
   window.addEventListener('resize', scheduleHomeHeader, {passive:true});
   new ResizeObserver(scheduleHomeHeader).observe(homeHeader);
   scheduleHomeHeader();
