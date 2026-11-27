@@ -38,7 +38,7 @@ const fs=require('fs'), assert=require('assert/strict');
   assert.equal(await page.locator('#user_home .home-bottom').count(),0,'Fixed tab bar must not be in animated #user_home');
   await page.waitForTimeout(300);
   const bar=await page.locator('.home-tabs').boundingBox();
-  assert.ok(Math.abs(bar.height-76)<1);assert.ok(844-bar.y-bar.height>=32 && 844-bar.y-bar.height<=35);
+  assert.ok(Math.abs(bar.height-76)<1);assert.ok(844-bar.y-bar.height>=24 && 844-bar.y-bar.height<=35);
   assert.ok(Math.abs(bar.y-initialBar.y)<1,'Revealing search must not move navigation');
   await page.evaluate(()=>{
     const spacer=document.createElement('div');spacer.id='scroll_test_spacer';spacer.style.height='1200px';
@@ -64,6 +64,25 @@ const fs=require('fs'), assert=require('assert/strict');
   await page.locator('.home-trip-shortcut').first().click();assert.equal(await page.evaluate(()=>destination),'arquivos');
   await page.locator('.home-tabs button[data-home-tab="budgets"]').click();await page.locator('.home-trip-shortcut').first().click();assert.equal(await page.evaluate(()=>destination),'orcamento');
   await page.locator('.home-tabs button[data-home-tab="calendar"]').click();await page.locator('.home-calendar').waitFor();assert.equal(await page.locator('.home-calendar').count(),1);
+  const calendarGeometry = await page.evaluate(()=>{
+    const shell=document.getElementById('app').getBoundingClientRect();
+    const calendar=document.getElementById('home_tab_content').getBoundingClientRect();
+    const bar=document.querySelector('.home-tabs').getBoundingClientRect();
+    return {shellBottom:shell.bottom,calendarBottom:calendar.bottom,barBottom:bar.bottom};
+  });
+  assert.ok(Math.abs(calendarGeometry.shellBottom-calendarGeometry.calendarBottom)<1,'Calendar must reach shell edge');
+  assert.ok(Math.abs(calendarGeometry.barBottom-(bar.y+bar.height))<1,'Calendar and Home navigation share bottom anchor');
+  await page.evaluate(()=>document.documentElement.style.setProperty('--viaggio-screen-height','904px'));
+  const expanded=await page.evaluate(()=>{
+    const shell=document.getElementById('app').getBoundingClientRect();
+    const calendar=document.getElementById('home_tab_content').getBoundingClientRect();
+    const bar=document.querySelector('.home-tabs').getBoundingClientRect();
+    return {shellBottom:shell.bottom,calendarBottom:calendar.bottom,barBottom:bar.bottom};
+  });
+  assert.ok(Math.abs(expanded.shellBottom-904)<1);
+  assert.ok(Math.abs(expanded.calendarBottom-expanded.shellBottom)<1);
+  assert.ok(Math.abs(expanded.barBottom-calendarGeometry.barBottom-60)<1);
+  await page.evaluate(()=>document.documentElement.style.removeProperty('--viaggio-screen-height'));
   assert.equal(await page.locator('#new_trip_button').isVisible(),false);
   assert.equal(await page.locator('.home-discovery').isVisible(),false);
   assert.match(await page.locator('.home-calendar-heading strong').first().textContent(),/novembro.*2026/);

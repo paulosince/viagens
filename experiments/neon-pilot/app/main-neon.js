@@ -6914,6 +6914,34 @@ function compareTripsForHome(a, b, now = new Date()) {
   return String(a.start_date || '').localeCompare(String(b.start_date || ''));
 }
 
+// Installed iPhone PWAs can report a shortened dynamic viewport after startup or gestures.
+// Use the full display's CSS-pixel height only in standalone mode on a full-width iPhone.
+// The desktop/browser and split-screen layouts keep their normal layout viewport.
+function standaloneIPhoneHeight({ standalone, iphone, screenWidth, screenHeight, layoutWidth }) {
+  if (!standalone || !iphone || !Number.isFinite(layoutWidth) || layoutWidth <= 0 ||
+      !Number.isFinite(screenWidth) || !Number.isFinite(screenHeight) || screenWidth <= 0 || screenHeight <= 0) return null;
+  if (Math.abs(screenWidth - layoutWidth) <= 3) return screenHeight;
+  if (Math.abs(screenHeight - layoutWidth) <= 3) return screenWidth;
+  return null;
+}
+
+function updateAppScreenHeight() {
+  const height = standaloneIPhoneHeight({
+    standalone: navigator.standalone === true || matchMedia('(display-mode: standalone)').matches,
+    iphone: /iPhone|iPod/.test(navigator.userAgent),
+    screenWidth: window.screen.width,
+    screenHeight: window.screen.height,
+    layoutWidth: document.documentElement.clientWidth
+  });
+  const root = document.documentElement;
+  if (height === null) root.style.removeProperty('--viaggio-screen-height');
+  else root.style.setProperty('--viaggio-screen-height', height + 'px');
+}
+updateAppScreenHeight();
+window.addEventListener('resize', updateAppScreenHeight, { passive: true });
+window.addEventListener('pageshow', updateAppScreenHeight);
+window.addEventListener('orientationchange', () => requestAnimationFrame(updateAppScreenHeight), { passive: true });
+
 function setHomeSearchOpen(open) {
   const region = document.getElementById('home_search_reveal');
   region.dataset.open = String(open);

@@ -12,7 +12,7 @@ const rule = selector => {
 
 const root = rule(':root');
 assert(root.includes('--viaggio-tab-bar-height: 76px;'));
-assert(root.includes('--viaggio-tab-bar-bottom: max(32px, env(safe-area-max-inset-bottom, 0px), env(safe-area-inset-bottom, 0px));'));
+assert(root.includes('--viaggio-tab-bar-bottom: max(24px, env(safe-area-max-inset-bottom, 0px), env(safe-area-inset-bottom, 0px));'));
 const trip = rule('.trip-tabs');
 const home = rule('.home-tabs');
 for (const [name, r] of [['trip',trip],['home',home]]) {
@@ -49,7 +49,7 @@ const main = fs.readFileSync('experiments/neon-pilot/app/main-neon.js', 'utf8');
 assert(html.includes('data-layout="fixed-shell"'));
 const scope = 'body[data-layout="fixed-shell"][data-session="authenticated"]';
 const shell = rule(scope + ' #app');
-assert(shell.includes('position: fixed') && shell.includes('height: 100dvh'));
+assert(shell.includes('position: fixed') && shell.includes('height: var(--viaggio-screen-height, 100%)') && !shell.includes('100dvh'));
 const scrollport = rule(scope + ' #user_home');
 assert(scrollport.includes('overflow-y: auto') && scrollport.includes('overscroll-behavior-y: none'));
 const anchor = rule(scope + ' .home-bottom');
@@ -58,4 +58,17 @@ assert(main.includes('home.scrollTop <= 1') && main.includes('home.scrollTop > 6
 assert(main.includes("home.addEventListener('scroll',"));
 assert(main.includes("document.getElementById('user_home').scrollTo("));
 assert(main.includes("document.getElementById('user_home').addEventListener('scroll', scheduleHomeHeader"));
-console.log('PASS: fixed 76px navigation, independent Home scrollport and stable shell anchor');
+const calendar = rule(scope + '[data-home-tab="calendar"] #home_tab_content');
+assert(calendar.includes('position: absolute') && calendar.includes('height: 100%') && !calendar.includes('100dvh'));
+assert(rule(scope + ' .calendar-trip').includes('min-height: 100%'));
+assert(rule(scope + ' .trip-tabs').includes('position: absolute'));
+const heightSource = main.slice(main.indexOf('function standaloneIPhoneHeight('), main.indexOf('function updateAppScreenHeight('));
+const height = new Function(heightSource + '; return standaloneIPhoneHeight;')();
+const iPhone = {standalone:true,iphone:true,screenWidth:430,screenHeight:932,layoutWidth:430};
+assert.equal(height(iPhone),932,'Full physical display in portrait');
+assert.equal(height({...iPhone,layoutWidth:932}),430,'Full physical display after rotation');
+assert.equal(height({...iPhone,standalone:false}),null,'Safari browser is not extended');
+assert.equal(height({...iPhone,iphone:false}),null,'iPad or desktop is not extended');
+assert.equal(height({...iPhone,layoutWidth:320}),null,'Do not extend a non-full-width view');
+assert.equal(height({...iPhone,screenHeight:0}),null,'Invalid screen geometry is ignored');
+console.log('PASS: shared edge-to-edge shell, fixed navigation, standalone iPhone sizing and isolated scrollport');
