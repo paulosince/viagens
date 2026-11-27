@@ -47,9 +47,9 @@
     .splash-cloud-two { top: 58%; left: -90px; width: 230px; }
     .splash-cloud-three { right: 12%; bottom: 12%; width: 145px; }
   </style>
-  <link rel="preload" href="style.css?v=20261125-admingraph1" as="style">
-  <link rel="stylesheet" href="style.css?v=20261125-admingraph1" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
-  <noscript><link rel="stylesheet" href="style.css?v=20261125-admingraph1"></noscript>
+  <link rel="preload" href="style.css?v=20261127-profileios1" as="style">
+  <link rel="stylesheet" href="style.css?v=20261127-profileios1" media="print" onload="this.media='all';window.__appStylesReady=true;document.dispatchEvent(new Event('appstylesready'))">
+  <noscript><link rel="stylesheet" href="style.css?v=20261127-profileios1"></noscript>
   <link rel="stylesheet" href="src/update-manager.css?v=20261125-admingraph1">
   <script>
     function showViaggioStartupError(detail) {
@@ -226,7 +226,24 @@
             <h2 id="profile-title">Perfil</h2>
             <button id="save_profile" class="sheet-control confirm" type="submit" aria-label="Salvar perfil" aria-busy="false" data-loading="false"><span class="confirm-check">✓</span><span class="confirm-spinner" aria-hidden="true"></span></button>
           </header>
-<section class="form-section profile-storage"><h3>Armazenamento</h3>            <div class="home-usage-container">
+<p id="profile_message" class="profile-save-message" role="status"></p>
+          <section class="profile-photo-section">
+            <div class="profile-photo-editor"><img id="profile_editor_image" src="assets/avatar-placeholder.svg" alt=""><label class="profile-photo-action" for="profile-photo">Alterar foto<input id="profile-photo" type="file" accept="image/*" aria-label="Alterar foto do perfil"></label></div>
+            <strong id="profile_display_name"></strong><span id="profile_email"></span>
+          </section>
+          <section class="form-section"><h3>Passageiro</h3><div class="form-group">
+            <div class="form-row"><label for="profile-name">Nome</label><input id="profile-name" name="name" required autocomplete="name"></div>
+            <div class="form-row"><label for="birth-date">Nascimento</label><input id="birth-date" name="birth_date" type="date"></div>
+            <div class="form-row static-row"><span>Idade</span><output id="profile_age">—</output></div>
+          </div><p class="form-note">A idade é calculada automaticamente pela data de nascimento.</p></section>
+          <section class="form-section"><h3>Passageiros salvos</h3>
+            <div class="form-group saved-passenger-manager">
+              <div id="profile_saved_passenger_list" class="profile-saved-passenger-list"></div>
+              <button id="add_profile_saved_passenger" class="add-trip-passenger profile-add-saved-passenger" type="button"><span>＋</span>Adicionar passageiro</button>
+            </div>
+            <p class="form-note">Família e pessoas frequentes ficam disponíveis em todas as viagens. Passageiros ocasionais são adicionados somente na viagem.</p>
+          </section>
+          <section class="form-section profile-storage"><h3>Armazenamento</h3>            <div class="home-usage-container">
               <button id="home_usage_button" class="home-usage-summary" type="button" aria-expanded="false" aria-controls="home_usage_details" aria-label="Ver distribuição do armazenamento da conta">
                 <span class="home-usage-label">Armazenamento</span>
                 <span class="home-usage-summary-values">
@@ -254,23 +271,6 @@
               </section>
             </div>
 </section><section class="form-section"><button id="edit_trips_button" class="trip-edit-text" type="button">Editar viagens</button><button id="home_chatgpt_button" class="glass-button chatgpt-header-button" hidden type="button"><img src="assets/chatgpt-mark.svg" alt=""><span>ChatGPT</span></button></section>
-          <p id="profile_message" class="profile-save-message" role="status"></p>
-          <section class="profile-photo-section">
-            <label class="profile-photo-editor" for="profile-photo"><img id="profile_editor_image" src="assets/avatar-placeholder.svg" alt=""><span>Alterar foto</span><input id="profile-photo" type="file" accept="image/*"></label>
-            <strong id="profile_display_name"></strong><span id="profile_email"></span>
-          </section>
-          <section class="form-section"><h3>Passageiro</h3><div class="form-group">
-            <div class="form-row"><label for="profile-name">Nome</label><input id="profile-name" name="name" required autocomplete="name"></div>
-            <div class="form-row"><label for="birth-date">Nascimento</label><input id="birth-date" name="birth_date" type="date"></div>
-            <div class="form-row static-row"><span>Idade</span><output id="profile_age">—</output></div>
-          </div><p class="form-note">A idade é calculada automaticamente pela data de nascimento.</p></section>
-          <section class="form-section"><h3>Passageiros salvos</h3>
-            <div class="form-group saved-passenger-manager">
-              <div id="profile_saved_passenger_list" class="profile-saved-passenger-list"></div>
-              <button id="add_profile_saved_passenger" class="add-trip-passenger profile-add-saved-passenger" type="button"><span>＋</span>Adicionar passageiro</button>
-            </div>
-            <p class="form-note">Família e pessoas frequentes ficam disponíveis em todas as viagens. Passageiros ocasionais são adicionados somente na viagem.</p>
-          </section>
           <section class="form-section legacy-chatgpt-profile" hidden><h3>Integrações</h3>
             <div class="form-group account-actions">
               <button id="chatgpt_button" class="account-row account-row-detail integration-row" type="button">
